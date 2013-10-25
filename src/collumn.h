@@ -214,7 +214,22 @@ namespace collums{
 	public:	
 		typedef typename stored::IntTypeStored<_Rid> _StoredRowId;
 		stored::abstracted_storage storage;
-		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage> _ColMap;
+		
+		struct int_terpolator{
+		
+			/// function assumes a list of monotonously ascending integer values
+			inline bool can(const _StoredRowId& first, const _StoredRowId& last, int size) const {
+
+				return size > 0;
+			}
+
+			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const {
+				if(last.get_value()>first.get_value())
+					return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
+				return 0;
+			}
+		};	
+		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, int_terpolator> _ColMap;
 	private:
 		typedef std::vector<_Stored> _Cache;
 
@@ -224,6 +239,12 @@ namespace collums{
 			bool loaded;
 			_Cache data;
 			Poco::Mutex lock;
+			void unload(){
+				nst::synchronized _l(lock);
+				loaded = false;
+				data.clear();
+				available = false;
+			}
 		};
 
 		class ColLoader : public Poco::Notification{
@@ -400,7 +421,7 @@ namespace collums{
 			cache_r = NULL;
 			cache_size = 0;
 			next_id = (_Rid)col.size();
-			check_cache();
+			//check_cache();
 
 			
 		}
@@ -446,7 +467,7 @@ namespace collums{
 					{
 						return ival.data();
 					}
-				}
+				}/**/
 				
 				ival = col.find(row);
 				
@@ -520,7 +541,16 @@ namespace collums{
 		ImplIterator<_ColMap> begin(){
 			return ImplIterator<_ColMap> (col, col.begin());
 		}
-		
+		void erase(_Rid row){
+			col.erase(row);
+			rows = std::min<_Rid>(0, --rows);
+			next_id = rows;
+			if(has_cache()){
+				if(get_cache().data.size() > row){
+					//get_cache().data.erase(row);
+				}
+			}
+		}
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
 			next_id = rows;

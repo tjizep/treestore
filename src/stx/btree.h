@@ -128,11 +128,53 @@ extern ptrdiff_t btree_totl_used ;
 extern ptrdiff_t btree_totl_instances ;
 extern void add_btree_totl_used(ptrdiff_t added);
 extern void remove_btree_totl_used(ptrdiff_t added);
+
+
 namespace stx
 {
 
+	template<typename _KeyType>
+	struct interpolator{
+		
+		inline bool can(const _KeyType&, const _KeyType&, int ) const {
+			return false;
+		}
 
-	struct default_persist_traits
+		inline int interpolate(const _KeyType&, const _KeyType&, const _KeyType&, int) const {
+			return 0;
+		}
+
+	};
+
+	template<>
+	struct interpolator<int>{
+		
+		/// function assumes a list of monotonously ascending integer values
+		inline bool can(const int& first, const int& last, int size) const {
+
+			return false;
+		}
+
+		inline int interpolate(int k, int first , int last, int size) const {
+			return 0;
+		}
+	};	
+	template<>
+	struct interpolator<unsigned int>{
+		
+		/// function assumes a list of monotonously ascending integer values
+		inline bool can(const int& first, const int& last, int size) const {
+
+			return false;
+		}
+
+		inline int interpolate(unsigned int k, unsigned int first , unsigned int last, int size) const {
+			return 0;
+		}
+	};	
+
+
+	struct def_p_traits /// persist traits
 	{
 		typedef storage::stream_address stream_address;
 		typedef unsigned long relative_address;
@@ -167,7 +209,7 @@ namespace stx
 		/// printable.
 		static const bool   debug = false;
 
-		typedef default_persist_traits persist_traits;
+		typedef def_p_traits persist_traits;
 
 		typedef _Key key_proxy;
 
@@ -188,7 +230,7 @@ namespace stx
 	/** Generates default traits for a B+ tree used as a map. It estimates surface and
 	* interior node sizes by assuming a cache line size of btree_traits::bytes_per_page bytes. */
 	template <typename _Key, typename _Data, typename _PersistTraits >
-	struct btree_default_map_traits
+	struct bt_def_map_t /// default map traits
 	{
 
 		/// If true, the tree will self verify it's invariants after each insert()
@@ -266,7 +308,8 @@ namespace stx
 	template <typename _Key, typename _Data, typename _Storage,
 		typename _Value = std::pair<_Key, _Data>,
 		typename _Compare = std::less<_Key>,
-		typename _Traits = btree_default_map_traits<_Key, _Data, default_persist_traits>,
+		typename _Iterpolator = stx::interpolator<_Key> ,
+		typename _Traits = bt_def_map_t<_Key, _Data, default_persist_traits>,
 		bool _Duplicates = false,
 		typename _Alloc = std::allocator<_Value> >
 	class btree
@@ -294,9 +337,12 @@ namespace stx
 
 		/// Fourth template parameter: Key comparison function object
 		/// NOTE: this comparator is on the 'default type' of the proxy
-		typedef _Compare                   key_compare;
+		typedef _Compare					key_compare;
 
-		/// Sixth template parameter: Allow duplicate keys in the B+ tree. Used to
+		/// Fourth template parameter: interpolator if applicable
+		typedef _Iterpolator				key_interpolator;
+
+		/// Fifth template parameter: Allow duplicate keys in the B+ tree. Used to
 		/// implement multiset and multimap.
 		static const bool                   allow_duplicates = _Duplicates;
 
@@ -317,7 +363,7 @@ namespace stx
 
 		/// Typedef of our own type
 		typedef btree<key_type, data_type,  storage_type, value_type, key_compare,
-			traits, allow_duplicates, allocator_type> btree_self;
+			key_interpolator, traits, allow_duplicates, allocator_type> btree_self;
 
 		/// Size type used to count keys
 		typedef size_t                              size_type;
@@ -975,23 +1021,50 @@ namespace stx
 			/// persisted reference type
 
 			typedef pointer_proxy<node> ptr;
+			
 			inline bool key_lessequal(key_compare key_less, const key_type &a, const key_type& b) const
 			{
 				return !key_less(b, a);
 			}
-			template<typename key_compare >
-			inline int find_lower(key_compare key_less, const key_type* keys, const key_type& key, bool do_llb = true) const {			
+			
+			inline bool key_equal(key_compare key_less, const key_type &a, const key_type& b) const
+			{
+				return !key_less(a, b) && !key_less(b, a);
+			}
+			template<typename key_compare, typename key_interpolator >
+			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key, bool do_llb = true) const {			
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
-				register int l = 0, ll=llb, h = o,llo = std::min<int>(o,llb+3);
-				if(do_llb){
+
+				register unsigned int l = 0, ll=llb, hh = 0, h = o;
+				
+				
+				if(interp.can(keys[0],keys[o-1],o)){
+					ll = interp.interpolate(key, keys[0], keys[o-1], o);
+					if(ll >0) --ll;
+					if(ll < h && key_less(keys[ll],key)){
+						++ll;
+						if(ll < h && key_less(keys[ll],key)){
+							++ll;
+							if(ll < h && key_less(keys[ll],key)){
+								++ll;
+								if(ll < h && key_less(keys[ll],key)){
+								}else return ll;
+							}else return ll;
+						}else return ll;
+					}
 					
+					
+					
+				}else if(do_llb){
+					unsigned int llo = std::min<unsigned int>(o,llb+3);
 					while (ll < llo && key_less(keys[ll],key)) ++ll;
 					if(ll > llb && ll < llo){
 						llb = ll;
 						return ll;
 					}
 				}
+
 				while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //				
 					int m = (l + h) >> 1;
 					if (key_lessequal(key_less, key, keys[m])) {
@@ -1002,6 +1075,7 @@ namespace stx
 				}							
 				while (l < h && key_less(keys[l],key)) ++l;
 				llb = l;
+				
 				return l;
 			}
 		};
@@ -1049,10 +1123,10 @@ namespace stx
 				return (node::get_occupants() < mininteriorslots);
 			}
 
-			template<typename key_compare >
-			inline int find_lower(tree_stats& s, key_compare key_less, const key_type& key) const
+			template<typename key_compare,typename key_interpolator >
+			inline int find_lower(tree_stats& s, key_compare key_less, key_interpolator interp, const key_type& key) const
 			{
-				return node::find_lower(key_less, keys, key);
+				return node::find_lower(key_less, interp, keys, key);
 
 			}
 			/// decodes a page from given storage and buffer and puts it in slots
@@ -1187,12 +1261,12 @@ namespace stx
 				return (node::get_occupants() < minsurfaces);
 			}
 
-			template< typename key_compare >
-			inline int find_lower(tree_stats& stats, key_compare key_less, const key_type& key) const
+			template< typename key_compare, typename key_interpolator >
+			inline int find_lower(tree_stats& stats, key_compare key_less, key_interpolator interp, const key_type& key) const
 			{
 				this->sort(stats, key_less);
 				
-				return node::find_lower(key_less, keys, key, !shared);//a_refs < 4
+				return node::find_lower(key_less, interp, keys, key, !shared);//a_refs < 4
 
 			}
 
@@ -1716,7 +1790,7 @@ namespace stx
 
 			/// Also friendly to the base btree class, because erase_iter() needs
 			/// to read the currnode and current_slot values directly.
-			friend class btree<key_type, data_type, storage_type, value_type, key_compare, traits, allow_duplicates>;
+			friend class btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, allow_duplicates>;
 
 			/// Evil! A temporary value_type to STL-correctly deliver operator* and
 			/// operator->
@@ -2679,6 +2753,7 @@ namespace stx
 		/// this < relation.
 		key_compare key_less;
 
+		key_interpolator key_terp;
 		/// Memory allocator.
 		allocator_type allocator;
 
@@ -2810,7 +2885,7 @@ namespace stx
 			{ }
 
 			/// Friendly to the btree class so it may call the constructor
-			friend class btree<key_type, data_type, storage_type, value_type, key_compare, traits, allow_duplicates>;
+			friend class btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, allow_duplicates>;
 
 		public:
 			/// Function call "less"-operator resulting in true if x < y.
@@ -3151,12 +3226,12 @@ namespace stx
 				save(n,w);
 				nodes_loaded.erase(w);
 				surface_node *ln = n;
-				//typename surface_node::alloc_type a(surface_node_allocator());
-				static mt_free liberator(surface_node_allocator());
+				typename surface_node::alloc_type a(surface_node_allocator());
+				//static mt_free liberator(surface_node_allocator());
 				surface_node * removed = ln;
-				liberator.liberate(removed);
-				//a.destroy(removed);
-				//a.deallocate(removed, 1);				
+				//liberator.liberate(removed);
+				a.destroy(removed);
+				a.deallocate(removed, 1);				
 				change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
 				stats.leaves--;
 			}
@@ -3476,12 +3551,12 @@ namespace stx
 		
 		inline int find_lower(const surface_node* n, const key_type& key) const
 		{			
-			return n->find_lower<key_compare>(((btree&)(*this)).stats, key_less, key);
+			return n->find_lower<key_compare,key_interpolator>(((btree&)(*this)).stats, key_less, key_terp, key);
 		}
 		template <typename node_ptr_type>
 		inline int find_lower(const node_ptr_type n, const key_type& key) const
 		{			
-			return n->find_lower<key_compare>(((btree&)(*this)).stats, key_less, key);
+			return n->find_lower<key_compare,key_interpolator>(((btree&)(*this)).stats, key_less, key_terp, key);
 			
 #ifdef _BT_CHECK
 			BTREE_PRINT("btree::find_lower: on " << n << " key " << key << " -> (" << lo << ") " << hi << ", ");
@@ -4058,7 +4133,7 @@ namespace stx
 				key_type newkey = key_type();
 				typename node::ptr newchild ;
 
-				int at = interior->find_lower(((btree&)(*this)).stats, key_less, key);
+				int at = interior->find_lower(((btree&)(*this)).stats, key_less, key_terp, key);
 
 				BTREE_PRINT("btree::insert_descend into " << interior->childid[at] << std::endl);
 
@@ -4163,7 +4238,7 @@ namespace stx
 					
 				}else{
 					
-					int at = surface->find_lower(stats, key_less, key);
+					int at = surface->find_lower(stats, key_less, key_terp, key);
 
 					if (!allow_duplicates && at < surface->get_occupants() && key_equal(key, surface->keys[at]))
 					{

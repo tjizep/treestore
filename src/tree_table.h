@@ -208,6 +208,7 @@ namespace tree_stored{
 		}
 		virtual abstract_my_iter * create_iterator(_Rid rows) = 0;
 		virtual void add_row(collums::_Rid row, Field * f) = 0;
+		virtual void erase_row(collums::_Rid row) = 0;
 		virtual NS_STORAGE::u32 field_size() const = 0;
 		virtual _Rid stored_rows() const = 0;
 		virtual void initialize(bool by_tree) = 0;
@@ -247,6 +248,10 @@ namespace tree_stored{
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
 			col.add(row, temp);
+		}
+
+		virtual void erase_row(collums::_Rid row){			
+			col.erase(row);
 		}
 		
 		virtual void initialize(bool by_tree){
@@ -949,7 +954,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				rollback();
+				//rollback();
 			}
 		}
 		void write(TABLE* table){
@@ -980,6 +985,21 @@ namespace tree_stored{
 				//reduce_col_use();
 				//reduce_use();
 			}
+		}
+		void erase(_Rid rid, TABLE* table){
+			if(!changed)
+			{
+				//printf("table not locked for writing\n");
+				return;
+			}
+			erase_row_index(rid);
+			TABLE_SHARE *share= table->s;			
+			for (Field **field=table->field ; *field ; field++){	
+				if(!(*field)->is_null() && cols[(*field)->field_index]){
+					cols[(*field)->field_index]->erase_row(rid);
+				}
+			}			
+			
 		}
 		void write(_Rid rid, TABLE* table){
 			if(!changed)

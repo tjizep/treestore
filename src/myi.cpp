@@ -81,7 +81,10 @@ void print_read_lookups(){
 #include "tree_index.h"
 #include "tree_table.h"
 typedef std::map<std::string, _FileNames > _Extensions;
-_Extensions save_extensions; // because the handlerton asks for extensions when the table defs are already destroyed w.t.f.
+
+// because the handlerton asks for extensions when the table defs are already destroyed w.t.f.
+_Extensions save_extensions; 
+
 namespace tree_stored{	
 	
 	typedef std::map<std::string, tree_table::ptr> _Tables;
@@ -382,7 +385,7 @@ public:
 			//stats.sortkey;
 			//stats.ref_length;
 			stats.block_size = 1;
-			stats.mrr_length_per_rec= 8; 
+			stats.mrr_length_per_rec= sizeof(tree_stored::_Rid)+sizeof(void*); 
 			//handler::table->s->keys_in_use;
 			//handler::table->s->keys_for_keyread;
 			
@@ -443,12 +446,12 @@ public:
 					HA_PARTIAL_COLUMN_READ | HA_NULL_IN_KEY /*|HA_CAN_REPAIR*/
 );
 	}
+	
 	double scan_time()
-	{
-			
+	{			
 		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size()/8192)));/*assume an average page size of 8192 bytes*/
 	}
-
+	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows) 
 	{
 		ha_rows total_rows;
@@ -576,6 +579,15 @@ public:
 			
 		DBUG_RETURN(0);
 	}
+
+	int erase_row(byte* buf){
+		statistic_increment(table->in_use->status_var.ha_delete_count,&LOCK_status);
+		
+		get_tree_table()->erase(last_resolved, (*this).table);
+		get_thread()->check_use();
+		st.check_use();
+		return 0;
+	}
 	
 	int write_row(byte * buf){
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
@@ -588,6 +600,7 @@ public:
 		st.check_use();
 		return 0;
 	}
+
 	int update_row(const byte *old_data, byte *new_data) {
 		 statistic_increment(table->in_use->status_var.ha_read_rnd_next_count,
                       &LOCK_status);
@@ -629,6 +642,7 @@ public:
 		}
 		return 0;
 	}
+	
 	ha_rows records_in_range
 	(	uint inx
 	,	key_range *start_key
@@ -963,10 +977,10 @@ void initialize_loggers(){
 	using Poco::AutoPtr;
 
 	AutoPtr<SimpleFileChannel> pChannel(new SimpleFileChannel);
-	pChannel->setProperty("path", "C:/dev/bin/addresses.log");
+	pChannel->setProperty("path", "treestore_addresses.log");
 	pChannel->setProperty("rotation", "50 M");
 	AutoPtr<SimpleFileChannel> pBuffers(new SimpleFileChannel);
-	pBuffers->setProperty("path", "C:/dev/bin/buffers.log");
+	pBuffers->setProperty("path", "treestore_buffers.log");
 	pBuffers->setProperty("rotation", "50 M");
 	Logger& logger = Logger::get("addresses");
 	Logger& buffers = Logger::get("buffers");

@@ -122,7 +122,8 @@ private:
 		writer.writeRaw(name );
 		writer.write7BitEncoded((Poco::UInt64)address);
 		writer.write7BitEncoded(buffer.size());
-		writer.writeRaw((const char*)&buffer[0], buffer.size() );
+		if(!buffer.empty())
+			writer.writeRaw((const char*)&buffer[0], buffer.size() );
 		
 	}
 	void compact()

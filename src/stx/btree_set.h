@@ -38,6 +38,7 @@ namespace stx {
 template <	typename _Key,
 			typename _Storage,
 			typename _Compare = std::less<_Key>,
+			typename _Iterpolator = stx::interpolator<_Key> ,
 			typename _Traits = btree_default_set_traits<_Key, default_persist_traits>,
 			typename _Alloc = std::allocator<_Key> >
 class btree_set
@@ -52,11 +53,14 @@ public:
     /// Second template parameter: Key comparison function object
     typedef _Compare                    key_compare;
 
-    /// Third template parameter: Traits object used to define more parameters
+	/// Third template parameter: interpolator if applicable
+	typedef _Iterpolator				key_interpolator;
+
+    /// Fourth template parameter: Traits object used to define more parameters
     /// of the B+ tree
     typedef _Traits                     traits;
 
-    /// Fourth template parameter: STL allocator
+    /// Fifth template parameter: STL allocator
     typedef _Alloc                      allocator_type;
 
 private:
@@ -77,14 +81,14 @@ public:
     typedef key_type                    value_type;
 
     /// Typedef of our own type
-    typedef btree_set<key_type, key_compare, traits, allocator_type> self;
+    typedef btree_set<key_type, key_compare, key_interpolator, traits, allocator_type> self;
 	
 	/// Storage
 
     typedef _Storage storage_type;
 
     /// Implementation type of the btree_base
-    typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, traits, false, allocator_type> btree_impl;
+    typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, false, allocator_type> btree_impl;
 
     /// Function class comparing two value_type keys.
     typedef typename btree_impl::value_compare  value_compare;

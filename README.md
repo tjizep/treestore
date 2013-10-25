@@ -23,7 +23,7 @@ Features
  7. Simple and easy to change code base
 
  8. stl like internal data structures for index and collumn storage
- 
+
  9. No NULL storage 
 
 
@@ -35,6 +35,6 @@ Currently only MSVC 11 is a supported compiler. Future builds will be GCC 'compl
 TODO
 ----
 
- 1. Erase records
+ 1. Erase records not always transactionally consistent
  2. Simple Configuration
  3. Compile with GCC

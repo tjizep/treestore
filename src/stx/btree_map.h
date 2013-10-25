@@ -37,7 +37,8 @@ namespace stx
 template <	typename _Key, typename _Data,
 			typename _Storage ,
 			typename _Compare = std::less<_Key>,
-			typename _Traits = btree_default_map_traits<_Key, _Data, default_persist_traits>,
+			typename _Iterpolator = stx::interpolator<_Key> ,
+			typename _Traits = bt_def_map_t<_Key, _Data, def_p_traits>,
 			typename _Alloc = std::allocator<std::pair<_Key, _Data> > >
 class btree_map
 {
@@ -55,15 +56,18 @@ public:
     /// Third template parameter: Key comparison function object
     typedef _Compare                    key_compare;
 
-    /// Fourth template parameter: Traits object used to define more parameters
+	/// Fourth template parameter: interpolator if applicable
+	typedef _Iterpolator				key_interpolator;
+
+    /// Fifth template parameter: Traits object used to define more parameters
     /// of the B+ tree
     typedef _Traits                     traits;
 
-    /// Fifth template parameter: STL allocator
+    /// Sixth template parameter: STL allocator
 
     typedef _Alloc                      allocator_type;
 
-    /// persistence context
+    /// Seventh template parameter: persistence context
 
     typedef _Storage					storage_type;
 
@@ -75,14 +79,14 @@ public:
     // *** Constructed Types
 
     /// Typedef of our own type
-    typedef btree_map<key_type, data_type, storage_type, key_compare, traits, allocator_type> self;
+    typedef btree_map<key_type, data_type, storage_type, key_compare, key_interpolator, traits, allocator_type> self;
 
     /// Construct the STL-required value_type as a composition pair of key and
     /// data types
     typedef std::pair<key_type, data_type>      value_type;
 
     /// Implementation type of the btree_base
-    typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, traits, false, allocator_type> btree_impl;
+    typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, false, allocator_type> btree_impl;
 
     /// Function class comparing two value_type pairs.
     typedef typename btree_impl::value_compare  value_compare;
