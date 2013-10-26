@@ -564,18 +564,14 @@ public:
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
 		last_resolved = (*this).r.key().get_value();
-		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);		
-			sel.field->set_notnull();	
-			sel.col->seek_retrieve(last_resolved, sel.field);
-		}
+		
 		return 0;
 	}
 	// tscan 4
 	
 	int rnd_next(byte *buf){
 		DBUG_ENTER("rnd_next");
-		++((*this).r);
+		//++((*this).r);
 		if((*this).r == (*this).r_stop){
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
@@ -585,7 +581,7 @@ public:
 			tree_stored::selection_tuple & sel = (*s);		
 			sel.col->seek_retrieve(last_resolved, sel.field);
 		}
-			
+		++((*this).r);
 		DBUG_RETURN(0);
 	}
 
