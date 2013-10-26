@@ -339,6 +339,10 @@ namespace tree_stored{
 	};
 	typedef std::vector<selection_tuple> _Selection;
 	class tree_table{
+	public:
+		typedef stored::IntTypeStored<_Rid> _StoredRowId;
+		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
+		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
 	protected:
 		bool changed;
 		inline char* INDEX_SEP(){
@@ -422,7 +426,7 @@ namespace tree_stored{
 						break; //do nothing pass
 				}//switch									
 				
-				_row_count = std::max<_Rid>(_row_count, cols[(*field)->field_index]->stored_rows());
+				//_row_count = std::max<_Rid>(_row_count, cols[(*field)->field_index]->stored_rows());
 			}
 		}
 		_FileNames create_file_names(TABLE *table_arg){
@@ -493,7 +497,7 @@ namespace tree_stored{
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				
-				tree_index::ptr index = new tree_index(index_name, pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) );		
+				tree_index::ptr index = new tree_index(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );		
 				
 				index->ix = i;
 				index->fields_indexed = pos->usable_key_parts;
@@ -513,12 +517,18 @@ namespace tree_stored{
 		_FileNames file_names;
 		_Rid _row_count;
 		int locks;
+		
 	public:
 		
 		
-		tree_table(TABLE *table_arg) : _row_count(0),changed(false){
+		tree_table(TABLE *table_arg) 
+		:	_row_count(0)
+		,	changed(false)
+		,	storage(table_arg->s->path.str)
+		,	table(storage)
+		{
 			load(table_arg);
-				
+			_row_count = 0;
 		}
 		~tree_table(){
 			clear();
@@ -528,7 +538,43 @@ namespace tree_stored{
 		CompositeStored temp;
 		_Indexes indexes;
 		_Collumns cols;
+		stored::abstracted_storage storage;
+		_TableMap table;
 		
+
+		void begin_table(){
+			if(changed || storage.stale()){
+				storage.begin();
+				storage.set_transaction_r(!changed);
+				table.reload();
+			}else{
+				storage.set_transaction_r(!changed);
+			}
+			
+			if(!changed) table.share(storage.get_name());
+			else table.unshare();
+			init_rowcount();
+		
+		}
+
+		void rollback_table(){
+			commit_table1();
+			storage.rollback();
+		}
+
+		void commit_table1(){
+			if(changed){
+				table.flush();
+				table.reduce_use();
+			}
+		}
+
+		void commit_table2(){
+			if(changed){
+				storage.commit();
+			}
+		}
+
 		void begin(bool read){
 			changed = !read;
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
@@ -536,9 +582,10 @@ namespace tree_stored{
 			}
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){				
 				(*c)->begin(read);
-
 			}
+			begin_table();
 		}
+
 		void commit1(){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
 				(*x)->commit1();				
@@ -547,7 +594,9 @@ namespace tree_stored{
 				(*c)->commit1();
 
 			}
+			commit_table1();
 		}
+
 		void commit2(){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
 				(*x)->commit2();				
@@ -556,6 +605,7 @@ namespace tree_stored{
 				(*c)->commit2();
 
 			}
+			commit_table2();
 			changed = false;
 		}
 
@@ -567,7 +617,9 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){				
 				(*c)->rollback();
 			}
+			rollback_table();
 		}
+
 		void clear(){
 			
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
@@ -624,7 +676,8 @@ namespace tree_stored{
 				(*c)->reduce_use();
 
 			}
-			
+			table.reduce_use();
+
 		}
 
 		void reduce_col_use(){
@@ -841,7 +894,7 @@ namespace tree_stored{
 			if(!key_map || key==NULL){
 				return indexes[ax]->index.end();
 			}
-			_compose_query(table, 0xFFFFFFFFFFFFFFFFull, ax, key, key_l, key_map);
+			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
 			return indexes[ax]->index.upper(temp);
 		}
 
@@ -855,7 +908,7 @@ namespace tree_stored{
 			if(!key_map || key==NULL){
 				return indexes[ax]->index.end();
 			}
-			_compose_query(table, 0xFFFFFFFFFFFFFFFFull, ax, key, key_l, key_map);
+			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
 			return indexes[ax]->index.upper(temp);
 		}
 
@@ -931,7 +984,17 @@ namespace tree_stored{
 			out = indexes[ax]->index.find(temp);
 		}
 		
-		
+
+		void init_rowcount(){
+			_TableMap::iterator t = table.end();
+			_row_count = 0;
+			if(!table.empty()){
+				--t;
+				_row_count = t.key().get_value();
+				++_row_count;
+			}			
+		}
+
 		/// aquire lock and resources
 		void lock(bool writer)
 		{
@@ -977,14 +1040,15 @@ namespace tree_stored{
 				}
 				temp.row = _row_count;
 				(*x)->index.add(temp, 0);
-			}
-			_row_count++;
+			}			
 			
+			(*this).table.insert(_row_count, '0');
 			if(_row_count % 300000 == 0){
 				printf("%lld rows added to %s\n", _row_count, table->s->table_name.str);
 				//reduce_col_use();
 				//reduce_use();
 			}
+			_row_count++;
 		}
 		void erase(_Rid rid, TABLE* table){
 			if(!changed)
@@ -993,6 +1057,7 @@ namespace tree_stored{
 				return;
 			}
 			erase_row_index(rid);
+			(*this).table.erase(rid);
 			TABLE_SHARE *share= table->s;			
 			for (Field **field=table->field ; *field ; field++){	
 				if(!(*field)->is_null() && cols[(*field)->field_index]){
@@ -1037,7 +1102,7 @@ namespace tree_stored{
 			}
 		}
 		_Rid row_count() const {
-			return _row_count;
+			return table.size();
 		}
 
 		_Rid table_size() const {
@@ -1063,7 +1128,7 @@ namespace tree_stored{
 			}
 			bool by_tree = (total > 4 && (selected > total/4 || selected > 16));
 			for (Field **field=table->field ; *field ; field++){	
-				_row_count = std::max<_Rid>(_row_count, cols[(*field)->field_index]->stored_rows());
+				
 				if(bitmap_is_set(table->read_set, (*field)->field_index)){
 					selection_tuple selection;
 					selection.col = cols[(*field)->field_index];

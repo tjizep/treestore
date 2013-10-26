@@ -1044,13 +1044,13 @@ namespace stx
 					if(ll >0) --ll;
 					if(ll < h && key_less(keys[ll],key)){
 						++ll;
+						if(ll < h && key_less(keys[ll],key)){							
+						}else return ll;
+						++ll;
+						if(ll < h && key_less(keys[ll],key)){								
+						}else return ll;
+						++ll;
 						if(ll < h && key_less(keys[ll],key)){
-							++ll;
-							if(ll < h && key_less(keys[ll],key)){
-								++ll;
-								if(ll < h && key_less(keys[ll],key)){
-								}else return ll;
-							}else return ll;
 						}else return ll;
 					}
 					

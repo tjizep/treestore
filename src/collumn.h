@@ -258,8 +258,13 @@ namespace collums{
 			bool load_into_cache(size_t col_size){
 				_Rid ctr = 0;
 				NS_STORAGE::add_total_use(ctr * sizeof(_Stored));
-				for(_ColMap::iterator c = col.begin(); c !=col.end(); ++c){
-					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));				
+				_ColMap::iterator c = col.end();
+				if(!col.empty()){
+					--c;
+					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));	
+				}
+				for(c = col.begin(); c !=col.end(); ++c){
+								
 					(*cache).data[c.key().get_value()] = c.data();
 					ctr++;					
 				}
@@ -453,29 +458,25 @@ namespace collums{
 			{
 				return cache_r[row];
 			}
-
 			check_cache();
-
-			if(row < next_id)
+			/*//
+			if(ival != cend && ival.key().get_value() < row)
 			{
-
-				if(ival != cend && ival.key().get_value() < row)
-				{
-					++ival;
+				++ival;
 					
-					if(ival != cend && ival.key().get_value() == row)
-					{
-						return ival.data();
-					}
-				}/**/
-				
-				ival = col.find(row);
-				
-				if(ival != cend)
+				if(ival != cend && ival.key().get_value() == row)
 				{
 					return ival.data();
 				}
+			}*/
+				
+			ival = col.find(row);
+				
+			if(ival != cend)
+			{
+				return ival.data();
 			}
+			
 			return empty;
 		}
 		void flush(){
@@ -560,7 +561,7 @@ namespace collums{
 					NS_STORAGE::synchronized synch(get_cache().lock);
 					if(get_cache().data.size() > row){
 
-						get_cache().data[row] = s;
+						//get_cache().data[row] = s;
 					}
 
 				}

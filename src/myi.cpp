@@ -209,7 +209,7 @@ public:
 			}
 		}
 		threads.push_back(tt);
-		printf("added {%lld} t resources\n", (NS_STORAGE::u64)threads.size());
+		DBUG_PRINT("info",("added {%lld} t resources\n", (NS_STORAGE::u64)threads.size()));
 	}
 	tree_stored::tree_thread * reuse_thread(){
 		NS_STORAGE::scoped_ulock ul(tlock);
@@ -230,7 +230,7 @@ public:
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
 		}
-		printf("{%lld} t resources \n", (NS_STORAGE::u64)threads.size());
+		DBUG_PRINT("info",("{%lld} t resources \n", (NS_STORAGE::u64)threads.size()));
 		return r;
 	}
 	void check_use(){
@@ -300,6 +300,8 @@ public:
 	static const int TREESTORE_MAX_KEY_LENGTH = collums::StaticKey::MAX_BYTES;
 	std::string path;
 	tree_stored::tree_table::ptr tt;
+	tree_stored::tree_table::_TableMap::iterator r;
+	tree_stored::tree_table::_TableMap::iterator r_stop;
 	tree_stored::_Rid row;
 	tree_stored::_Rid last_resolved;
 	typedef tree_stored::_Selection  _Selection;
@@ -556,10 +558,16 @@ public:
 		clear_selection(selected);
 
 		selected = get_tree_table()->create_output_selection(table);
+		(*this).r = get_tree_table()->table.begin();
+		(*this).r_stop = get_tree_table()->table.end();
+		if((*this).r == (*this).r_stop){
+			DBUG_RETURN(HA_ERR_END_OF_FILE);
+		}
+		last_resolved = (*this).r.key().get_value();
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			tree_stored::selection_tuple & sel = (*s);		
 			sel.field->set_notnull();	
-			sel.iter->retrieve(sel.field);
+			sel.col->seek_retrieve(last_resolved, sel.field);
 		}
 		return 0;
 	}
@@ -567,20 +575,21 @@ public:
 	
 	int rnd_next(byte *buf){
 		DBUG_ENTER("rnd_next");
-		if(row >= get_tree_table()->row_count() ){
+		++((*this).r);
+		if((*this).r == (*this).r_stop){
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
-		}	
+		}
+		last_resolved = (*this).r.key().get_value();
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			tree_stored::selection_tuple & sel = (*s);		
-			sel.iter->retrieve_next(sel.field);//retrieve into field			
+			sel.col->seek_retrieve(last_resolved, sel.field);
 		}
-		row++;
 			
 		DBUG_RETURN(0);
 	}
 
-	int erase_row(byte* buf){
+	int delete_row(const byte *buf){
 		statistic_increment(table->in_use->status_var.ha_delete_count,&LOCK_status);
 		
 		get_tree_table()->erase(last_resolved, (*this).table);
