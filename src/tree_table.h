@@ -39,166 +39,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "tree_index.h"
 typedef std::vector<std::string> _FileNames;
 namespace tree_stored{
-	class abstract_my_iter : public collums::AbstractedIterator{
-	public:
-		virtual void seek(_Rid row)=0;
-		virtual bool valid()=0;
-		virtual bool invalid()=0;
-		virtual void first()=0;
-		virtual void next()=0;
-		virtual void store(Field * f)=0;
-		virtual _Rid get_row() const = 0 ;
-		virtual void set_by_tree()=0;
-		virtual void set_by_cache()=0;
-		virtual void retrieve(Field * f)=0;
-		virtual void retrieve_next(Field * f) = 0;
-		virtual void compose(CompositeStored& comp)=0;
-	};
-
-	template <typename _Colt, typename _Iter, typename _Fieldt>
-	class my_iter : public abstract_my_iter{
-	protected:
-		_Iter iter;
-		_Rid cur;
-		_Rid rows;
-		_Colt * pcol;
-		conversions covertor;
-		bool reposition;
-		bool use_tree;
-		void do_repos(){
-			if(reposition){
-				iter.find(cur);
-				reposition = false;
-			}
-		}
-	public:
-
-		my_iter(_Colt * _pcol, _Rid rows, const _Iter &i)
-		:	iter(i)
-		,	cur(0)
-		,	pcol(_pcol)
-		,	reposition (false)
-		,	use_tree (false)
-		{
-			(*this).rows = rows;
-			
-		}
-		~my_iter(){
-		}
-
-		virtual void seek(_Rid row){
-			cur = row;								
-			reposition = true;
-		}
-		
-
-		virtual bool valid(){
-			return (cur < rows);			
-		};
-		
-		virtual bool invalid(){
-			return (rows <= cur);
-		};
-
-		virtual void first(){	
-			iter.first();
-			cur = 0;
-		}
-
-		virtual void next(){		
-			if(use_tree){
-				do_repos();
-				if(iter.valid()){
-				
-					if (iter.get_key().get_value() == cur){
-						iter.next();
-					}
-				}
-			}
-			++cur;
-		}
-		
-		virtual _Rid get_row() const{
-			return cur;
-		}
-		
-		virtual void store(Field * f){
-			
-		}
-
-		virtual void set_by_tree(){
-			use_tree = true;
-		}
-
-		virtual void set_by_cache(){
-			use_tree = false;
-		}
-
-		virtual void retrieve(Field * f){
-			if(use_tree){
-				do_repos();
-				if(iter.valid()){
-
-					if (iter.get_key().get_value() == cur){
-						f->set_notnull();			
-						covertor.fset(f, (_Fieldt&)iter.get_value());
-
-					}else{
-						f->set_null();
-					}
-				}else if(cur < rows){
-					f->set_null();
-				}
-			}else if(cur < rows){
-				covertor.fset(f, pcol->seek_by_cache(cur));
-			}
-		}
-
-		virtual void retrieve_next(Field * f){
-			if(use_tree){
-				do_repos();
-				/*while(iter.valid() && iter.get_key().get_value() != cur){
-					
-					iter.next();
-				}*/
-				if(iter.valid()){
-					
-					if (iter.get_key().get_value() == cur){
-						f->set_notnull();			
-						covertor.fset(f, (_Fieldt&)iter.get_value());
-						iter.next();
-					}else{
-						f->set_null();
-					}
-				}else if(cur < rows){
-					f->set_null();
-				}
-			}else if(cur < rows){
-						
-				covertor.fset(f, pcol->seek_by_cache(cur));
-				
-			}
-			++cur;
-		}
-
-		virtual void compose(CompositeStored& comp){
-			if(use_tree){
-				do_repos();
-				if(iter.valid()){
-					if (iter.get_key().get_value() == cur){
-						comp.add(iter.get_value());
-					}else{
-						//comp.add();
-					}
-				}else if(cur < rows){
-					//comp.add();
-				}
-			}else if(cur < rows){
-				comp.add(pcol->seek_by_cache(cur));
-				
-			}
-		}
-	};
+	
 
 	class abstract_my_collumn {
 	public:
@@ -206,7 +47,6 @@ namespace tree_stored{
 		}
 		virtual ~abstract_my_collumn(){
 		}
-		virtual abstract_my_iter * create_iterator(_Rid rows) = 0;
 		virtual void add_row(collums::_Rid row, Field * f) = 0;
 		virtual void erase_row(collums::_Rid row) = 0;
 		virtual NS_STORAGE::u32 field_size() const = 0;
@@ -241,10 +81,7 @@ namespace tree_stored{
 		}
 		virtual ~my_collumn(){
 		}
-		virtual abstract_my_iter * create_iterator(_Rid rows) {
-			return new my_iter<_Colt,_Colt::iterator_type,_Fieldt>(&col, rows, col.begin());
-		}
-
+		
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
 			col.add(row, temp);
@@ -322,20 +159,20 @@ namespace tree_stored{
 	typedef std::vector<tree_index::ptr> _Indexes;
 	typedef std::vector<abstract_my_collumn*> _Collumns;
 	struct selection_tuple{
-		selection_tuple():col(NULL),field(NULL),iter(NULL){
+		selection_tuple():col(NULL),field(NULL){//,iter(NULL)
 		}
-		selection_tuple(const selection_tuple& right):col(NULL),field(NULL),iter(NULL){
+		selection_tuple(const selection_tuple& right):col(NULL),field(NULL){//,iter(NULL)
 			*this = right;
 		}
 		selection_tuple& operator=(const selection_tuple& right){
 			col = right.col;
 			field = right.field;
-			iter = right.iter;
+			//iter = right.iter;
 			return *this;
 		}
 		abstract_my_collumn * col;
 		Field * field;
-		abstract_my_iter * iter;
+		//abstract_my_iter * iter;
 	};
 	typedef std::vector<selection_tuple> _Selection;
 	class tree_table{
@@ -1135,8 +972,8 @@ namespace tree_stored{
 					selection.col->initialize(by_tree);
 					
 					selection.field = (*field);
-					selection.iter = selection.col->create_iterator(selection.col->stored_rows());
-					selection.iter->set_by_cache();
+					//selection.iter = selection.col->create_iterator(selection.col->stored_rows());
+					//selection.iter->set_by_cache();
 					
 					r.push_back(selection);					
 					
@@ -1155,7 +992,7 @@ namespace tree_stored{
 					selection_tuple selection;
 					selection.col = cols[(*field)->field_index];
 					selection.field = (*field);
-					selection.iter = selection.col->create_iterator(_row_count);
+					//selection.iter = selection.col->create_iterator(_row_count);
 					r.push_back(selection);					
 				}				
 			}

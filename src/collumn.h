@@ -258,15 +258,19 @@ namespace collums{
 			bool load_into_cache(size_t col_size){
 				_Rid ctr = 0;
 				NS_STORAGE::add_total_use(ctr * sizeof(_Stored));
-				_ColMap::iterator c = col.end();
+				_ColMap::iterator e = col.end();
+				_ColMap::iterator c = e;
 				if(!col.empty()){
 					--c;
 					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));	
 				}
-				for(c = col.begin(); c !=col.end(); ++c){
+				for(c = col.begin(); c !=e; ++c){
 								
 					(*cache).data[c.key().get_value()] = c.data();
-					ctr++;					
+					ctr++;		
+					if(ctr % 100000ull == 0ull){
+						printf(" %lld items in col %s\n",ctr,storage.get_name().c_str());
+					}
 				}
 			
 				col.reduce_use();
@@ -965,7 +969,16 @@ namespace collums{
 			size_t col_size;
 		protected:
 			bool scan_index(){
-				
+				iterator_type s = index.begin();
+				iterator_type e = index.end();
+				nst::u64 ctr= 0;
+				for(;s!=e;++s){
+					ctr++;
+					if(ctr % 100000ull == 0ull){
+						printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
+					}
+				}
+				printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
 				return true;
 			}
 		public:
@@ -1015,7 +1028,7 @@ namespace collums{
 			the_end = index.end();
 			index.share(name);
 
-			/// get_scanner().add(new IndexScanner(storage.get_name()));
+			get_scanner().add(new IndexScanner(storage.get_name()));
 			
 		}
 		

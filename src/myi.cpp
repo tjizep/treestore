@@ -321,11 +321,11 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-		for(_Selection::iterator s = selected.begin(); s!=selected.end();++s){
+		/*for(_Selection::iterator s = selected.begin(); s!=selected.end();++s){
 			if((*s).iter){
 				delete (*s).iter;
 			}
-		}
+		}*/
 		selected.clear();
 	}
 	
@@ -571,7 +571,6 @@ public:
 	
 	int rnd_next(byte *buf){
 		DBUG_ENTER("rnd_next");
-		//++((*this).r);
 		if((*this).r == (*this).r_stop){
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
