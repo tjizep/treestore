@@ -934,7 +934,7 @@ namespace storage{
 			if(references == 0){
 				
 				if(_session!=nullptr){
-					//printf(" discarding storage %s\n",name.c_str());
+					printf(" discarding storage %s\n",name.c_str());
 					rollback();
 					insert_stmt = nullptr;
 					get_stmt = nullptr;
@@ -1070,6 +1070,7 @@ namespace storage{
 			++references;
 		}
 		void release(){ //s an instance reference
+			scoped_ulock ul(lock);
 			--references;
 			//printf("references for %s reached %ld\n", name.c_str(), (long)references);
 			discard();
@@ -1585,7 +1586,8 @@ namespace storage{
 		
 		/// merge idle transactions from latest to oldest
 		/// merge unused transaction versions - releasing any held resources
-
+		/// the merge should produce only one table on completion in idle state
+		/// i.e. storages.size()==1
 		void merge_down()
 		{
 			scoped_ulock _sync(*lock);
@@ -1692,6 +1694,7 @@ namespace storage{
 		/// engages the instance - its resources may not be released if references > 0
 
 		void engage(){
+			scoped_ulock _sync(*lock);
 			++references;
 			
 		}
@@ -1699,9 +1702,17 @@ namespace storage{
 		/// releases a reference to this coordinatron
 
 		void release(){
+			scoped_ulock _sync(*lock);
 			--references;
 			/// TODO: if references == 0 the handles held to resources 
 			///	need to let go so that maintenance can happen (i.e. drop table)
+			if(0==references){
+				
+				//merge_down();
+				if(storages.size()==1){
+					initial->release();
+				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
+			}
 		}
 
 		/// reduces use

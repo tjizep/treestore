@@ -128,6 +128,8 @@ namespace tree_stored{
 				t = new tree_table(table_arg);
 				tables[table_arg->s->path.str] = t;
 				save_extensions[table_arg->s->path.str] = t->get_file_names();
+			}else{
+				t->check_load(table_arg);
 			}
 			
 			return t;
@@ -321,11 +323,7 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-		/*for(_Selection::iterator s = selected.begin(); s!=selected.end();++s){
-			if((*s).iter){
-				delete (*s).iter;
-			}
-		}*/
+		
 		selected.clear();
 	}
 	
@@ -526,22 +524,23 @@ public:
 			return 0;
 		}
 		bool writer = false;
-		tree_stored::tree_thread * tt = new_thread_from_thd(thd);
+		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));		
 			if(lock_type == F_WRLCK){
 				writer = true;
-				tt->modify();
+				thread->modify();
 			}
-			(*this).tt = tt->lock(table, writer);
+			(*this).tt = thread->lock(table, writer);
 		}else if(lock_type == F_UNLCK){
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
-			tt->release(table);
-			if(tt->get_locks()==0){
+			thread->release(table);
+			if(thread->get_locks()==0){
 				clear_thread(thd);
-				st.release_thread(tt);
+				st.release_thread(thread);
 				clear_selection(selected);
 				//(*this).tt = 0;
+				printf("transaction finalized : %s\n",table->alias);
 			}
 		}
 		
@@ -556,14 +555,11 @@ public:
 		get_thread()->check_use();
 		st.check_use();
 		clear_selection(selected);
-
+		last_resolved = 0;
 		selected = get_tree_table()->create_output_selection(table);
 		(*this).r = get_tree_table()->table.begin();
 		(*this).r_stop = get_tree_table()->table.end();
-		if((*this).r == (*this).r_stop){
-			DBUG_RETURN(HA_ERR_END_OF_FILE);
-		}
-		last_resolved = (*this).r.key().get_value();
+		
 		
 		return 0;
 	}
@@ -886,6 +882,7 @@ public:
 		}
 
 	}
+
 	tree_stored::IndexIterator get_index_iterator_upper(const key_range *start_key){
 		return get_index_iterator_upper(active_index, start_key);		
 	}
@@ -896,6 +893,7 @@ public:
 		else
 			return set_index_iterator_lower(active_index, NULL, 0, 0, HA_READ_KEY_OR_NEXT);
 	}
+
 	tree_stored::IndexIterator get_index_iterator_lower(uint ax, const key_range *bound){
 		if(bound != NULL){
 			return get_index_iterator_lower(ax, bound->key, bound->length, bound->keypart_map,bound->flag);
@@ -903,6 +901,7 @@ public:
 			return get_index_iterator_lower(ax, NULL, 0ul, 0xFFFFFFFF, HA_READ_AFTER_KEY);
 		}
 	}
+
 	int iterations;
 	
 	tree_stored::_Rid range_iterator;
@@ -932,6 +931,7 @@ public:
 		print_read_lookups();
 		DBUG_RETURN(r);
 	}
+
 	virtual int read_range_next(){
 		int r = HA_ERR_END_OF_FILE;
 		
@@ -1039,7 +1039,7 @@ mysql_declare_plugin(plasticity)
 		&treestore_storage_engine,
 		"TREESTORE",
 		"Christiaan Pretorius (c) 2013",
-		"TReeStore MySQL storage engine",
+		"TuReeStore MySQL storage engine",
 		PLUGIN_LICENSE_GPL,
 		treestore_db_init, /* Plugin Init */
 		treestore_done, /* Plugin Deinit */

@@ -216,6 +216,7 @@ public:
 					bytes_used += nbuf->capacity();
 				}
 				commands.clear();
+
 				for(block_registery_type::iterator s = storages.begin(); s != storages.end(); ++s){
 					std::string storage_name = (*s).first;
 					buffers_type_ptr storage_buffers = (*s).second;
@@ -235,16 +236,17 @@ public:
 						transaction->complete();
 					}					
 				}
+				storages.clear();
 			}
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
-				std::string storage_name = (*p).first;
-				stored::_Transaction* transaction = pending[storage_name];
-				stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
-				printf("recovering %s...\n", storage_name.c_str());
-				storage->commit(transaction);
-				storage->set_recovery(false);
-				printf("recovered %s\n", storage_name.c_str());
+			std::string storage_name = (*p).first;
+			stored::_Transaction* transaction = pending[storage_name];
+			stored::_Allocations* allocations = stored::_get_abstracted_storage(storage_name);
+			printf("recovering %s...\n", storage_name.c_str());
+			allocations->commit(transaction);
+			allocations->set_recovery(false);
+			printf("recovered %s\n", storage_name.c_str());
 		}
 		storages.clear();
 		bytes_used = 0;

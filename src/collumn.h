@@ -231,14 +231,60 @@ namespace collums{
 		};	
 		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, int_terpolator> _ColMap;
 	private:
-		typedef std::vector<_Stored> _Cache;
+		static const nst::u16 F_NOT_NULL = 1;
+		static const nst::u16 F_CHANGED = 2;
+		static const nst::u16 F_INVALID = 4;
+		struct _StoredEntry{
+			
+			_StoredEntry(const _Stored& key):key(key),flags(F_NOT_NULL){};
+			
+			_StoredEntry():flags(0){};
+
+			_StoredEntry &operator=(const _Stored& key){
+				(*this).key = key;
+				flags = F_NOT_NULL;
+				return *this;
+			}
+
+			inline operator typename _Stored&() {
+				return key;
+			}
+			
+			inline operator typename const _Stored&() const {
+				return key;
+			}
+			void nullify(){
+				flags &= (~F_NOT_NULL);
+			}
+			bool null(){
+				return ( ( flags & F_NOT_NULL ) == 0);
+			}
+			bool invalid() const {
+				return ( ( flags & F_INVALID ) != 0);
+			}
+			bool valid() const {
+				return ( ( flags & F_INVALID ) == 0);
+			}
+			void invalidate(){
+				flags |= F_INVALID;
+			}
+			void validate(){
+				flags &= (~F_INVALID);
+			}
+			_Stored key;
+			nst::u16 flags;
+
+			
+		};
+		typedef std::vector<_StoredEntry> _Cache;
 
 		struct _CacheEntry{
-			_CacheEntry() : available(false), loaded(false){};
+			_CacheEntry() : available(false), loaded(false),density(1){};
 			bool available;
 			bool loaded;
 			_Cache data;
 			Poco::Mutex lock;
+			_Rid density;
 			void unload(){
 				nst::synchronized _l(lock);
 				loaded = false;
@@ -246,7 +292,31 @@ namespace collums{
 				available = false;
 			}
 		};
-
+		class Density{
+		public:
+			Density(){
+			}
+			~Density(){
+			}
+			_Rid density;
+			template<typename _DataType>
+			void measure(_DataType& data){
+				/// get a 5% sample
+				typedef std::set<_Stored> _Uniques;
+				_Uniques uniques;
+				_Rid SAMPLE = (_Rid)data.size()/20;
+				printf("calc %lld density sample\n",(nst::u64)SAMPLE);
+				for(_Rid r = 0;r<SAMPLE ; ++r){
+					_Rid sample = std::rand() % data.size();
+					uniques.insert(data[sample].key);
+				}
+				density = SAMPLE/std::max<_Rid>(1,(_Rid)uniques.size());
+				if(density >= 2){
+					density /= 2;
+				}
+				
+			}
+		};
 		class ColLoader : public Poco::Notification{
 		protected:
 			stored::abstracted_storage storage;
@@ -254,6 +324,13 @@ namespace collums{
 			
 			_CacheEntry* cache;
 			size_t col_size;
+			void calc_density(){
+				/// get a 5% sample
+				Density d;
+				d.measure((*cache).data);
+				(*cache).density = d.density;
+				printf("measured density sample: %lld\n", (nst::u64)(*cache).density);
+			}
 		protected:
 			bool load_into_cache(size_t col_size){
 				_Rid ctr = 0;
@@ -264,16 +341,14 @@ namespace collums{
 					--c;
 					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));	
 				}
-				for(c = col.begin(); c !=e; ++c){
+				for(c = col.begin(); c != e; ++c){
 								
 					(*cache).data[c.key().get_value()] = c.data();
 					ctr++;		
-					if(ctr % 100000ull == 0ull){
-						printf(" %lld items in col %s\n",ctr,storage.get_name().c_str());
-					}
+					
 				}
-			
 				col.reduce_use();
+				calc_density();
 				
 				cache->available = true;
 				
@@ -301,7 +376,7 @@ namespace collums{
 			typedef Poco::AutoPtr<ColLoader> Ptr;
 		};
 		typedef std::vector<char>    _Nulls;
-		typedef std::vector<_Stored> _Cache;
+		
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
 		typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
 		static const int MAX_THREADS = 16;
@@ -354,7 +429,7 @@ namespace collums{
 		_Rid next_id;
 		_CacheEntry * _cache;
 		_Nulls * _nulls;
-		_Stored * cache_r;
+		_StoredEntry * cache_r;
 		_Stored empty;
 		_Rid cache_size;
 		_Rid rows;
@@ -437,7 +512,11 @@ namespace collums{
 		/// returns a sampled rows per key statistic for the collumn
 		nst::u32 get_rows_per_key(){
 			typedef std::set<_Stored> _Uniques;
+			if(has_cache()){
+				rows_per_key = get_cache().density;
+			}
 			if(rows_per_key == 0){
+				
 				_Uniques unique;
 				const nst::u32 SAMPLE = std::min<nst::u32>((nst::u32)col.size(), 100000);
 				for(nst::u32 u = 0; u < SAMPLE; ++u){
@@ -448,6 +527,7 @@ namespace collums{
 					rows_per_key /= 2;
 				}
 				printf("rows/key for %s : %ld\n",storage.get_name().c_str(), rows_per_key);
+				
 			}
 			return rows_per_key;
 		}
@@ -460,19 +540,14 @@ namespace collums{
 			
 			if( has_cache() && cache_size > row )
 			{
-				return cache_r[row];
+				_StoredEntry & se = cache_r[row];
+				if(se.valid()){
+					return se;
+				}
+				
 			}
 			check_cache();
-			/*//
-			if(ival != cend && ival.key().get_value() < row)
-			{
-				++ival;
-					
-				if(ival != cend && ival.key().get_value() == row)
-				{
-					return ival.data();
-				}
-			}*/
+			
 				
 			ival = col.find(row);
 				
@@ -552,7 +627,11 @@ namespace collums{
 			next_id = rows;
 			if(has_cache()){
 				if(get_cache().data.size() > row){
-					//get_cache().data.erase(row);
+					NS_STORAGE::synchronized synch(get_cache().lock);
+					if(get_cache().data.size() > row){
+
+						get_cache().data[row].invalidate();
+					}
 				}
 			}
 		}
@@ -565,7 +644,7 @@ namespace collums{
 					NS_STORAGE::synchronized synch(get_cache().lock);
 					if(get_cache().data.size() > row){
 
-						//get_cache().data[row] = s;
+						get_cache().data[row].invalidate();
 					}
 
 				}
@@ -666,7 +745,7 @@ namespace collums{
 		/// with a transitive and simmetric property
 		/// such that i < j then enc(i) < enc(j) and 
 		/// i < j and j < k then enc(i) < enc(k) and
-		/// enc(-i) < enc(i)
+		/// enc(-i) < enc(i) and {i,j,k} from integers
 
 		template<typename _It>
 		inline void storei(uchar* d, _It v){
@@ -975,7 +1054,7 @@ namespace collums{
 				for(;s!=e;++s){
 					ctr++;
 					if(ctr % 100000ull == 0ull){
-						printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
+						//printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
 					}
 				}
 				printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
@@ -1005,7 +1084,7 @@ namespace collums{
 		typedef asynchronous::QueueManager<IndexScanner> IndexScannerManager;
 
 		IndexScannerManager &get_scanner(){
-			static IndexScannerManager scanner(2);
+			static IndexScannerManager scanner(1);
 			return scanner;
 		}
 	private:

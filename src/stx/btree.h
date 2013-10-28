@@ -2747,7 +2747,7 @@ namespace stx
 
 		/// use lz4 in mem compression otherwize use zlib
 
-		static const bool lz4 = false;
+		static const bool lz4 = true;
 
 		/// Key comparison object. More comparison functions are generated from
 		/// this < relation.
