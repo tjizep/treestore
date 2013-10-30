@@ -1529,7 +1529,7 @@ namespace stx
 			if(n->is_modified()){
 				//printf("[B-TREE SAVE] i-node  %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version()); 
 				using namespace stx::storage;
-				buffer_type &buffer = get_storage()->allocate(w, stx::storage::write);
+				buffer_type &buffer = get_storage()->allocate(w, stx::storage::create);
 				n->save(*get_storage(), buffer);
 				if(lz4){
 					inplace_compress_lz4(buffer);
@@ -1564,7 +1564,7 @@ namespace stx
 			if(n->is_modified()){
 				//printf("[B-TREE SAVE] s-node %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version()); 
 				using namespace stx::storage;
-				buffer_type &buffer = get_storage()->allocate(w,stx::storage::write);
+				buffer_type &buffer = get_storage()->allocate(w,stx::storage::create);
 				n->sort(stats, key_less);
 				n->save(*get_storage(), buffer);
 				if(lz4){
@@ -1630,7 +1630,7 @@ namespace stx
 			/// TODO: NB! double mutex
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
-				printf("bad allocation\n");
+				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());
 				buffer_type& dangling_buffer2 = get_storage()->allocate(w, stx::storage::read);
 				printf("bad allocation %lld\n", (long long)dangling_buffer2.size());
 			}
@@ -2971,8 +2971,13 @@ namespace stx
 			stx::storage::u64 flushed = 0;
 			if(stats.tree_size){
 				
-				save_recursive(flushed,root);
+				//save_recursive(flushed,root);
+				for(_AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+					node::ptr np = (*n).second;
+					np.set_where((*n).first);
+					np.save(*this);
 				
+				}
 				write_boot_values();
 				
 				///BTREE_PRINT("flushing %ld\n",flushed);
@@ -3282,8 +3287,8 @@ namespace stx
 		///
 		void share(std::string name){
 			if(NULL == shared.nodes){
-				release_surfaces(); /// release previously unshared surfaces
 				shared.share(name);
+				reload();
 			}
 			
 		}
@@ -3291,8 +3296,9 @@ namespace stx
 		/// unshare pages and release surfaces
 		void unshare(){
 			if(NULL != shared.nodes){
-				release_surfaces(); /// release shared surfaces
+				
 				shared.nodes = NULL;
+				reload();
 			}
 		}
 		// *** Fast Destruction of the B+ Tree
@@ -4095,6 +4101,8 @@ namespace stx
 				newroot->childid[1] = newchild;
 
 				newroot->set_occupants(1);
+				newroot.change();
+				root.change();
 				//newroot->set_modified();
 				root = newroot;
 			}
@@ -4126,6 +4134,7 @@ namespace stx
 			const key_type& key, const data_type& value,
 			key_type* splitkey, typename node::ptr& splitnode)
 		{
+			
 			if (!n->issurfacenode())
 			{
 				typename interior_node::ptr interior = n;
@@ -4143,7 +4152,7 @@ namespace stx
 				if (newchild != NULL_REF)
 				{
 					BTREE_PRINT("btree::insert_descend newchild with key " << newkey << " node " << newchild << " at at " << at << std::endl);
-
+					newchild.change();
 					if (interior->isfull())
 					{
 						split_interior_node(interior, splitkey, splitnode, at);
@@ -4317,6 +4326,7 @@ namespace stx
 			else
 			{
 				newsurface->next->preceding = newsurface;
+				newsurface->next.change();
 			}
 			surface->sort(((btree&)(*this)).stats, key_less);
 			for(unsigned int slot = mid; slot < surface->get_occupants(); ++slot)
@@ -4330,8 +4340,10 @@ namespace stx
 			surface->set_occupants(mid);
 			surface->sorted = mid;
 			surface->next = newsurface;
+
 			newsurface->preceding = surface;
 			newsurface->sorted = newsurface->get_occupants();
+			newsurface.change();
 
 			*_newkey = surface->keys[surface->get_occupants()-1];
 			_newsurface = newsurface;
@@ -4369,6 +4381,7 @@ namespace stx
 				newinterior->childid[ni] = interior->childid[slot];
 			}
 			newinterior->childid[newinterior->get_occupants()] = interior->childid[interior->get_occupants()];
+			newinterior.change();
 
 			interior.change();
 			interior->set_occupants(mid);

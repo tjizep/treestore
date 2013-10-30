@@ -586,10 +586,12 @@ namespace collums{
 		}
 
 		void tx_begin(bool read){			
+			if(read) col.share(storage.get_name());
+			else col.unshare();
 			if(!read || storage.stale()){
 				storage.begin();
 				storage.set_transaction_r(read);
-				col.reload();
+				if(read) col.reload();
 			}else{
 				storage.set_transaction_r(read);
 			}
@@ -1182,15 +1184,17 @@ namespace collums{
 			set_end();
 		}
 		void begin(bool read){
+			if(read) index.share(storage.get_name());
+			else index.unshare();
+
 			if(!read || storage.stale()){
 				storage.begin();
 				storage.set_transaction_r(read);
-				index.reload();
+				if(read) index.reload();
 			}else{
 				storage.set_transaction_r(read);
 			}
-			if(read) index.share(storage.get_name());
-			else index.unshare();
+			
 		}
 
 		void rollback(){
@@ -1201,7 +1205,7 @@ namespace collums{
 
 		void commit1(){
 			if(modified){
-				index.reduce_use();
+				
 				index.flush();			
 				set_end();
 			}

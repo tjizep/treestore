@@ -779,7 +779,7 @@ namespace storage{
 		typedef std::set<stream_address> _Addresses;
 		void get_addresses(_Addresses& out){
 			synchronized s(lock);
-			if(!is_new){
+			if(_session != nullptr){
 				_SQLAddresses addresses;
 				get_session() << "select a1 from " << (*this).table_name << " ;" , into(addresses), now;
 				for(_SQLAddresses::iterator sa = addresses.begin(); sa != addresses.end(); ++sa){
@@ -1119,7 +1119,10 @@ namespace storage{
 			get_addresses(todo);
 			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
 				stream_address at = (*a);
-				buffer_type &r = allocate(at, read);				
+				buffer_type &r = allocate(at, read);		
+				if(is_end(r)){
+					throw InvalidAddressException();
+				}
 				journal::get_instance().add_entry(JOURNAL_PAGE, name, at, r);				
 				complete();				
 			}
@@ -1396,32 +1399,37 @@ namespace storage{
 				allocated_version = get_allocator().get_allocated_version();	
 				return r;
 			}
+
 			if(how != create){
 				/// at this point the action can only be one of read and write
 				/// given that the block exists as a local version 
 				/// if it was read previously it will change to a write
 				/// when action is copy_reads and it doesnt exist in the local then 
 				/// it will be copied into the local storage
-				block_type& r= get_allocator().allocate(which, how);
+ 				block_type& r= get_allocator().allocate(which, how);
 				if( !get_allocator().is_end(r) ){
 					
 					allocated_version = get_allocator().get_allocated_version();	
 					return r;// it may be a previously written or read block
 				}
 				get_allocator().complete();
-			}
-			
-			
+			}else if(how == create){ 
+				/// the element wil not exist in any of the previous versions
+				/// and is created right here
+				block_type& r = get_allocator().allocate(which, how);	
+				allocated_version = get_allocator().get_allocated_version();	
 
-			
+				return r;
+			}
+			if(how==create)
+				throw InvalidStorageAction();
+
 			last_base  = this->based.get();
 			while(last_base != nullptr){
 				block_type& r = last_base->get_allocator().allocate(which, read); //can only read from previous versions 
 				if(!(last_base->get_allocator().is_end(r))){
 					if
 					(	how == write 
-					||	how == create 
-					||	copy_reads  // dont copy read blocks to local allocator unless specified
 					)
 					{
 						
@@ -1440,14 +1448,7 @@ namespace storage{
 				last_base->get_allocator().complete();
 				last_base = last_base->based.get();
 			}
-			if(how == create){ 
-				/// the element does not exist in any of the previous versions
-				/// and is created right here
-				block_type& r = get_allocator().allocate(which, how);	
-				allocated_version = get_allocator().get_allocated_version();	
-
-				return r;
-			}
+			
 			
 			/// it was never found in the base or local versions
 			return empty_block;
@@ -1775,6 +1776,9 @@ namespace storage{
 				throw InvalidVersion();				
 			}
 			
+			if (!recovery)		/// dont journal during recovery
+				transaction->journal((*this).initial->get_name());
+
 			version->set_readonly();	
 			
 			last_address = std::max<address_type>(last_address, version->last());
@@ -1785,9 +1789,6 @@ namespace storage{
 				prev->remove_reader();
 
 			storages.push_back(version);
-
-			if (!recovery)		/// dont journal during recovery
-				transaction->journal((*this).initial->get_name());
 
 			++order;			/// increment transaction count
 

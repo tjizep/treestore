@@ -70,21 +70,25 @@ namespace tree_stored{
 			
 		}
 		void cache_it(IndexIterator& io){
-
 			cache->store(io.get_i());
 		}
+
 		void begin(bool read){
 			index.begin(read);
 		}
+		
 		void commit1(){
 			index.commit1();
 		}
+		
 		void commit2(){
 			index.commit2();
 		}
+		
 		void rollback(){
 			index.rollback();
 		}
+		
 		void share(){
 		}
 		void unshare(){

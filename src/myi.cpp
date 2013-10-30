@@ -129,7 +129,7 @@ namespace tree_stored{
 				tables[table_arg->s->path.str] = t;
 				save_extensions[table_arg->s->path.str] = t->get_file_names();
 			}else{
-				t->check_load(table_arg);
+				
 			}
 			
 			return t;
@@ -487,6 +487,7 @@ public:
 	
 	int open(const char *n,int,uint){
 		tt = get_thread()->compose_table(table);
+		tt->check_load(table);
 		path = table->s->path.str;
 		printf("open tt %s\n", table->alias);
 		return 0;

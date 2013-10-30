@@ -70,7 +70,7 @@ private:
 	Poco::BinaryWriter writer;
 	Poco::BinaryWriter compacted_writer;
 	size_t bytes_used;
-	block_registery_type storages;
+	
 	participants_type participants;
 public:	
 	static const int o_mode = std::ios::binary|std::ios::app;
@@ -87,32 +87,7 @@ public:
 	~journal_state(){
 	}
 private:
-	buffers_type_ptr get_buffers(const std::string &name)
-	{
-
-		buffers_type_ptr &r = storages[name];
-
-		if(r==nullptr)
-		{
-			r = std::make_shared<buffers_type>();
-		}
-		return r;
-	}
-
-	buffer_type_ptr get_buffer(const std::string &name, long long addr){
-
-		buffers_type_ptr buffers = get_buffers(name);
-
-		buffer_type_ptr & r = (*buffers)[addr];
-
-		if(r == nullptr)
-		{
-			r = std::make_shared<nst::buffer_type>();
-
-		}
-
-		return r;
-	}
+	
 
 	void add_entry(Poco::UInt32 command, Poco::BinaryWriter &writer, const std::string &name, long long address, const nst::buffer_type& buffer)
 	{
@@ -124,26 +99,12 @@ private:
 		writer.write7BitEncoded(buffer.size());
 		if(!buffer.empty())
 			writer.writeRaw((const char*)&buffer[0], buffer.size() );
-		
+		else if(command != nst::JOURNAL_COMMIT)
+			printf("the journal buffer is empty\n");
 	}
 	void compact()
 	{
-		for(block_registery_type::iterator s = storages.begin(); s != storages.end(); ++s){
-			std::string name = (*s).first;
-			buffers_type_ptr bt = (*s).second;
-			for(buffers_type::iterator b = bt->begin(); b != bt->end(); ++b){
-				long long address = (*b).first;
-				buffer_type_ptr buffer = (*b).second;
-				add_entry(nst::JOURNAL_PAGE, compacted_writer, name, address, *buffer);
-			}
-		}
-		compacted_writer.flush();
 		
-		compacted_writer.stream().flush();
-		storages.clear();
-		bytes_used = 0;
-		
-		journal_ostr.seekp(0ll); /// start over
 		
 	}
 public:
@@ -193,33 +154,29 @@ public:
 		std::ifstream journal_istr(journal_name, std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
 		
-		storages.clear();
-
 		_PendingTransactions pending;
 		_Commands commands;
-		
+		const double MB = 1024.0*1024.0;
 		while(reader.good()){
 			_Command entry;
 			entry.load(reader);
 			if(entry.command == 0 && entry.name.size() == 0){
-				break;
+				continue;
 			}
 			if(entry.command == nst::JOURNAL_PAGE){
+				
+								
 				commands.push_back(entry);
 			}
-			double MB = 1024.0*1024.0;
+			
 			if(entry.command == nst::JOURNAL_COMMIT){
 				printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)reader.stream().tellg()/MB );
 				for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
-					buffer_type_ptr nbuf = get_buffer((*c).name, (*c).address);
-					(*nbuf) = (*c).buffer;
-					bytes_used += nbuf->capacity();
-				}
-				commands.clear();
-
-				for(block_registery_type::iterator s = storages.begin(); s != storages.end(); ++s){
-					std::string storage_name = (*s).first;
-					buffers_type_ptr storage_buffers = (*s).second;
+			
+					_Command &entry =  (*c);
+					nst::stream_address add = entry.address;
+					std::string storage_name = entry.name;
+					
 					stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
 					storage->set_recovery(true);
 					stored::_Transaction* transaction = pending[storage_name];
@@ -228,15 +185,17 @@ public:
 						pending[storage_name] = transaction;
 					}
 					//printf("Recovering %lld pages in %s...\n",(long long)storage_buffers->size(), storage_name.c_str());
-					for(buffers_type::iterator b = storage_buffers->begin(); b != storage_buffers->end(); ++b){
-						nst::stream_address address = (nst::stream_address)(*b).first;
-						buffer_type_ptr buffer = (*b).second;
-						nst::buffer_type& dest = transaction->allocate(address, nst::create);
-						dest = (*buffer);
-						transaction->complete();
-					}					
+					
+					nst::buffer_type& dest = transaction->allocate(add, nst::create);
+					dest = entry.buffer;
+					transaction->complete();
+										
+
+				
 				}
-				storages.clear();
+				
+				commands.clear();
+				
 			}
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
@@ -248,7 +207,8 @@ public:
 			allocations->set_recovery(false);
 			printf("recovered %s\n", storage_name.c_str());
 		}
-		storages.clear();
+		pending.clear();
+		
 		bytes_used = 0;
 		journal_istr.close();
 		journal_ostr.close();
@@ -265,11 +225,13 @@ public:
 
 		writer.flush();
 		journal_ostr.flush();
+		journal_ostr.rdbuf()->pubsync();
 		Poco::File jf(journal_name);
 		if(jf.exists()){
-			if(jf.getSize() > 1024ll*1024ll*1024ll*4ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
 			
-				printf("journal file > 4 GB compacting\n");
+			if(jf.getSize() > 1024ll*1024ll*512ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
+			
+				printf("journal file > n GB compacting\n");
 				//compact();
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){				
 					(*p).second->journal_commit();
