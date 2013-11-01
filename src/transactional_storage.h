@@ -1302,31 +1302,31 @@ namespace storage{
 
 		/// notify the addition of a new reader
 		void add_reader(){
-			scoped_ulock _sync(*lock);
+			
 			(*this).readers++;
 		}
 		
 		/// notify the release of an existing reader
 		void remove_reader(){
-			scoped_ulock _sync(*lock);
+			
 			(*this).readers--;
 		}
 
 		/// how many dependencies are there
 		u64 get_readers() const {
-			scoped_ulock _sync(*lock);
+			
 			return (*this).readers;
 		}
 
 		/// returns true if there are no dependants
 		bool is_unused() const {
-			scoped_ulock _sync(*lock);
+			
 			return ((*this).readers == 0ull);
 		}
 		
 		/// retruns true if there are dependants
 		bool is_used() const {
-			scoped_ulock _sync(*lock);
+			
 			return ((*this).readers != 0ull);
 		}
 
@@ -1403,7 +1403,7 @@ namespace storage{
 		/// TODODONE: set previously committed versions to read only
 		block_type & allocate(address_type& which, storage_action how){
 			last_base = nullptr;
-			(*lock).lock();
+			scoped_ulock _sync(*lock);
 			(*this).allocated_version = 0;
 
 			if(is_readonly() && how != read)
@@ -1470,13 +1470,13 @@ namespace storage{
 			
 		}
 		void complete(){
-			
+			scoped_ulock _sync(*lock);
 			get_allocator().complete();
 			if(last_base != nullptr){
 				last_base->get_allocator().complete();
 				last_base = nullptr;
 			}
-			(*lock).unlock();
+			
 		}
 		void begin(){
 			scoped_ulock _sync(*lock);
