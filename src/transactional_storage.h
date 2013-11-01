@@ -271,6 +271,7 @@ namespace storage{
 		}
 	};
 
+	
 	class InvalidStorageAction : public std::exception{
 		public: /// The storage action supplied is inconsistent with the address provided (according to contract)
 		InvalidStorageAction() throw() {
@@ -282,6 +283,14 @@ namespace storage{
 		WriterConsistencyViolation() throw() {
 		}
 	};
+
+	class ConcurrentWriterError : public std::exception{
+	public: /// There was more than one transaction writing simultaneously
+		ConcurrentWriterError() throw() {
+		}
+	};
+
+	
 
 	class InvalidVersion : public std::exception{
 		public: /// The writing version has uncommitted dependencies
@@ -1175,7 +1184,7 @@ namespace storage{
 
 		typedef std::shared_ptr<storage_allocator_type> storage_allocator_type_ptr;
 
-		typedef std::shared_ptr<version_based_allocator> version_based_allocator_ptr;
+		typedef version_based_allocator* version_based_allocator_ptr;
 
 		typedef version_based_allocator* version_based_allocator_ref;
 
@@ -1260,11 +1269,13 @@ namespace storage{
 
 		/// sets the previous version of this version
 		void set_previous(version_based_allocator_ptr based){
+			scoped_ulock _sync(*lock);
 			(*this).based = based;
 		}
 
 		/// return the previous version of this version if there is one
 		version_based_allocator_ptr get_previous(){
+			scoped_ulock _sync(*lock);
 			return (*this).based;
 		}
 
@@ -1291,26 +1302,31 @@ namespace storage{
 
 		/// notify the addition of a new reader
 		void add_reader(){
+			scoped_ulock _sync(*lock);
 			(*this).readers++;
 		}
 		
 		/// notify the release of an existing reader
 		void remove_reader(){
+			scoped_ulock _sync(*lock);
 			(*this).readers--;
 		}
 
 		/// how many dependencies are there
 		u64 get_readers() const {
+			scoped_ulock _sync(*lock);
 			return (*this).readers;
 		}
 
 		/// returns true if there are no dependants
 		bool is_unused() const {
+			scoped_ulock _sync(*lock);
 			return ((*this).readers == 0ull);
 		}
 		
 		/// retruns true if there are dependants
 		bool is_used() const {
+			scoped_ulock _sync(*lock);
 			return ((*this).readers != 0ull);
 		}
 
@@ -1367,21 +1383,12 @@ namespace storage{
 				if(b->get_allocator().is_end(r)){
 					return true;
 				}
-				b = b->based.get();
+				b = b->based;
 			}
 			return false;
 		}
-		private:
-			void distribute_last()
-			{
-				last_base  = this->based.get();
-				while(last_base != nullptr){
-					block_type& r = last_base->get_allocator().allocate(which, read); //can only read from previous versions 
-					
-					last_base->get_allocator().complete();
-					last_base = last_base->based.get();
-				}
-			}
+		
+			
 		public:
 
 		/// 'interceptor' function allocates or retrieves the latest version of a resource
@@ -1396,7 +1403,7 @@ namespace storage{
 		/// TODODONE: set previously committed versions to read only
 		block_type & allocate(address_type& which, storage_action how){
 			last_base = nullptr;
-			scoped_ulock _sync(*lock);
+			(*lock).lock();
 			(*this).allocated_version = 0;
 
 			if(is_readonly() && how != read)
@@ -1432,7 +1439,7 @@ namespace storage{
 			if(how==create)
 				throw InvalidStorageAction();
 
-			last_base  = this->based.get();
+			last_base  = this->based;
 			while(last_base != nullptr){
 				block_type& r = last_base->get_allocator().allocate(which, read); //can only read from previous versions 
 				if(!(last_base->get_allocator().is_end(r))){
@@ -1454,7 +1461,7 @@ namespace storage{
 					return r;
 				}
 				last_base->get_allocator().complete();
-				last_base = last_base->based.get();
+				last_base = last_base->based;
 			}
 			
 			
@@ -1463,41 +1470,53 @@ namespace storage{
 			
 		}
 		void complete(){
+			
 			get_allocator().complete();
 			if(last_base != nullptr){
 				last_base->get_allocator().complete();
 				last_base = nullptr;
 			}
+			(*lock).unlock();
 		}
 		void begin(){
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->begin();
 		}
 		/// special case only called by mvcc_coordinator
 		void begin_new(){
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->begin_new();
 		}
 		
 		void commit(){
+
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->commit();
 		}
 		void flush(){
+
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->flush();
 		}
+
 		/// write the allocated data to the global journal
 		void journal(const std::string &name){
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->journal(name);
 		}
 		/// return the last address allocated during the lifetime of this version
 		address_type last() const {
+			scoped_ulock _sync(*lock);
 			return allocations->last();
 		}
 
 		bool modified() const {
+			scoped_ulock _sync(*lock);
 			if(allocations!=nullptr)
 				return allocations->modified();
 			return false;
@@ -1529,7 +1548,7 @@ namespace storage{
 
 		typedef version_based_allocator<storage_allocator_type> version_storage_type;
 
-		typedef std::shared_ptr<version_storage_type> version_storage_type_ptr;
+		typedef version_storage_type* version_storage_type_ptr;
 		
 		typedef std::vector<version_storage_type_ptr> storage_container;
 
@@ -1619,7 +1638,7 @@ namespace storage{
 															/// resources
 						for(; i != idle.end(); ++i)
 						{
-							first->copy((*i).get());		/// first -> i
+							first->copy((*i));		/// first -> i
 							
 							first->set_merged();			/// flagged as copied or merged
 							first = (*i);
@@ -1648,16 +1667,35 @@ namespace storage{
 						}
 						merged.push_back((*c));
 					}else{
-						
-						(*c)->set_transient();				/// let any resources be cleaned up
+						if((*c)->is_unused()){
+							(*c)->set_transient();				/// let any resources be cleaned up
 
-						storage_versions.erase((*c)->get_version());
-						
+							storage_versions.erase((*c)->get_version());
+							(*c)->set_previous(nullptr);
+							delete (*c);
+						}else{
+							throw InvalidVersion();
+						}
 					}
 				}
-				
 				storages.swap(merged);
-				if(storages.empty()){};					/// algorithm error
+
+				version_storage_map tester;
+				version_storage_type_ptr prev = nullptr;
+				
+				for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c){
+					if(tester.count((*c)->get_version()) != 0){
+						throw InvalidVersion();
+					}
+					(*c)->set_previous(prev);
+					tester[(*c)->get_version()] = (*c);
+					prev = (*c);
+				}
+				
+				if(storages.empty()){
+					throw InvalidVersion();
+				};					
+				/// algorithm error
 				//if((*storages.begin()) != initial) {}; ///algorithm error
 
 			}
@@ -1678,7 +1716,7 @@ namespace storage{
 		,	recovery(false)
 		{
 			initial->engage();
-			version_storage_type_ptr b = std::make_shared<version_storage_type>(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
 			b->set_allocator(initial);
 			b->set_previous(nullptr);			
 			storages.push_back(b);
@@ -1696,7 +1734,7 @@ namespace storage{
 				for(Poco::StringTokenizer::Iterator t = tokens.begin(); t != tokens.end(); ++t){
 					storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t)));
 					last_address = std::max<stream_address>(last_address, allocator->last() );
-					version_storage_type_ptr b = std::make_shared<version_storage_type>(last_address, ++order, ++next_version, (*this).lock);						
+					version_storage_type_ptr b = new version_storage_type(last_address, ++order, ++next_version, (*this).lock);						
 					allocator->set_allocation_start(last_address);
 					b->set_allocator(allocator);
 					storages.push_back(b);
@@ -1758,7 +1796,7 @@ namespace storage{
 			/// TODODONE: lazy create unmerged transactions only when a write occurs
 			/// TODO: optimize mergeable transactions
 			/// TODODONE: merge unused transactions into single transaction
-			version_storage_type_ptr b = std::make_shared<version_storage_type>(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
 			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()));
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
@@ -1768,11 +1806,10 @@ namespace storage{
 				storages.back()->add_reader();
 			}else{
 				/// TODO: should be an err
-				b->set_allocator(initial);
-				b->set_previous(nullptr);
+				throw WriterConsistencyViolation();
 			}
 
-			return b.get();
+			return b;
 		}
 
 		/// return the transaction order of this coordinator
@@ -1806,7 +1843,8 @@ namespace storage{
 			
 			
 			version->set_readonly();	
-			
+			transaction->set_transient();
+
 			if (!recovery)		/// dont journal during recovery
 				transaction->journal((*this).initial->get_name());
 
@@ -1814,10 +1852,13 @@ namespace storage{
 			last_address = std::max<address_type>(last_address, version->last());
 			
 			version_storage_type_ptr prev = version->get_previous();
-
-			if(prev!=nullptr)		
-				prev->remove_reader();
-
+			if(prev==nullptr)
+				throw WriterConsistencyViolation();
+			if(prev != storages.back()){
+				throw ConcurrentWriterError();
+			}
+			prev->remove_reader();
+			
 			storages.push_back(version);
 
 			++order;			/// increment transaction count
@@ -1843,20 +1884,24 @@ namespace storage{
 					
 			transaction->set_readonly();
 			transaction->set_discard_on_finalize();
-			
+			transaction->set_transient();
 			version_storage_type_ptr version = storage_versions.at(transaction->get_version());
 			
 			if(version == nullptr){
 				throw InvalidVersion();
 			}
-			
+			if(version != transaction){
+				throw InvalidVersion();
+			}
 			version_storage_type_ptr prev = version->get_previous();
 			
 			if(prev!=nullptr)		
 				prev->remove_reader();
 	
 			storage_versions.erase(transaction->get_version());
-			
+			delete transaction;
+			merge_down();	/// merge unused transaction versions 
+							/// releasing any held resources
 		}
 
 		void set_recovery(bool recovery){
