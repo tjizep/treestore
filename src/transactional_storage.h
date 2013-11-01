@@ -57,6 +57,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/Path.h"
 #include "Poco/Logger.h"
 #include "Poco/LogFile.h"
+#include "Poco/StringTokenizer.h"
 #include <lz4.h>
 ///:sqlite_storage
 
@@ -150,6 +151,7 @@ namespace storage{
 		virtual std::string get_name() const = 0;
 		bool participating;
 		journal_participant():participating(false){};
+		
 	};
 	
 	/// the global journal for durable and atomic transactions
@@ -181,6 +183,10 @@ namespace storage{
 		/// called during startup to recover unwritten transactions
 
 		void recover();
+
+		/// log new address creation
+		
+		void log(const std::string &name, const std::string& jtype, stream_address sa);
 	};
 
 	template <typename _AddressType, typename _BlockType = std::vector<u8>>
@@ -254,6 +260,11 @@ namespace storage{
 		}
 	};
 
+	class InvalidStorageException : public std::exception{
+	public: /// The storage has invalid meta data
+		InvalidStorageException() throw() {
+		}
+	};
 	class NonExistentAddressException : public std::exception{
 	public: /// The address required does not exist
 		NonExistentAddressException() throw() {
@@ -1025,13 +1036,10 @@ namespace storage{
 			NS_STORAGE::synchronized s(lock);
 			
 			if(busy){
-				//printf("UN-locking %s\n", get_name().c_str());
-				//_LockList& ll = get_locklist();
-				//ll.erase ( get_name() );
 				if(nullptr != result){
-					
 					up_use(reflect_block_use(result)); /// update changes made to last allocation
 				}
+				
 				busy = false;
 				lock.unlock();
 			}
@@ -1059,7 +1067,7 @@ namespace storage{
 			scoped_ulock ul(lock);
 			open_session();			
 		}
-		/// close all handles and opened files and release memory held in caches unwritten pages are not flushed
+		/// close all handles and opened files and release memory held in caches, unwritten pages are not flushed
 		void close(){
 			discard();
 		}
@@ -1160,7 +1168,7 @@ namespace storage{
 	/// example base storage typedef sqlite_allocator<_AddressType, _BlockType>
 	
 	template <typename _BaseStorage >
-	class version_based_allocator : public journal_participant{
+	class version_based_allocator {
 	public:
 
 		typedef _BaseStorage storage_allocator_type;
@@ -1494,17 +1502,7 @@ namespace storage{
 				return allocations->modified();
 			return false;
 		}
-		/// journal participation functions
-		/// the journal asks this participant to 
-		/// commit its storage
-		virtual void journal_commit() {
-			this->get_allocator().begin_new();
-			this->get_allocator().commit();
-		}
-
-		virtual std::string get_name() const {
-			return this->get_allocator().get_name();
-		}
+		
 	};
 
 	/// coordinates mvcc enabled storages - the mvcc ness of a storage is defined by its 
@@ -1522,7 +1520,7 @@ namespace storage{
 	///	transaction registers its intention
 	///
 	template<typename _BaseStorage>
-	class mvcc_coordinator{
+	class mvcc_coordinator : public journal_participant{
 	public:
 		
 		typedef _BaseStorage storage_allocator_type;
@@ -1543,9 +1541,11 @@ namespace storage{
 			std::string name;
 			
 			version_namer(u64 version, const std::string extension) {
+				
 				name += extension;
 				name += ".";
 				Poco::NumberFormatter::append(name, version);				
+				
 			}
 			
 			version_namer (const default_name_factory& nf){
@@ -1620,6 +1620,7 @@ namespace storage{
 						for(; i != idle.end(); ++i)
 						{
 							first->copy((*i).get());		/// first -> i
+							
 							first->set_merged();			/// flagged as copied or merged
 							first = (*i);
 							
@@ -1647,17 +1648,15 @@ namespace storage{
 						}
 						merged.push_back((*c));
 					}else{
-
-						storage_versions.erase((*c)->get_version());
 						
 						(*c)->set_transient();				/// let any resources be cleaned up
 
+						storage_versions.erase((*c)->get_version());
 						
 					}
 				}
 				
 				storages.swap(merged);
-				
 				if(storages.empty()){};					/// algorithm error
 				//if((*storages.begin()) != initial) {}; ///algorithm error
 
@@ -1667,7 +1666,7 @@ namespace storage{
 		storage_allocator_type_ptr get_initial(){
 			return initial;
 		}
-
+		static const stream_address INTITIAL_ADDRESS = 16;
 		mvcc_coordinator
 		(	storage_allocator_type_ptr initial			/// initial version - to locate storage
 		)
@@ -1683,12 +1682,41 @@ namespace storage{
 			b->set_allocator(initial);
 			b->set_previous(nullptr);			
 			storages.push_back(b);
-			journal::get_instance().engage_participant(b.get());
+			std::string names;
+			stream_address addr = INTITIAL_ADDRESS;
+			buffer_type& content = initial->allocate(addr, create);
+			if(!initial->is_end(content) && content.size() > 0){
+				names.resize(content.size());
+				memcpy(&names[0], &content[0], names.size());
+				printf("found initial versions %s\n",names.c_str());
+			}
+			initial->complete();
+			if(!names.empty()){
+				Poco::StringTokenizer tokens(names, ",");
+				for(Poco::StringTokenizer::Iterator t = tokens.begin(); t != tokens.end(); ++t){
+					storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t)));
+					last_address = std::max<stream_address>(last_address, allocator->last() );
+					version_storage_type_ptr b = std::make_shared<version_storage_type>(last_address, ++order, ++next_version, (*this).lock);						
+					allocator->set_allocation_start(last_address);
+					b->set_allocator(allocator);
+					storages.push_back(b);
+					storage_versions[b->get_version()] = b;			
+				}
+				merge_down();
+				if(storages.size() > 1){
+					throw InvalidStorageException();
+				}
+				initial->begin_new();
+				initial->allocate(addr, create).clear();
+				initial->complete();
+				initial->commit();
+			}
+			journal::get_instance().engage_participant(this);
 		}
 
 		~mvcc_coordinator(){
 
-			journal::get_instance().release_participant(b.get());
+			journal::get_instance().release_participant(this);
 			initial->discard();
 		}
 
@@ -1731,7 +1759,7 @@ namespace storage{
 			/// TODO: optimize mergeable transactions
 			/// TODODONE: merge unused transactions into single transaction
 			version_storage_type_ptr b = std::make_shared<version_storage_type>(last_address, order, ++next_version, (*this).lock);
-			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()+".version"));
+			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()));
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
 			storage_versions[b->get_version()] = b;			
@@ -1776,11 +1804,13 @@ namespace storage{
 				throw InvalidVersion();				
 			}
 			
+			
+			version->set_readonly();	
+			
 			if (!recovery)		/// dont journal during recovery
 				transaction->journal((*this).initial->get_name());
 
-			version->set_readonly();	
-			
+
 			last_address = std::max<address_type>(last_address, version->last());
 			
 			version_storage_type_ptr prev = version->get_previous();
@@ -1831,6 +1861,42 @@ namespace storage{
 
 		void set_recovery(bool recovery){
 			(*this).recovery = recovery;
+		}
+
+		/// journal participation functions
+		/// the journal asks this participant to 
+		/// commit its storage
+		virtual void journal_commit() {
+			
+			std::string names; 
+			storage_container::iterator c = storages.begin();
+			storage_container::iterator c_begin = ++c;
+			for(; c != storages.end(); ++c)
+			{
+				if( c != c_begin )
+					names += ",";
+				std::string n = (*c)->get_allocator().get_name();
+				names += n;
+			}
+			
+
+			stream_address addr = INTITIAL_ADDRESS;
+			buffer_type& content = initial->allocate(addr, create);
+			content.resize(names.size());
+			if(names.size() > 0)
+				memcpy(&content[0], &names[0], names.size());
+			initial->complete();
+			for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
+			{
+				(*c)->begin_new();
+				
+				(*c)->commit();
+				
+			}
+		}
+
+		virtual std::string get_name() const {
+			return this->initial->get_name();
 		}
 	};
 /// complete namespaces

@@ -627,11 +627,17 @@ namespace stx
 
 				if(!w)
 				{
-					context->get_storage()->allocate(super::w,stx::storage::create);
+					if(context->get_storage()->is_readonly()){
+
+						printf("allocating new page in readonly mode\n");
+						throw std::exception("cannot allocate new page in readonly transaction\n");
+					}
+					context->get_storage()->allocate(super::w, stx::storage::create);
 					context->get_storage()->complete();
 				}
 				(*this).set_state( created );
 			}
+			
 
 			/// load the persist proxy and set its state to changed
 			void change(){
@@ -646,7 +652,10 @@ namespace stx
 					(*this).set_state(changed);
 								
 				}
-				
+				if(rget()->shared){
+					throw std::exception("cannot change state of shared node");
+				}
+
 			}
 
 			void _save(btree & context){
@@ -1525,7 +1534,10 @@ namespace stx
 
 		void save(interior_node* n, stream_address& w){
 			if(shared.nodes) return;
-			if(get_storage()->is_readonly()) return;
+			if(get_storage()->is_readonly()){
+				printf("NOT saving readonly page\n");
+				return;
+			}
 			if(n->is_modified()){
 				//printf("[B-TREE SAVE] i-node  %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version()); 
 				using namespace stx::storage;
@@ -1560,7 +1572,10 @@ namespace stx
 
 		void save(surface_node* n, stream_address& w){
 			if(shared.nodes) return;
-			if(get_storage()->is_readonly()) return;
+			if(get_storage()->is_readonly()){
+				printf("NOT saving readonly surface node\n");
+				return;
+			}
 			if(n->is_modified()){
 				//printf("[B-TREE SAVE] s-node %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version()); 
 				using namespace stx::storage;
@@ -1630,9 +1645,7 @@ namespace stx
 			/// TODO: NB! double mutex
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
-				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());
-				buffer_type& dangling_buffer2 = get_storage()->allocate(w, stx::storage::read);
-				printf("bad allocation %lld\n", (long long)dangling_buffer2.size());
+				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());				
 			}
 			NS_STORAGE::version_type version = get_storage()->get_allocated_version();
 			_AddressPair ap = std::make_pair(w, version);

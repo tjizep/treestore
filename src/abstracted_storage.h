@@ -61,7 +61,7 @@ namespace stored{
 		virtual NS_STORAGE::buffer_type::iterator read(NS_STORAGE::buffer_type::iterator reader) = 0;
 	};
 	class NullPointerException : public std::exception{
-		public: /// The storage action supplied is inconsistent with the address provided (according to contract)
+		public: /// The storage action required is inconsistent with the address provided (according to contract)
 		NullPointerException() throw() {
 		}
 	};
@@ -233,7 +233,7 @@ namespace stored{
 		}
 		
 		/// returns true if the buffer passed marks the end of storage
-		///	i.e. invalid read or write allocation of non existend address
+		///	i.e. invalid read or write allocation of non existent address
 
 		bool is_end(const NS_STORAGE::buffer_type& buffer) const {
 			return get_transaction().is_end(buffer);

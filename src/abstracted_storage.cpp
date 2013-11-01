@@ -48,9 +48,13 @@ _LockList& get_locklist(){
 #include <Poco/BinaryWriter.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/File.h>
-
-
-
+static Poco::Mutex llock;
+std::ofstream creation("allocations.txt", std::ios::app);
+void log_journal(const std::string &name, const std::string& jtype, nst::u64 sa){
+	nst::synchronized _llock(llock);
+	
+	creation << name << " : " << jtype << " : " << sa << std::endl;
+}
 struct journal_state{
 public:
 	typedef nst::journal_participant participant;
@@ -70,7 +74,7 @@ private:
 	Poco::BinaryWriter writer;
 	Poco::BinaryWriter compacted_writer;
 	size_t bytes_used;
-	
+	nst::u64 sequence;
 	participants_type participants;
 public:	
 	static const int o_mode = std::ios::binary|std::ios::app;
@@ -82,6 +86,7 @@ public:
 	,	writer(journal_ostr)
 	,	compacted_writer(compacted_ostr)
 	,	bytes_used(0)
+	,	sequence(0)
 	{
 	}
 	~journal_state(){
@@ -91,7 +96,8 @@ private:
 
 	void add_entry(Poco::UInt32 command, Poco::BinaryWriter &writer, const std::string &name, long long address, const nst::buffer_type& buffer)
 	{
-
+		//log_journal(name, "entry", address);
+		writer.write7BitEncoded(++sequence);
 		writer.write7BitEncoded(command);
 		writer.write7BitEncoded(name.size());
 		writer.writeRaw(name );
@@ -129,6 +135,7 @@ public:
 		
 	}
 	struct _Command{
+		nst::u64 sequence;
 		Poco::UInt32 command;	
 		std::string name;
 		Poco::UInt64 address;
@@ -136,6 +143,7 @@ public:
 
 		void load(Poco::BinaryReader& reader){
 			Poco::UInt64 size;
+			reader.read7BitEncoded(sequence);	
 			reader.read7BitEncoded(command);				
 			reader.read7BitEncoded(size);
 			name.resize(size);
@@ -153,62 +161,68 @@ public:
 		typedef std::unordered_map<std::string, stored::_Transaction*> _PendingTransactions;
 		std::ifstream journal_istr(journal_name, std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
-		
+		nst::u64 sequence = 0;
 		_PendingTransactions pending;
 		_Commands commands;
 		const double MB = 1024.0*1024.0;
-		while(reader.good()){
-			_Command entry;
-			entry.load(reader);
-			if(entry.command == 0 && entry.name.size() == 0){
-				continue;
-			}
-			if(entry.command == nst::JOURNAL_PAGE){
-				
-								
-				commands.push_back(entry);
-			}
-			
-			if(entry.command == nst::JOURNAL_COMMIT){
-				printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)reader.stream().tellg()/MB );
-				for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
-			
-					_Command &entry =  (*c);
-					nst::stream_address add = entry.address;
-					std::string storage_name = entry.name;
+		try{
+			while(reader.good()){
+				_Command entry;
+				entry.load(reader);
+				if(entry.sequence != ++sequence){
+					if(entry.sequence)
+						printf("bad sequence number %lld received %lld expected\n", entry.sequence, sequence);
 					
-					stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
-					storage->set_recovery(true);
-					stored::_Transaction* transaction = pending[storage_name];
-					if(transaction == nullptr){
-						transaction = storage->begin();
-						pending[storage_name] = transaction;
-					}
-					//printf("Recovering %lld pages in %s...\n",(long long)storage_buffers->size(), storage_name.c_str());
-					
-					nst::buffer_type& dest = transaction->allocate(add, nst::create);
-					dest = entry.buffer;
-					transaction->complete();
-										
-
-				
+					throw std::exception("recovery error");
+					return;
 				}
-				
-				commands.clear();
-				
+			
+				if(entry.command == nst::JOURNAL_PAGE){
+
+					commands.push_back(entry);
+					
+				}
+			
+				if(entry.command == nst::JOURNAL_COMMIT){
+					printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)reader.stream().tellg()/MB );
+					for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
+			
+						_Command &entry =  (*c);
+						nst::stream_address add = entry.address;
+						std::string storage_name = entry.name;
+					
+						stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
+						storage->set_recovery(true);
+						stored::_Transaction* transaction = pending[storage_name];
+						if(transaction == nullptr){
+							transaction = storage->begin();
+							pending[storage_name] = transaction;
+						}
+						
+						nst::buffer_type& dest = transaction->allocate(add, nst::create);
+						dest = entry.buffer;
+						transaction->complete();
+										
+					}
+					
+					commands.clear();
+					
+				}
 			}
+			
+		}catch(...){
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
 			std::string storage_name = (*p).first;
 			stored::_Transaction* transaction = pending[storage_name];
 			stored::_Allocations* allocations = stored::_get_abstracted_storage(storage_name);
-			printf("recovering %s...\n", storage_name.c_str());
 			allocations->commit(transaction);
 			allocations->set_recovery(false);
 			printf("recovered %s\n", storage_name.c_str());
 		}
+					
 		pending.clear();
-		
+		(*this).sequence = 0;
 		bytes_used = 0;
 		journal_istr.close();
 		journal_ostr.close();
@@ -229,16 +243,18 @@ public:
 		Poco::File jf(journal_name);
 		if(jf.exists()){
 			
-			if(jf.getSize() > 1024ll*1024ll*512ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
+			if(jf.getSize() > 1024ll*1024ll*1024ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
 			
 				printf("journal file > n GB compacting\n");
 				//compact();
+				log_journal(journal_name,"commit",0);
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){				
 					(*p).second->journal_commit();
 				}
 				printf("journal file compacting complete\n");
 				journal_ostr.close();
 				jf.remove();
+				sequence = 0;
 				journal_ostr.open(journal_name, std::ios::binary);
 			}
 		}
@@ -255,22 +271,32 @@ namespace storage{
 
 	journal::journal(){
 	}
+
 	journal::~journal(){
 	}
+
 	void journal::recover(){
 		js().recover();
 	}
+
 	void journal::engage_participant(journal_participant* p){
 		js().engage_participant(p);
 	}
+
 	void journal::release_participant(journal_participant* p){
 		js().release_participant(p);
 	}
+
 	journal& journal::get_instance(){
 		
 		static journal j;
 		return j;
 	}
+
+	void journal::log(const std::string &name, const std::string& jtype, stream_address sa){
+		log_journal(name, jtype, sa);
+	}
+	
 	/// adds a journal entry written to disk
 
 	void journal::add_entry(Poco::UInt32 command, const std::string &name, long long address, const buffer_type& buffer){

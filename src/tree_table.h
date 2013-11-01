@@ -380,6 +380,9 @@ namespace tree_stored{
 		
 
 		void begin_table(){
+			if(!changed) table.share(storage.get_name());
+			else table.unshare();
+						
 			if(changed || storage.stale()){
 				storage.begin();
 				storage.set_transaction_r(!changed);
@@ -387,10 +390,8 @@ namespace tree_stored{
 			}else{
 				storage.set_transaction_r(!changed);
 			}
-			
-			if(!changed) table.share(storage.get_name());
-			else table.unshare();
 			init_rowcount();
+			
 		
 		}
 
@@ -854,7 +855,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				//rollback();
+				rollback();
 			}
 		}
 		void write(TABLE* table){

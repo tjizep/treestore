@@ -747,7 +747,7 @@ namespace collums{
 		/// with a transitive and simmetric property
 		/// such that i < j then enc(i) < enc(j) and 
 		/// i < j and j < k then enc(i) < enc(k) and
-		/// enc(-i) < enc(i) and {i,j,k} from integers
+		/// enc(-i) < enc(0) < enc(i) and {i,j,k} from integers
 
 		template<typename _It>
 		inline void storei(uchar* d, _It v){
