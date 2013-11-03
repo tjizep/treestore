@@ -243,7 +243,7 @@ public:
 		Poco::File jf(journal_name);
 		if(jf.exists()){
 			
-			if(jf.getSize() > 1024ll*1024ll*1024ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
+			if(jf.getSize() > 1024ll*1024ll*1024ll*8ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
 			
 				printf("journal file > n GB compacting\n");
 				//compact();

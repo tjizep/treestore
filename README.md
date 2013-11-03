@@ -27,7 +27,7 @@ Features
 
  9. Simple and easy to change code base
 
- 10. stl like internal data structures for index and collumn storage
+ 10. STL like internal data structures for index and collumn storage
 
  11. No NULL storage format, no extra bit for NULL values
 

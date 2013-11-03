@@ -290,7 +290,11 @@ namespace storage{
 		}
 	};
 
-	
+	class InvalidReaderDependencies : public std::exception{
+		public: /// The reader has no locks
+		InvalidReaderDependencies() throw() {
+		}
+	};
 
 	class InvalidVersion : public std::exception{
 		public: /// The writing version has uncommitted dependencies
@@ -832,8 +836,8 @@ namespace storage{
 					dest.complete();
 					d = &(dest.allocate(at, create));
 				}
-				if((*this).get_allocated_version() < dest.get_allocated_version()){
-					printf("low version copy error\n");
+				if((*this).get_allocated_version() <= dest.get_allocated_version()){
+					throw InvalidVersion();
 				}
 				*d = r;
 
@@ -952,7 +956,10 @@ namespace storage{
 			
 			scoped_ulock ul(lock);
 			if(references == 0){
-				
+				if(_session!=nullptr){
+					(*this).begin_new();
+					(*this).commit();
+				}
 				if(_session!=nullptr){
 					printf(" discarding storage %s\n",name.c_str());
 					rollback();
@@ -965,7 +972,7 @@ namespace storage{
 					delete (*a).second;
 				}
 				allocations.clear();
-				versions.clear();
+				//versions.clear();
 			}
 		}
 
@@ -1302,13 +1309,13 @@ namespace storage{
 
 		/// notify the addition of a new reader
 		void add_reader(){
-			
+			scoped_ulock _sync(*lock);
 			(*this).readers++;
 		}
 		
 		/// notify the release of an existing reader
 		void remove_reader(){
-			
+			scoped_ulock _sync(*lock);
 			(*this).readers--;
 		}
 
@@ -1403,7 +1410,7 @@ namespace storage{
 		/// TODODONE: set previously committed versions to read only
 		block_type & allocate(address_type& which, storage_action how){
 			last_base = nullptr;
-			scoped_ulock _sync(*lock);
+			(*lock).lock();
 			(*this).allocated_version = 0;
 
 			if(is_readonly() && how != read)
@@ -1470,13 +1477,13 @@ namespace storage{
 			
 		}
 		void complete(){
-			scoped_ulock _sync(*lock);
+			//scoped_ulock _sync(*lock);
 			get_allocator().complete();
 			if(last_base != nullptr){
 				last_base->get_allocator().complete();
 				last_base = nullptr;
 			}
-			
+			(*lock).unlock();
 		}
 		void begin(){
 			scoped_ulock _sync(*lock);
@@ -1601,7 +1608,27 @@ namespace storage{
 		mutex_ptr lock;						/// lock for access to member data from different threads
 
 		bool recovery;						/// flags recovery mode so that journal isnt used
+	private:
+		void save_recovery_info(){
+			std::string names; 
+			storage_container::iterator c = storages.begin();
+			storage_container::iterator c_begin = ++c;
+			for(; c != storages.end(); ++c)
+			{
+				if( c != c_begin )
+					names += ",";
+				std::string n = (*c)->get_allocator().get_name();
+				names += n;
+			}
+			
 
+			stream_address addr = INTITIAL_ADDRESS;
+			buffer_type& content = initial->allocate(addr, create);
+			content.resize(names.size());
+			if(names.size() > 0)
+				memcpy(&content[0], &names[0], names.size());
+			initial->complete();
+		}
 	public:
 		
 		/// merge idle transactions from latest to oldest
@@ -1617,12 +1644,19 @@ namespace storage{
 				storage_container merged;
 				storage_container::reverse_iterator latest_idle = storages.rbegin();
 				storage_container idle;
-			
+				u64 version = 0;
+				for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
+				{
+					if((*c)->get_version() <= version)
+						throw InvalidWriterOrder();
+					(*c)->clear_merged();
+					version = (*c)->get_version();
+				}
+
 				for(;;)
 				{
-					bool rok  = latest_idle != storages.rend();
-					if(rok) (*latest_idle)->clear_merged();
-					if(rok && (*latest_idle)->is_unused())
+					bool Ok  = latest_idle != storages.rend();
+					if(Ok && (*latest_idle)->is_unused())
 					{
 						
 						idle.push_back((*latest_idle));		/// collect idle transactions
@@ -1630,27 +1664,29 @@ namespace storage{
 						
 					}else if(!idle.empty())
 					{
-						version_storage_type_ptr first;						
+						version_storage_type_ptr latest;						
 						storage_container::iterator i = idle.begin();
-						first = (*i);
-						++i;								/// at least 2 consecutive versions 
+						latest = (*i);
+						++i;								/// at least 2 consecutive idle versions 
 															/// are needed to actually merge their 
 															/// resources
 						for(; i != idle.end(); ++i)
 						{
-							first->copy((*i));		/// first -> i
+							if(latest->get_version() <= (*i)->get_version())
+								throw InvalidWriterOrder();
+							latest->copy((*i));		/// first -> i
 							
-							first->set_merged();			/// flagged as copied or merged
-							first = (*i);
+							latest->set_merged();	/// flagged as copied or merged
+							latest = (*i);
 							
 						}
 						
-						first->clear_merged();				/// its not merged with something lower down
+						latest->clear_merged();				/// its not merged with something lower down
 						
 						idle.clear();						/// cleanup references
 
 					}else idle.clear();
-					if(!rok){
+					if(!Ok){
 						break;
 					}
 					++latest_idle;
@@ -1658,15 +1694,8 @@ namespace storage{
 				
 				for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 				{
-					if(!(*c)->is_merged())
+					if((*c)->is_merged())
 					{
-						if(recovery){
-							/// only during recovery shall this be done
-							(*c)->begin_new();
-							(*c)->commit();
-						}
-						merged.push_back((*c));
-					}else{
 						if((*c)->is_unused()){
 							(*c)->set_transient();				/// let any resources be cleaned up
 
@@ -1676,25 +1705,38 @@ namespace storage{
 						}else{
 							throw InvalidVersion();
 						}
+						
+					}else{
+						if(recovery){
+							
+							(*c)->begin_new();
+							(*c)->commit();
+
+						}
+						merged.push_back((*c));
 					}
 				}
 				storages.swap(merged);
 
-				version_storage_map tester;
+				version_storage_map verify;
 				version_storage_type_ptr prev = nullptr;
 				
 				for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c){
-					if(tester.count((*c)->get_version()) != 0){
+					if(verify.count((*c)->get_version()) != 0){
 						throw InvalidVersion();
 					}
 					(*c)->set_previous(prev);
-					tester[(*c)->get_version()] = (*c);
+					(*c)->set_permanent();
+					if(prev && (*c)->get_version() <= prev->get_version())
+						throw InvalidWriterOrder();
+					verify[(*c)->get_version()] = (*c);
 					prev = (*c);
 				}
 				
 				if(storages.empty()){
 					throw InvalidVersion();
-				};					
+				};			
+				save_recovery_info();
 				/// algorithm error
 				//if((*storages.begin()) != initial) {}; ///algorithm error
 
@@ -1775,8 +1817,8 @@ namespace storage{
 			///	need to let go so that maintenance can happen (i.e. drop table)
 			if(0==references){
 				
-				//merge_down();
-				if(storages.size()==1){
+				merge_down();
+				if(storages.size()==1){					
 					initial->release();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
 			}
@@ -1805,7 +1847,7 @@ namespace storage{
 				b->set_previous(storages.back());
 				storages.back()->add_reader();
 			}else{
-				/// TODO: should be an err
+				
 				throw WriterConsistencyViolation();
 			}
 
@@ -1843,8 +1885,7 @@ namespace storage{
 			
 			
 			version->set_readonly();	
-			transaction->set_transient();
-
+			
 			if (!recovery)		/// dont journal during recovery
 				transaction->journal((*this).initial->get_name());
 
@@ -1900,8 +1941,7 @@ namespace storage{
 	
 			storage_versions.erase(transaction->get_version());
 			delete transaction;
-			merge_down();	/// merge unused transaction versions 
-							/// releasing any held resources
+		
 		}
 
 		void set_recovery(bool recovery){
@@ -1913,24 +1953,10 @@ namespace storage{
 		/// commit its storage
 		virtual void journal_commit() {
 			
-			std::string names; 
-			storage_container::iterator c = storages.begin();
-			storage_container::iterator c_begin = ++c;
-			for(; c != storages.end(); ++c)
-			{
-				if( c != c_begin )
-					names += ",";
-				std::string n = (*c)->get_allocator().get_name();
-				names += n;
-			}
-			
+			merge_down();
 
-			stream_address addr = INTITIAL_ADDRESS;
-			buffer_type& content = initial->allocate(addr, create);
-			content.resize(names.size());
-			if(names.size() > 0)
-				memcpy(&content[0], &names[0], names.size());
-			initial->complete();
+			save_recovery_info();
+
 			for(storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
 				(*c)->begin_new();
