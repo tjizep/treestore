@@ -80,11 +80,11 @@ namespace asynchronous{
 				Notification::Ptr pNf(_queue.waitDequeueNotification());
 				if (pNf)
 				{
-					message_type::Ptr pWorkNf = pNf.cast<message_type>();
+					typename message_type::Ptr pWorkNf = pNf.cast<message_type>();
 					if (pWorkNf)
 					{
 						pWorkNf->doTask();
-						
+
 						continue;
 					}
 
@@ -102,14 +102,14 @@ namespace asynchronous{
 	private:
 		std::string        _name;
 		NotificationQueue& _queue;
-		
+
 	};
 
 
 	template<typename _Notification>
 	class QueueManager{
 	public:
-		typedef typename _Notification notification_type;
+		typedef _Notification notification_type;
 		typedef typename asynchronous::Worker<notification_type> _Worker;
 		typedef _Worker* WorkerPtr;
 		typedef std::vector<WorkerPtr> _Workers;
@@ -121,7 +121,7 @@ namespace asynchronous{
 	protected:
 		void createWorkers(){
 
-			for (_Workers::iterator w = workers.begin(); w != workers.end(); ++w){
+			for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
 				(*w) = new _Worker("asynchronous worker", queue);
 				threads.start(*(*w));
 			}
@@ -129,15 +129,15 @@ namespace asynchronous{
 		}
 		void stopWorkers(){
 			try{
-				for (_Workers::iterator w = workers.begin(); w != workers.end(); ++w){
-					queue.enqueueNotification(new QuitNotification());				
+				for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
+					queue.enqueueNotification(new QuitNotification());
 				}
 				printf("workers stopping...\n");
-				while (!queue.empty()) Thread::__sleep(50);				
+				while (!queue.empty()) Thread::__sleep(50);
 				printf("workers stopped\n");
-				for (_Workers::iterator w = workers.begin(); w != workers.end(); ++w){
+				for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
 					//delete (*w);
-				}				
+				}
 			}catch(Poco::Exception&){
 				printf("error stopping workers\n");
 			}
@@ -153,10 +153,10 @@ namespace asynchronous{
 			stopWorkers();
 		}
 
-		void add(typename notification_type* note){
+		void add(typename QueueManager::notification_type* note){
 			queue.enqueueNotification(note);
-			
+
 		}
-		
+
 	};
 };

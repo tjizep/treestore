@@ -39,7 +39,7 @@ template <	typename _Key,
 			typename _Storage,
 			typename _Compare = std::less<_Key>,
 			typename _Iterpolator = stx::interpolator<_Key> ,
-			typename _Traits = btree_default_set_traits<_Key, default_persist_traits>,
+			typename _Traits = btree_default_set_traits<_Key, def_p_traits>,
 			typename _Alloc = std::allocator<_Key> >
 class btree_set
 {
@@ -82,7 +82,7 @@ public:
 
     /// Typedef of our own type
     typedef btree_set<key_type, key_compare, key_interpolator, traits, allocator_type> self;
-	
+
 	/// Storage
 
     typedef _Storage storage_type;
@@ -558,7 +558,7 @@ public:
 	}
 
 	/// unshare all surfaces
-	
+
 	void unshare(){
 		tree.unshare();
 	}
@@ -566,10 +566,10 @@ public:
 	stx::storage::stream_address get_root_address() const {
 		return tree.get_root_address();
 	}
-    
+
 	// encodes and writes all nodes active nodes thats still modified
 
-    void flush() 
+    void flush()
     {
         tree.flush();
     }

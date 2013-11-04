@@ -3,13 +3,14 @@
 #pragma warning(disable : 4503)
 #include <stx/storage/types.h>
 #include <stx/storage/leb128.h>
-#include "Poco/Mutex.h"
+#include <Poco/Mutex.h>
 #include <lz4.h>
+#include <stdio.h>
 extern "C"{
 	#include "zlib.h"
 };
 namespace stx{
-	
+
 	namespace storage{
 
 		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
@@ -17,17 +18,17 @@ namespace stx{
 		static void inplace_compress_lz4(buffer_type& buff){
 			buffer_type t;
 			/// TODO: cannot compress sizes lt 200 mb
-			t.resize(LZ4_compressBound((int)buff.size())+sizeof(int));			
+			t.resize(LZ4_compressBound((int)buff.size())+sizeof(int));
 			int cp = buff.empty() ? 0 : LZ4_compress((const char*)&buff[0], (char*)&t[sizeof(int)], (int)buff.size());
 			t.resize(cp + sizeof(int));
 			*((int*)&t[0]) = (int)buff.size();
-			buff = t;			
+			buff = t;
 		}
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){
-			
+
 			int d = *((int*)&buff[0]) ;
 			decoded.resize(d);
-			LZ4_decompress_fast((const char *)&buff[sizeof(int)],(char *)&decoded[0],d);			
+			LZ4_decompress_fast((const char *)&buff[sizeof(int)],(char *)&decoded[0],d);
 		}
 		static void inplace_decompress_lz4(buffer_type& buff){
 			if(buff.empty()) return;
@@ -53,17 +54,18 @@ namespace stx{
 		}
 		static void decompress_zlib(buffer_type &decoded,const buffer_type& encoded){
 			if(encoded.empty()) return;
-			uLongf eos = (uLongf)encoded.size();			
-			uLongf actual = *((uLongf*)&encoded[0]);			
+			uLongf eos = (uLongf)encoded.size();
+			uLongf actual = *((uLongf*)&encoded[0]);
 			uLongf compressed = eos - sizeof(actual);
-			decoded.resize(actual+1024);		
+			decoded.resize(actual+1024);
 			if(Z_OK != uncompress((Bytef*)&decoded[0], (uLongf*)&actual, (Bytef*)&encoded[sizeof(actual)], compressed)){
 				printf("ZLIB read error eos %ld, actual %ld, compressed %ld\n",eos,actual,compressed);
 				return;
 			}
 			decoded.resize(actual);
-			decoded.shrink_to_fit();
-		
+			buffer_type temp = decoded;
+			decoded.swap(temp);
+
 		}
 		static void inplace_decompress_zlib(buffer_type &decoded){
 			if(decoded.empty()) return;
@@ -77,19 +79,19 @@ namespace stx{
 			create
 		};
 
-		/// basic storage functions based on vectors of 1 byte unsigned 
+		/// basic storage functions based on vectors of 1 byte unsigned
 		class basic_storage{
 		protected:
 			typedef u8 value_type;
-		
+
 		public:
 			/// reading functions for basic types
-			
-			buffer_type::iterator write(buffer_type::iterator out, u8 some){				
+
+			buffer_type::iterator write(buffer_type::iterator out, u8 some){
 				return stx::storage::leb128::write_unsigned(out, some);
 			}
-			
-			buffer_type::iterator write(buffer_type::iterator out, u16 some){				
+
+			buffer_type::iterator write(buffer_type::iterator out, u16 some){
 				return stx::storage::leb128::write_unsigned(out, some);
 			}
 
@@ -101,7 +103,7 @@ namespace stx{
 				return stx::storage::leb128::write_signed(out, some);
 			}
 
-			/// write the buffer to the out iterator			
+			/// write the buffer to the out iterator
 			buffer_type::iterator write(buffer_type::iterator out, buffer_type::iterator limit, const u8 *some, u32 l){
 				const u8* e = some+l;
 				for(;some != e && out !=limit ;++some){
@@ -110,14 +112,14 @@ namespace stx{
 				}
 				return out;
 			}
-			
+
 			/// reading functions for basic types
-			u32 read_unsigned(buffer_type::iterator &inout){				
-				return stx::storage::leb128::read_unsigned(inout);				
+			u32 read_unsigned(buffer_type::iterator &inout){
+				return stx::storage::leb128::read_unsigned(inout);
 			}
-			
-			i32 read_signed(buffer_type::iterator &inout){				
-				return stx::storage::leb128::read_signed(inout);				
+
+			i32 read_signed(buffer_type::iterator &inout){
+				return stx::storage::leb128::read_signed(inout);
 			}
 
 			size_t read(u8 *some, buffer_type::iterator in, buffer_type::iterator limit){

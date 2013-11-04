@@ -26,7 +26,7 @@ namespace stx {
  * tree nodes. Additionally this version has a node proxy which allows pointers to
  * diffrent types of memory simultaneously like encoded,compressed,disk etc.
  * The tree does not provide LRU optimization. modified semantics is provided
- * via non-const iterator to provide storage with idea of newly created/modified 
+ * via non-const iterator to provide storage with idea of newly created/modified
  * pages
  *
  */
@@ -34,7 +34,7 @@ template <	typename _Key, typename _Data,
 			typename _Storage ,
 			typename _Compare = std::less<_Key>,
 			typename _Iterpolator = stx::interpolator<_Key> ,
-			typename _Traits = btree_default_map_traits<_Key, _Data, default_persist_traits>,
+			typename _Traits = bt_def_map_t<_Key, _Data, def_p_traits>,
 			typename _Alloc = std::allocator<std::pair<_Key, _Data> > >
 class btree_multimap
 {
@@ -61,7 +61,7 @@ public:
 
     /// Sixth template parameter: STL allocator
     typedef _Alloc                      allocator_type;
-	
+
     /// Seventh template parameter: persistence context
     typedef _Storage storage_type;
 
@@ -70,12 +70,12 @@ public:
 
     /// Typedef of our own type
     typedef btree_multimap<key_type, data_type, storage_type, key_compare, key_interpolator, traits, allocator_type> self;
-	
+
     /// Construct the STL-required value_type as a composition pair of key and
     /// data types
     typedef std::pair<key_type, data_type>      value_type;
 
-    /// Implementation type of the btree_base    
+    /// Implementation type of the btree_base
 	typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, true, allocator_type> btree_impl;
 
     /// Function class comparing two value_type pairs.
@@ -512,7 +512,7 @@ public:
 
 public:
 
-	/// reduce the tree memory use by encoding pages 
+	/// reduce the tree memory use by encoding pages
 
 	void reduce_use(){
 		tree.reduce_use();
@@ -587,7 +587,7 @@ public:
 	}
 
 	/// unshare all surfaces
-	
+
 	void unshare(){
 		tree.unshare();
 	}
@@ -599,7 +599,7 @@ public:
 
     void flush()    {
         tree.flush();
-		
+
     }
     bool restore(std::istream &is)
     {

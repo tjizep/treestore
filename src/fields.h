@@ -56,10 +56,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 namespace NS_STORAGE = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
 namespace stored{
-	
+
 	static const double	MB = 1024.0*1024.0;
 	static const double	GB = 1024*1024*1024;
-	
+
 	inline double units(NS_STORAGE::u64 in, double unit){
 		return in / unit;
 	}
@@ -69,7 +69,7 @@ namespace stored{
 		_IntType value;
 	public:
 		inline _IntType get_value() const {
-			
+
 			return value;
 		}
 		inline void set_value(_IntType nv) {
@@ -141,13 +141,13 @@ namespace stored{
 			return sizeof(value);
 		};
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
-			NS_STORAGE::buffer_type::iterator writer = w;		
+			NS_STORAGE::buffer_type::iterator writer = w;
 			memcpy((NS_STORAGE::u8*)&(*writer), &value, sizeof(value));
 			writer += sizeof(value);
 			return writer;
 		};
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
-			NS_STORAGE::buffer_type::const_iterator reader = r;		
+			NS_STORAGE::buffer_type::const_iterator reader = r;
 			memcpy(&value, (const NS_STORAGE::u8*)&(*reader), sizeof(value));
 			reader+=sizeof(value);
 			return reader;
@@ -189,14 +189,14 @@ namespace stored{
 		};
 
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
-			NS_STORAGE::buffer_type::iterator writer =  NS_STORAGE::leb128::write_signed(w, value.size());		
+			NS_STORAGE::buffer_type::iterator writer =  NS_STORAGE::leb128::write_signed(w, value.size());
 			memcpy((NS_STORAGE::u8*)writer, &value, value.size()*sizeof(_FType::value_type));
 			writer += value.size();
 			return writer;
 		};
 
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
-			NS_STORAGE::buffer_type::iterator reader = r;		
+			NS_STORAGE::buffer_type::iterator reader = r;
 			value.resize(NS_STORAGE::leb128::read_signed(reader));
 			memcpy(&value, (NS_STORAGE::u8*)reader, value.size()*sizeof(_FType::value_type));
 			reader += value.size();
@@ -213,12 +213,12 @@ namespace stored{
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 		NS_STORAGE::u8 buf[_ConstSize];
-		
-		inline NS_STORAGE::u8 *extract_ptr(){			
-			return (NS_STORAGE::u8*)(*(size_t*)(buf));	
+
+		inline NS_STORAGE::u8 *extract_ptr(){
+			return (NS_STORAGE::u8*)(*(size_t*)(buf));
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));	
+			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
 		NS_STORAGE::u8* data(){
 			if(bytes <= _ConstSize){
@@ -249,29 +249,29 @@ namespace stored{
 			}
 			return r;
 		}
-		void _add( const void * v, size_t count, bool end_term = false){	
+		void _add( const void * v, size_t count, bool end_term = false){
 			_BufferSize extra = end_term ? 1 : 0;
 			_resize_buffer(count + extra);
 			memcpy(data(),v,count);
 			if(end_term) data()[count] = 0;
-			size+=(_BufferSize)count + extra;			
+			size+=(_BufferSize)count + extra;
 		}
 		bool less(const Blobule& right) const {
 			using namespace NS_STORAGE;
-		
+
 			const u8 * lp = data();
 			const u8 * rp = right.data();
-			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));			
+			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));
 			if(r != 0){
 				return (r < 0);
 			}
 
-			return (size < right.size);						
+			return (size < right.size);
 		}
-		bool not(const Blobule& right) const {
+		bool not_equal(const Blobule& right) const {
 			using namespace NS_STORAGE;
 			if(size != right.size){
-				return true;			
+				return true;
 			}
 			const u8 * lp = data();
 			const u8 * rp = right.data();
@@ -279,9 +279,9 @@ namespace stored{
 			if(r != 0){
 				return true;
 			}
-			
+
 			return false;
-		
+
 		}
 	public:
 		char * get_value(){
@@ -321,7 +321,7 @@ namespace stored{
 		void add(double v){
 			_add(&v, sizeof(v));
 		}
-		
+
 		void add(const char * nt,size_t n){
 			_add(nt,(_size_type)n);
 		}
@@ -359,8 +359,8 @@ namespace stored{
 			size = 0;
 			add();
 		}
-		
-		Blobule () 
+
+		Blobule ()
 		:	bytes(_ConstSize)
 		,	size(0)
 		{
@@ -373,7 +373,7 @@ namespace stored{
 				delete data();
 			}
 		}
-		
+
 		Blobule (const Blobule& init)
 		:	bytes(_ConstSize)
 		,	size(0)
@@ -383,42 +383,42 @@ namespace stored{
 		Blobule(const char *right)
 		:	bytes(_ConstSize)
 		,	size(0)
-		{			
+		{
 			*this = right;
 		}
 
-		Blobule(const NS_STORAGE::i64& right) 
+		Blobule(const NS_STORAGE::i64& right)
 		:	bytes(_ConstSize)
 		,	size(0)
 		{
 			set(right);
 
 		}
-		Blobule(const double& right) 
+		Blobule(const double& right)
 		:	bytes(_ConstSize)
 		,	size(0)
 		{
 			set(right);
-			return *this;
+
 		}
-		
-		inline Blobule& operator=(const Blobule& right) 
+
+		inline Blobule& operator=(const Blobule& right)
 		{
 			using namespace NS_STORAGE;
-			if(right.size > _ConstSize){			
-				u8 * d = _resize_buffer(right.size);		
-				size = right.size;					
+			if(right.size > _ConstSize){
+				u8 * d = _resize_buffer(right.size);
+				size = right.size;
 				memcpy(d,right.data(),size);//right.size+1
 			}else{
 				size = right.size;
 				if(size)
 					memcpy(data(), right.data(), _ConstSize);//right.size+1
 			}
-			
-			
+
+
 			return *this;
 		}
-		
+
 		Blobule& operator=(const char *right) {
 			set(right);
 			return *this;
@@ -437,11 +437,11 @@ namespace stored{
 		}
 
 		inline bool operator!=(const Blobule& right) const {
-			
+
 			return not(right);
 		}
 		inline bool operator==(const Blobule& right) const {
-			
+
 			return !not(right);
 		}
 		inline NS_STORAGE::u8  get_size() const {
@@ -454,29 +454,29 @@ namespace stored{
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
 			buffer_type::iterator writer = w;
-			writer = leb128::write_signed(writer, size);			
+			writer = leb128::write_signed(writer, size);
 			const u8 * end = data()+size;
 			for(const u8 * d = data(); d < end; ++d,++writer){
-				*writer = *d;				
+				*writer = *d;
 			}
 			return writer;
 		};
 
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
-			buffer_type::const_iterator reader = r;		
-			size = leb128::read_signed(reader);			
+			buffer_type::const_iterator reader = r;
+			size = leb128::read_signed(reader);
 			_resize_buffer(size);
 			const u8 * end = data()+size;
 			for(u8 * d = data(); d < end; ++d,++reader){
-				*d = *reader;				
+				*d = *reader;
 			}
 			return reader;
 		};
 	};
 
-	
 
-	
-	
+
+
+
 };
