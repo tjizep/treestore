@@ -1040,6 +1040,10 @@ namespace stx
 			{
 				return !key_less(a, b) && !key_less(b, a);
 			}
+			
+			/// multiple search type lower bound template function
+			/// performs a lower bound mapping using a couple of techniques simultaneously
+
 			template<typename key_compare, typename key_interpolator >
 			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key, bool do_llb = true) const {
 				int o = get_occupants() ;
@@ -1047,8 +1051,9 @@ namespace stx
 
 				register unsigned int l = 0, ll=llb, hh = 0, h = o;
 
-
+				/// multiple search type lower bound function
 				if(interp.can(keys[0],keys[o-1],o)){
+					/// interpolated search if available
 					ll = interp.interpolate(key, keys[0], keys[o-1], o);
 					if(ll >0) --ll;
 					if(ll < h && key_less(keys[ll],key)){
@@ -1066,6 +1071,7 @@ namespace stx
 
 
 				}else if(do_llb){
+					/// history optimized linear search
 					unsigned int llo = std::min<unsigned int>(o,llb+3);
 					while (ll < llo && key_less(keys[ll],key)) ++ll;
 					if(ll > llb && ll < llo){
@@ -1073,7 +1079,7 @@ namespace stx
 						return ll;
 					}
 				}
-
+				/// truncated binary search
 				while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
 					int m = (l + h) >> 1;
 					if (key_lessequal(key_less, key, keys[m])) {
@@ -1082,6 +1088,7 @@ namespace stx
 						l = m + 1;
 					}
 				}
+				/// residual linear search
 				while (l < h && key_less(keys[l],key)) ++l;
 				llb = l;
 
@@ -1096,7 +1103,7 @@ namespace stx
 		struct interior_node : public node
 		{
 
-			/// Define an related allocator for the interior_node structs.
+			/// Define a related allocator for the interior_node structs.
 			typedef typename _Alloc::template rebind<interior_node>::other alloc_type;
 
 			/// persisted reference type providing unobtrusive page management
@@ -3258,7 +3265,7 @@ namespace stx
 		{
 			if (root!=NULL_REF)
 			{
-				reduce_use(); /// get rid of shared nodes and unlink unshared nodes
+				reduce_use(); /// get rid of unshared nodes and unlink shared nodes
 
 				headsurface = last_surface = NULL_REF;
 
@@ -3305,6 +3312,13 @@ namespace stx
 
 	private:
 		/// Recursively free up nodes
+
+		/// currently this function can be replaced by an iteration through the 
+		/// iteration through the nodes list
+		/// i.e. 
+		///	for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n)
+		///
+
 		void clear_recursive(node* n)
 		{
 			if (!n->issurfacenode())

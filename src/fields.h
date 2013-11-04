@@ -301,19 +301,9 @@ namespace stored{
 		}
 		void add(NS_STORAGE::i64 val){
 			using namespace NS_STORAGE;
-			u64 v = val;
-			if(v < 256){
-				u8 bv = (u8)v;
-				_add(&bv, sizeof(bv));
-			}else if(v < 65536){
-				u16 bv = (u16)v;
-				_add(&bv, sizeof(bv));
-			}else if(v < 65536ll*32768ll){
-				u32 bv = (u32)v;
-				_add(&bv, sizeof(bv));
-			}else{
-				_add(&v, sizeof(v));
-			}
+			
+			_add(&v, sizeof(v));
+			
 		}
 		void add(float v){
 			_add(&v, sizeof(v));
