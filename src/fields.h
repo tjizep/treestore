@@ -438,11 +438,11 @@ namespace stored{
 
 		inline bool operator!=(const Blobule& right) const {
 
-			return not(right);
+			return not_equal(right);
 		}
 		inline bool operator==(const Blobule& right) const {
 
-			return !not(right);
+			return !not_equal(right);
 		}
 		inline NS_STORAGE::u8  get_size() const {
 			return size;
