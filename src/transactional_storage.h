@@ -565,32 +565,7 @@ namespace storage{
 			}
 		};
 
-		/// compress a single block and set its status
-
-		void _compress_block(block_descriptor& rb){
-			if(!rb.compressed){
-
-			}
-		}
-		void compress_block(ref_block_descriptor ref){
-			if(ref != result){
-				_compress_block(*ref);
-			}
-		}
-
-		/// decompress a single block and set its status
-
-		void _decompress_block(block_descriptor& rb){
-			rb.compressed = false;
-		}
-		void decompress_block(ref_block_descriptor rb){
-			_decompress_block(*rb);
-		}
-		/// compress all uncompressed blocks in memory except the currently active one
-		void compress_blocks(){
-
-		}
-
+		
 		/// flush any or all excess data to disk, the factor determines the fraction
 		/// of the total use to release i.e. a value of 0 releases all
 		/// the default value will release 25% of the total used memory
@@ -1174,8 +1149,9 @@ namespace storage{
 	typedef std::shared_ptr<Poco::Mutex> mutex_ptr;
 	typedef Poco::Mutex * mutex_ref;
 
-	/// this defines a storage which is based on a previous version if this member is nullptr then
-	/// the version based storage puts it in its own member storage
+	/// this defines a storage which is based on a previous version 
+	/// if the based member is nullptr then the version based storage 
+	/// puts it in its own member storage
 
 	/// this interface supports multi threaded access on public functions
 	/// except for contructors and destructors implying the users of instances
