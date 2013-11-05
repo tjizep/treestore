@@ -1,0 +1,9 @@
+Removed dependancy to "lz4_encoder.h" and "lz4hc_encoder.h"
+Improved speed of LZ4_decompress_fast() with GCC
+Improved speed of LZ4_decompress_safe() for 32-bits
+Made the fast LZ4 compression compatible with low-memory systems (buffer adddress < 64K). Thanks Francois Gretief for report and suggestion.
+Makefile : added fuzzer32
+Makefile : added fullbench32
+fullbench : added ability to select one specific function to benchmark
+lz4.c : copy macros follow memcpy() arguments convention
+Small coding style modifications, hinted by cppCheck. 
