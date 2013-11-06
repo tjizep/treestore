@@ -1101,7 +1101,7 @@ namespace storage{
 		void commit(){
 			scoped_ulock ul(lock);
 			if(transacted){
-				flush_back(0.0, false); /// write all changes to disk or pigeons etc.
+				flush_back(0.0, true); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1569,6 +1569,8 @@ namespace storage{
 
 		u64 order;							/// transaction order set on commit
 
+		u32 active_transactions;
+
 		version_type next_version;			/// next version generator
 
 		address_type last_address;			/// maximum address allocated
@@ -1732,6 +1734,7 @@ namespace storage{
 		,	order(1)
 		,	last_address ( initial->last() )
 		,	recovery(false)
+		,	active_transactions(0)
 		{
 			initial->engage();
 			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
@@ -1770,9 +1773,12 @@ namespace storage{
 			journal::get_instance().engage_participant(this);
 		}
 
-		~mvcc_coordinator(){
-
+		virtual ~mvcc_coordinator(){
+			if(references != 0)
+				printf("non zero references\n");
+			
 			journal::get_instance().release_participant(this);
+			
 			initial->discard();
 		}
 
@@ -1795,7 +1801,7 @@ namespace storage{
 
 				merge_down();
 				if(storages.size()==1){
-					initial->release();
+					initial->discard();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
 			}
 		}
@@ -1822,6 +1828,7 @@ namespace storage{
 			if(!storages.empty()){
 				b->set_previous(storages.back());
 				storages.back()->add_reader();
+				++active_transactions;
 			}else{
 
 				throw WriterConsistencyViolation();
@@ -1837,6 +1844,10 @@ namespace storage{
 			return (*this).order;
 		}
 
+		u32 transactions_away() const {
+			scoped_ulock _sync(*lock);
+			return active_transactions;
+		}
 		/// finish a version and commit it to storage
 		/// the commit is coordinated with other mvcc storages
 		/// via the journal
@@ -1847,7 +1858,7 @@ namespace storage{
 			scoped_ulock _sync(*lock);
 
 			//printf("[COMMIT MVCC] [%s] %lld at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
-
+			--active_transactions;
 			if(transaction->modified() && transaction->get_order() < order){
 				discard(transaction);
 				throw InvalidWriterOrder();
@@ -1891,7 +1902,7 @@ namespace storage{
 		void discard(version_storage_type* transaction){
 
 			synchronized _sync(*lock);
-
+			--active_transactions;
 			//printf("[DISCARD MVCC] [%s] at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
 
 			if(transaction->get_previous() == nullptr)

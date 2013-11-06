@@ -1542,7 +1542,6 @@ namespace stx
 		void save(interior_node* n, stream_address& w){
 			if(shared.nodes) return;
 			if(get_storage()->is_readonly()){
-				printf("NOT saving readonly page\n");
 				return;
 			}
 			if(n->is_modified()){
@@ -1580,7 +1579,7 @@ namespace stx
 		void save(surface_node* n, stream_address& w){
 			if(shared.nodes) return;
 			if(get_storage()->is_readonly()){
-				printf("NOT saving readonly surface node\n");
+			
 				return;
 			}
 			if(n->is_modified()){

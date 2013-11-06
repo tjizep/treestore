@@ -361,7 +361,11 @@ public:
 		if(get_tree_table() == NULL){
 			return 0;
 		}
-
+		bool do_unlock = false;
+		if(get_tree_table()->table==nullptr){
+			do_unlock = true;
+			get_tree_table()->begin(true);
+		}
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = get_tree_table()->table_size();
 			stats.block_size = 1;
@@ -413,7 +417,8 @@ public:
 			//handler::auto_increment_value = get_tree_table()->row_count();
 		}	
 		
-		
+		if(do_unlock)
+			get_tree_table()->rollback();
 
 		return 0;
 	}
@@ -558,8 +563,8 @@ public:
 		clear_selection(selected);
 		last_resolved = 0;
 		selected = get_tree_table()->create_output_selection(table);
-		(*this).r = get_tree_table()->table.begin();
-		(*this).r_stop = get_tree_table()->table.end();
+		(*this).r = get_tree_table()->get_table().begin();
+		(*this).r_stop = get_tree_table()->get_table().end();
 		
 		
 		return 0;
@@ -659,7 +664,7 @@ public:
 		if (rows == 0) {
 			rows = 1;
 		}
-		printf("records in range %lld\n", (NS_STORAGE::u64)rows);
+		DBUG_PRINT("info", ("records in range %lld\n", (NS_STORAGE::u64)rows));
 		DBUG_RETURN((ha_rows) rows);
 	
 	}
@@ -976,6 +981,7 @@ static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 #include "Poco/Logger.h"
 #include "Poco/SimpleFileChannel.h"
 #include "Poco/AutoPtr.h"
+/// example code
 void initialize_loggers(){
 	using Poco::Logger;
 	using Poco::SimpleFileChannel;
@@ -1006,13 +1012,13 @@ int treestore_db_init(void *p)
 		printf(" *** Tree Store (eyore) starting\n");
 	} 
 	DBUG_ENTER("treestore_db_init");
-	initialize_loggers();
+	//initialize_loggers();
 
 	Poco::Data::SQLite::Connector::registerConnector();
 	handlerton *treestore_hton= (handlerton *)p;
 	static_treestore_hton = treestore_hton;
 	treestore_hton->state= SHOW_OPTION_YES;
-	treestore_hton->db_type = DB_TYPE_FEDERATED_DB;
+	treestore_hton->db_type = DB_TYPE_DEFAULT;
 	treestore_hton->commit = treestore_commit;
 	treestore_hton->rollback = treestore_rollback;
 	treestore_hton->create = treestore_create_handler;

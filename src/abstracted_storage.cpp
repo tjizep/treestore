@@ -194,13 +194,19 @@ public:
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
 						if(transaction == nullptr){
-							transaction = storage->begin();
-							pending[storage_name] = transaction;
-						}
+							
+							Poco::File tmpDir(storage_name);
+							if(tmpDir.exists()){
+								transaction = storage->begin();
 
-						nst::buffer_type& dest = transaction->allocate(add, nst::create);
-						dest = entry.buffer;
-						transaction->complete();
+								pending[storage_name] = transaction;
+							}
+						}
+						if(storage->transactions_away() > 0){
+							nst::buffer_type& dest = transaction->allocate(add, nst::create);
+							dest = entry.buffer;
+							transaction->complete();
+						}
 
 					}
 
@@ -215,9 +221,13 @@ public:
 			std::string storage_name = (*p).first;
 			stored::_Transaction* transaction = pending[storage_name];
 			stored::_Allocations* allocations = stored::_get_abstracted_storage(storage_name);
-			allocations->commit(transaction);
+			if(allocations->transactions_away()){
+				allocations->commit(transaction);
+				
+				printf("recovered %s\n", storage_name.c_str());
+			}
 			allocations->set_recovery(false);
-			printf("recovered %s\n", storage_name.c_str());
+			
 		}
 
 		pending.clear();

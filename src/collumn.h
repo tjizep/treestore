@@ -307,7 +307,7 @@ namespace collums{
 				_Rid SAMPLE = (_Rid)data.size()/20;
 				printf("calc %lld density sample\n",(nst::u64)SAMPLE);
 				for(_Rid r = 0;r<SAMPLE ; ++r){
-					_Rid sample = std::rand() % data.size();
+					_Rid sample = (std::rand()*std::rand()) % data.size();
 					uniques.insert(data[sample].key);
 				}
 				density = SAMPLE/std::max<_Rid>(1,(_Rid)uniques.size());
@@ -1198,6 +1198,7 @@ namespace collums{
 		}
 
 		void rollback(){
+			//index.reduce_use();
 			if(modified)
 				storage.rollback();
 			modified = false;
@@ -1206,7 +1207,8 @@ namespace collums{
 		void commit1(){
 			if(modified){
 				
-				index.flush();			
+				index.flush();	
+				index.reduce_use();
 				set_end();
 			}
 		}

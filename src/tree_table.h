@@ -39,7 +39,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "tree_index.h"
 typedef std::vector<std::string> _FileNames;
 namespace tree_stored{
-	
+	class InvalidTablePointer : public std::exception{
+	public:
+		InvalidTablePointer () throw(){
+		}
+	};
 
 	class abstract_my_collumn {
 	public:
@@ -159,21 +163,30 @@ namespace tree_stored{
 	typedef std::vector<tree_index::ptr> _Indexes;
 	typedef std::vector<abstract_my_collumn*> _Collumns;
 	struct selection_tuple{
-		selection_tuple():col(NULL),field(NULL){//,iter(NULL)
+		selection_tuple()
+		:	col(NULL)
+		,	field(NULL)
+		{
 		}
-		selection_tuple(const selection_tuple& right):col(NULL),field(NULL){//,iter(NULL)
+
+		selection_tuple(const selection_tuple& right)
+		:	col(NULL)
+		,	field(NULL)
+		{
 			*this = right;
 		}
+
 		selection_tuple& operator=(const selection_tuple& right){
 			col = right.col;
 			field = right.field;
-			//iter = right.iter;
+			
 			return *this;
 		}
 		abstract_my_collumn * col;
 		Field * field;
-		//abstract_my_iter * iter;
+		
 	};
+
 	typedef std::vector<selection_tuple> _Selection;
 	class tree_table{
 	public:
@@ -274,6 +287,7 @@ namespace tree_stored{
 			pos = table_arg->key_info;
 			_FileNames names;
 			std::string path = table_arg->s->path.str;
+			names.push_back(path);
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string name = path;
 				name += INDEX_SEP();
@@ -362,7 +376,7 @@ namespace tree_stored{
 		:	_row_count(0)
 		,	changed(false)
 		,	storage(table_arg->s->path.str)
-		,	table(storage)
+		,	table(nullptr)
 		{
 			load(table_arg);
 			_row_count = 0;
@@ -376,17 +390,31 @@ namespace tree_stored{
 		_Indexes indexes;
 		_Collumns cols;
 		stored::abstracted_storage storage;
-		_TableMap table;
+		_TableMap * table;
 		
+		_TableMap& get_table(){
+		
+			if(nullptr==table) 
+				table = new _TableMap(storage);
+			return *table;
 
+		}
+
+		const _TableMap& get_table() const {		
+			if(nullptr==table) 
+				throw InvalidTablePointer();
+			return *table;
+
+		}
+		
 		void begin_table(){
-			if(!changed) table.share(storage.get_name());
-			else table.unshare();
+			if(!changed) get_table().share(storage.get_name());
+			else get_table().unshare();
 						
 			if(changed || storage.stale()){
 				storage.begin();
 				storage.set_transaction_r(!changed);
-				table.reload();
+				get_table().reload();
 			}else{
 				storage.set_transaction_r(!changed);
 			}
@@ -402,8 +430,8 @@ namespace tree_stored{
 
 		void commit_table1(){
 			if(changed){
-				table.flush();
-				table.reduce_use();
+				get_table().flush();
+				get_table().reduce_use();
 			}
 		}
 
@@ -471,6 +499,10 @@ namespace tree_stored{
 
 			}
 			cols.clear();
+			if(nullptr != table)
+				delete table;
+			storage.close();
+			table = nullptr;
 			changed = false;
 		}
 		
@@ -514,7 +546,7 @@ namespace tree_stored{
 				(*c)->reduce_use();
 
 			}
-			table.reduce_use();
+			get_table().reduce_use();
 
 		}
 
@@ -540,7 +572,7 @@ namespace tree_stored{
 
 		/// returns the rows per key for a given collumn
 		
-		nst::u32 get_rows_per_key(nst::u32 i, nst::u32 part){
+		nst::u32 get_rows_per_key(nst::u32 i, nst::u32 part) const {
 			if(indexes.size() > i && indexes[i]->density.size() > part){
 				return indexes[i]->density[part];
 			}
@@ -824,9 +856,9 @@ namespace tree_stored{
 		
 
 		void init_rowcount(){
-			_TableMap::iterator t = table.end();
+			_TableMap::iterator t = get_table().end();
 			_row_count = 0;
-			if(!table.empty()){
+			if(!get_table().empty()){
 				--t;
 				_row_count = t.key().get_value();
 				++_row_count;
@@ -880,7 +912,7 @@ namespace tree_stored{
 				(*x)->index.add(temp, 0);
 			}			
 			
-			(*this).table.insert(_row_count, '0');
+			(*this).get_table().insert(_row_count, '0');
 			if(_row_count % 300000 == 0){
 				printf("%lld rows added to %s\n", _row_count, table->s->table_name.str);
 				//reduce_col_use();
@@ -895,7 +927,7 @@ namespace tree_stored{
 				return;
 			}
 			erase_row_index(rid);
-			(*this).table.erase(rid);
+			(*this).get_table().erase(rid);
 			TABLE_SHARE *share= table->s;			
 			for (Field **field=table->field ; *field ; field++){	
 				if(!(*field)->is_null() && cols[(*field)->field_index]){
@@ -940,7 +972,7 @@ namespace tree_stored{
 			}
 		}
 		_Rid row_count() const {
-			return table.size();
+			return get_table().size();
 		}
 
 		_Rid table_size() const {
