@@ -2990,13 +2990,13 @@ namespace stx
 			stx::storage::u64 flushed = 0;
 			if(stats.tree_size){
 
-				//save_recursive(flushed,root);
-				for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+				save_recursive(flushed,root);
+				/*for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 					typename node::ptr np = (*n).second;
 					np.set_where((*n).first);
 					np.save(*this);
 
-				}
+				}*/
 				write_boot_values();
 
 				///BTREE_PRINT("flushing %ld\n",flushed);

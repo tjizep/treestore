@@ -1070,7 +1070,8 @@ namespace storage{
 		}
 		void release(){ //s an instance reference
 			scoped_ulock ul(lock);
-			--references;
+			if(references>0)
+				--references;
 			//printf("references for %s reached %ld\n", name.c_str(), (long)references);
 			discard();
 		}
@@ -1101,7 +1102,7 @@ namespace storage{
 		void commit(){
 			scoped_ulock ul(lock);
 			if(transacted){
-				flush_back(0.0, true); /// write all changes to disk or pigeons etc.
+				flush_back(0.0, false); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1736,7 +1737,7 @@ namespace storage{
 		,	recovery(false)
 		,	active_transactions(0)
 		{
-			initial->engage();
+			//initial->engage();
 			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
 			b->set_allocator(initial);
 			b->set_previous(nullptr);
@@ -1779,13 +1780,15 @@ namespace storage{
 			
 			journal::get_instance().release_participant(this);
 			
-			initial->discard();
+			initial->release();
 		}
 
 		/// engages the instance - its resources may not be released if references > 0
 
 		void engage(){
 			scoped_ulock _sync(*lock);
+			if(references==0)
+				initial->engage();
 			++references;
 
 		}
@@ -1801,7 +1804,7 @@ namespace storage{
 
 				merge_down();
 				if(storages.size()==1){
-					initial->discard();
+					initial->release();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
 			}
 		}

@@ -220,7 +220,7 @@ namespace collums{
 			/// function assumes a list of monotonously ascending integer values
 			inline bool can(const _StoredRowId& first, const _StoredRowId& last, int size) const {
 
-				return size > 0;
+				return false; //size > 0;
 			}
 
 			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const {
@@ -319,8 +319,7 @@ namespace collums{
 		};
 		class ColLoader : public Poco::Notification{
 		protected:
-			stored::abstracted_storage storage;
-			_ColMap col;
+			std::string name;
 			
 			_CacheEntry* cache;
 			size_t col_size;
@@ -333,6 +332,14 @@ namespace collums{
 			}
 		protected:
 			bool load_into_cache(size_t col_size){
+				stored::abstracted_storage storage(name);
+				storage.begin();
+				storage.set_transaction_r(true);
+				_ColMap col(storage);
+			
+				
+				col.share(storage.get_name());
+				col.reload();
 				_Rid ctr = 0;
 				NS_STORAGE::add_total_use(ctr * sizeof(_Stored));
 				_ColMap::iterator e = col.end();
@@ -349,7 +356,7 @@ namespace collums{
 				}
 				col.reduce_use();
 				calc_density();
-				
+				storage.rollback();
 				cache->available = true;
 				
 				
@@ -357,12 +364,11 @@ namespace collums{
 			}
 		public:
 			ColLoader(std::string name,_CacheEntry * cache, size_t col_size)
-			:	storage(name)
-			,	col(storage)
+			:	name(name)
 			,	cache(cache)
 			,	col_size(col_size)
 			{
-				col.share(name);
+				
 			}
 			
 			virtual void doTask(){
@@ -563,7 +569,7 @@ namespace collums{
 			{
 				printf("flushing %s\n", storage.get_name().c_str());
 				col.flush();
-				col.reduce_use();
+				//col.reduce_use();
 				storage.commit();
 			}
 			modified = false;
@@ -586,27 +592,28 @@ namespace collums{
 		}
 
 		void tx_begin(bool read){			
-			if(read) col.share(storage.get_name());
-			else col.unshare();
-			if(!read || storage.stale()){
-				storage.begin();
-				storage.set_transaction_r(read);
-				if(read) col.reload();
-			}else{
-				storage.set_transaction_r(read);
-			}
+			storage.rollback();
+			storage.begin();
+			storage.set_transaction_r(read);
 			
 			if(read) col.share(storage.get_name());
-			else col.unshare();
+			else col.unshare();	
+			
+			col.reload();
+			if(read && storage.stale()){
+				
+			}
+			
 		}
 		
 		void rollback(){
 			if(modified){
 				//printf("releasing %s\n", storage.get_name().c_str());
 				col.flush();
-				col.reduce_use();
+				
 				
 			}
+			col.reduce_use();
 			modified = false;
 			storage.rollback();
 		}
@@ -1043,13 +1050,19 @@ namespace collums{
 
 		class IndexScanner : public Poco::Notification{
 		protected:
-			stored::abstracted_storage storage;
-			_IndexMap index;
 			
 			
+			std::string name;
 			size_t col_size;
 		protected:
 			bool scan_index(){
+				stored::abstracted_storage storage(name);
+				storage.begin();
+				storage.set_transaction_r(true);
+				
+				_IndexMap index(storage);
+				index.share(storage.get_name());
+				
 				iterator_type s = index.begin();
 				iterator_type e = index.end();
 				nst::u64 ctr= 0;
@@ -1060,14 +1073,14 @@ namespace collums{
 					}
 				}
 				printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
+				storage.rollback();
 				return true;
 			}
 		public:
 			IndexScanner(std::string name)
-			:	storage(name)
-			,	index(storage)
+			:	name(name)
 			{
-				index.share(name);
+				
 			}
 			
 			virtual void doTask(){
@@ -1184,21 +1197,20 @@ namespace collums{
 			set_end();
 		}
 		void begin(bool read){
+			
+			storage.begin();
+			storage.set_transaction_r(read);
 			if(read) index.share(storage.get_name());
-			else index.unshare();
-
-			if(!read || storage.stale()){
-				storage.begin();
-				storage.set_transaction_r(read);
-				if(read) index.reload();
-			}else{
-				storage.set_transaction_r(read);
+			else index.unshare();	
+			index.reload();
+			if(read && storage.stale()){
+				
 			}
 			
 		}
 
 		void rollback(){
-			//index.reduce_use();
+			index.reduce_use();
 			if(modified)
 				storage.rollback();
 			modified = false;
@@ -1206,8 +1218,9 @@ namespace collums{
 
 		void commit1(){
 			if(modified){
-				
-				index.flush();	
+				// this doesnt seem to work
+				// index.flush();	
+				// !!! this seems to work
 				index.reduce_use();
 				set_end();
 			}
