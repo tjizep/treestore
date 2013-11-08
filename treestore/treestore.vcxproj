@@ -179,6 +179,7 @@
     <ClInclude Include="..\src\stx\btree_multimap.h" />
     <ClInclude Include="..\src\stx\btree_multiset.h" />
     <ClInclude Include="..\src\stx\btree_set.h" />
+    <ClInclude Include="..\src\system_timers.h" />
     <ClInclude Include="..\src\transactional_storage.h" />
     <ClInclude Include="..\src\tree_index.h" />
     <ClInclude Include="..\src\tree_stored.h" />

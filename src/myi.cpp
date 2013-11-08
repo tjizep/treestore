@@ -63,16 +63,16 @@ static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 void print_read_lookups(){
 	
-	if(GetTickCount()-ltime > 1000){
+	if(os::millis()-ltime > 1000){
 		stx::storage::scoped_ulock ul(plock);
-		if(GetTickCount()-ltime > 1000){
+		if(os::millis()-ltime > 1000){
 			if(ltime){
 				printf("read_lookups %lld/s hh %ld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n", read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups), hash_hits, hash_predictions, read_lookups, (double)btree_totl_used/(1024.0*1024.0),btree_totl_instances);				
 			}
 			last_read_lookups = read_lookups;
 			hash_hits = 0;
 			hash_predictions = 0;
-			ltime = ::GetTickCount();
+			ltime = ::os::millis();
 		}
 	}
 }

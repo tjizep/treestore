@@ -78,6 +78,9 @@
     <ClInclude Include="..\src\stx\btree_set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\system_timers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="treestore.cpp">

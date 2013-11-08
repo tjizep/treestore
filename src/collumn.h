@@ -222,7 +222,13 @@ namespace collums{
 
 				return false; //size > 0;
 			}
-
+			inline bool asc() const {
+				return true;
+			}
+			inline _StoredRowId diff(const _StoredRowId &larger, const _StoredRowId &smaller) const {
+				_StoredRowId r = larger.get_value() - smaller.get_value();
+				return r;
+			}
 			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const {
 				if(last.get_value()>first.get_value())
 					return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());

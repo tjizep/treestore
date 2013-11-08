@@ -58,7 +58,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/Logger.h"
 #include "Poco/LogFile.h"
 #include "Poco/StringTokenizer.h"
+#include "Poco/Timestamp.h"
 #include <lz4.h>
+
 ///:sqlite_storage
 
 /// TODO: initialize 'next' to address of last block available
@@ -79,8 +81,8 @@ namespace storage{
 	extern void add_total_use(long long added);
 	extern void remove_total_use(long long removed);
 	extern long long total_use;
-	extern unsigned int ptime;
-	extern long long last_flush_time;		/// last time it released memory to disk
+	extern Poco::UInt64 ptime;
+	extern Poco::UInt64 last_flush_time;		/// last time it released memory to disk
 	/// defines a concurrently accessable transactional storage providing ACID properties
 	/// This class should be extended to provide encoding services for a b-tree or other
 	/// storage oriented data structures
@@ -667,9 +669,9 @@ namespace storage{
 
 		void print_use(){
 
-			if(::GetTickCount()-ptime > 3000){
+			if(::os::millis()-ptime > 3000){
 				//printf("total use blocks %.4g MiB\n", (double)total_use/(1024.0*1024.0));
-				ptime = ::GetTickCount();
+				ptime = ::os::millis();
 			}
 		}
 		void check_use(){
@@ -681,7 +683,7 @@ namespace storage{
 					ptrdiff_t before = get_use();
 
 					flush_back(0.4);
-					last_flush_time = ::GetTickCount();
+					last_flush_time = ::os::millis();
 					//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				}
 			}

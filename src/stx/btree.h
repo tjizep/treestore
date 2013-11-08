@@ -78,6 +78,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <Poco/ThreadPool.h>
 #include <Poco/TaskManager.h>
 #include <Poco/Task.h>
+#include <Poco/Timestamp.h>
+
 #include "NotificationQueueWorker.h"
 // *** Debugging Macros
 
@@ -108,7 +110,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 // * define an os related realtime clock
 
-#define OS_CLOCK GetTickCount
+#define OS_CLOCK Poco::Timestamp().epochMicroseconds
 
 
 /// Compiler options for optimization
@@ -144,35 +146,16 @@ namespace stx
 			return 0;
 		}
 
-	};
-
-	template<>
-	struct interpolator<int>{
-
-		/// function assumes a list of monotonously ascending integer values
-		inline bool can(const int& first, const int& last, int size) const {
-
+		inline bool asc() const {
 			return false;
 		}
 
-		inline int interpolate(int k, int first , int last, int size) const {
-			return 0;
-		}
-	};
-	template<>
-	struct interpolator<unsigned int>{
-
-		/// function assumes a list of monotonously ascending integer values
-		inline bool can(const int& first, const int& last, int size) const {
-
-			return false;
-		}
-
-		inline int interpolate(unsigned int k, unsigned int first , unsigned int last, int size) const {
-			return 0;
+		inline _KeyType diff(const _KeyType&, const _KeyType&) const {
+			return _KeyType();
 		}
 	};
 
+	
 
 	struct def_p_traits /// persist traits
 	{
