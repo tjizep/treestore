@@ -3,10 +3,12 @@
 #include <Poco/Timestamp.h>
 namespace os{
 	inline Poco::UInt64 millis(){
-		return Poco::Timestamp().epochMicroseconds()/1000;
+		Poco::Timestamp now;
+		return now.epochMicroseconds()/1000;
 	}
 	inline Poco::UInt64 micros(){
-		return Poco::Timestamp().epochMicroseconds()/1000;
+		Poco::Timestamp now;
+		return now.epochMicroseconds();
 	}
 }
 #endif
