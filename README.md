@@ -29,8 +29,9 @@ Features
 
  10. STL like internal data structures for index and collumn storage
 
- 11. No NULL storage format, no extra bit for NULL values
+ 11. No NULL storage format i.e. no extra bit for NULL values
 
+ 12. Very Efficient sparse collumn storage due to 11 and differencial encoding
 
 Building
 --------
