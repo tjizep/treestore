@@ -150,8 +150,12 @@ namespace stx
 			return false;
 		}
 
-		inline _KeyType diff(const _KeyType&, const _KeyType&) const {
-			return _KeyType();
+		inline _KeyType diff(const _KeyType& a, const _KeyType&) const {
+			return a;
+		}
+
+		inline _KeyType add(const _KeyType& a, const _KeyType&) const {
+			return a;
 		}
 	};
 
@@ -1381,7 +1385,7 @@ namespace stx
 			/// decodes a page into a exterior node using the provided buffer and storage instance/context
 			/// TODO: throw an exception if checks fail
 
-			void load(btree* context, storage_type & storage,const buffer_type& buffer){
+			void load(btree* context, storage_type & storage,const buffer_type& buffer, key_interpolator interp){
 
 			    using namespace stx::storage;
 
@@ -1396,9 +1400,17 @@ namespace stx
 				sa = leb128::read_signed(reader);
 				next.set_context(context);
 				next.set_where(sa);
-
-				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.retrieve(reader, keys[k]);
+				if(interp.asc()){
+					key_type prev;
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.retrieve(reader,keys[k]);
+						keys[k] = interp.add(keys[k], prev);
+						prev = keys[k];
+					}
+				}else{
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.retrieve(reader, keys[k]);
+					}
 				}
 
 				for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -1417,17 +1429,25 @@ namespace stx
 			/// TODO: throw an exception if read iteration extends beyond
 			/// buffer size
 
-			void save(storage_type &storage, buffer_type& buffer) const {
+			void save(key_interpolator interp, storage_type &storage, buffer_type& buffer) const {
 				using namespace stx::storage;
 
 				ptrdiff_t storage_use = leb128::signed_size((*this).get_occupants());
 				storage_use += leb128::signed_size((*this).level);
 				storage_use += leb128::signed_size(preceding.get_where());
 				storage_use += leb128::signed_size(next.get_where());
-
-				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage_use += storage.store_size(keys[k]);
-					storage_use += storage.store_size(values[k]);
+				if(interp.asc()){
+					key_type prev;
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage_use += storage.store_size(interp.diff(keys[k],prev));
+						storage_use += storage.store_size(values[k]);
+						prev = keys[k];
+					}
+				}else{
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage_use += storage.store_size(keys[k]);
+						storage_use += storage.store_size(values[k]);
+					}
 				}
 				buffer.resize(storage_use);
 				buffer_type::iterator writer = buffer.begin();
@@ -1436,9 +1456,16 @@ namespace stx
 
 				writer = leb128::write_signed(writer, preceding.get_where());
 				writer = leb128::write_signed(writer, next.get_where());
-
-				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.store(writer, keys[k]);
+				if(interp.asc()){
+					key_type prev;
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.store(writer, interp.diff(keys[k],prev));
+						prev = keys[k];
+					}
+				}else{
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.store(writer, keys[k]);
+					}
 				}
 				for(u16 k = 0; k < (*this).get_occupants();++k){
 					storage.store(writer, values[k]);
@@ -1570,7 +1597,7 @@ namespace stx
 				using namespace stx::storage;
 				buffer_type &buffer = get_storage()->allocate(w,stx::storage::create);
 				n->sort(stats, key_less);
-				n->save(*get_storage(), buffer);
+				n->save(key_interpolator(), *get_storage(), buffer);
 				if(lz4){
 					inplace_compress_lz4(buffer);
 				}else{
@@ -1663,7 +1690,7 @@ namespace stx
 			if(level==0){ // its a surface
 				typename surface_node::ptr s ;
 				s = allocate_surface(w);
-				s->load(this, *(get_storage()), buffer);
+				s->load(this, *(get_storage()), buffer, key_interpolator());
 				s.set_state(loaded);
 				s.set_where(w);
 				nodes_loaded[w] = s.rget();
