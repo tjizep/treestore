@@ -1532,8 +1532,8 @@ namespace stx
 		/// therefore providing consistency to updates to any
 		/// node
 
-		btree::_AddressedNodes nodes_loaded;
-		btree::_Shared shared;
+		_AddressedNodes nodes_loaded;
+		_Shared shared;
 		///	returns NULL if a node with given storage address is not currently
 		/// loaded. otherwise returns the currently loaded node
 
