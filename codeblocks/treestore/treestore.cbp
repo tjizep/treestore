@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="treestore" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/treestore" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-std=c++11" />
+					<Add option="-g" />
+					<Add option="-ftemplate-backtrace-limit=0" />
+					<Add option="-fpermissive" />
+					<Add option="-Wreorder" />
+					<Add directory="../../src" />
+					<Add directory="../../repo" />
+					<Add directory="../../repo/lz4-r101" />
+					<Add directory="/usr/local/mysql-5.6.10/include" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/treestore" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+		</Compiler>
+		<Unit filename="../../src/MurmurHash3.cpp" />
+		<Unit filename="../../src/MurmurHash3.h" />
+		<Unit filename="../../src/NotificationQueueWorker.h" />
+		<Unit filename="../../src/PredictiveCache.h" />
+		<Unit filename="../../src/abstracted_storage.cpp" />
+		<Unit filename="../../src/abstracted_storage.h" />
+		<Unit filename="../../src/allocator_test.cpp" />
+		<Unit filename="../../src/allocator_test.h" />
+		<Unit filename="../../src/collumn.cpp" />
+		<Unit filename="../../src/collumn.h" />
+		<Unit filename="../../src/conversions.h" />
+		<Unit filename="../../src/example_storage.h" />
+		<Unit filename="../../src/fields.cpp" />
+		<Unit filename="../../src/fields.h" />
+		<Unit filename="../../src/myi.cpp" />
+		<Unit filename="../../src/myi.h" />
+		<Unit filename="../../src/stx/btree" />
+		<Unit filename="../../src/stx/btree.h" />
+		<Unit filename="../../src/stx/btree_map" />
+		<Unit filename="../../src/stx/btree_map.h" />
+		<Unit filename="../../src/stx/btree_multimap" />
+		<Unit filename="../../src/stx/btree_multimap.h" />
+		<Unit filename="../../src/stx/btree_multiset" />
+		<Unit filename="../../src/stx/btree_multiset.h" />
+		<Unit filename="../../src/stx/btree_set" />
+		<Unit filename="../../src/stx/btree_set.h" />
+		<Unit filename="../../src/stx/storage/basic_storage.h" />
+		<Unit filename="../../src/stx/storage/leb128.h" />
+		<Unit filename="../../src/stx/storage/types.h" />
+		<Unit filename="../../src/system_timers.h" />
+		<Unit filename="../../src/transactional_storage.cpp" />
+		<Unit filename="../../src/transactional_storage.h" />
+		<Unit filename="../../src/tree_index.h" />
+		<Unit filename="../../src/tree_stored.h" />
+		<Unit filename="../../src/tree_table.h" />
+		<Unit filename="main.cpp" />
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
