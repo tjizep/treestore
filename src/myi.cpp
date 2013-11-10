@@ -1,9 +1,7 @@
 #include "myi.h"
 
-/* Copyright (c) 2012, Christiaan Pretorius, Datacyte and/or its affiliates. All rights reserved.
+/* Copyright (c) 2012, Christiaan Pretorius. All rights reserved.
 
-
-/*
 
 MySQL TreeStore Storage Engine
 
@@ -25,32 +23,41 @@ ENGINE="TREESTORE"
 //#define ENABLED_DEBUG_SYNC
 //#define NDEBUG
 #define DBUG_OFF
-//#define __WIN__
-
-//#define _WIN32_WINNT=0x0501
-//#define WIN32_LEAN_AND_MEAN
 
 #define MYSQL_DYNAMIC_PLUGIN
 
 #define MYSQL_SERVER 1
-
-
-
 
 #ifdef USE_PRAGMA_IMPLEMENTATION
 #pragma implementation                          // gcc: Class implementation
 #endif
 
 
-#include "sql_class.h"           // SSV
-#include <mysql.h>
-#include <mysql/plugin.h>
+#define MYSQL_SERVER 1
+
+#ifndef _MSC_VER
+#include <cmath>
+#define isfinite std::isfinite
+#endif
+
+#include "sql_priv.h"
+#include "probes_mysql.h"
+#include "key.h"                                // key_copy
+#include "sql_plugin.h"
+#include <m_ctype.h>
+#include <my_bit.h>
+#include <stdarg.h>
+
+#include "sql_table.h"                          // tablename_to_filename
+#include "sql_class.h"                          // THD
+      // SSV
 
 #include <limits>
 
 #include <map>
 #include <string>
 #include "collumn.h"
+typedef uchar byte;
 ptrdiff_t MAX_PC_MEM = 1024ll*1024ll*1024ll*4ll;
 namespace nst = NS_STORAGE;
 static NS_STORAGE::u64 read_lookups =0;
@@ -67,7 +74,15 @@ void print_read_lookups(){
 		stx::storage::scoped_ulock ul(plock);
 		if(os::millis()-ltime > 1000){
 			if(ltime){
-				printf("read_lookups %lld/s hh %ld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n", read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups), hash_hits, hash_predictions, read_lookups, (double)btree_totl_used/(1024.0*1024.0),btree_totl_instances);				
+				printf
+				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n"
+				,   (nst::lld)read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups)
+				,   (nst::lld)hash_hits
+				,   (nst::lld)hash_predictions
+				,   (nst::lld)read_lookups
+				,   (double)btree_totl_used/(1024.0*1024.0)
+				,   (nst::lld)btree_totl_instances
+				);
 			}
 			last_read_lookups = read_lookups;
 			hash_hits = 0;
@@ -83,10 +98,10 @@ void print_read_lookups(){
 typedef std::map<std::string, _FileNames > _Extensions;
 
 // because the handlerton asks for extensions when the table defs are already destroyed w.t.f.
-_Extensions save_extensions; 
+_Extensions save_extensions;
 
-namespace tree_stored{	
-	
+namespace tree_stored{
+
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	class tree_thread{
 	protected:
@@ -107,7 +122,7 @@ namespace tree_stored{
 		~tree_thread(){
 			clear();
 			printf("tree thread removed\n");
-			
+
 		}
 		_Tables tables;
 		void modify(){
@@ -116,29 +131,29 @@ namespace tree_stored{
 		bool is_writing() const {
 			return changed;
 		}
-		
+
 		tree_table::ptr compose_table(TABLE *table_arg){
 			tree_table::ptr t = tables[table_arg->s->path.str];
 			if(t == NULL ){
-				
-				KEY *pos;	
- 				TABLE_SHARE *share= table_arg->s;
+
+				KEY *pos;
+ 				/// TABLE_SHARE *share= table_arg->s;
 				//uint options= share->db_options_in_use;
 				pos= table_arg->key_info;
 				t = new tree_table(table_arg);
 				tables[table_arg->s->path.str] = t;
 				save_extensions[table_arg->s->path.str] = t->get_file_names();
 			}else{
-				
+
 			}
-			
+
 			return t;
 		}
 		void clear(){
 			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 				delete (*t).second;
 			}
-			printf("cleared %lld tables\n", (NS_STORAGE::u64)tables.size());
+			printf("cleared %lld tables\n", (NS_STORAGE::lld)tables.size());
 			tables.clear();
 		}
 		tree_table * lock(TABLE *table_arg, bool writer){
@@ -149,7 +164,7 @@ namespace tree_stored{
 			if(!locks){
 				hash_hits = 0;
 				read_lookups = 0;
-				
+
 			}
 			++locks;
 			return result;
@@ -157,14 +172,14 @@ namespace tree_stored{
 		void release(TABLE *table_arg){
 			compose_table(table_arg)->unlock(&p2_lock);
 			if(1==locks){
-				if(changed) 
-					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage 
+				if(changed)
+					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
 				check_use();
-				print_read_lookups();				
+				print_read_lookups();
 				changed = false;
 			}
 			--locks;
-			
+
 		}
 		void reduce_tables(){
 			if(!locks){
@@ -173,17 +188,17 @@ namespace tree_stored{
 					(*t).second->check_use();
 				}
 			}
-				
+
 		}
 		void check_use(){
 			if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					(*t).second->check_use();
 				}
-				
+
 				printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				stored::reduce_all();
-				
+
 			}
 		}
 	};
@@ -204,7 +219,7 @@ public:
 			return ;
 		}
 		NS_STORAGE::scoped_ulock ul(tlock);
-		
+
 		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
 			if((*t) == tt){
 				return;
@@ -216,8 +231,8 @@ public:
 	tree_stored::tree_thread * reuse_thread(){
 		NS_STORAGE::scoped_ulock ul(tlock);
 		tree_stored::tree_thread * r = NULL;
-		Poco::Thread::TID curt = Poco::Thread::currentTid(); 
-		
+		Poco::Thread::TID curt = Poco::Thread::currentTid();
+
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 			if((*t))
 			{
@@ -228,7 +243,7 @@ public:
 				}
 			}
 		}
-		
+
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
 		}
@@ -238,10 +253,10 @@ public:
 	void check_use(){
 		if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
 			(*this).reduce();
-				
+
 			printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 			stored::reduce_all();
-				
+
 			}
 	}
 	void reduce(){
@@ -272,9 +287,9 @@ tree_stored::tree_thread * new_thread_from_thd(THD* thd){
 	tree_stored::tree_thread** stpp = thd_to_tree_thread(thd);
 	if((*stpp) == NULL){
 		*stpp = st.reuse_thread();
-	}	
+	}
 	if(*stpp == NULL){
-		printf("the thread thd is NULL\n");		
+		printf("the thread thd is NULL\n");
 	}
 	return *stpp;
 }
@@ -287,18 +302,18 @@ tree_stored::tree_thread * old_thread_from_thd(THD* thd,THD* thd_old){
 		}else{ // throw an error ??
 			return NULL;
 		}
-	}	
+	}
 	return *stpp;
 }
 
 tree_stored::tree_thread* updated_thread_from_thd(THD* thd){
-	tree_stored::tree_thread* r = new_thread_from_thd(thd);	
+	tree_stored::tree_thread* r = new_thread_from_thd(thd);
 	return r;
 }
 
 class ha_treestore: public handler{
 public:
-	
+
 	static const int TREESTORE_MAX_KEY_LENGTH = collums::StaticKey::MAX_BYTES;
 	std::string path;
 	tree_stored::tree_table::ptr tt;
@@ -319,34 +334,34 @@ public:
 		if(tt==NULL){
 			tt = get_thread()->compose_table((*this).table);
 			tt->check_load((*this).table);
-		}		
+		}
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-		
+
 		selected.clear();
 	}
-	
+
 	ha_treestore
 	(	handlerton *hton
 	,	TABLE_SHARE *table_arg
 	)
-	:	handler(hton, table_arg)	
+	:	handler(hton, table_arg)
 	,	tt(NULL)
-	,	row(0)	
+	,	row(0)
 	,	last_resolved(0)
 	{
-		
+
 	}
 	~ha_treestore(){
 	}
-	
+
 
 	int rnd_pos(uchar * buf,uchar * pos){
 		memcpy(&row, pos, sizeof(row));
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);												
-			sel.col->seek_retrieve(row, sel.field);	
+			tree_stored::selection_tuple & sel = (*s);
+			sel.col->seek_retrieve(row, sel.field);
 		}
 		return 0;
 	}
@@ -356,8 +371,8 @@ public:
 	}
 
 	int info(uint which){
-		
-	
+
+
 		if(get_tree_table() == NULL){
 			return 0;
 		}
@@ -375,8 +390,8 @@ public:
 		if(which & HA_STATUS_TIME) // - only update of stats->update_time required
 		{}
 
-		if(which & HA_STATUS_CONST){ 
-			// - update the immutable members of stats 
+		if(which & HA_STATUS_CONST){
+			// - update the immutable members of stats
 			/// (max_data_file_length, max_index_file_length, create_time, sortkey, ref_length, block_size, data_file_name, index_file_name)
 			/*
 			  update the 'constant' part of the info:
@@ -384,15 +399,15 @@ public:
 			  sortkey, ref_length, block_size, data_file_name, index_file_name.
 			  handler::table->s->keys_in_use, keys_for_keyread, rec_per_key
 			*/
-			//stats.max_data_file_length = MAX_FILE_SIZE;		
+			//stats.max_data_file_length = MAX_FILE_SIZE;
 			//stats.max_index_file_length = 0;
 			//stats.sortkey;
 			//stats.ref_length;
 			stats.block_size = 1;
-			stats.mrr_length_per_rec= sizeof(tree_stored::_Rid)+sizeof(void*); 
+			stats.mrr_length_per_rec= sizeof(tree_stored::_Rid)+sizeof(void*);
 			//handler::table->s->keys_in_use;
 			//handler::table->s->keys_for_keyread;
-			
+
 		}
 
 		if(which & HA_STATUS_VARIABLE) {// - records, deleted, data_file_length, index_file_length, delete_length, check_time, mean_rec_length
@@ -400,23 +415,23 @@ public:
 			stats.block_size = 4096;
 			stats.records = std::max<tree_stored::_Rid>(2, get_tree_table()->row_count());
 			stats.mean_rec_length = stats.data_file_length / stats.records;
-			
+
 		}
-		for (ulong	i = 0; i < table->s->keys; i++) {				
+		for (ulong	i = 0; i < table->s->keys; i++) {
 			for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
-			
+
 				table->key_info[i].rec_per_key[j] = tt->get_rows_per_key(i,j);
 			}
 		}
 		if(which & HA_STATUS_ERRKEY) // - status pertaining to last error key (errkey and dupp_ref)
 		{}
-		
-		if(which & HA_STATUS_AUTO)// - update autoincrement value 
+
+		if(which & HA_STATUS_AUTO)// - update autoincrement value
 		{
-			
+
 			//handler::auto_increment_value = get_tree_table()->row_count();
-		}	
-		
+		}
+
 		if(do_unlock)
 			get_tree_table()->rollback();
 
@@ -441,7 +456,7 @@ public:
 	uint max_supported_key_length()    const { return TREESTORE_MAX_KEY_LENGTH; }
 	uint max_supported_key_part_length() const { return TREESTORE_MAX_KEY_LENGTH; }
 	const key_map *keys_to_use_for_scanning() { return &key_map_full; }
-	Table_flags table_flags(void) const{		
+	Table_flags table_flags(void) const{
 		return (	HA_PRIMARY_KEY_REQUIRED_FOR_POSITION |// HA_TABLE_SCAN_ON_INDEX |HA_PRIMARY_KEY_IN_READ_INDEX |
 					 HA_FILE_BASED |
 					/*| HA_REC_NOT_IN_SEQ | HA_AUTO_PART_KEY | HA_CAN_INDEX_BLOBS |*/
@@ -451,19 +466,19 @@ public:
 					HA_PARTIAL_COLUMN_READ | HA_NULL_IN_KEY /*|HA_CAN_REPAIR*/
 );
 	}
-	
+
 	double scan_time()
-	{			
+	{
 		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size()/8192)));/*assume an average page size of 8192 bytes*/
 	}
 	/// from InnoDB
-	double read_time(uint index, uint ranges, ha_rows rows) 
+	double read_time(uint index, uint ranges, ha_rows rows)
 	{
 		ha_rows total_rows;
 		double	time_for_scan;
 
 		if (index != table->s->primary_key) {
-		
+
 			return(handler::read_time(index, ranges, rows));
 		}
 
@@ -483,13 +498,13 @@ public:
 
 		return(ranges + (double) rows / (double) total_rows * time_for_scan);
 	}
-	
+
 	int create(const char *n,TABLE *t,HA_CREATE_INFO *ha){
 		tt = get_thread()->compose_table(t);
 		path = t->s->path.str;
 		return 0;
 	}
-	
+
 	int open(const char *n,int,uint){
 		tt = get_thread()->compose_table(table);
 		tt->check_load(table);
@@ -522,7 +537,7 @@ public:
 
 		DBUG_RETURN(to);
 	}
-	// tscan 2 
+	// tscan 2
 	int external_lock(THD *thd, int lock_type){
 		DBUG_ENTER("::external_lock");
 		if(table == NULL){
@@ -532,7 +547,7 @@ public:
 		bool writer = false;
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
-			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));		
+			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));
 			if(lock_type == F_WRLCK){
 				writer = true;
 				thread->modify();
@@ -545,15 +560,15 @@ public:
 				clear_thread(thd);
 				st.release_thread(thread);
 				clear_selection(selected);
-				//(*this).tt = 0;
+				/// (*this).tt = 0;
 				printf("transaction finalized : %s\n",table->alias);
 			}
 		}
-		
-		
+
+
 		DBUG_RETURN(0);
 	}
-	
+
 	// tscan 3
 	int rnd_init(bool scan){
 		row = 0;
@@ -565,12 +580,12 @@ public:
 		selected = get_tree_table()->create_output_selection(table);
 		(*this).r = get_tree_table()->get_table().begin();
 		(*this).r_stop = get_tree_table()->get_table().end();
-		
-		
+
+
 		return 0;
 	}
 	// tscan 4
-	
+
 	int rnd_next(byte *buf){
 		DBUG_ENTER("rnd_next");
 		if((*this).r == (*this).r_stop){
@@ -579,7 +594,7 @@ public:
 		last_resolved = (*this).r.key().get_value();
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);		
+			tree_stored::selection_tuple & sel = (*s);
 			sel.col->seek_retrieve(last_resolved, sel.field);
 		}
 		++((*this).r);
@@ -588,13 +603,13 @@ public:
 
 	int delete_row(const byte *buf){
 		statistic_increment(table->in_use->status_var.ha_delete_count,&LOCK_status);
-		
+
 		get_tree_table()->erase(last_resolved, (*this).table);
 		get_thread()->check_use();
 		st.check_use();
 		return 0;
 	}
-	
+
 	int write_row(byte * buf){
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
 		//if (table->timestamp_field_type & TIMESTAMP_AUTO_SET_ON_INSERT)
@@ -614,50 +629,50 @@ public:
 		uchar *record_new = table->record[1];
 		typedef std::vector<uchar *> _Saved;
 		_Saved saved;
-		
+
 		for (Field **field=table->field ; *field ; field++){// offset to old rec
 			Field * f = (*field);
 			if(f){//this looks like its working but who knows actually
-				saved.push_back(f->ptr);		
+				saved.push_back(f->ptr);
 
 				f->ptr = (uchar*)(old_data+f->offset(record_old));
 			}
 		}
 
 		get_tree_table()->erase_row_index(last_resolved);/// remove old index entries
-	
+
 		for (Field **field=table->field ; *field ; field++){
 			Field * ff = (*field);
-			if(ff){		
+			if(ff){
 				if(bitmap_is_set(table->write_set, ff->field_index)){
 					ff->ptr = (uchar*)(new_data+ff->offset(record_new));//replace only new data
-				}						
+				}
 			}
 		}
 		get_tree_table()->write(last_resolved, (*this).table); /// write row and create indexes
 		/// restore the fields with their original pointers
-		_Saved::iterator si = saved.begin();			
+		_Saved::iterator si = saved.begin();
 		for (Field **field=table->field ; *field ; field++){
-			if(*field){					
+			if(*field){
 				Field * ff = (*field);
 				if(ff){
 					ff->ptr = (uchar*)(*si);
 					++si;
-				}			
+				}
 			}
 		}
 		return 0;
 	}
-	
+
 	ha_rows records_in_range
 	(	uint inx
 	,	key_range *start_key
 	,	key_range *end_key)
 	{
 		ha_rows rows = 0;
-		DBUG_ENTER("records_in_range");		
+		DBUG_ENTER("records_in_range");
 		//read_lookups+=2;
-		
+
 		tree_stored::IndexIterator first = get_index_iterator_lower(inx, start_key) ;
 		tree_stored::IndexIterator last = get_index_iterator_upper(inx, end_key);
 		rows = first.count(last);
@@ -666,7 +681,7 @@ public:
 		}
 		DBUG_PRINT("info", ("records in range %lld\n", (NS_STORAGE::u64)rows));
 		DBUG_RETURN((ha_rows) rows);
-	
+
 	}
 
 	/// indexing functions
@@ -677,7 +692,7 @@ public:
 		clear_selection(selected);
 		selected = get_tree_table()->create_output_selection(table);
 		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
-		
+
 		return 0;
 	}
 
@@ -688,32 +703,32 @@ public:
 	{
 		return input.row;
 	}
-	
+
 	void resolve_selection_from_index(uint ax, const tree_stored::CompositeStored& iinfo){
-		
+
 		using namespace NS_STORAGE;
 
-		tree_stored::_Rid row = key_to_rid(ax, iinfo);			
+		tree_stored::_Rid row = key_to_rid(ax, iinfo);
 		last_resolved = row;
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);										
-			sel.col->seek_retrieve(row,sel.field);		
+			tree_stored::selection_tuple & sel = (*s);
+			sel.col->seek_retrieve(row,sel.field);
 		}
-	
+
 	}
 	void resolve_selection_only_from_index(uint ax){
-		
-		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();		
-		resolve_selection_from_index(ax, iinfo);			
-		
+
+		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();
+		resolve_selection_from_index(ax, iinfo);
+
 	}
 	void resolve_selection_from_index(uint ax){
-		
-		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();						
+
+		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();
 		resolve_selection_from_index(ax, iinfo);
-		
+
 	}
-	
+
 	void resolve_selection_from_index(){
 		resolve_selection_from_index(active_index);
 	}
@@ -726,43 +741,43 @@ public:
 	,	enum ha_rkey_function find_flag
 	){
 		int r = HA_ERR_END_OF_FILE;
-		table->status = STATUS_NOT_FOUND;		
+		table->status = STATUS_NOT_FOUND;
 		tree_stored::tree_table::ptr tt =  get_tree_table();
-		
+
 		read_lookups++;
 		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map, index_iterator);
 		if(pred==NULL){
-			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,index_iterator);	
+			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,index_iterator);
 		}
 		print_read_lookups();
-		if(index_iterator.valid()){	
-			
+		if(index_iterator.valid()){
+
 			switch(find_flag){
 			case HA_READ_AFTER_KEY:
 				index_iterator.next();
-				if(index_iterator.invalid()){	
+				if(index_iterator.invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
-				
+
 				break;
-			case HA_READ_BEFORE_KEY:				
+			case HA_READ_BEFORE_KEY:
 				index_iterator.previous();
-				if(index_iterator.invalid()){	
+				if(index_iterator.invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
-			
+
 				break;
 			case HA_READ_KEY_EXACT:
 				{
-					const tree_stored::CompositeStored& current = pred == NULL ?index_iterator.get_key(): *pred;							
+					const tree_stored::CompositeStored& current = pred == NULL ?index_iterator.get_key(): *pred;
 					if(!tt->check_key_match2(current,table,keynr,keypart_map)){
 						DBUG_RETURN(HA_ERR_END_OF_FILE);
 					}
-					
+
 				}
 				break;
 			default:
-		
+
 				break;
 			}
 			table->status = 0;
@@ -772,20 +787,20 @@ public:
 			else
 				resolve_selection_from_index(keynr);
 			//if(HA_READ_KEY_EXACT != find_flag)
-				
+
 		}
 		DBUG_RETURN(r);
 	}
 	int index_read_map
-	(	uchar * buf	
+	(	uchar * buf
 	,	const uchar * key
 	,	key_part_map keypart_map
 	,	enum ha_rkey_function find_flag)
 	{
 		int r = basic_index_read_idx_map(buf, active_index, key, keypart_map, find_flag);
-		
+
 		DBUG_RETURN(r);
-		
+
 	}
 
 	int index_read
@@ -794,9 +809,9 @@ public:
 	,	uint key_len
 	,	enum ha_rkey_function find_flag
 	){
-		return index_read_map(buf, key, 0xFFFFFFFF, find_flag);	
+		return index_read_map(buf, key, 0xFFFFFFFF, find_flag);
 	}
-	
+
 	int index_read_idx_map
 	(	uchar * buf
 	,	uint keynr
@@ -808,7 +823,7 @@ public:
 		clear_selection(selected);
 		selected = tt->create_output_selection(table);
 		int r = basic_index_read_idx_map(buf, keynr, key, keypart_map, find_flag);
-		
+
 		DBUG_RETURN(r);
 	}
 
@@ -824,27 +839,27 @@ public:
 	int index_next(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
 		index_iterator.next();
-		table->status = STATUS_NOT_FOUND;	
+		table->status = STATUS_NOT_FOUND;
 		if(index_iterator.valid()){
 
 			resolve_selection_from_index();
-			r = 0;			
-			table->status = 0;	
+			r = 0;
+			table->status = 0;
 			//index_iterator.next();
 		}
-		
+
 		DBUG_RETURN(r);
 	}
 
 	int index_prev(byte * buf) {
 		index_iterator.previous();
 		int r = HA_ERR_END_OF_FILE;
-		table->status = STATUS_NOT_FOUND;	
+		table->status = STATUS_NOT_FOUND;
 		if(index_iterator.valid()){
 			r = 0;
 			resolve_selection_from_index();
-			table->status = 0;	
-			
+			table->status = 0;
+
 		}
 		DBUG_RETURN(r);
 	}
@@ -863,7 +878,7 @@ public:
 	(	uint ax
 	,	const uchar *key
 	,	uint key_l
-	,	uint key_map	
+	,	uint key_map
 	,	enum ha_rkey_function find_flag
 	){
 		index_iterator = get_tree_table()->compose_query_lower_r(table, ax, key, key_l, key_map);
@@ -874,12 +889,12 @@ public:
 	(	uint ax
 	,	const uchar *key
 	,	uint key_l
-	,	uint key_map	
+	,	uint key_map
 	,	enum ha_rkey_function find_flag
 	){
 		return get_tree_table()->compose_query_lower_r(table, ax, key, key_l, key_map);
 	}
-	
+
 	tree_stored::IndexIterator get_index_iterator_upper(uint ax, const key_range *start_key){
 		if(start_key != NULL){
 			return get_tree_table()->compose_query_upper(table, ax, start_key->key, start_key->length, start_key->keypart_map);
@@ -890,9 +905,9 @@ public:
 	}
 
 	tree_stored::IndexIterator get_index_iterator_upper(const key_range *start_key){
-		return get_index_iterator_upper(active_index, start_key);		
+		return get_index_iterator_upper(active_index, start_key);
 	}
-	
+
 	int set_index_iterator_lower(const key_range *start_key){
 		if(start_key != NULL)
 			return set_index_iterator_lower(active_index, start_key->key, start_key->length, start_key->keypart_map, start_key->flag);
@@ -909,23 +924,23 @@ public:
 	}
 
 	int iterations;
-	
+
 	tree_stored::_Rid range_iterator;
 	virtual int read_range_first
 	(	const key_range *start_key
 	,	const key_range *end_key
 	,	bool eq_range
 	,	bool sorted){
-		
-		
+
+
 		int r = get_tree_table()->row_count() == 0 ?  HA_ERR_END_OF_FILE : 0;
 		iterations = 0;
 		range_iterator = 0;
 		//if(readset_covered){
 		read_lookups++;
-		r = set_index_iterator_lower(start_key);		
+		r = set_index_iterator_lower(start_key);
 		if(r==0){
-			table->status = 0;	
+			table->status = 0;
 			resolve_selection_from_index();
 			read_lookups++;
 			index_iterator.set_end(get_index_iterator_upper(end_key));
@@ -940,23 +955,23 @@ public:
 
 	virtual int read_range_next(){
 		int r = HA_ERR_END_OF_FILE;
-		
-		
+
+
 		if(index_iterator.valid()){
 			r = 0;
-			table->status = 0;	
-			resolve_selection_from_index();				
+			table->status = 0;
+			resolve_selection_from_index();
 			index_iterator.next();
 		}
-		
+
 		++range_iterator;
-		
-		DBUG_RETURN(r); 
+
+		DBUG_RETURN(r);
 	}
 };
 
 
-static handler *treestore_create_handler(handlerton *hton, 
+static handler *treestore_create_handler(handlerton *hton,
 	TABLE_SHARE *table,
 	MEM_ROOT *mem_root)
 {
@@ -964,7 +979,7 @@ static handler *treestore_create_handler(handlerton *hton,
 }
 static int treestore_commit(handlerton *hton, THD *thd, bool all){
 	int return_val= 0;
-	
+
 	DBUG_PRINT("info", ("error val: %d", return_val));
 	DBUG_RETURN(return_val);
 }
@@ -973,7 +988,7 @@ static int treestore_commit(handlerton *hton, THD *thd, bool all){
 static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 	int return_val= 0;
 	DBUG_ENTER("plasticity_rollback");
-	
+
 	DBUG_PRINT("info", ("error val: %d", return_val));
 	DBUG_RETURN(return_val);
 }
@@ -1001,7 +1016,7 @@ void initialize_loggers(){
 }
 int treestore_db_init(void *p)
 {
-	
+#ifdef _MSC_VER
 	LONG  HeapFragValue = 2;
 	if(HeapSetInformation((PVOID)_get_heap_handle(),
 						HeapCompatibilityInformation,
@@ -1010,7 +1025,8 @@ int treestore_db_init(void *p)
 	)
 	{
 		printf(" *** Tree Store (eyore) starting\n");
-	} 
+	}
+#endif
 	DBUG_ENTER("treestore_db_init");
 	//initialize_loggers();
 

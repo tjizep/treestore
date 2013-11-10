@@ -133,7 +133,11 @@ namespace asynchronous{
 					queue.enqueueNotification(new QuitNotification());
 				}
 				printf("workers stopping...\n");
+				#ifdef _MSC_VER
 				while (!queue.empty()) Thread::__sleep(50);
+				#else
+				while (!queue.empty()) Thread::sleep(50);
+				#endif
 				printf("workers stopped\n");
 				for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
 					//delete (*w);

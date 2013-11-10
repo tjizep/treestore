@@ -32,7 +32,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA
 
 *****************************************************************************/
-#pragma once
+#ifndef CO_STORE_CEP20130823
 #define CO_STORE_CEP20130823
 #include <stx/storage/basic_storage.h>
 #include <stx/btree.h>
@@ -49,9 +49,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "MurmurHash3.h"
 #include <map>
 #include <vector>
+#ifdef _MSC_VER
 #include <conio.h>
+#endif
 #include "abstracted_storage.h"
-#include <byte_order_generic_x86.h>
 
 namespace NS_STORAGE = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
@@ -301,9 +302,9 @@ namespace stored{
 		}
 		void add(NS_STORAGE::i64 val){
 			using namespace NS_STORAGE;
-			
+            NS_STORAGE::i64 v = val;
 			_add(&v, sizeof(v));
-			
+
 		}
 		void add(float v){
 			_add(&v, sizeof(v));
@@ -470,3 +471,4 @@ namespace stored{
 
 
 };
+#endif

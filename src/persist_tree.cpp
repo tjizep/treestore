@@ -1,18 +1,22 @@
 // persist_tree.cpp : Defines the entry point for the console application.
 //
+
+#ifdef _MSC_VER
 #define _WIN32_WINNT 0x0400
 #include <windows.h>
-#include "stdafx.h"
+#endif
+
 #include "example_storage.h"
 #include "allocator_test.h"
 #include "fields.h"
+#include "system_timers.h"
 int strings_test(){
-					
-	
-	typedef stored::Composite<16> key_type;	
+
+
+	typedef stored::Blobule<16> key_type;
 	typedef stored::IntTypeStored<int> value_type;
 	typedef stored::abstracted_storage _Storage;
-	//typedef buf_type<32> key_type;	
+	//typedef buf_type<32> key_type;
 	//typedef buf_type<32> value_type;
 	//typedef buf_type_storage<key_type> _Storage;
 	_Storage storage("strings_test");
@@ -28,10 +32,10 @@ int strings_test(){
 	//_IntMap int_map;
 	_TestSet against;
 	_Script script;
-	size_t tt = ::GetTickCount();
+	size_t tt = ::os::millis();
 	size_t onek = 1024ull;
 	int_map.set_max_use(onek*onek*onek*2ull);
-	size_t t = ::GetTickCount();
+	size_t t = ::os::millis();
 	char buf[120];
 	int vgen = 0;
 	std::string d;
@@ -42,56 +46,52 @@ int strings_test(){
 		if(against.count(k) == 0){
 			against.insert(k);
 			script.push_back(k);
-			if(against.size() % (MAX_ITEMS/10)==0){					
-				printf("generated %ld test keys in %ld ms\n", against.size(), ::GetTickCount()-t);
+			if(against.size() % (MAX_ITEMS/10)==0){
+				printf("generated %ld test keys in %ld ms\n", against.size(), ::os::millis()-t);
 			}
 		}
 	}
-		
+
 	if(int_map.empty()){
-		getch();
 		//std::sort(script.begin(), script.end());
-		printf("%ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
-		t = ::GetTickCount();
-			
+		printf("%ld items in %ld ms\n", script.size(), ::os::millis()-t);
+		t = ::os::millis();
+
 		for(int i=0;i < MAX_ITEMS;++i){
 			//int_map[script[i]] = script[i];
-			
+
 			int_map[script[i]]=i;
 			if(i % INTERVAL == 0){
-				printf("%ld items in %ld ms\n", i, ::GetTickCount()-t);
+				printf("%lld items in %ld ms\n", i, ::os::millis()-t);
 				//int_map.reduce_use();
 			}
 		}
-			
-		printf("%ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
+
+		printf("%ld items in %ld ms\n", script.size(), ::os::millis()-t);
 		//int_map.flush();
-		getch();
-			
-			
-			
-		t = ::GetTickCount();
+
+		t = ::os::millis();
 		int iter = 0;
 		int ok = 0;
 		_IntMap::iterator the_end = int_map.end();
 		key_type val;
 		for(_IntMap::iterator j=int_map.begin(); j != the_end;++j){
 			++iter;
-			if(val != (*j).first){
+			if(val != j.key()){
 				ok++;
 			}
-				
+
 			if(iter % INTERVAL == 0){
-				printf("iterated %ld items in %ld ms\n", iter, ::GetTickCount()-t);
-			
+				printf("iterated %ld items in %lld ms\n", iter, ::os::millis()-t);
+
 			}
 		}
-		printf("iterated %ld items in %ld ms\n", int_map.size(), ::GetTickCount()-t);
-		getch();
+		printf("iterated %ld items in %lld ms\n", int_map.size(), ::os::millis()-t);
+
 	}
 	if(true){
-			
-		size_t t = ::GetTickCount();
+
+		size_t t = ::os::millis();
 		_IntMap::iterator f;
 		for(int i=0;i < MAX_ITEMS;++i){
 			f = int_map.find(script[i]);
@@ -99,33 +99,33 @@ int strings_test(){
 				printf("tree structure or insert error(-1)\n");
 				return -1;
 			}
-			if((*f).first != script[i]){//
-				printf("tree structure or insert error(1. %ld!=%ld)\n", (*f).second,script[i]);
+			if(f.key() != script[i]){//
+				printf("tree structure or insert error(1. %ld!=%ld)\n", f.data().get_value(),script[i].get_value());
 				return -1;
 			}
-			
+
 			/*if (int_map.count(script[i])==0 ){
 				printf("tree structure or insert error(0)\n");
 				return -1;
 			}*/
 
-			
+
 			if(i % INTERVAL == 0){
-				printf("read %ld items in %ld ms\n", i, ::GetTickCount()-t);
+				printf("read %ld items in %lld ms\n", i, ::os::millis()-t);
 				//int_map.reduce_use();
 			}
-							
+
 		}
-		printf("read %ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
-		t = ::GetTickCount();
+		printf("read %ld items in %lld ms\n", script.size(), ::os::millis()-t);
+		t = ::os::millis();
 		for(int i=0;i < MAX_ITEMS/2;++i){
 			int_map.erase(script[i]);
 			if(i % INTERVAL == 0){
-				printf("erased %ld items in %ld ms\n", i, ::GetTickCount()-t);
+				printf("erased %ld items in %lld ms\n", i, ::os::millis()-t);
 				//int_map.reduce_use();
 			}
 		}
-		t = ::GetTickCount();
+		t = ::os::millis();
 		for(int i=0;i < MAX_ITEMS/2;++i){
 			f = int_map.find(script[i]);
 			if(f!=int_map.end() ){//
@@ -133,7 +133,7 @@ int strings_test(){
 				return -1;
 			}
 			if(i % INTERVAL == 0){
-				printf("tested %ld erased items in %ld ms\n", i, ::GetTickCount()-t);
+				printf("tested %ld erased items in %lld ms\n", i, ::os::millis()-t);
 				//int_map.reduce_use();
 			}
 		}
@@ -144,24 +144,24 @@ int strings_test(){
 				return -1;
 			}
 			if(i % INTERVAL == 0){
-				printf("tested %ld items in %ld ms\n", i, ::GetTickCount()-t);
+				printf("tested %ld items in %lld ms\n", i, ::os::millis()-t);
 				//int_map.reduce_use();
 			}
-		}			
-		printf("tree ok %ld ms\n", ::GetTickCount()-tt);
-	}	
+		}
+		printf("tree ok %lld ms\n", ::os::millis()-tt);
+	}
 	return 0;
 }
 
-int main(int argc, _TCHAR* argv[])
+int test()
 {
 	Poco::Data::SQLite::Connector::registerConnector();
 	return strings_test();
-	
+
 	allocator_test::test_allocators();
-	
-	{				
-		typedef int key_type;	
+
+	{
+		typedef int key_type;
 		typedef int value_type;
 		example_storage<key_type, value_type> storage;
 		typedef std::unordered_set<key_type> _TestSet;
@@ -174,62 +174,60 @@ int main(int argc, _TCHAR* argv[])
 		_IntMap int_map(storage);
 		_TestSet against;
 		_Script script;
-		size_t tt = ::GetTickCount();
+		size_t tt = ::os::millis();
 		size_t onek = 1024ull;
 		int_map.set_max_use(onek*onek*onek*2ull);
-		size_t t = ::GetTickCount();
+		size_t t = ::os::millis();
 		int vgen = 0;
 		for(;against.size() < MAX_ITEMS;){//ensure uniqueness of keys
-			key_type k = rand()*rand();//vgen++; 
+			key_type k = rand()*rand();//vgen++;
 			if(against.count(k) == 0){
 				against.insert(k);
 				script.push_back(k);
-				if(against.size() % (MAX_ITEMS/10)==0){					
-					printf("generated %ld test keys in %ld ms\n", against.size(), ::GetTickCount()-t);
+				if(against.size() % (MAX_ITEMS/10)==0){
+					printf("generated %ld test keys in %lld ms\n", against.size(), ::os::millis()-t);
 				}
 			}
 		}
-		
+
 		if(int_map.empty()){
-			
+
 			//std::sort(script.begin(), script.end());
-			getch();	
-			printf("%ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
-			t = ::GetTickCount();
-			
+			printf("%ld items in %lld ms\n", script.size(), ::os::millis()-t);
+			t = ::os::millis();
+
 			for(int i=0;i < MAX_ITEMS;++i){
 				int_map[script[i]] = script[i];
 				//int_map.insert2(script[i], i);
 				if(i % INTERVAL == 0){
-					printf("%ld items in %ld ms\n", i, ::GetTickCount()-t);
+					printf("%ld items in %lld ms\n", i, ::os::millis()-t);
 					//int_map.reduce_use();
 				}
 			}
-			
-			printf("%ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
+
+			printf("%ld items in %lld ms\n", script.size(), ::os::millis()-t);
 			int_map.flush();
-			getch();
-			
-			
-			
-			t = ::GetTickCount();
+
+
+
+			t = ::os::millis();
 			int iter = 0;
 			_IntMap::iterator the_end = int_map.end();
 			for(_IntMap::iterator j=int_map.begin(); j != the_end;++j){
 				++iter;
-				int i = (*j).first;	
-				
+				int i = j.key();
+
 				if(iter % INTERVAL == 0){
-					printf("iterated %ld items in %ld ms\n", iter, ::GetTickCount()-t);
-			
+					printf("iterated %ld items in %ld ms\n", iter, ::os::millis()-t);
+
 				}
 			}
-			printf("iterated %ld items in %ld ms\n", int_map.size(), ::GetTickCount()-t);
-			getch();
+			printf("iterated %ld items in %ld ms\n", int_map.size(), ::os::millis()-t);
+
 		}
 		if(true){
-			
-			size_t t = ::GetTickCount();
+
+			size_t t = ::os::millis();
 			_IntMap::iterator f;
 			for(int i=0;i < MAX_ITEMS;++i){
 				f = int_map.find(script[i]);
@@ -242,26 +240,26 @@ int main(int argc, _TCHAR* argv[])
 					return -1;
 				}*/
 
-				if((*f).second != script[i]){//
-					printf("tree structure or insert error(1. %ld!=%ld)\n", (*f).second,script[i]);
+				if(f.data() != script[i]){//
+					printf("tree structure or insert error(1. %ld!=%ld)\n", f.data(), script[i]);
 					return -1;
 				}
 				if(i % INTERVAL == 0){
-					printf("read %ld items in %ld ms\n", i, ::GetTickCount()-t);
+					printf("read %ld items in %ld ms\n", i, ::os::millis()-t);
 					//int_map.reduce_use();
 				}
-							
+
 			}
-			printf("read %ld items in %ld ms\n", script.size(), ::GetTickCount()-t);
-			t = ::GetTickCount();
+			printf("read %ld items in %ld ms\n", script.size(), ::os::millis()-t);
+			t = ::os::millis();
 			for(int i=0;i < MAX_ITEMS/2;++i){
 				int_map.erase(script[i]);
 				if(i % INTERVAL == 0){
-					printf("erased %ld items in %ld ms\n", i, ::GetTickCount()-t);
+					printf("erased %ld items in %ld ms\n", i, ::os::millis-t);
 					//int_map.reduce_use();
 				}
 			}
-			t = ::GetTickCount();
+			t = ::os::millis();
 			for(int i=0;i < MAX_ITEMS/2;++i){
 				f = int_map.find(script[i]);
 				if(f!=int_map.end() ){//
@@ -269,7 +267,7 @@ int main(int argc, _TCHAR* argv[])
 					return -1;
 				}
 				if(i % INTERVAL == 0){
-					printf("tested %ld erased items in %ld ms\n", i, ::GetTickCount()-t);
+					printf("tested %ld erased items in %ld ms\n", i, ::os::millis()-t);
 					//int_map.reduce_use();
 				}
 			}
@@ -280,15 +278,15 @@ int main(int argc, _TCHAR* argv[])
 					return -1;
 				}
 				if(i % INTERVAL == 0){
-					printf("tested %ld items in %ld ms\n", i, ::GetTickCount()-t);
+					printf("tested %ld items in %ld ms\n", i, ::os::millis()-t);
 					///int_map.reduce_use();
 				}
-			}			
-			printf("tree ok %ld ms\n", ::GetTickCount()-tt);
+			}
+			printf("tree ok %ld ms\n", ::os::millis()-tt);
 		}
-		
+
 	}
-	
+
 	return 0;
 
 

@@ -34,12 +34,19 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _CONVERSIONS_H_CEP2013_
 #define _CONVERSIONS_H_CEP2013_
+
+#ifndef _MSC_VER
+#include <cmath>
+#define isfinite std::isfinite
+#endif
+
 #include "sql_class.h"           // SSV
+
 #include <mysql.h>
 #include <mysql/plugin.h>
 namespace tree_stored{
-	
-	
+
+
 	//typedef ColIndex::index_key CompositeStored;
 	class conversions{
 	public:
@@ -94,7 +101,7 @@ namespace tree_stored{
 				uint fl = fv->field_length;
 				uint cl = (uint)b.get_size();
 				if(fl <= cl) cl = fl;
-				
+
 				memcpy(ptr + lb,b.chars(),cl);
 				if (lb == 1)
 					*ptr= (uchar) cl;
@@ -111,7 +118,7 @@ namespace tree_stored{
 				uint fl = fv->field_length;
 				uint cl = (uint)b.get_size() - 1;
 				if(fl <= cl) cl = fl;
-				
+
 				memcpy(ptr + lb,b.chars(),cl);
 				if (lb == 1)
 					*ptr= (uchar) cl;
@@ -127,13 +134,13 @@ namespace tree_stored{
 				}else{
 					memcpy(ptr, b.chars(), lb);
 				}
-		
+
 			}else f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
 		}
-		inline void fget(FloatStored &fs, Field * f, const uchar*, uint flags){		
+		inline void fget(FloatStored &fs, Field * f, const uchar*, uint flags){
 			fs.set_value((float)f->val_real());
 		}
-		inline void fget(DoubleStored &ds, Field * f, const uchar*, uint flags){		
+		inline void fget(DoubleStored &ds, Field * f, const uchar*, uint flags){
 			ds.set_value(f->val_real());
 		}
 		inline void fget(ShortStored& s, Field * f, const uchar*, uint flags){
@@ -164,11 +171,11 @@ namespace tree_stored{
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
-				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);	
+				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);
 				b.set(varchar.ptr(), varchar.length());//, varchar.length()
 				return;
 			}
-			
+
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			b.set(r->ptr(),r->length());//
 		}
@@ -176,69 +183,69 @@ namespace tree_stored{
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
-				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);	
+				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);
 				b.setterm(varchar.ptr(), varchar.length());//, varchar.length()
 				return;
 			}
-			
+
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			b.setterm(r->ptr(),r->length());//
 		}
 
-		/// direct getters 
-		inline void fadd(CompositeStored& to, FloatStored &fs, Field * f, const uchar*, uint flags){		
+		/// direct getters
+		inline void fadd(CompositeStored& to, FloatStored &fs, Field * f, const uchar*, uint flags){
 			to.addf4((float)f->val_real());
-			
+
 		}
-		inline void fadd(CompositeStored& to, DoubleStored &ds, Field * f, const uchar*, uint flags){		
+		inline void fadd(CompositeStored& to, DoubleStored &ds, Field * f, const uchar*, uint flags){
 			to.addf8(f->val_real());
-			
+
 		}
 		inline void fadd(CompositeStored& to, ShortStored& s, Field * f, const uchar*, uint flags){
 			to.add2((short)f->val_int());
-			
+
 		}
 		inline void fadd(CompositeStored& to, UShortStored& us, Field * f, const uchar*, uint flags){
 			to.addu2((unsigned short)f->val_int());
-			
+
 		}
 		inline void fadd(CompositeStored& to, CharStored& c, Field * f, const uchar*, uint flags){
 			to.add1((char)f->val_int());
-			
+
 		}
 		inline void fadd(CompositeStored& to, UCharStored& uc , Field * f, const uchar*, uint flags){
 			to.addu1((unsigned char)f->val_int());
-			
+
 		}
 		inline void fadd(CompositeStored& to, IntStored& i, Field * f, const uchar*, uint flags){
 			to.add4((int)f->val_int());
-			
+
 		}
 		inline void fadd(CompositeStored& to, UIntStored& ui, Field * f, const uchar*, uint flags){
 			to.addu4((unsigned int)f->val_int());
-			
+
 		}
 
 		inline void fadd(CompositeStored& to, LongIntStored& li, Field * f, const uchar*, uint flags){
 			to.add8(f->val_int());
-			
+
 		}
 
 		inline void fadd(CompositeStored& to, ULongIntStored& uli, Field * f, const uchar*, uint flags){
 			to.addu8(f->val_int());
-			
+
 		}
 
 		inline void fadd(CompositeStored& to, BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
-				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);	
+				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);
 				to.add(varchar.ptr(), varchar.length());//, varchar.length()
 				return;
 			}
-			
-		
+
+
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			to.add(r->ptr(),r->length());//
 		}
@@ -247,12 +254,12 @@ namespace tree_stored{
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
-				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);	
+				varchar.set_quick((char*) n_ptr+HA_KEY_BLOB_LENGTH, var_length, &my_charset_bin);
 				to.addTerm(varchar.ptr(),varchar.length());//, varchar.length()
 				return;
 			}
 			if(n_ptr != NULL){
-				
+
 				r = f->val_str(&attribute,n_ptr);
 				to.addTerm(r->ptr(),r->length());
 				return;

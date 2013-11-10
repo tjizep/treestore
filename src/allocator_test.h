@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _ALLOCATOR_TEST_CEP_2013_
+#define _ALLOCATOR_TEST_CEP_2013_
 #include "example_storage.h"
 namespace allocator_test{
 	int test_allocators(){
@@ -11,13 +12,13 @@ namespace allocator_test{
 		NS_STORAGE::stream_address sa =0;
 		test_the_alloc->allocate(sa,NS_STORAGE::create);
 		mvcc_coordinator_type::version_storage_type* version =  mvcc.begin();
-		
+
 		version->allocate(sa,NS_STORAGE::read);
 		mvcc.commit(version);
 
-		mvcc_coordinator_type::version_storage_type* version2 =  mvcc.begin();		
+		mvcc_coordinator_type::version_storage_type* version2 =  mvcc.begin();
 		mvcc.commit(version2);
-		
+
 		mvcc_coordinator_type::version_storage_type* version3 =  mvcc.begin();
 		mvcc.discard(version3);
 		//mvcc.commit(version3);
@@ -25,3 +26,4 @@ namespace allocator_test{
 		return 0;
 	}
 };
+#endif

@@ -130,6 +130,10 @@ extern ptrdiff_t btree_totl_used ;
 extern ptrdiff_t btree_totl_instances ;
 extern void add_btree_totl_used(ptrdiff_t added);
 extern void remove_btree_totl_used(ptrdiff_t added);
+class malformed_page_exception : public std::exception{
+public:
+    malformed_page_exception() throw(){};
+};
 
 namespace nst = stx::storage;
 namespace stx
@@ -159,7 +163,7 @@ namespace stx
 		}
 	};
 
-	
+
 
 	struct def_p_traits /// persist traits
 	{
@@ -270,7 +274,7 @@ namespace stx
 		states s;
 
 
-		node_ref() : s(initial), refs(0)//, shared(false)
+		node_ref() : refs(0), s(initial)//, shared(false)
 		{
 		}
 	};
@@ -472,18 +476,18 @@ namespace stx
 				(*this).context = context;
 			}
 
-			base_proxy():ptr(NULL_REF),w(0)
+			base_proxy():context(NULL),ptr(NULL_REF),w(0)
 			{
 
 			}
 
 			base_proxy(const node_ref * ptr)
-			:	ptr((node_ref *)ptr),w(0),context(NULL){
+			:	context(NULL),ptr((node_ref *)ptr),w(0){
 
 			}
 
 			base_proxy(const node_ref * ptr, stream_address w)
-			:   ptr((node_ref *)ptr),w(0),context(NULL){
+			:   context(NULL),ptr((node_ref *)ptr),w(0){
 
 			}
 
@@ -617,7 +621,7 @@ namespace stx
 					if(context->get_storage()->is_readonly()){
 
 						printf("allocating new page in readonly mode\n");
-						throw std::exception("cannot allocate new page in readonly transaction\n");
+						throw std::exception();
 					}
 					context->get_storage()->allocate(super::w, stx::storage::create);
 					context->get_storage()->complete();
@@ -640,7 +644,7 @@ namespace stx
 
 				}
 				if(rget()->shared){
-					throw std::exception("cannot change state of shared node");
+					throw std::exception();//"cannot change state of shared node"
 				}
 
 			}
@@ -1027,7 +1031,7 @@ namespace stx
 			{
 				return !key_less(a, b) && !key_less(b, a);
 			}
-			
+
 			/// multiple search type lower bound template function
 			/// performs a lower bound mapping using a couple of techniques simultaneously
 
@@ -1036,7 +1040,7 @@ namespace stx
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
 
-				register unsigned int l = 0, ll=llb, hh = 0, h = o;
+				register unsigned int l = 0, ll=llb, h = o;
 
 				/// multiple search type lower bound function
 				if(interp.can(keys[0],keys[o-1],o)){
@@ -1220,7 +1224,7 @@ namespace stx
 			{
 				node::initialize(0);
 				sorted = 0;
-				shared = false;
+				(*this).shared = false;
 				a_refs = 0;
 				preceding = next = NULL_REF;
 
@@ -1230,7 +1234,7 @@ namespace stx
 				(*this).a_refs = (*this).refs;
 			}
 			bool unshare(){
-				if(shared && a_refs == 1){
+				if((*this).shared && a_refs == 1){
 					(*this).shared = false;
 					(*this).refs = (*this).a_refs ;
 					(*this).a_refs = 0;
@@ -1269,7 +1273,7 @@ namespace stx
 			{
 				this->sort(stats, key_less);
 
-				return node::find_lower(key_less, interp, keys, key, !shared);//a_refs < 4
+				return node::find_lower(key_less, interp, keys, key, !(*this).shared);//a_refs < 4
 
 			}
 
@@ -1389,7 +1393,7 @@ namespace stx
 
 			    using namespace stx::storage;
 
-				size_t bs = buffer.size();
+				/// size_t bs = buffer.size();
 				buffer_type::const_iterator reader = buffer.begin();
 				(*this).set_occupants(leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
@@ -1492,7 +1496,8 @@ namespace stx
 		typedef std::unordered_map<stream_address, node*> _AddressedNodes;
 		typedef std::pair<stream_address, stx::storage::version_type> _AddressPair;
 		typedef std::map<_AddressPair, node*> _AddressedVersionNodes;
-		struct _Shared{
+		class _Shared{
+		public:
 			struct _Addr{
 				_Addr() : p(NULL){};
 				_AddressedVersionNodes* p;
@@ -1527,8 +1532,8 @@ namespace stx
 		/// therefore providing consistency to updates to any
 		/// node
 
-		_AddressedNodes nodes_loaded;
-		_Shared shared;
+		btree::_AddressedNodes nodes_loaded;
+		btree::_Shared shared;
 		///	returns NULL if a node with given storage address is not currently
 		/// loaded. otherwise returns the currently loaded node
 
@@ -1540,7 +1545,7 @@ namespace stx
 				return NULL_REF;
 		}
 		_AddressPair make_ap(stream_address w){
-			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
+			get_storage()->allocate(w, stx::storage::read);
 			nst::version_type version = get_storage()->get_allocated_version();
 			_AddressPair ap = std::make_pair(w, version);
 			get_storage()->complete();
@@ -1589,7 +1594,7 @@ namespace stx
 		void save(surface_node* n, stream_address& w){
 			if(shared.nodes) return;
 			if(get_storage()->is_readonly()){
-			
+
 				return;
 			}
 			if(n->is_modified()){
@@ -3053,7 +3058,7 @@ namespace stx
 		/// writes all modified pages to storage and frees all leaf nodes
 		void reduce_use(){
 
-			size_t nodes_before = nodes_loaded.size();
+			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;
 			flush();
 			nst::u64 flushed = 0;
@@ -3088,14 +3093,14 @@ namespace stx
 					if(h!=(*shared.nodes).end()){
 						if((*n).second == (*h).second){
 							if(!(*n).second->issurfacenode()){
-								throw std::exception("malformed page");
+								throw malformed_page_exception();
 							}
 							surface_node * sn = static_cast<surface_node*>((*n).second);
 							if(!sn->shared){
-								throw std::exception("malformed page");
+								throw ::malformed_page_exception();
 							}
 							if(sn->a_refs <= 0){
-								throw std::exception("malformed page");
+								throw ::malformed_page_exception();
 							}
 							if(sn->unshare()){
 
@@ -3322,9 +3327,9 @@ namespace stx
 	private:
 		/// Recursively free up nodes
 
-		/// currently this function can be replaced by an iteration through the 
+		/// currently this function can be replaced by an iteration through the
 		/// iteration through the nodes list
-		/// i.e. 
+		/// i.e.
 		///	for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n)
 		///
 

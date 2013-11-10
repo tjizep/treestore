@@ -166,7 +166,7 @@ namespace stx{
 			return ptr;
 		}
 
-		
+
 		inline i32 signed_size
 		(   i64 value
         ) {
@@ -256,7 +256,6 @@ namespace stx{
 
 		template<typename _Iterator>
 		u64 read_unsigned64 (_Iterator& start, _Iterator end){
-			typedef i64 _Signed;
 			typedef u64 _Unsigned;
 			_Iterator p = start;
 			unsigned int shift = 0;

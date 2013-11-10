@@ -1,6 +1,8 @@
 #ifndef _STX_BSTORAGE_H_
 #define _STX_BSTORAGE_H_
+#ifdef _MSC_VER
 #pragma warning(disable : 4503)
+#endif
 #include <stx/storage/types.h>
 #include <stx/storage/leb128.h>
 #include <Poco/Mutex.h>

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef EXAMPLE_STORAGE_CEP2013
+#define EXAMPLE_STORAGE_CEP2013
 #include <stx/storage/basic_storage.h>
 #include <stx/btree.h>
 #include <stx/btree_map>
@@ -12,9 +13,10 @@
 #include "transactional_storage.h"
 #include <map>
 #include <vector>
+#ifdef _MSC_VER
 #include <conio.h>
-
-/// 
+#endif
+///
 /// TODO: the example storage cannot be exchanged between threads
 namespace NS_STORAGE = stx::storage;
 template<typename _KeyType,typename _ValueType>
@@ -22,24 +24,24 @@ class example_storage : public NS_STORAGE::basic_storage{
 public:
 
 private:
-			
+
 	typedef NS_STORAGE::sqlite_allocator<NS_STORAGE::stream_address, NS_STORAGE::buffer_type> _Allocations;
 
 	_Allocations allocations;
 	NS_STORAGE::stream_address boot;
 public:
-	
+
 	example_storage() : allocations( NS_STORAGE::default_name_factory("hello_data")), boot(1){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 
 		/// create a block at the boot address if its not there
-		
+
 		allocations.initialize(boot);
-				
+
     }
 
-	
+
 	~example_storage() {
 		try{
 			/// TODO: for test move it to a specific 'close' ? function or remove completely
@@ -48,20 +50,20 @@ public:
 			/// nothing todo in destructor
 		}
     }
-	
+
 	bool get_boot_value(NS_STORAGE::stream_address &r){
 		r = 0;
 		NS_STORAGE::buffer_type &ba = allocations.allocate(boot, NS_STORAGE::read); /// read it
 		if(!ba.empty()){
 			/// the b+tree/x map needs loading
-			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();			
+			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
 			r = NS_STORAGE::leb128::read_signed(reader);
 		}
 		return !ba.empty();
 	}
-	
+
 	void set_boot_value(NS_STORAGE::stream_address r){
-				
+
 		NS_STORAGE::buffer_type &buffer = allocations.allocate(boot, NS_STORAGE::write); /// read it
 		buffer.resize(NS_STORAGE::leb128::signed_size(r));
 		NS_STORAGE::buffer_type::iterator writer = buffer.begin();
@@ -69,7 +71,7 @@ public:
 		NS_STORAGE::leb128::write_signed(writer, r);
 
 	}
-	
+
 	/// a kind of auto commit - by starting the transaction immediately after commit
 	void commit(){
 		allocations.commit();
@@ -86,13 +88,13 @@ public:
 		return allocations.allocate(what,how);
 	}
 
-	
+
 	/// function returning the stored size in bytes of a value
 	NS_STORAGE::u32 store_size(const _KeyType& k) const {
 		return NS_STORAGE::leb128::signed_size(k);
 	}
-	
-	
+
+
 	/// writes a key to a vector::iterator like writer
 	template<typename _Iterator>
 	void store(_Iterator& writer, _KeyType value) const {
@@ -100,7 +102,7 @@ public:
 		writer = NS_STORAGE::leb128::write_signed(writer, value);
 	}
 
-		
+
 	/// reads a key from a vector::iterator like reader
 	template<typename _Iterator>
 	void retrieve(_Iterator& reader, _KeyType &value) const {
@@ -109,7 +111,7 @@ public:
 	}
 
 
-	
+
 
 };
 template<int _Size = 16>
@@ -124,7 +126,7 @@ struct buf_type{
 	}
 	buf_type(const char* in){
 		strncpy(buf, in, _Size);
-		
+
 	}
 	buf_type& operator=(const buf_type& in){
 		memcpy(buf, in.buf,_Size);
@@ -146,24 +148,24 @@ class buf_type_storage : public NS_STORAGE::basic_storage{
 public:
 
 private:
-			
+
 	typedef NS_STORAGE::sqlite_allocator<NS_STORAGE::stream_address, NS_STORAGE::buffer_type> _Allocations;
 
 	_Allocations allocations;
 	NS_STORAGE::stream_address boot;
 public:
-	
+
 	buf_type_storage() : allocations( NS_STORAGE::default_name_factory("hellov_data")), boot(1){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 
 		/// create a block at the boot address if its not there
-		
+
 		allocations.initialize(boot);
-				
+
     }
 
-	
+
 	~buf_type_storage() {
 		try{
 			/// TODO: for test move it to a specific 'close' ? function or remove completely
@@ -172,20 +174,20 @@ public:
 			/// nothing todo in destructor
 		}
     }
-	
+
 	bool get_boot_value(NS_STORAGE::stream_address &r){
 		r = 0;
 		NS_STORAGE::buffer_type &ba = allocations.allocate(boot, NS_STORAGE::read); /// read it
 		if(!ba.empty()){
 			/// the b+tree/x map needs loading
-			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();			
+			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
 			r = NS_STORAGE::leb128::read_signed(reader);
 		}
 		return !ba.empty();
 	}
-	
+
 	void set_boot_value(NS_STORAGE::stream_address r){
-				
+
 		NS_STORAGE::buffer_type &buffer = allocations.allocate(boot, NS_STORAGE::write); /// read it
 		buffer.resize(NS_STORAGE::leb128::signed_size(r));
 		NS_STORAGE::buffer_type::iterator writer = buffer.begin();
@@ -193,7 +195,7 @@ public:
 		NS_STORAGE::leb128::write_signed(writer, r);
 
 	}
-	
+
 	/// a kind of auto commit - by starting the transaction immediately after commit
 	void commit(){
 		allocations.commit();
@@ -210,45 +212,45 @@ public:
 		return allocations.allocate(what,how);
 	}
 
-	
+
 	/// function returning the stored size in bytes of a value
 	NS_STORAGE::u32 store_size(const _BuffType& k) const {
-		
+
 		return _BuffType::size;
 	}
-	
-	
+
+
 	/// writes a key to a vector::iterator like writer
 	template<typename _Iterator>
 	void store(_Iterator& writer, const _BuffType &value) const {
 		size_t l = _BuffType::size;
-		//writer = NS_STORAGE::leb128::write_signed(writer, l);		
+		//writer = NS_STORAGE::leb128::write_signed(writer, l);
 		for(size_t k =0; k < l; ++k){
 			*writer = (basic_storage::value_type)value.buf[k];
 			++writer;
 		}
 	}
 
-		
+
 	/// reads a key from a vector::iterator like reader
 	template<typename _Iterator>
 	void retrieve(_Iterator& reader, _BuffType &value) const {
 
 		size_t l = _BuffType::size; //NS_STORAGE::leb128::read_signed(reader);
-		//value.resize(l);		
+		//value.resize(l);
 		for(size_t k =0; k < l; ++k){
 			value.buf[k] = *reader;
 			++reader;
 		}
-		
+
 	}
 
 	/// function returning the stored size in bytes of a value
 	NS_STORAGE::u32 store_size(const unsigned int& k) const {
 		return NS_STORAGE::leb128::signed_size(k);
 	}
-	
-	
+
+
 	/// writes a key to a vector::iterator like writer
 	template<typename _Iterator>
 	void store(_Iterator& writer, unsigned int value) const {
@@ -256,7 +258,7 @@ public:
 		writer = NS_STORAGE::leb128::write_signed(writer, value);
 	}
 
-		
+
 	/// reads a key from a vector::iterator like reader
 	template<typename _Iterator>
 	void retrieve(_Iterator& reader, unsigned int &value) const {
@@ -270,24 +272,24 @@ class vector_storage : public NS_STORAGE::basic_storage{
 public:
 
 private:
-			
+
 	typedef NS_STORAGE::sqlite_allocator<NS_STORAGE::stream_address, NS_STORAGE::buffer_type> _Allocations;
 
 	_Allocations allocations;
 	NS_STORAGE::stream_address boot;
 public:
-	
+
 	vector_storage() : allocations( NS_STORAGE::default_name_factory("hellov_data")), boot(1){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 
 		/// create a block at the boot address if its not there
-		
+
 		allocations.initialize(boot);
-				
+
     }
 
-	
+
 	~vector_storage() {
 		try{
 			/// TODO: for test move it to a specific 'close' ? function or remove completely
@@ -296,20 +298,20 @@ public:
 			/// nothing todo in destructor
 		}
     }
-	
+
 	bool get_boot_value(NS_STORAGE::stream_address &r){
 		r = 0;
 		NS_STORAGE::buffer_type &ba = allocations.allocate(boot, NS_STORAGE::read); /// read it
 		if(!ba.empty()){
 			/// the b+tree/x map needs loading
-			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();			
+			NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
 			r = NS_STORAGE::leb128::read_signed(reader);
 		}
 		return !ba.empty();
 	}
-	
+
 	void set_boot_value(NS_STORAGE::stream_address r){
-				
+
 		NS_STORAGE::buffer_type &buffer = allocations.allocate(boot, NS_STORAGE::write); /// read it
 		buffer.resize(NS_STORAGE::leb128::signed_size(r));
 		NS_STORAGE::buffer_type::iterator writer = buffer.begin();
@@ -317,7 +319,7 @@ public:
 		NS_STORAGE::leb128::write_signed(writer, r);
 
 	}
-	
+
 	/// a kind of auto commit - by starting the transaction immediately after commit
 	void commit(){
 		allocations.commit();
@@ -334,39 +336,40 @@ public:
 		return allocations.allocate(what,how);
 	}
 
-	
+
 	/// function returning the stored size in bytes of a value
 	NS_STORAGE::u32 store_size(const _VectorType& k) const {
-		
+
 		return NS_STORAGE::leb128::signed_size(k.size())+k.size()*sizeof(_VectorType::value_type);
 	}
-	
-	
+
+
 	/// writes a key to a vector::iterator like writer
 	template<typename _Iterator>
 	void store(_Iterator& writer, const _VectorType &value) const {
 		size_t l = value.size();
-		writer = NS_STORAGE::leb128::write_signed(writer, l);		
+		writer = NS_STORAGE::leb128::write_signed(writer, l);
 		for(size_t k =0; k < l; ++k){
 			*writer = (basic_storage::value_type)value[k];
 			++writer;
 		}
 	}
 
-		
+
 	/// reads a key from a vector::iterator like reader
 	template<typename _Iterator>
 	void retrieve(_Iterator& reader, _VectorType &value) const {
 
 		size_t l = NS_STORAGE::leb128::read_signed(reader);
-		value.resize(l);		
+		value.resize(l);
 		for(size_t k =0; k < l; ++k){
 			value[k] = (_VectorType::value_type)*reader;
 			++reader;
 		}
-		
+
 	}
 
-	
+
 
 };
+#endif

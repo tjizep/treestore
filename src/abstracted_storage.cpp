@@ -171,7 +171,7 @@ public:
 				entry.load(reader);
 				if(entry.sequence != ++sequence){
 					if(entry.sequence)
-						printf("bad sequence number %lld received %lld expected\n", entry.sequence, sequence);
+						printf("bad sequence number %lld received %lld expected\n", (nst::lld)entry.sequence, (nst::lld)sequence);
 
 					break;
 				}
@@ -194,7 +194,7 @@ public:
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
 						if(transaction == nullptr){
-							
+
 							Poco::File tmpDir(storage_name);
 							if(tmpDir.exists()){
 								transaction = storage->begin();
@@ -223,11 +223,11 @@ public:
 			stored::_Allocations* allocations = stored::_get_abstracted_storage(storage_name);
 			if(allocations->transactions_away()){
 				allocations->commit(transaction);
-				
+
 				printf("recovered %s\n", storage_name.c_str());
 			}
 			allocations->set_recovery(false);
-			
+
 		}
 
 		pending.clear();

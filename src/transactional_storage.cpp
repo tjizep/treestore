@@ -1,4 +1,4 @@
-#include <windows.h>
+
 #include "Poco/Mutex.h"
 #include "system_timers.h"
 typedef Poco::ScopedLockWithUnlock<Poco::Mutex> scoped_ulock;
@@ -17,6 +17,6 @@ namespace storage{
 		total_use -= removed;
 	}
 
-	
+
 }
 }

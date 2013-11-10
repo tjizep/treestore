@@ -345,7 +345,8 @@ namespace storage{
 	private: /// private types
 
 		struct block_descriptor {
-			block_descriptor(version_type version) : use(0), clock(0), mod(read), compressed(false), version(version){
+
+			block_descriptor(version_type version) : clock(0), mod(read), use(0), compressed(false), version(version){
 			}
 			block_descriptor(const block_descriptor& right) {
 				*this  = right;
@@ -567,7 +568,7 @@ namespace storage{
 			}
 		};
 
-		
+
 		/// flush any or all excess data to disk, the factor determines the fraction
 		/// of the total use to release i.e. a value of 0 releases all
 		/// the default value will release 25% of the total used memory
@@ -680,7 +681,7 @@ namespace storage{
 			//if(total_use > limit){
 			if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
 				if(get_use() > 1024*1024*2){
-					ptrdiff_t before = get_use();
+					//ptrdiff_t before = get_use();
 
 					flush_back(0.4);
 					last_flush_time = ::os::millis();
@@ -843,9 +844,9 @@ namespace storage{
 		)
 		:	name(namer.get_name())		/// storage name can be a path should contain only numbers and letters no seperators commans etc
 										/// the path should contain the trailing delimeter
-		,	_use(0)						/// current memory use in bytes
-		,	limit(128 * 1024 * 1024)	/// default memory limit
 		,	clock(0)					/// initial clock value gets incremented with every access
+		,	limit(128 * 1024 * 1024)	/// default memory limit
+		,	_use(0)						/// current memory use in bytes
 		,	transacted(false)			/// when true begin where called at least once since startup, commit or rollback
 		,	next(ma)					/// logical address space iterative generator
 		,	table_name("blocks")		/// table name - nothing special
@@ -1152,8 +1153,8 @@ namespace storage{
 	typedef std::shared_ptr<Poco::Mutex> mutex_ptr;
 	typedef Poco::Mutex * mutex_ref;
 
-	/// this defines a storage which is based on a previous version 
-	/// if the based member is nullptr then the version based storage 
+	/// this defines a storage which is based on a previous version
+	/// if the based member is nullptr then the version based storage
 	/// puts it in its own member storage
 
 	/// this interface supports multi threaded access on public functions
@@ -1321,20 +1322,21 @@ namespace storage{
 			return order;
 		}
 
+
 		version_based_allocator(address_type initial, u64 order, version_type version, mutex_ptr lock)
 		:	allocations(nullptr)
 		,	based(nullptr)
 		,	last_base(nullptr)
-		,	lock(lock.get())
-		,	read_only(false)
 		,	version(version)
+		,	allocated_version(0)
+		,	readers(0)
+		,	order(order)
+		,	initial(initial)
+		,	read_only(false)
 		,	copy_reads(false)
 		,	discard_on_end(false)
-		,	readers(0)
-		,	initial(initial)
-		,	order(order)
 		,	merged(false)
-		,	allocated_version(0)
+		,	lock(lock.get())
 		{
 
 		}
@@ -1779,9 +1781,9 @@ namespace storage{
 		virtual ~mvcc_coordinator(){
 			if(references != 0)
 				printf("non zero references\n");
-			
+
 			journal::get_instance().release_participant(this);
-			
+
 			initial->release();
 		}
 

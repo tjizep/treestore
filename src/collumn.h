@@ -32,7 +32,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA
 
 *****************************************************************************/
-#pragma once
+#ifndef _COLLUM_DEF_CEP_20130801_
+#define _COLLUM_DEF_CEP_20130801_
 #include "fields.h"
 #include "Poco/Mutex.h"
 #include "Poco/Thread.h"
@@ -42,7 +43,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "NotificationQueueWorker.h"
 namespace nst = NS_STORAGE;
 namespace collums{
-	
+
 	typedef NS_STORAGE::u32 _Rid;
 
 	class AbstractedIterator{
@@ -57,7 +58,7 @@ namespace collums{
 		virtual bool invalid(){
 			return true;
 		};
-		virtual void next(){			
+		virtual void next(){
 		}
 	};
 
@@ -67,7 +68,7 @@ namespace collums{
 		typename _MapType::iterator i;
 		typename _MapType::iterator iend;
 		_MapType * map;
-		
+
 		_MapType &get_map(){
 			return *map;
 		}
@@ -82,30 +83,30 @@ namespace collums{
 			}
 #endif
 		}
-		
+
+		typedef _MapType map_type;
 		typedef typename _MapType::iterator::initializer_pair initializer_pair;
-		typedef typename _MapType map_type;
 		typedef typename _MapType::key_type key_type;
 		typedef typename _MapType::data_type data_type;
 		typedef typename _MapType::iterator iterator_type;
-		
+
 		ImplIterator()
 		:	map(NULL)
 		{
 		}
 
-		ImplIterator(typename _MapType& map, typename _MapType::iterator i){
+		ImplIterator(_MapType& map, typename _MapType::iterator i){
 			(*this).map = &map;
 			(*this).i = i;
 			iend = get_map().end();
 			check();
 		}
-		
+
 		ImplIterator(const ImplIterator& right){
 			*this = right;
 			check();
 		}
-		
+
 		ImplIterator& operator=(const ImplIterator& right){
 			map = right.map;
 			iend.clear();
@@ -126,10 +127,10 @@ namespace collums{
 			iend = the_end.i;
 			check();
 		}
-		void seek(typename const _MapType::iterator& the_i){
+		void seek(const typename _MapType::iterator& the_i){
 			i = the_i;
 		}
-		void set(typename const _MapType::iterator& the_i,typename const _MapType::iterator& the_end, _MapType& amap){
+		void set(const typename _MapType::iterator& the_i,const typename _MapType::iterator& the_end, _MapType& amap){
 			i.clear();
 			iend.clear();
 			i = the_i;
@@ -137,9 +138,9 @@ namespace collums{
 			(*this).map = &amap;
 			check();
 		}
-		
+
 		void lower(const key_type &k){
-			i = get_map().lower_bound(k);	
+			i = get_map().lower_bound(k);
 			check();
 		}
 		void find(const key_type &k){
@@ -154,7 +155,7 @@ namespace collums{
 			iend = get_map().end();
 			check();
 		}
-		
+
 		_Rid count(const ImplIterator &last){
 			_Rid r = (_Rid)i.count(last.i);
 			check();
@@ -164,28 +165,28 @@ namespace collums{
 		const key_type& get_key() const{
 			return i.key();
 		}
-		
+
 		data_type& get_value(){
 			return i.data();
 		}
-		
+
 		const data_type& get_value() const{
 			return i.data();
 		}
-		
+
 		bool valid(){
 			check();
 			return (i!=iend);
 		};
-		
+
 		bool invalid(){
 			check();
 			return (i==iend);
 		};
-		
+
 		initializer_pair get_initializer(){
 			check();
-			return i.construction();		
+			return i.construction();
 		}
 
 		void from_initializer(_MapType& amap, const initializer_pair& init){
@@ -201,61 +202,61 @@ namespace collums{
 
 		void next(){
 			check();
-			++i;			
+			++i;
 		}
 		void previous(){
-			--i;			
+			--i;
 		}
 	};
-		
+
 
 	template<typename _Stored>
 	class collumn {
-	public:	
+	public:
 		typedef typename stored::IntTypeStored<_Rid> _StoredRowId;
 		stored::abstracted_storage storage;
-		
+
 		struct int_terpolator{
-		
+
 			/// function assumes a list of monotonously ascending integer values
-			inline bool can(const _StoredRowId& first, const _StoredRowId& last, int size) const 
+			inline bool can(const _StoredRowId& first, const _StoredRowId& last, int size) const
 			{
 				return false; //size > 0;
 			}
-			
-			inline bool asc() const 
+
+			inline bool asc() const
 			{
 				return true;
 			}
-			
-			inline _StoredRowId diff(const _StoredRowId &larger, const _StoredRowId &smaller) const 
+
+			inline _StoredRowId diff(const _StoredRowId &larger, const _StoredRowId &smaller) const
 			{
 				_StoredRowId r = larger.get_value() - smaller.get_value();
 				return r;
 			}
-			
-			inline _StoredRowId add(const _StoredRowId &larger, const _StoredRowId &smaller) const 
+
+			inline _StoredRowId add(const _StoredRowId &larger, const _StoredRowId &smaller) const
 			{
 				_StoredRowId r = larger.get_value() + smaller.get_value();
 				return r;
 			}
 
-			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const 
+			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
 			{
 				if(last.get_value()>first.get_value())
 					return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
 				return 0;
 			}
-		};	
+		};
 		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, int_terpolator> _ColMap;
 	private:
 		static const nst::u16 F_NOT_NULL = 1;
 		static const nst::u16 F_CHANGED = 2;
 		static const nst::u16 F_INVALID = 4;
 		struct _StoredEntry{
-			
+
 			_StoredEntry(const _Stored& key):key(key),flags(F_NOT_NULL){};
-			
+
 			_StoredEntry():flags(0){};
 
 			_StoredEntry &operator=(const _Stored& key){
@@ -264,11 +265,11 @@ namespace collums{
 				return *this;
 			}
 
-			inline operator typename _Stored&() {
+			inline operator _Stored&() {
 				return key;
 			}
-			
-			inline operator typename const _Stored&() const {
+
+			inline operator const _Stored&() const {
 				return key;
 			}
 			void nullify(){
@@ -292,7 +293,7 @@ namespace collums{
 			_Stored key;
 			nst::u16 flags;
 
-			
+
 		};
 		typedef std::vector<_StoredEntry> _Cache;
 
@@ -323,7 +324,7 @@ namespace collums{
 				typedef std::set<_Stored> _Uniques;
 				_Uniques uniques;
 				_Rid SAMPLE = (_Rid)data.size()/20;
-				printf("calc %lld density sample\n",(nst::u64)SAMPLE);
+				printf("calc %ld density sample\n",(long)SAMPLE);
 				for(_Rid r = 0;r<SAMPLE ; ++r){
 					_Rid sample = (std::rand()*std::rand()) % data.size();
 					uniques.insert(data[sample].key);
@@ -332,13 +333,13 @@ namespace collums{
 				if(density >= 2){
 					density /= 2;
 				}
-				
+
 			}
 		};
 		class ColLoader : public Poco::Notification{
 		protected:
 			std::string name;
-			
+
 			_CacheEntry* cache;
 			size_t col_size;
 			void calc_density(){
@@ -346,7 +347,7 @@ namespace collums{
 				Density d;
 				d.measure((*cache).data);
 				(*cache).density = d.density;
-				printf("measured density sample: %lld\n", (nst::u64)(*cache).density);
+				printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
 			}
 		protected:
 			bool load_into_cache(size_t col_size){
@@ -354,30 +355,30 @@ namespace collums{
 				storage.begin();
 				storage.set_transaction_r(true);
 				_ColMap col(storage);
-			
-				
+
+
 				col.share(storage.get_name());
 				col.reload();
 				_Rid ctr = 0;
 				NS_STORAGE::add_total_use(ctr * sizeof(_Stored));
-				_ColMap::iterator e = col.end();
-				_ColMap::iterator c = e;
+				typename _ColMap::iterator e = col.end();
+				typename _ColMap::iterator c = e;
 				if(!col.empty()){
 					--c;
-					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));	
+					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));
 				}
 				for(c = col.begin(); c != e; ++c){
-								
+
 					(*cache).data[c.key().get_value()] = c.data();
-					ctr++;		
-					
+					ctr++;
+
 				}
 				col.reduce_use();
 				calc_density();
 				storage.rollback();
 				cache->available = true;
-				
-				
+
+
 				return true;
 			}
 		public:
@@ -386,25 +387,25 @@ namespace collums{
 			,	cache(cache)
 			,	col_size(col_size)
 			{
-				
+
 			}
-			
+
 			virtual void doTask(){
 				(*this).load_into_cache(col_size);
 
 			}
 			virtual ~ColLoader(){
-				
+
 			}
 		public:
 			typedef Poco::AutoPtr<ColLoader> Ptr;
 		};
 		typedef std::vector<char>    _Nulls;
-		
+
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
 		typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
 		static const int MAX_THREADS = 16;
-		
+
 		ColLoaderManager &get_loader(){
 			static ColLoaderManager loader(2);
 			return loader;
@@ -418,32 +419,32 @@ namespace collums{
 			return _g_cache;
 		}
 		//static _Nulls _g_nulls;
-		
+
 		_CacheEntry* load_cache(std::string name, size_t col_size){
 			_CacheEntry * result = 0;
-			
-			
-			{	
+
+
+			{
 				NS_STORAGE::synchronized ll(get_mutex());
 				if(NS_STORAGE::total_use+btree_totl_used+col_size*sizeof(_Stored) > MAX_EXT_MEM){
 					return result;
 				}
 				if(get_g_cache().count(name)==0){
-					
+
 					std::shared_ptr<_CacheEntry> cache = std::make_shared<_CacheEntry>();
-					
+
 					get_g_cache()[name] = cache;
-				
+
 				}
 				result = get_g_cache()[name].get() ;
 			}
-			
-			NS_STORAGE::synchronized slock(result->lock);	
+
+			NS_STORAGE::synchronized slock(result->lock);
 			if(!result->loaded){
 				result->loaded = true;
 				get_loader().add(new ColLoader(name, result, col.size()));
 			}
-			
+
 			return result;
 		}
 	private:
@@ -466,34 +467,34 @@ namespace collums{
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
 				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)) < MAX_EXT_MEM){
-					
+
 					_cache = load_cache(storage.get_name(),col.size());
 				}
 			}
 		}
 		inline _CacheEntry& get_cache()  {
-			
+
 			return *_cache;
 		}
-	
+
 		const _CacheEntry& get_cache() const {
-			
+
 			return *_cache;
 		}
 		void check_cache(){
 			if(has_cache()){
-				NS_STORAGE::synchronized slock(_cache->lock);			
+				NS_STORAGE::synchronized slock(_cache->lock);
 				if(_cache->available)
 				{
 					cache_size = (_Rid)get_cache().data.size();
-				
+
 					if(cache_size)
 						cache_r = &(get_cache().data[0]);
-				
+
 					if(cache_size != col.size())
 					{
 						cache_size = 0;
-					
+
 						_cache->available = false;
 						_cache->loaded = true;
 						get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
@@ -505,6 +506,8 @@ namespace collums{
 		_Rid get_rows() const {
 			return  (_Rid)col.size();
 		}
+
+
 		typedef ImplIterator<_ColMap> iterator_type;
 		collumn(std::string name)
 		:	storage(name)
@@ -512,14 +515,14 @@ namespace collums{
 		,	next_id(0)
 		,	_cache(nullptr)
 		,	_nulls(nullptr)
-		,	modified(false)
 		,	rows_per_key(0)
+		,	modified(false)
 		{
 			next_id = (_Rid)col.size();
 			rows = next_id;
-			
+
 		}
-		
+
 		~collumn(){
 		}
 		void initialize(bool by_tree){
@@ -531,7 +534,7 @@ namespace collums{
 			next_id = (_Rid)col.size();
 			//check_cache();
 
-			
+
 		}
 		/// returns a sampled rows per key statistic for the collumn
 		nst::u32 get_rows_per_key(){
@@ -540,7 +543,7 @@ namespace collums{
 				rows_per_key = get_cache().density;
 			}
 			if(rows_per_key == 0){
-				
+
 				_Uniques unique;
 				const nst::u32 SAMPLE = std::min<nst::u32>((nst::u32)col.size(), 100000);
 				for(nst::u32 u = 0; u < SAMPLE; ++u){
@@ -550,36 +553,36 @@ namespace collums{
 				if(rows_per_key > 1){
 					rows_per_key /= 2;
 				}
-				printf("rows/key for %s : %ld\n",storage.get_name().c_str(), rows_per_key);
-				
+
+
 			}
 			return rows_per_key;
 		}
 		const _Stored& seek_by_tree(_Rid row) {
-			
-			return seek_by_cache(row);			
+
+			return seek_by_cache(row);
 		}
 		const _Stored& seek_by_cache(_Rid row)  {
 
-			
+
 			if( has_cache() && cache_size > row )
 			{
 				_StoredEntry & se = cache_r[row];
 				if(se.valid()){
 					return se;
 				}
-				
+
 			}
 			check_cache();
-			
-				
+
+
 			ival = col.find(row);
-				
+
 			if(ival != cend)
 			{
 				return ival.data();
 			}
-			
+
 			return empty;
 		}
 		void flush(){
@@ -597,60 +600,60 @@ namespace collums{
 				//printf("commit p1 %s\n", storage.get_name().c_str());
 				col.flush();
 				col.reduce_use();
-		
+
 			}
-			
+
 		}
 		void commit2(){
 			if(modified){
-				
+
 				storage.commit();
 			}
 			modified = false;
 		}
 
-		void tx_begin(bool read){			
+		void tx_begin(bool read){
 			storage.rollback();
 			storage.begin();
 			storage.set_transaction_r(read);
-			
+
 			if(read) col.share(storage.get_name());
-			else col.unshare();	
-			
+			else col.unshare();
+
 			col.reload();
 			if(read && storage.stale()){
-				
+
 			}
-			
+
 		}
-		
+
 		void rollback(){
 			if(modified){
 				//printf("releasing %s\n", storage.get_name().c_str());
 				col.flush();
-				
-				
+
+
 			}
 			col.reduce_use();
 			modified = false;
 			storage.rollback();
 		}
-		
+
 		void reduce_use(){
 			col.reduce_use();
-		
+
 		}
-		
+
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));
 		}
-		
+
 		ImplIterator<_ColMap> begin(){
 			return ImplIterator<_ColMap> (col, col.begin());
 		}
 		void erase(_Rid row){
 			col.erase(row);
-			rows = std::min<_Rid>(0, --rows);
+			rows = std::min<_Rid>(0, (_Rid)(int)--rows);
 			next_id = rows;
 			if(has_cache()){
 				if(get_cache().data.size() > row){
@@ -692,11 +695,11 @@ namespace collums{
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
 	typedef stored::Blobule<false, 14> BlobStored;
 	typedef stored::Blobule<true, 14> VarCharStored;
-	
-	
+
+
 	class StaticKey{
 	public:
-		
+
 		typedef unsigned char	uchar;	/* Short for unsigned char */
 		typedef signed char int8;       /* Signed integer >= 8  bits */
 		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
@@ -713,38 +716,38 @@ namespace collums{
 		static const size_t MAX_BYTES = 255;
 		static const size_t MAX_CONST_BYTES = 10;
 		typedef NS_STORAGE::u32 row_type ;
-		
+
 		typedef NS_STORAGE::u8 _size_type;
 		typedef NS_STORAGE::u8 _BufferSize;
-	
+
 	protected:
 		NS_STORAGE::u8 buf[MAX_CONST_BYTES];
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
-		
-		
-		inline NS_STORAGE::u8 *extract_ptr(){			
-			return (NS_STORAGE::u8*)(*(size_t*)(buf));	
+
+
+		inline NS_STORAGE::u8 *extract_ptr(){
+			return (NS_STORAGE::u8*)(*(size_t*)(buf));
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));	
+			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
 		inline NS_STORAGE::u8* data(){
-			
+
 			if(bytes <= MAX_CONST_BYTES){
 				return buf;
 			}
 			return extract_ptr();
 		}
 		inline const NS_STORAGE::u8* data() const{
-			
+
 			if(bytes <= MAX_CONST_BYTES){
 				return buf;
 			}
 			return extract_ptr();
 		}
 		inline NS_STORAGE::u8* _resize_buffer(_BufferSize nbytes){
-			
+
 			using namespace NS_STORAGE;
 			NS_STORAGE::u8* r = data();
 			if(nbytes > bytes){
@@ -761,22 +764,22 @@ namespace collums{
 			}
 			return r;
 		}
-		NS_STORAGE::u8* _append( _BufferSize count ){	
-			
+		NS_STORAGE::u8* _append( _BufferSize count ){
+
 			NS_STORAGE::u8* r = _resize_buffer( size + count ) + size;
-			size += count ;			
+			size += count ;
 			return r;
 		}
-		
+
 		/// sign sensitive memcmp compatible int encoding
 		/// with a transitive and simmetric property
-		/// such that i < j then enc(i) < enc(j) and 
+		/// such that i < j then enc(i) < enc(j) and
 		/// i < j and j < k then enc(i) < enc(k) and
 		/// enc(-i) < enc(0) < enc(i) and {i,j,k} from integers
 
 		template<typename _It>
 		inline void storei(uchar* d, _It v){
-			static uchar mask_1 = ~(1<<7);
+			static uchar mask_1 = (uchar)~(1<<7);
 			_It vd = v;
 			uchar * at = d + sizeof(v);
 			for(; at >= d; ){
@@ -793,12 +796,12 @@ namespace collums{
 		row_type row;
 	public:
 		void addf8(double v){
-			
-			doublestore(_append(sizeof(v)), v);		
+
+			doublestore(_append(sizeof(v)), v);
 		}
 
 		void add1(char c){
-			
+
 			*_append(sizeof(c)) = c;
 		}
 
@@ -808,8 +811,8 @@ namespace collums{
 		}
 
 		void addf4(float v){
-			
-			floatstore(_append(sizeof(float)), v);			
+
+			floatstore(_append(sizeof(float)), v);
 		}
 
 		void add8(long long v){
@@ -818,45 +821,45 @@ namespace collums{
 
 		void addu8(unsigned long long v){
 
-			storei(_append(sizeof(v)+1), v);			
+			storei(_append(sizeof(v)+1), v);
 		}
 
 		void add4(long v){
 
-			storei(_append(sizeof(v)+1), v);			
+			storei(_append(sizeof(v)+1), v);
 		}
 
 		void addu4(long v){
 
-			storei(_append(sizeof(v)+1), v);			
+			storei(_append(sizeof(v)+1), v);
 		}
 
 		void add2(short v){
 
-			storei(_append(sizeof(v)+1), v);			
+			storei(_append(sizeof(v)+1), v);
 		}
 
 		void addu2(unsigned short v){
 
-			storei(_append(sizeof(v)+1), v);			
+			storei(_append(sizeof(v)+1), v);
 		}
 
 		void add(const FloatStored & v){
-		
+
 			addf4(v.get_value());
 		}
 
 		void add(const DoubleStored & v){
-		
+
 			addf8(v.get_value());
 		}
 		void add(const ShortStored& v){
-		
+
 			add2(v.get_value());
 		}
 
 		void add(const UShortStored& v){
-		
+
 			addu2(v.get_value());
 		}
 
@@ -903,7 +906,7 @@ namespace collums{
 		void add(const char* k, size_t s){
 			size_t sad = s;
 			if(sad > 0){
-				memcpy(_append(sad), k, sad);								
+				memcpy(_append(sad), k, sad);
 			}
 		}
 
@@ -925,18 +928,18 @@ namespace collums{
 			}
 		}
 
-		StaticKey():size(0),row(0),bytes(MAX_CONST_BYTES){//
+		StaticKey():bytes(MAX_CONST_BYTES),size(0),row(0){//
 			//buf[0] = 0;
 		}
 
-		StaticKey(const StaticKey& right):size(0),row(0),bytes(MAX_CONST_BYTES){//
+		StaticKey(const StaticKey& right):bytes(MAX_CONST_BYTES),size(0),row(0){//
 			*this = right;
 		}
 
 		inline bool left_equal_key(const StaticKey& right) const {
 			//if( size != right.size ) return false;
 			if( size == 0 ) return false;
-			
+
 			int r = memcmp(data(), right.data(), std::min<_BufferSize>(size,right.size) );
 			return r == 0;
 		}
@@ -944,12 +947,12 @@ namespace collums{
 			if( size != right.size ) return false;
 			int r = memcmp(data(), right.data(), size );
 			return r == 0;
-				
+
 		}
 		StaticKey& operator=(const StaticKey& right){
 			_resize_buffer(right.size);
 			memcpy(data(), right.data(), right.size);
-			
+
 			size = right.size;
 			row = right.row;
 			return *this;
@@ -960,7 +963,7 @@ namespace collums{
 			return r;
 		}
 		inline bool operator<(const StaticKey& right) const {
-			
+
 			int r = memcmp(data(), right.data(), std::min<_size_type>(size, right.size));
 			if(r != 0) return r < 0;
 			if(size != right.size) return (size < right.size);
@@ -987,27 +990,27 @@ namespace collums{
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
 			buffer_type::iterator writer = w;
-			writer = leb128::write_signed(writer, row);	
-			writer = leb128::write_signed(writer, size);			
+			writer = leb128::write_signed(writer, row);
+			writer = leb128::write_signed(writer, size);
 
 			const u8 * end = data()+size;
 			for(const u8 * d = data(); d < end; ++d,++writer){
-				*writer = *d;				
+				*writer = *d;
 			}
 			return writer;
 		};
 
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
-			buffer_type::const_iterator reader = r;		
+			buffer_type::const_iterator reader = r;
 			row = leb128::read_signed(reader);
 			size_t size = leb128::read_signed(reader);
 			if(size > MAX_BYTES){
 				size = MAX_BYTES;
 			}
-			u8 * end = _resize_buffer(size)+size;			
+			u8 * end = _resize_buffer(size)+size;
 			for(u8 * d = data(); d < end; ++d,++reader){
-				*d = *reader;				
+				*d = *reader;
 			}
 			if(size < MAX_CONST_BYTES){
 				buf[size] = 0;
@@ -1059,7 +1062,7 @@ namespace collums{
 
 	class col_index{
 	public:
-		typedef stored::IntTypeStored<char> index_value;		
+		typedef stored::IntTypeStored<char> index_value;
 		typedef StaticKey index_key;//StaticKey
 		stored::abstracted_storage storage;
 		typedef stx::btree_map<index_key, index_value, stored::abstracted_storage> _IndexMap;
@@ -1068,8 +1071,8 @@ namespace collums{
 
 		class IndexScanner : public Poco::Notification{
 		protected:
-			
-			
+
+
 			std::string name;
 			size_t col_size;
 		protected:
@@ -1077,20 +1080,20 @@ namespace collums{
 				stored::abstracted_storage storage(name);
 				storage.begin();
 				storage.set_transaction_r(true);
-				
+
 				_IndexMap index(storage);
 				index.share(storage.get_name());
-				
+
 				iterator_type s = index.begin();
 				iterator_type e = index.end();
-				nst::u64 ctr= 0;
+				nst::i64 ctr= 0;
 				for(;s!=e;++s){
 					ctr++;
 					if(ctr % 100000ull == 0ull){
 						//printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
 					}
 				}
-				printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
+				printf(" %lld items in index %s\n",(nst::lld)ctr,storage.get_name().c_str());
 				storage.rollback();
 				return true;
 			}
@@ -1098,9 +1101,9 @@ namespace collums{
 			IndexScanner(std::string name)
 			:	name(name)
 			{
-				
+
 			}
-			
+
 			virtual void doTask(){
 
 				(*this).scan_index();
@@ -1108,12 +1111,12 @@ namespace collums{
 			}
 
 			virtual ~IndexScanner(){
-				
+
 			}
 		public:
 			typedef Poco::AutoPtr<IndexScanner> Ptr;
 		};
-		
+
 		typedef asynchronous::QueueManager<IndexScanner> IndexScannerManager;
 
 		IndexScannerManager &get_scanner(){
@@ -1126,9 +1129,9 @@ namespace collums{
 		_IndexMap::iterator the_end;
 		bool modified;
 	private:
-		
+
 	public:
-		
+
 		col_index(std::string name)
 		:	storage(name)
 		,	index(storage)
@@ -1141,9 +1144,9 @@ namespace collums{
 			index.share(name);
 
 			get_scanner().add(new IndexScanner(storage.get_name()));
-			
+
 		}
-		
+
 		~col_index(){
 			storage.close();
 		}
@@ -1153,22 +1156,22 @@ namespace collums{
 
 		void reduce_use(){
 			index.reduce_use();
-		
+
 		}
 		void share(){
 
 			//index.share(storage.get_name());
 		}
 		void unshare(){
-			
+
 		}
 
 		void scan(){
 
-			
-		
+
+
 		}
-		
+
 		std::string get_name() const {
 			return storage.get_name();
 		}
@@ -1179,7 +1182,7 @@ namespace collums{
 			out.from_initializer(index, ip);
 		}
 		void lower_(IndexIterator& out,  const index_key& k){
-			
+
 			out.set(index.lower_bound(k),the_end,index);
 		}
 
@@ -1211,20 +1214,20 @@ namespace collums{
 
 		void flush(){
 			index.reduce_use();
-			index.flush();			
+			index.flush();
 			set_end();
 		}
 		void begin(bool read){
-			
+
 			storage.begin();
 			storage.set_transaction_r(read);
 			if(read) index.share(storage.get_name());
-			else index.unshare();	
+			else index.unshare();
 			index.reload();
 			if(read && storage.stale()){
-				
+
 			}
-			
+
 		}
 
 		void rollback(){
@@ -1237,18 +1240,19 @@ namespace collums{
 		void commit1(){
 			if(modified){
 				// this doesnt seem to work
-				// index.flush();	
+				// index.flush();
 				// !!! this seems to work
 				index.reduce_use();
 				set_end();
 			}
 		}
 
-		void commit2(){		
+		void commit2(){
 			if(modified)
-				storage.commit();	
+				storage.commit();
 			modified = false;
-			
+
 		}
 	};
 };
+#endif

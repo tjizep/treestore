@@ -41,7 +41,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "MurmurHash3.h"
 #include <map>
 #include <vector>
+#ifdef _MSC_VER
 #include <conio.h>
+#endif
 namespace NS_STORAGE = stx::storage;
 typedef std::set<std::string> _LockList;
 extern _LockList& get_locklist();
@@ -55,7 +57,7 @@ namespace stored{
 	extern void reduce_all();
 	class AbstractStored{
 	public:
-	
+
 		virtual NS_STORAGE::u32 stored() const = 0;
 		virtual NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator writer) const = 0;
 		virtual NS_STORAGE::buffer_type::iterator read(NS_STORAGE::buffer_type::iterator reader) = 0;
@@ -69,10 +71,11 @@ namespace stored{
 	public:
 
 	private:
-			
+
 		std::string name;
-		_Transaction *_transaction;
 		_Allocations *_allocations;
+		_Transaction *_transaction;
+
 		_Allocations& get_allocations(){
 			if(_allocations == NULL){
 				_allocations = get_abstracted_storage(   (*this).name  );
@@ -106,18 +109,18 @@ namespace stored{
 		}
 
 		void reduce(){
-			
+
 		}
 
-		abstracted_storage(std::string name) 
+		abstracted_storage(std::string name)
 		:	name(name)
 		,	_allocations( NULL)
 		,	_transaction(NULL)
 		,	boot(1)
 		{
-			
+
 			get_allocations().get_initial()->set_limit(1024ll*1024ll*1024ll*3ll);
-			
+
 		}
 
 		~abstracted_storage() {
@@ -129,13 +132,13 @@ namespace stored{
 				/// nothing todo in destructor
 			}
 		}
-	
+
 		bool get_boot_value(NS_STORAGE::i64 &r){
 			r = 0;
 			NS_STORAGE::buffer_type &ba = get_transaction().allocate((*this).boot, NS_STORAGE::read); /// read it
 			if(!ba.empty()){
 				/// the b+tree/x map needs loading
-				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();			
+				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
 				r = NS_STORAGE::leb128::read_signed(reader);
 			}
 			get_transaction().complete();
@@ -146,17 +149,17 @@ namespace stored{
 			NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
 			if(!ba.empty()){
 				/// the b+tree/x map needs loading
-				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();		
-			
+				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
+
 				r = NS_STORAGE::leb128::read_signed(reader);
 				//printf("[BOOT VAL] %s [%lld] version %lld\n",get_name().c_str(), r, get_transaction().get_allocated_version());
 			}
 			get_transaction().complete();
 			return !ba.empty();
 		}
-	
+
 		void set_boot_value(NS_STORAGE::i64 r){
-				
+
 			NS_STORAGE::buffer_type &buffer = get_transaction().allocate((*this).boot, NS_STORAGE::create); /// read it
 			buffer.resize(NS_STORAGE::leb128::signed_size(r));
 			NS_STORAGE::buffer_type::iterator writer = buffer.begin();
@@ -166,7 +169,7 @@ namespace stored{
 
 		}
 		void set_boot_value(NS_STORAGE::i64 r, NS_STORAGE::stream_address boot){
-				
+
 			NS_STORAGE::buffer_type &buffer = get_transaction().allocate(boot, NS_STORAGE::create); /// read it
 			buffer.resize(NS_STORAGE::leb128::signed_size(r));
 			NS_STORAGE::buffer_type::iterator writer = buffer.begin();
@@ -193,24 +196,24 @@ namespace stored{
 			if(_transaction == NULL) return true;
 			return get_transaction().is_readonly();
 		}
-		
+
 		/// a kind of auto commit - by starting the transaction immediately after initialization
-		
+
 		void commit(){
 			if(_transaction != NULL){
 				get_allocations().commit(_transaction);
 				_transaction = NULL;
 			}
 		}
-		
+
 		/// return the version of the current transaction
 
 		NS_STORAGE::version_type get_version(){
 			return get_transaction().get_version();
 		}
-		
+
 		/// releases whatever version locks may be used
-		
+
 		void rollback(){
 			if(_transaction != NULL){
 				get_allocations().discard(_transaction);
@@ -231,21 +234,21 @@ namespace stored{
 				_allocations = NULL;
 			}
 		}
-		
+
 		/// returns true if the buffer passed marks the end of storage
 		///	i.e. invalid read or write allocation of non existent address
 
 		bool is_end(const NS_STORAGE::buffer_type& buffer) const {
 			return get_transaction().is_end(buffer);
 		}
-		
+
 		/// Storage functions called by persisted data structure
 		/// allocate a new or existing buffer, new denoted by what == 0 else an existing
 		/// buffer with the specfied stream address is returned - if the non nil address
 		/// does not exist an exception is thrown'
 
 		NS_STORAGE::buffer_type& allocate(NS_STORAGE::stream_address &what,NS_STORAGE::storage_action how){
-			
+
 			return get_transaction().allocate(what,how);
 		}
 
@@ -254,19 +257,19 @@ namespace stored{
 		}
 
 		/// get allocated version
-		
+
 		NS_STORAGE::version_type get_allocated_version() const {
 			return get_transaction().get_allocated_version();
 		}
-		
+
 		/// function returning the stored size in bytes of a value
-		
+
 		template<typename _Stored>
 		NS_STORAGE::u32 store_size(const _Stored& k) const {
 			return  k.stored();
 		}
-	
-	
+
+
 		/// writes a key to a vector::iterator like writer
 
 		template<typename _Iterator,typename _Stored>
@@ -274,14 +277,14 @@ namespace stored{
 			writer = stored.store(writer);
 		}
 
-		
+
 		/// reads a key from a vector::iterator like reader
 
 		template<typename _Iterator,typename _Stored>
 		void retrieve(_Iterator& reader, _Stored &value) const {
-			reader = value.read(reader);		
+			reader = value.read(reader);
 		}
-	
+
 	};
 };
 #endif

@@ -14,7 +14,9 @@
 
 #ifndef _STX_BTREE_MAP_H_
 #define _STX_BTREE_MAP_H_
+#ifdef _MSC_VER
 #pragma warning (disable : 4503)
+#endif
 #include <stx/btree.h>
 
 namespace stx
@@ -72,8 +74,8 @@ public:
     typedef _Storage					storage_type;
 
     ///typedef _Context					persist_context;
-   
-   
+
+
 
 public:
     // *** Constructed Types
@@ -233,7 +235,7 @@ public:
 		tree.set_max_use(max_use);
 	}
 
-	
+
 public:
     // *** Fast Destruction of the B+ Tree
 
@@ -608,7 +610,7 @@ public:
 	}
 
 	/// unshare all surfaces
-	
+
 	void unshare(){
 		tree.unshare();
 	}
@@ -619,9 +621,9 @@ public:
 
     void flush()    {
         tree.flush();
-		
+
     }
-	
+
 	/// loads the tree from the specified root address - all previous changes are lost
 
 	void restore(stx::storage::stream_address r){
@@ -631,7 +633,7 @@ public:
 	}
 
 	/// when a tree becomes stale
-	
+
 	void reload()
 	{
 		tree.reload();
