@@ -258,7 +258,7 @@ namespace stx
 		static const int    max_scan = btree_traits::max_scan;
 
 	};
-	static unsigned int cgen = 0;
+
 	enum states
 	{
 		initial = 1,

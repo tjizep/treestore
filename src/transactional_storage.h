@@ -842,19 +842,22 @@ namespace storage{
 		(	_NameFactory namer			/// storage name
 		,	address_type ma = 32		/// minimum address
 		)
-		:	name(namer.get_name())		/// storage name can be a path should contain only numbers and letters no seperators commans etc
-										/// the path should contain the trailing delimeter
+		:	transient(false)			/// the path should contain the trailing delimeter
+		,	busy(false)					///	set to true during an allocation to false when complete is called
+		,	next(ma)					/// logical address space iterative generator
+		,   currently_active(0)         /// logical address after allocate and before complete is called
+		,	table_name("blocks")		/// table name - nothing special
+        ,   name(namer.get_name())		/// storage name can be a path should contain only numbers and letters no seperators commans etc
+        ,	changes(0)					/// changes made since begin
+        ,	version(0)					/// starts the version at 0
+        ,	allocated_version(0)		/// the version after allocate
+		,	transacted(false)			/// when true begin where called at least once since startup, commit or rollback
 		,	clock(0)					/// initial clock value gets incremented with every access
 		,	limit(128 * 1024 * 1024)	/// default memory limit
 		,	_use(0)						/// current memory use in bytes
-		,	transacted(false)			/// when true begin where called at least once since startup, commit or rollback
-		,	next(ma)					/// logical address space iterative generator
-		,	table_name("blocks")		/// table name - nothing special
-		,	changes(0)					/// changes made since begin
-		,	busy(false)					///	set to true during an allocation to false when complete is called
 		,	result(nullptr)				///	save the last result after allocate is called to improve safety
-		,	transient(false)			/// if true the data files are deleted on destruction
-		,	version(0)					/// starts the version at 0
+					/// if true the data files are deleted on destruction
+
 		{
 			using Poco::File;
 			File df (get_storage_path() + name );
@@ -1733,13 +1736,14 @@ namespace storage{
 		mvcc_coordinator
 		(	storage_allocator_type_ptr initial			/// initial version - to locate storage
 		)
-		:	initial(initial)
-		,	next_version(1)
-		,	lock(std::make_shared<Poco::Mutex>())
-		,	order(1)
-		,	last_address ( initial->last() )
-		,	recovery(false)
+		:   order(1)
 		,	active_transactions(0)
+		,	next_version(1)
+		,	last_address ( initial->last() )
+		,	initial(initial)
+		,   lock(std::make_shared<Poco::Mutex>())
+		,	recovery(false)
+
 		{
 			//initial->engage();
 			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);

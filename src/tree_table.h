@@ -195,10 +195,10 @@ namespace tree_stored{
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
 	protected:
 		bool changed;
-		inline char* INDEX_SEP(){
+		inline const char* INDEX_SEP(){
 			return "__";
 		}
-		inline char* TABLE_SEP(){
+		inline const char* TABLE_SEP(){
 			return "_";
 		}
 		void load_cols(TABLE *table_arg){

@@ -653,7 +653,7 @@ namespace collums{
 		}
 		void erase(_Rid row){
 			col.erase(row);
-			rows = std::min<_Rid>(0, (_Rid)(int)--rows);
+			if((*this).rows > 0) --(*this).rows;
 			next_id = rows;
 			if(has_cache()){
 				if(get_cache().data.size() > row){
