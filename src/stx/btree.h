@@ -1515,6 +1515,7 @@ namespace stx
 				static _NamedSharedNodes named;
 				nst::synchronized s(get_named_mutex());
 				_AddressedVersionNodes* r =  named[name].p;
+
 				if(r == nullptr){
 					r = new _AddressedVersionNodes();
 					named[name].p = r;
