@@ -258,7 +258,7 @@ namespace stx
 		static const int    max_scan = btree_traits::max_scan;
 
 	};
-	static unsigned int cgen = 0;
+
 	enum states
 	{
 		initial = 1,
@@ -1515,6 +1515,7 @@ namespace stx
 				static _NamedSharedNodes named;
 				nst::synchronized s(get_named_mutex());
 				_AddressedVersionNodes* r =  named[name].p;
+
 				if(r == nullptr){
 					r = new _AddressedVersionNodes();
 					named[name].p = r;

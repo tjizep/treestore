@@ -136,10 +136,9 @@ namespace tree_stored{
 			tree_table::ptr t = tables[table_arg->s->path.str];
 			if(t == NULL ){
 
-				KEY *pos;
- 				/// TABLE_SHARE *share= table_arg->s;
+				/// TABLE_SHARE *share= table_arg->s;
 				//uint options= share->db_options_in_use;
-				pos= table_arg->key_info;
+
 				t = new tree_table(table_arg);
 				tables[table_arg->s->path.str] = t;
 				save_extensions[table_arg->s->path.str] = t->get_file_names();

@@ -1,7 +1,8 @@
 #include "abstracted_storage.h"
+static Poco::Mutex m;
 namespace nst = stx::storage;
 namespace stored{
-	static Poco::Mutex m;
+
 	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;
 	static _AlocationsMap instances;
 	_Allocations* _get_abstracted_storage(std::string name){
@@ -38,10 +39,6 @@ namespace stored{
 	}
 }; //stored
 
-_LockList& get_locklist(){
-	static _LockList ll;
-	return ll;
-}
 
 #include "transactional_storage.h"
 #include <fstream>
