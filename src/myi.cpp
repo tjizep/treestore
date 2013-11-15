@@ -97,8 +97,9 @@ void print_read_lookups(){
 #include "tree_table.h"
 typedef std::map<std::string, _FileNames > _Extensions;
 
-// because the handlerton asks for extensions when the table defs are already destroyed w.t.f.
-_Extensions save_extensions;
+// w.t.f.
+// The handlerton asks for extensions when the table defs are already destroyed 
+static _Extensions save_extensions;
 
 namespace tree_stored{
 
@@ -560,7 +561,7 @@ public:
 				st.release_thread(thread);
 				clear_selection(selected);
 				/// (*this).tt = 0;
-				printf("transaction finalized : %s\n",table->alias);
+				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 			}
 		}
 
@@ -1039,10 +1040,7 @@ int treestore_db_init(void *p)
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 
-	/*
-	Support for transactions disabled until WL#2952 fixes it.
-	We do it like this to avoid "defined but not used" compiler warnings.
-	*/
+	
 	//treestore_hton->commit= 0;
 	//treestore_hton->rollback= 0;
 	DBUG_RETURN(FALSE);

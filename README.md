@@ -38,7 +38,7 @@ Features
 Building
 --------
 
-GCC and MSVC is supported
+GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
 
 TODO
 ----
