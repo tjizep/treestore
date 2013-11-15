@@ -3056,7 +3056,7 @@ namespace stx
 				}
 			}
 		}
-		/// writes all modified pages to storage and frees all leaf nodes
+		/// writes all modified pages to storage and frees all surface nodes
 		void reduce_use(){
 
 			/// size_t nodes_before = nodes_loaded.size();
@@ -3098,10 +3098,10 @@ namespace stx
 							}
 							surface_node * sn = static_cast<surface_node*>((*n).second);
 							if(!sn->shared){
-								throw ::malformed_page_exception();
+								throw malformed_page_exception();
 							}
 							if(sn->a_refs <= 0){
-								throw ::malformed_page_exception();
+								throw malformed_page_exception();
 							}
 							if(sn->unshare()){
 
@@ -3199,6 +3199,9 @@ namespace stx
 				nodes_loaded.erase(w);
 				surface_node *ln = n;
 				typename surface_node::alloc_type a(surface_node_allocator());
+				/// TODO: adding multithreaded freeing of pages can improve transactional
+				/// performance where small ammounts of random page access is prevalent 
+
 				//static mt_free liberator(surface_node_allocator());
 				surface_node * removed = ln;
 				//liberator.liberate(removed);
