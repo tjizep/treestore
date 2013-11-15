@@ -33,7 +33,7 @@ Features
 
  12. Very Efficient sparse collumn storage due to 11 and differencial encoding
 
- 13. High perfromance usually more than 200% on tpc-h (HammerDB)
+ 13. High performance - usually more than 200% on tpc-h (HammerDB)
 
 Building
 --------
