@@ -38,7 +38,7 @@ Features
 Building
 --------
 
-Currently only MSVC 11 is a supported compiler. Future builds will be GCC 'compliant'
+GCC and MSVC is supported
 
 TODO
 ----
