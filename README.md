@@ -29,9 +29,11 @@ Features
 
  10. STL like internal data structures for index and collumn storage
 
- 11. No NULL storage format i.e. no extra bit for NULL values
+ 11. No NULL storage format i.e .no extra bit for NULL values
 
  12. Very Efficient sparse collumn storage due to 11 and differencial encoding
+
+ 13. High perfromance usually more than 200% on tpc-h (HammerDB)
 
 Building
 --------
@@ -42,4 +44,3 @@ TODO
 ----
 
  1. Simple Configuration
- 2. Compile with GCC
