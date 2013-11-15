@@ -1053,7 +1053,7 @@ int treestore_done(void *p)
 struct st_mysql_storage_engine treestore_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 
-mysql_declare_plugin(plasticity)
+mysql_declare_plugin(treestore)
 {
 	MYSQL_STORAGE_ENGINE_PLUGIN,
 		&treestore_storage_engine,
