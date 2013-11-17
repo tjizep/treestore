@@ -438,6 +438,7 @@ namespace storage{
 
 		bool is_new;				/// flag set when storage file exists used to suppress file creation if there is nothing in it
 
+
 		ptrdiff_t get_block_use(const block_descriptor& v){
 			return v.block.capacity() + sizeof(block_type)+32; /// the 32 is for the increase in the allocations table
 		}
@@ -717,11 +718,18 @@ namespace storage{
 					{
 
 						if(read == how){
-							read_block.clear();
-							read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
-							currently_active = which;
-							allocated_version = version_off(which);
-							return read_block;
+							bool noreadcache  = false;
+							if(noreadcache){
+								read_block.clear();
+								read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
+								currently_active = which;
+								allocated_version = version_off(which);
+								return read_block;
+							}
+							result = new block_descriptor(version_off(which));
+							result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
+							allocations[which] = result;
+							
 						}else{
 							result = new block_descriptor(version_off(which));
 							result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
