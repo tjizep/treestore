@@ -439,7 +439,7 @@ namespace storage{
 		bool is_new;				/// flag set when storage file exists used to suppress file creation if there is nothing in it
 
 		ptrdiff_t get_block_use(const block_descriptor& v){
-			return v.block.capacity() + sizeof(block_type);
+			return v.block.capacity() + sizeof(block_type)+32; /// the 32 is for the increase in the allocations table
 		}
 
 		ptrdiff_t get_block_use(const ref_block_descriptor& v){
@@ -695,6 +695,7 @@ namespace storage{
 				return (*i).second;
 			}
 			versions[which] = (*this).get_version();
+			
 			return (*this).get_version();
 		}
 	protected:
@@ -715,10 +716,17 @@ namespace storage{
 					if((*this).get_buffer(which))
 					{
 
-						result = new block_descriptor(version_off(which));
-						result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
-						allocations[which] = result;
-
+						if(read == how){
+							read_block.clear();
+							read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
+							currently_active = which;
+							allocated_version = version_off(which);
+							return read_block;
+						}else{
+							result = new block_descriptor(version_off(which));
+							result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
+							allocations[which] = result;
+						}
 					}else if(how == create)
 					{
 						result = new block_descriptor(version_off(which));

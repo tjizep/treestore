@@ -255,7 +255,7 @@ namespace collums{
 		static const nst::u16 F_INVALID = 4;
 		struct _StoredEntry{
 
-			_StoredEntry(const _Stored& key):key(key),flags(F_NOT_NULL){};
+			_StoredEntry(const _Stored& key):key(key),flags(F_INVALID){};
 
 			_StoredEntry():flags(0){};
 
@@ -299,6 +299,10 @@ namespace collums{
 
 		struct _CacheEntry{
 			_CacheEntry() : available(false), loaded(false),density(1){};
+			~_CacheEntry(){
+				NS_STORAGE::remove_total_use(data.capacity()* sizeof(_Stored)*2);
+				
+			}
 			bool available;
 			bool loaded;
 			_Cache data;
@@ -306,9 +310,14 @@ namespace collums{
 			_Rid density;
 			void unload(){
 				nst::synchronized _l(lock);
+				printf("unloading col cache\n");
+				NS_STORAGE::remove_total_use(data.capacity()* sizeof(_Stored)*2);
 				loaded = false;
-				data.clear();
 				available = false;
+				data.clear();
+				data.~_Cache();
+				new (&data) _Cache();
+				
 			}
 		};
 		class Density{
@@ -324,7 +333,7 @@ namespace collums{
 				typedef std::set<_Stored> _Uniques;
 				_Uniques uniques;
 				_Rid SAMPLE = (_Rid)data.size()/20;
-				printf("calc %ld density sample\n",(long)SAMPLE);
+				//printf("calc %ld density sample\n",(long)SAMPLE);
 				for(_Rid r = 0;r<SAMPLE ; ++r){
 					_Rid sample = (std::rand()*std::rand()) % data.size();
 					uniques.insert(data[sample].key);
@@ -360,19 +369,37 @@ namespace collums{
 				col.share(storage.get_name());
 				col.reload();
 				_Rid ctr = 0;
-				NS_STORAGE::add_total_use(ctr * sizeof(_Stored));
+				
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				if(!col.empty()){
 					--c;
-					(*cache).data.resize(std::max<size_t>(col_size ,c.key().get_value()+1));
+					nst::u64 cached = std::max<size_t>(col_size ,c.key().get_value()+1);
+					nst::u64 bytes_used = cached * sizeof(_Stored) *2;
+					NS_STORAGE::remove_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
+					(*cache).data.clear();
+					if(btree_totl_used + nst::total_use + bytes_used > MAX_EXT_MEM){
+						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
+						(*cache).unload();
+						return false;
+					}
+					
+					(*cache).data.resize(cached);
+					NS_STORAGE::add_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 				}
+				const _Rid FACTOR = 10;
 				for(c = col.begin(); c != e; ++c){
-
 					(*cache).data[c.key().get_value()] = c.data();
 					ctr++;
-
+					if((*cache).data.size() > FACTOR){
+						if(ctr % ( (*cache).data.size() / FACTOR ) ==0){
+							col.reduce_use();
+							//double MB = 1024.0*1024.0;
+							//printf("mem use loading col %.4g MB\n", (double)(btree_totl_used + nst::total_use )/MB);
+						}
+					}
 				}
+				
 				col.reduce_use();
 				calc_density();
 				storage.rollback();
@@ -387,6 +414,8 @@ namespace collums{
 			,	cache(cache)
 			,	col_size(col_size)
 			{
+				cache->available = false;
+				cache->loaded = true;
 
 			}
 
@@ -404,10 +433,10 @@ namespace collums{
 
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
 		typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
-		static const int MAX_THREADS = 16;
+		static const int MAX_THREADS = 1;
 
 		ColLoaderManager &get_loader(){
-			static ColLoaderManager loader(2);
+			static ColLoaderManager loader(MAX_THREADS);
 			return loader;
 		}
 		Poco::Mutex &get_mutex(){
@@ -486,6 +515,7 @@ namespace collums{
 				NS_STORAGE::synchronized slock(_cache->lock);
 				if(_cache->available)
 				{
+					
 					cache_size = (_Rid)get_cache().data.size();
 
 					if(cache_size)
@@ -495,8 +525,7 @@ namespace collums{
 					{
 						cache_size = 0;
 
-						_cache->available = false;
-						_cache->loaded = true;
+						_cache->unload();
 						get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
 					}
 				}
@@ -620,9 +649,9 @@ namespace collums{
 			if(read) col.share(storage.get_name());
 			else col.unshare();
 
-			col.reload();
-			if(read && storage.stale()){
-
+			
+			if(storage.stale()){
+				col.reload();
 			}
 
 		}
@@ -641,7 +670,11 @@ namespace collums{
 
 		void reduce_use(){
 			col.reduce_use();
-
+			//if(NS_STORAGE::total_use + btree_totl_used > MAX_EXT_MEM){
+				if(has_cache())
+					_cache->unload();
+				
+			//}
 		}
 
 		ImplIterator<_ColMap> find(_Rid rid){
@@ -1143,7 +1176,7 @@ namespace collums{
 			the_end = index.end();
 			index.share(name);
 
-			get_scanner().add(new IndexScanner(storage.get_name()));
+			//get_scanner().add(new IndexScanner(storage.get_name()));
 
 		}
 
@@ -1223,9 +1256,9 @@ namespace collums{
 			storage.set_transaction_r(read);
 			if(read) index.share(storage.get_name());
 			else index.unshare();
-			index.reload();
-			if(read && storage.stale()){
-
+			
+			if(storage.stale()){
+				index.reload();
 			}
 
 		}

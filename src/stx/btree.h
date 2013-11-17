@@ -1528,11 +1528,19 @@ namespace stx
 			}
 			_AddressedVersionNodes* nodes;
 		};
+		
+		/// used to consistently report nodes loaded memory use;
+		nst::u64 _nodes_loaded_mem_reported;
+		void report_nodes_loaded_mem(){
+			remove_btree_totl_used (_nodes_loaded_mem_reported);
+			_nodes_loaded_mem_reported = nodes_loaded.size()*32;
+			add_btree_totl_used (_nodes_loaded_mem_reported);
+		}
 		/// provides register for currently loaded/decoded nodes
 		/// used to prevent reinstantiation of existing nodes
 		/// therefore providing consistency to updates to any
 		/// node
-
+		
 		_AddressedNodes nodes_loaded;
 		_Shared shared;
 		///	returns NULL if a node with given storage address is not currently
@@ -2796,7 +2804,7 @@ namespace stx
 		storage_type *storage;
 
 		void initialize_contexts(){
-
+			_nodes_loaded_mem_reported = 0;
 			root.set_context(this);
 			headsurface.set_context(this);
 			last_surface.set_context(this);
@@ -3164,6 +3172,7 @@ namespace stx
 			if(n.get_where()){
 				nodes_loaded[n.get_where()] = pn;
 			}
+			report_nodes_loaded_mem();
 			return n;
 		}
 
@@ -3248,7 +3257,7 @@ namespace stx
 			}else{
 				//printf("node %lld already removed\n", (NS_STORAGE::u64)w);
 			}
-
+			report_nodes_loaded_mem();
 		}
 
 	public:
@@ -3276,6 +3285,7 @@ namespace stx
 		void reload()
 		{
 			clear();
+
 			initialize_contexts();
 		}
 		/// Frees all key/data pairs and all nodes of the tree
@@ -3302,7 +3312,7 @@ namespace stx
 				}
 
 				nodes_loaded.clear();
-
+				report_nodes_loaded_mem();
 			}
 
 			BTREE_ASSERT(stats.tree_size == 0);
