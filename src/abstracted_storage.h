@@ -67,6 +67,11 @@ namespace stored{
 		NullPointerException() throw() {
 		}
 	};
+	class TransactionNotStartedException : public std::exception{
+	public: /// the transaction was not started and the transaction would be by calling this function
+		TransactionNotStartedException() throw(){
+		}
+	};
 	class abstracted_storage : public NS_STORAGE::basic_storage{
 	public:
 
@@ -97,7 +102,7 @@ namespace stored{
 
 		_Transaction& get_transaction() const {
 			if(_transaction == NULL){
-				throw NullPointerException();
+				throw TransactionNotStartedException();
 			}
 			return *_transaction;
 		}
@@ -181,12 +186,15 @@ namespace stored{
 		void begin(){
 			rollback();
 			get_allocations();
+			get_transaction();
 		}
 		bool stale() const {
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
 		}
 		void set_transaction_r(bool read){
+			if(_transaction==nullptr) 
+				throw TransactionNotStartedException();
 			if(read)
 				get_transaction().set_readonly();
 			else
@@ -286,5 +294,29 @@ namespace stored{
 		}
 
 	};
+	template<typename _Storage, typename _Map>
+	void abstracted_tx_begin(bool read, _Storage& storage, _Map& map){
+		if(!read){
+			storage.rollback();
+			storage.begin();		
+			storage.set_transaction_r(read);
+			map.unshare();
+			map.reload();
+		}			 
+		else 
+		{
+					
+			if(storage.stale()){
+				storage.rollback();
+				storage.begin();
+				storage.set_transaction_r(read);
+				map.share(storage.get_name());		
+				map.reload();
+			}else{
+				map.share(storage.get_name());	
+				storage.set_transaction_r(read);
+			}
+		}
+	}
 };
 #endif

@@ -310,7 +310,7 @@ namespace collums{
 			_Rid density;
 			void unload(){
 				nst::synchronized _l(lock);
-				printf("unloading col cache\n");
+				//printf("unloading col cache\n");
 				NS_STORAGE::remove_total_use(data.capacity()* sizeof(_Stored)*2);
 				loaded = false;
 				available = false;
@@ -356,7 +356,7 @@ namespace collums{
 				Density d;
 				d.measure((*cache).data);
 				(*cache).density = d.density;
-				printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
+				//printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
 			}
 		protected:
 			bool load_into_cache(size_t col_size){
@@ -626,8 +626,6 @@ namespace collums{
 		}
 		void commit1(){
 			if(modified){
-				//printf("commit p1 %s\n", storage.get_name().c_str());
-				col.flush();
 				col.reduce_use();
 
 			}
@@ -642,18 +640,7 @@ namespace collums{
 		}
 
 		void tx_begin(bool read){
-			storage.rollback();
-			storage.begin();
-			storage.set_transaction_r(read);
-
-			if(read) col.share(storage.get_name());
-			else col.unshare();
-
-			
-			if(storage.stale()){
-				col.reload();
-			}
-
+			stored::abstracted_tx_begin(read, storage, col);			
 		}
 
 		void rollback(){
@@ -1251,15 +1238,8 @@ namespace collums{
 			set_end();
 		}
 		void begin(bool read){
-
-			storage.begin();
-			storage.set_transaction_r(read);
-			if(read) index.share(storage.get_name());
-			else index.unshare();
-			
-			if(storage.stale()){
-				index.reload();
-			}
+			stored::abstracted_tx_begin(read, storage, index);
+			set_end();
 
 		}
 
@@ -1276,7 +1256,7 @@ namespace collums{
 				// index.flush();
 				// !!! this seems to work
 				index.reduce_use();
-				set_end();
+				
 			}
 		}
 

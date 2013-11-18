@@ -408,18 +408,8 @@ namespace tree_stored{
 		}
 
 		void begin_table(){
-			if(!changed) get_table().share(storage.get_name());
-			else get_table().unshare();
-
-			if(changed || storage.stale()){
-				storage.begin();
-				storage.set_transaction_r(!changed);
-				get_table().reload();
-			}else{
-				storage.set_transaction_r(!changed);
-			}
+			stored::abstracted_tx_begin(!changed, storage, get_table());			
 			init_rowcount();
-
 
 		}
 
@@ -429,8 +419,7 @@ namespace tree_stored{
 		}
 
 		void commit_table1(){
-			if(changed){
-				get_table().flush();
+			if(changed){				
 				get_table().reduce_use();
 			}
 		}
