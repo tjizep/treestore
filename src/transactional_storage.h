@@ -310,6 +310,12 @@ namespace storage{
 		InvalidWriterOrder() throw() {
 		}
 	};
+
+	class InvalidReaderCount : public std::exception{
+		public: /// A version has been released more than it was engaged
+		InvalidReaderCount() throw() {
+		}
+	};
 	enum journal_commands{
 		JOURNAL_PAGE = 0,
 		JOURNAL_COMMIT
@@ -684,7 +690,7 @@ namespace storage{
 				if(get_use() > 1024*1024*2){
 					//ptrdiff_t before = get_use();
 
-					flush_back(0.4);
+					//flush_back(0.4,);
 					last_flush_time = ::os::millis();
 					//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				}
@@ -1165,6 +1171,7 @@ namespace storage{
 		}
 		void reduce(){
 			scoped_ulock ul(lock);
+			printf("reducing storage %s\n", get_name().c_str());
 			flush_back(0.1);
 		}
 	};
@@ -1315,6 +1322,9 @@ namespace storage{
 		/// notify the release of an existing reader
 		void remove_reader(){
 			scoped_ulock _sync(*lock);
+			if((*this).readers == 0){
+				throw InvalidReaderCount();
+			}
 			(*this).readers--;
 		}
 
@@ -1676,7 +1686,10 @@ namespace storage{
 						{
 							if(latest->get_version() <= (*i)->get_version())
 								throw InvalidWriterOrder();
-							latest->copy((*i));		/// first -> i
+							if(!(*i)->is_unused()){
+								throw InvalidVersion();
+							}
+							latest->copy((*i));		/// latest -> i
 
 							latest->set_merged();	/// flagged as copied or merged
 							latest = (*i);
@@ -1826,7 +1839,7 @@ namespace storage{
 			///	need to let go so that maintenance can happen (i.e. drop table)
 			if(0==references){
 
-				merge_down();
+				//merge_down();
 				if(storages.size()==1){
 					initial->release();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
@@ -1836,6 +1849,13 @@ namespace storage{
 		/// reduces use
 
 		void reduce(){
+			scoped_ulock _sync(*lock);
+			typename storage_container::iterator c = storages.begin(); //c != storages.end(); ++c)
+			
+			if((*c)->is_unused()){
+				(*c)->get_allocator().reduce();
+			}
+			
 		}
 
 		/// start a new version with a dependency on the previously commited version or initial storage
@@ -1854,7 +1874,11 @@ namespace storage{
 			storage_versions[b->get_version()] = b;
 			if(!storages.empty()){
 				b->set_previous(storages.back());
-				storages.back()->add_reader();
+				for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
+				{
+					(*c)->add_reader();
+				}
+
 				++active_transactions;
 			}else{
 
@@ -1912,8 +1936,10 @@ namespace storage{
 			if(prev != storages.back()){
 				throw ConcurrentWriterError();
 			}
-			prev->remove_reader();
-
+			while(prev != nullptr){
+				prev->remove_reader();
+				prev = prev->get_previous();
+			}
 			storages.push_back(version);
 
 			++order;			/// increment transaction count
@@ -1950,12 +1976,15 @@ namespace storage{
 			}
 			version_storage_type_ptr prev = version->get_previous();
 
-			if(prev!=nullptr)
+			while(prev != nullptr){
 				prev->remove_reader();
+				prev = prev->get_previous();
+			}
 
 			storage_versions.erase(transaction->get_version());
 			delete transaction;
-
+			merge_down();		/// merge unused transaction versions
+								/// releasing any held resources
 		}
 
 		void set_recovery(bool recovery){
@@ -1967,7 +1996,7 @@ namespace storage{
 		/// commit its storage
 		virtual void journal_commit() {
 
-			merge_down();
+			//merge_down();
 
 			save_recovery_info();
 

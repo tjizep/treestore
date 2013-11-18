@@ -196,7 +196,7 @@ namespace tree_stored{
 					(*t).second->check_use();
 				}
 
-				printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 				stored::reduce_all();
 
 			}
@@ -262,6 +262,7 @@ public:
 	void reduce(){
 		NS_STORAGE::scoped_ulock ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+			
 			(*t)->reduce_tables();
 		}
 	}

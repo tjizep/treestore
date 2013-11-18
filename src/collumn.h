@@ -366,8 +366,8 @@ namespace collums{
 				_ColMap col(storage);
 
 
-				col.share(storage.get_name());
-				col.reload();
+				//col.share(storage.get_name());
+				//col.reload();
 				_Rid ctr = 0;
 				
 				typename _ColMap::iterator e = col.end();
@@ -389,8 +389,25 @@ namespace collums{
 				}
 				const _Rid FACTOR = 10;
 				for(c = col.begin(); c != e; ++c){
+					_Rid kv = c.key().get_value();
+					if(e != col.end()){
+						e = col.end();
+						
+						printf("tx bug iterator should stop\n");
+						break;
+					}
+					if(c.key().get_value() < ctr){
+						printf("tx bug iterator should stop\n");
+						break;
+					}
+					if((*cache).data.size() <= c.key().get_value()){
+						e = col.end();
+						printf("tx bug iterator should stop\n");
+						break;
+					}
 					(*cache).data[c.key().get_value()] = c.data();
 					ctr++;
+
 					if((*cache).data.size() > FACTOR){
 						if(ctr % ( (*cache).data.size() / FACTOR ) ==0){
 							col.reduce_use();
