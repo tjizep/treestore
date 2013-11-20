@@ -3266,8 +3266,8 @@ namespace stx
 		///
 		void share(std::string name){
 			if(NULL == shared.nodes){
-				//shared.share(name);
-				//reload();
+				shared.share(name);
+				reload();
 			}
 
 		}

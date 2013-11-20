@@ -213,6 +213,7 @@ private:
 	_Threads threads;
 	Poco::Mutex tlock;
 public:
+
 	void release_thread(tree_stored::tree_thread * tt){
 		if(tt==NULL){
 			printf("Invalid argument to release thread\n");
@@ -228,6 +229,7 @@ public:
 		threads.push_back(tt);
 		DBUG_PRINT("info",("added {%lld} t resources\n", (NS_STORAGE::u64)threads.size()));
 	}
+
 	tree_stored::tree_thread * reuse_thread(){
 		NS_STORAGE::scoped_ulock ul(tlock);
 		tree_stored::tree_thread * r = NULL;
@@ -250,6 +252,7 @@ public:
 		DBUG_PRINT("info",("{%lld} t resources \n", (NS_STORAGE::u64)threads.size()));
 		return r;
 	}
+
 	void check_use(){
 		if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
 			(*this).reduce();
@@ -259,12 +262,13 @@ public:
 
 			}
 	}
+
 	void reduce(){
 		NS_STORAGE::scoped_ulock ul(tlock);
-		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
-			
-			(*t)->reduce_tables();
-		}
+		/*for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+			if((*t)->get_locks()==0)
+				(*t)->reduce_tables();
+		}*/
 	}
 };
 

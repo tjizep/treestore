@@ -1171,7 +1171,7 @@ namespace storage{
 		}
 		void reduce(){
 			scoped_ulock ul(lock);
-			printf("reducing storage %s\n", get_name().c_str());
+			//printf("reducing storage %s\n", get_name().c_str());
 			flush_back(0.1);
 		}
 	};
@@ -1197,7 +1197,7 @@ namespace storage{
 
 		typedef std::shared_ptr<storage_allocator_type> storage_allocator_type_ptr;
 
-		typedef version_based_allocator* version_based_allocator_ptr;
+		typedef std::shared_ptr<version_based_allocator> version_based_allocator_ptr;
 
 		typedef version_based_allocator* version_based_allocator_ref;
 
@@ -1400,7 +1400,7 @@ namespace storage{
 				if(b->get_allocator().is_end(r)){
 					return true;
 				}
-				b = b->based;
+				b = b->based.get();
 			}
 			return false;
 		}
@@ -1456,7 +1456,7 @@ namespace storage{
 			if(how==create)
 				throw InvalidStorageAction();
 
-			last_base  = this->based;
+			last_base  = this->based.get();
 			while(last_base != nullptr){
 				block_type& r = last_base->get_allocator().allocate(which, read); //can only read from previous versions
 				if(!(last_base->get_allocator().is_end(r))){
@@ -1478,7 +1478,7 @@ namespace storage{
 					return r;
 				}
 				last_base->get_allocator().complete();
-				last_base = last_base->based;
+				last_base = last_base->based.get();
 			}
 
 
@@ -1565,7 +1565,7 @@ namespace storage{
 
 		typedef version_based_allocator<storage_allocator_type> version_storage_type;
 
-		typedef version_storage_type* version_storage_type_ptr;
+		typedef std::shared_ptr<version_storage_type> version_storage_type_ptr;
 
 		typedef std::vector<version_storage_type_ptr> storage_container;
 
@@ -1689,7 +1689,7 @@ namespace storage{
 							if(!(*i)->is_unused()){
 								throw InvalidVersion();
 							}
-							latest->copy((*i));		/// latest -> i
+							latest->copy((*i).get());		/// latest -> i
 
 							latest->set_merged();	/// flagged as copied or merged
 							latest = (*i);
@@ -1716,7 +1716,7 @@ namespace storage{
 
 							storage_versions.erase((*c)->get_version());
 							(*c)->set_previous(nullptr);
-							delete (*c);
+							//delete (*c);
 						}else{
 							throw InvalidVersion();
 						}
@@ -1775,7 +1775,7 @@ namespace storage{
 
 		{
 			//initial->engage();
-			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
 			b->set_allocator(initial);
 			b->set_previous(nullptr);
 			storages.push_back(b);
@@ -1793,7 +1793,7 @@ namespace storage{
 				for(Poco::StringTokenizer::Iterator t = tokens.begin(); t != tokens.end(); ++t){
 					storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t)));
 					last_address = std::max<stream_address>(last_address, allocator->last() );
-					version_storage_type_ptr b = new version_storage_type(last_address, ++order, ++next_version, (*this).lock);
+					version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, ++order, ++next_version, (*this).lock);
 					allocator->set_allocation_start(last_address);
 					b->set_allocator(allocator);
 					storages.push_back(b);
@@ -1850,10 +1850,12 @@ namespace storage{
 
 		void reduce(){
 			scoped_ulock _sync(*lock);
-			typename storage_container::iterator c = storages.begin(); //c != storages.end(); ++c)
-			
-			if((*c)->is_unused()){
-				(*c)->get_allocator().reduce();
+			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
+			{
+				if((*c)->is_unused())
+				{
+					(*c)->get_allocator().reduce();
+				}
 			}
 			
 		}
@@ -1867,7 +1869,7 @@ namespace storage{
 			/// TODODONE: lazy create unmerged transactions only when a write occurs
 			/// TODO: optimize mergeable transactions
 			/// TODODONE: merge unused transactions into single transaction
-			version_storage_type_ptr b = new version_storage_type(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
 			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()));
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
@@ -1885,7 +1887,7 @@ namespace storage{
 				throw WriterConsistencyViolation();
 			}
 
-			return b;
+			return b.get();
 		}
 
 		/// return the transaction order of this coordinator
@@ -1971,7 +1973,7 @@ namespace storage{
 			if(version == nullptr){
 				throw InvalidVersion();
 			}
-			if(version != transaction){
+			if(version.get() != transaction){
 				throw InvalidVersion();
 			}
 			version_storage_type_ptr prev = version->get_previous();
@@ -1982,7 +1984,7 @@ namespace storage{
 			}
 
 			storage_versions.erase(transaction->get_version());
-			delete transaction;
+			//delete transaction;
 			merge_down();		/// merge unused transaction versions
 								/// releasing any held resources
 		}

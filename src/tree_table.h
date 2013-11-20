@@ -507,6 +507,7 @@ namespace tree_stored{
 			if(cols.empty()){
 				load(table_arg);
 			}
+			
 		}
 
 		void load(TABLE *table_arg){
@@ -612,6 +613,7 @@ namespace tree_stored{
 			}
 			return r;
 		}
+		private:
 		void _compose_query_nb
 		(	TABLE* table
 		,	_Rid bound
@@ -670,7 +672,7 @@ namespace tree_stored{
 			_compose_query_nb(table, bound, ax, key, key_l, key_part_map);
 			temp.row = bound;
 		}
-
+		public:
 		bool check_key_match
 		(	const CompositeStored& current
 		,	TABLE* table
@@ -678,6 +680,7 @@ namespace tree_stored{
 		,	uint parts_map
 		){
 			/// KEY & ki = table->key_info[ax];
+			check_load(table);
 			return current.left_equal_key(temp);
 
 		}
@@ -688,6 +691,7 @@ namespace tree_stored{
 		,	uint ax
 		,	uint parts_map
 		){
+			check_load(table);
 			KEY & ki = table->key_info[ax];
 			if(count_parts(table, ax, parts_map) < ki.usable_key_parts){
 				return current.left_equal_key(temp);
@@ -705,6 +709,7 @@ namespace tree_stored{
 		,	IndexIterator & out
 
 		){
+			check_load(table);
 			tree_index::ptr ix =  indexes[ax];
 			if(!key_map || key==NULL){
 				out = ix->index.first();
@@ -737,6 +742,7 @@ namespace tree_stored{
 		,	uint key_map
 
 		){
+			check_load(table);
 			_compose_query(table, 0ull, ax, key, key_l, key_map);
 			return indexes[ax]->index.find(temp);
 		}
@@ -750,6 +756,7 @@ namespace tree_stored{
 
 		,	uint key_map
 		){
+			check_load(table);
 			if(!key_map || key==NULL){
 				return indexes[ax]->index.end();
 			}
@@ -764,6 +771,7 @@ namespace tree_stored{
 		,	uint key_l
 		,	uint key_map
 		){
+			check_load(table);
 			if(!key_map || key==NULL){
 				return indexes[ax]->index.end();
 			}
@@ -779,6 +787,7 @@ namespace tree_stored{
 		,	uint key_map
 		,	IndexIterator & out
 		){
+			check_load(table);
 			if(!key_map || key==NULL){
 				out = indexes[ax]->index.first();
 				return ;
@@ -797,6 +806,7 @@ namespace tree_stored{
 		,	uint key_map
 		,	IndexIterator & out
 		){
+			check_load(table);
 			tree_index::ptr ix =  indexes[ax];
 			if(!key_map || key==NULL){
 				out = ix->index.first();
@@ -818,6 +828,7 @@ namespace tree_stored{
 		,	uint key_l
 		,	uint key_map
 		){
+			check_load(table);
 			if(!key_map || key==NULL){
 				return indexes[ax]->index.first();
 			}
@@ -834,6 +845,7 @@ namespace tree_stored{
 		,	uint key_map
 		,	IndexIterator & out
 		){
+			check_load(table);
 			if(!key_map){
 				out = indexes[ax]->index.end();
 				return ;
@@ -880,6 +892,7 @@ namespace tree_stored{
 			}
 		}
 		void write(TABLE* table){
+			check_load(table);
 			if(!changed)
 			{
 				printf("table not locked for writing\n");
@@ -910,6 +923,7 @@ namespace tree_stored{
 			_row_count++;
 		}
 		void erase(_Rid rid, TABLE* table){
+			check_load(table);
 			if(!changed)
 			{
 				//printf("table not locked for writing\n");
@@ -926,6 +940,7 @@ namespace tree_stored{
 
 		}
 		void write(_Rid rid, TABLE* table){
+			check_load(table);
 			if(!changed)
 			{
 				//printf("table not locked for writing\n");

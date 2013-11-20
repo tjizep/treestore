@@ -366,15 +366,16 @@ namespace collums{
 				_ColMap col(storage);
 
 
-				//col.share(storage.get_name());
+				col.share(storage.get_name());
 				//col.reload();
 				_Rid ctr = 0;
 				
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
+				nst::u64 cached = 0;
 				if(!col.empty()){
 					--c;
-					nst::u64 cached = std::max<size_t>(col_size ,c.key().get_value()+1);
+					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
 					nst::u64 bytes_used = cached * sizeof(_Stored) *2;
 					NS_STORAGE::remove_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 					(*cache).data.clear();
@@ -385,7 +386,7 @@ namespace collums{
 					}
 					
 					(*cache).data.resize(cached);
-					NS_STORAGE::add_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
+					//NS_STORAGE::add_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 				}
 				const _Rid FACTOR = 10;
 				for(c = col.begin(); c != e; ++c){
@@ -393,19 +394,19 @@ namespace collums{
 					if(e != col.end()){
 						e = col.end();
 						
-						printf("tx bug iterator should stop\n");
+						printf("tx bug 1 iterator should stop %s\n",storage.get_name().c_str());
 						break;
 					}
-					if(c.key().get_value() < ctr){
-						printf("tx bug iterator should stop\n");
+					if(kv < ctr){
+						printf("tx bug 2 iterator should stop  %s\n",storage.get_name().c_str());
 						break;
 					}
-					if((*cache).data.size() <= c.key().get_value()){
+					if(cached <= kv){
 						e = col.end();
-						printf("tx bug iterator should stop\n");
+						printf("tx bug 3 iterator should stop %s\n",storage.get_name().c_str());
 						break;
 					}
-					(*cache).data[c.key().get_value()] = c.data();
+					(*cache).data[kv] = c.data();
 					ctr++;
 
 					if((*cache).data.size() > FACTOR){
@@ -512,8 +513,8 @@ namespace collums{
 		void load_cache(){
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
-				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)) < MAX_EXT_MEM){
-
+				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)*2) < MAX_EXT_MEM){
+					
 					_cache = load_cache(storage.get_name(),col.size());
 				}
 			}
@@ -675,8 +676,8 @@ namespace collums{
 		void reduce_use(){
 			col.reduce_use();
 			//if(NS_STORAGE::total_use + btree_totl_used > MAX_EXT_MEM){
-				if(has_cache())
-					_cache->unload();
+				//if(has_cache())
+				//	_cache->unload();
 				
 			//}
 		}
