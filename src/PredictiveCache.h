@@ -159,9 +159,10 @@ namespace tree_stored{
 			if(iter.invalid()) return;
 			stx::storage::scoped_ulock ul((*this).plock);
 			load();
-			if(sec_cache.empty()) return;
+			if(!loaded) return;
 			size_t h = ((size_t)iter.key()) % HASH_SIZE;
 			store_pos = sec_cache.size();
+			
 			size_t s = cache_index[h];
 			if(s == 0){
 				cache_index[h] = sec_cache.size(); //store_pos+1;

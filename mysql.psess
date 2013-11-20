@@ -84,6 +84,9 @@
     <Report>
       <Path>mysql131025(5).vspx</Path>
     </Report>
+    <Report>
+      <Path>mysql131120.vspx</Path>
+    </Report>
   </Reports>
   <Launches>
     <Binary>
