@@ -1839,7 +1839,7 @@ namespace storage{
 			///	need to let go so that maintenance can happen (i.e. drop table)
 			if(0==references){
 
-				//merge_down();
+				merge_down();
 				if(storages.size()==1){
 					initial->release();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state

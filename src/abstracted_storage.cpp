@@ -1,4 +1,5 @@
 #include "abstracted_storage.h"
+
 static Poco::Mutex m;
 namespace nst = stx::storage;
 namespace stored{
@@ -152,6 +153,8 @@ public:
 				reader.readRaw( (char*)&buffer[0], buffer.size() );
 		}
 	};
+	
+
 	void recover(){
 
 		typedef std::vector<_Command> _Commands;
@@ -186,16 +189,21 @@ public:
 						_Command &entry =  (*c);
 						nst::stream_address add = entry.address;
 						std::string storage_name = entry.name;
-
+						
 						stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
 						if(transaction == nullptr){
+							Poco::Path pdir = Poco::Path::current();
 
-							Poco::File tmpDir(storage_name);
-							if(tmpDir.exists()){
+							pdir.append(Poco::Path(storage_name.substr(2)));
+							std::string dtest = pdir.toString();
+							pdir.parseDirectory(dtest);
+							pdir.popDirectory();
+							dtest =  pdir.toString();
+							Poco::File tmpDir(dtest);							
+							if(tmpDir.isDirectory()){
 								transaction = storage->begin();
-
 								pending[storage_name] = transaction;
 							}
 						}
