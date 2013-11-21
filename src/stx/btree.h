@@ -178,7 +178,7 @@ namespace stx
 	{
 		enum
 		{
-			bytes_per_page = 4096,
+			bytes_per_page = 4096, /// this isnt currently used but could be 
 			max_scan = 3,
 			interior_mul = 1,
 			keys_per_page = 512
@@ -188,7 +188,7 @@ namespace stx
 	template <typename _Key, typename _PersistTraits >
 	struct btree_default_set_traits
 	{
-		/// persistence related addressing
+		
 
 		/// If true, the tree will self verify it's invariants after each insert()
 		/// or erase(). The header must have been compiled with BTREE_DEBUG defined.
@@ -199,7 +199,8 @@ namespace stx
 		/// compiled with BTREE_DEBUG defined and key_type must be std::ostream
 		/// printable.
 		static const bool   debug = false;
-
+		
+		/// persistence related addressing
 		typedef def_p_traits persist_traits;
 
 		typedef _Key key_proxy;

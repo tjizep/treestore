@@ -192,10 +192,11 @@ namespace tree_stored{
 		}
 		void check_use(){
 			if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
-				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					(*t).second->check_use();
+				if(!locks){
+					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+						(*t).second->check_use();
+					}
 				}
-
 				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 				stored::reduce_all();
 

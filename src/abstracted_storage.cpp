@@ -48,11 +48,19 @@ namespace stored{
 #include <Poco/File.h>
 static Poco::Mutex llock;
 std::ofstream creation("allocations.txt", std::ios::app);
+
 void log_journal(const std::string &name, const std::string& jtype, nst::u64 sa){
 	nst::synchronized _llock(llock);
 
 	creation << name << " : " << jtype << " : " << sa << std::endl;
 }
+
+class invalid_journal_format : public std::exception{
+public:
+	/// the journal has a invalid format
+	invalid_journal_format() throw(){};
+
+};
 struct journal_state{
 public:
 	typedef nst::journal_participant participant;
@@ -132,6 +140,7 @@ public:
 		add_entry(command, writer, name, address, buffer);
 
 	}
+
 	struct _Command{
 		nst::u64 sequence;
 		Poco::UInt32 command;
@@ -154,6 +163,16 @@ public:
 		}
 	};
 	
+	bool is_valid_storage_directory(const std::string& storage_name) const {
+		Poco::Path pdir = Poco::Path::current();
+		pdir.append(Poco::Path(storage_name.substr(2)));
+		std::string dtest = pdir.toString();
+		pdir.parseDirectory(dtest);
+		pdir.popDirectory();
+		dtest =  pdir.toString();
+		Poco::File tmpDir(dtest);							
+		return tmpDir.isDirectory();
+	}
 
 	void recover(){
 
@@ -194,15 +213,8 @@ public:
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
 						if(transaction == nullptr){
-							Poco::Path pdir = Poco::Path::current();
-
-							pdir.append(Poco::Path(storage_name.substr(2)));
-							std::string dtest = pdir.toString();
-							pdir.parseDirectory(dtest);
-							pdir.popDirectory();
-							dtest =  pdir.toString();
-							Poco::File tmpDir(dtest);							
-							if(tmpDir.isDirectory()){
+											
+							if(is_valid_storage_directory(storage_name)){
 								transaction = storage->begin();
 								pending[storage_name] = transaction;
 							}
@@ -221,6 +233,7 @@ public:
 			}
 
 		}catch(...){
+			printf("unknown exception during recovery\n");
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
 			std::string storage_name = (*p).first;
@@ -263,7 +276,10 @@ public:
 				//compact();
 				log_journal(journal_name,"commit",0);
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-					(*p).second->journal_commit();
+					/// test if the data files have not been deleted
+					if(is_valid_storage_directory((*p).second->get_name())){
+						(*p).second->journal_commit();
+					}
 				}
 				printf("journal file compacting complete\n");
 				journal_ostr.close();

@@ -81,7 +81,7 @@ namespace tree_stored{
 					cache_index.resize(HASH_SIZE);
 					sec_cache.reserve(CIRC_SIZE);
 					total_cache_size+=(sizeof(CachedRow)*CIRC_SIZE + sizeof(_Rid)*HASH_SIZE);
-					printf("total_Cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
+					printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
 				}
 				loaded = true;
 			}
