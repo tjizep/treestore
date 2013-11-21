@@ -66,6 +66,7 @@ NS_STORAGE::u64 hash_predictions =0;
 static NS_STORAGE::u64 last_read_lookups ;
 static NS_STORAGE::u64 total_cache_size=0;
 static NS_STORAGE::u64 ltime = 0;
+
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 void print_read_lookups(){
@@ -96,6 +97,9 @@ void print_read_lookups(){
 #include "tree_index.h"
 #include "tree_table.h"
 typedef std::map<std::string, _FileNames > _Extensions;
+
+Poco::Mutex tree_stored::tree_table::shared_lock;
+tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 
 // w.t.f.
 // The handlerton asks for extensions when the table defs are already destroyed 

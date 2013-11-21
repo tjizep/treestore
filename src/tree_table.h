@@ -37,6 +37,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "tree_stored.h"
 #include "conversions.h"
 #include "tree_index.h"
+#include "system_timers.h"
+
 typedef std::vector<std::string> _FileNames;
 namespace tree_stored{
 	class InvalidTablePointer : public std::exception{
@@ -193,6 +195,14 @@ namespace tree_stored{
 		typedef stored::IntTypeStored<_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
+		struct shared_data{
+			shared_data(){
+			}
+			nst::u64 last_write_lock_time;
+		};
+		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
+		static Poco::Mutex shared_lock;
+		static _SharedData shared;
 	protected:
 		bool changed;
 		inline const char* INDEX_SEP(){
@@ -378,6 +388,15 @@ namespace tree_stored{
 		,	storage(table_arg->s->path.str)
 		,	table(nullptr)
 		{
+			{
+				nst::synchronized sync(shared_lock);
+				std::shared_ptr<shared_data> sshared;
+				if(shared.count(storage.get_name())==0){
+					shared[storage.get_name()] = std::make_shared<shared_data>();
+				}
+				sshared = shared[storage.get_name()];
+				(*this).share = sshared.get();
+			}
 			load(table_arg);
 			_row_count = 0;
 		}
@@ -391,7 +410,7 @@ namespace tree_stored{
 		_Collumns cols;
 		stored::abstracted_storage storage;
 		_TableMap * table;
-
+		shared_data * share;
 		_TableMap& get_table(){
 
 			if(nullptr==table)
@@ -870,11 +889,17 @@ namespace tree_stored{
 		void lock(bool writer)
 		{
 			changed = writer;
-
+			if(changed)
+				 (*this).share->last_write_lock_time = ::os::millis();
 			begin(!changed);
 
 		}
-
+		static const nst::u64 READER_ROLLBACK_THRESHHOLD = 10000ll;/// in millis
+		private:
+			
+			
+			
+		public:
 		/// release locks and resources
 		void unlock(Poco::Mutex* p2_lock)
 		{
@@ -888,7 +913,9 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				rollback();
+				
+				if(::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD)
+					rollback();
 			}
 		}
 		void write(TABLE* table){
