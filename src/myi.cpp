@@ -66,6 +66,11 @@ NS_STORAGE::u64 hash_predictions =0;
 static NS_STORAGE::u64 last_read_lookups ;
 static NS_STORAGE::u64 total_cache_size=0;
 static NS_STORAGE::u64 ltime = 0;
+LONGLONG treestore_mem_use = 0;
+static MYSQL_SYSVAR_LONGLONG(mem_use, treestore_mem_use,
+  PLUGIN_VAR_RQCMDARG,
+  "The ammount of memory used before treestore starts flushing caches etc.",
+  NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
 
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
@@ -119,14 +124,15 @@ namespace tree_stored{
 		}
 		tree_thread() : locks(0),changed(false){
 			created_tid = Poco::Thread::currentTid();
-			printf("tree thread %ld created\n", created_tid);
+			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
+			DBUG_PRINT("info",(" *** Tree Store (eyore) memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L)));
 		}
 		Poco::Thread::TID get_created_tid() const {
 			return (*this).created_tid;
 		}
 		~tree_thread(){
 			clear();
-			printf("tree thread removed\n");
+			DBUG_PRINT("info",("tree thread removed\n"));
 
 		}
 		_Tables tables;
@@ -195,7 +201,7 @@ namespace tree_stored{
 
 		}
 		void check_use(){
-			if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
+			if(NS_STORAGE::total_use+btree_totl_used > treestore_mem_use){
 				if(!locks){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 						(*t).second->check_use();
@@ -259,7 +265,7 @@ public:
 	}
 
 	void check_use(){
-		if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
+		if(NS_STORAGE::total_use+btree_totl_used > treestore_mem_use){
 			(*this).reduce();
 
 			printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
@@ -1034,9 +1040,10 @@ int treestore_db_init(void *p)
 						sizeof(HeapFragValue))
 	)
 	{
-		printf(" *** Tree Store (eyore) starting\n");
+		//printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L));
 	}
 #endif
+	printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L));
 	DBUG_ENTER("treestore_db_init");
 	//initialize_loggers();
 
@@ -1060,6 +1067,11 @@ int treestore_done(void *p)
 {
 	return 0;
 }
+static struct st_mysql_sys_var* treestore_system_variables[]= {
+  MYSQL_SYSVAR(mem_use),
+  NULL
+};
+
 struct st_mysql_storage_engine treestore_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 
@@ -1075,7 +1087,7 @@ mysql_declare_plugin(treestore)
 		treestore_done, /* Plugin Deinit */
 		0x0100 /* 1.0 */,
 		NULL,                       /* status variables                */
-		NULL,                       /* system variables                */
+		treestore_system_variables,                       /* system variables                */
 		NULL,                       /* config options                  */
 		0,                          /* flags                           */
 }

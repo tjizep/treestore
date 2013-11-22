@@ -35,6 +35,11 @@ Features
 
  13. High performance - usually more than 200% on tpc-h (HammerDB)
 
+Configuration
+-------------
+
+The mysql system variable treestore_mem_use can be used to limit the treestore memory use
+
 Building
 --------
 
@@ -43,4 +48,6 @@ GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
 TODO
 ----
 
- 1. Simple Configuration
+ 1. Interpolation encoding on collumn id
+ 2. Integrate with MariaDB
+ 3. Expose Virtual col for fast table offsets

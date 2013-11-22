@@ -379,7 +379,7 @@ namespace collums{
 					nst::u64 bytes_used = cached * sizeof(_Stored) *2;
 					NS_STORAGE::remove_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 					(*cache).data.clear();
-					if(btree_totl_used + nst::total_use + bytes_used > MAX_EXT_MEM){
+					if(btree_totl_used + nst::total_use + bytes_used > treestore_mem_use){
 						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
 						(*cache).unload();
 						return false;
@@ -479,7 +479,7 @@ namespace collums{
 
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-				if(NS_STORAGE::total_use+btree_totl_used+col_size*sizeof(_Stored) > MAX_EXT_MEM){
+				if(NS_STORAGE::total_use+btree_totl_used+col_size*sizeof(_Stored) > treestore_mem_use){
 					return result;
 				}
 				if(get_g_cache().count(name)==0){
@@ -519,7 +519,7 @@ namespace collums{
 		void load_cache(){
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
-				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)*2) < MAX_EXT_MEM){
+				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)*2) < treestore_mem_use){
 					
 					_cache = load_cache(storage.get_name(),col.size());
 				}

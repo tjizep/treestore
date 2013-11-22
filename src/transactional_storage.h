@@ -71,7 +71,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /// TODODONE: version storage naming
 /// TODODONE: merge versions on commit or if there are too many versions
 
-extern ptrdiff_t MAX_EXT_MEM ;
+extern LONGLONG treestore_mem_use ;
 
 extern ptrdiff_t  _reported_memory_size();
 namespace NS_STORAGE = stx::storage;
@@ -686,7 +686,7 @@ namespace storage{
 			print_use();
 
 			//if(total_use > limit){
-			if(NS_STORAGE::total_use+btree_totl_used > MAX_EXT_MEM){
+			if(NS_STORAGE::total_use+btree_totl_used > treestore_mem_use){
 				if(get_use() > 1024*1024*2){
 					//ptrdiff_t before = get_use();
 
