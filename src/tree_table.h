@@ -123,13 +123,18 @@ namespace tree_stored{
 		virtual bool equal(_Rid row, Field* f){
 			convertor.fget(temp, f, NULL, 0);
 			const _Fieldt& t = col.seek_by_cache(row);
+			if(col.is_null(t)) return false;
 			return (t==temp);
 		}
 
 		virtual void seek_retrieve(_Rid row, Field* f) {
 			const _Fieldt& t = col.seek_by_cache(row);
-			f->set_notnull();
-			convertor.fset(f, t);
+			if(col.is_null(t)){
+				f->set_null();
+			}else{
+				f->set_notnull();
+				convertor.fset(f, t);
+			}
 		}
 
 		virtual _Rid stored_rows() const {

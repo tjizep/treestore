@@ -389,6 +389,7 @@ namespace collums{
 					//NS_STORAGE::add_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 				}
 				const _Rid FACTOR = 10;
+				_Rid prev = 0;
 				for(c = col.begin(); c != e; ++c){
 					_Rid kv = c.key().get_value();
 					if(e != col.end()){
@@ -406,7 +407,12 @@ namespace collums{
 						printf("tx bug 3 iterator should stop %s\n",storage.get_name().c_str());
 						break;
 					}
+					/// nullify the gaps
+					for(_Rid n = prev; n < kv; ++n){
+						(*cache).data[n].nullify();
+					}
 					(*cache).data[kv] = c.data();
+					prev = kv;
 					ctr++;
 
 					if((*cache).data.size() > FACTOR){
@@ -605,6 +611,9 @@ namespace collums{
 			}
 			return rows_per_key;
 		}
+		bool is_null(const _Stored&v){
+			return (&v == &empty);
+		}
 		const _Stored& seek_by_tree(_Rid row) {
 
 			return seek_by_cache(row);
@@ -615,9 +624,11 @@ namespace collums{
 			if( has_cache() && cache_size > row )
 			{
 				_StoredEntry & se = cache_r[row];
-				if(se.valid()){
+				if(se.valid())
 					return se;
-				}
+				
+				if(se.null())
+					return se;
 
 			}
 			check_cache();
