@@ -74,6 +74,9 @@ static MYSQL_SYSVAR_LONGLONG(mem_use, treestore_mem_use,
 
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
+long long calc_total_use(){
+	return NS_STORAGE::total_use+btree_totl_used+total_cache_size;
+}
 void print_read_lookups(){
 	return;
 	if(os::millis()-ltime > 1000){
@@ -201,7 +204,7 @@ namespace tree_stored{
 
 		}
 		void check_use(){
-			if(NS_STORAGE::total_use+btree_totl_used > treestore_mem_use){
+			if(calc_total_use() > treestore_mem_use){
 				if(!locks){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 						(*t).second->check_use();
@@ -265,7 +268,7 @@ public:
 	}
 
 	void check_use(){
-		if(NS_STORAGE::total_use+btree_totl_used > treestore_mem_use){
+		if(calc_total_use() > treestore_mem_use){
 			(*this).reduce();
 
 			printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));

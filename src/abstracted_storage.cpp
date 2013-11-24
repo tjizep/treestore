@@ -164,14 +164,18 @@ public:
 	};
 	
 	bool is_valid_storage_directory(const std::string& storage_name) const {
-		Poco::Path pdir = Poco::Path::current();
-		pdir.append(Poco::Path(storage_name.substr(2)));
-		std::string dtest = pdir.toString();
-		pdir.parseDirectory(dtest);
-		pdir.popDirectory();
-		dtest =  pdir.toString();
-		Poco::File tmpDir(dtest);							
-		return tmpDir.isDirectory();
+		try{
+			Poco::Path pdir = Poco::Path::current();
+			pdir.append(Poco::Path(storage_name.substr(2)));
+			std::string dtest = pdir.toString();
+			pdir.parseDirectory(dtest);
+			pdir.popDirectory();
+			dtest =  pdir.toString();
+			Poco::File tmpDir(dtest);							
+			return tmpDir.isDirectory();
+		}catch(...){
+		}
+		return false;
 	}
 
 	void recover(){

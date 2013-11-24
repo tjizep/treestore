@@ -94,7 +94,7 @@ namespace tree_stored{
 				predictor++;
 				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
 
-				while(predictor < stop){ /// this loop finds the a hash item based on store history or order
+				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
 					if(sec_cache[predictor].k.left_equal_key(input) ){
 						out = sec_cache[predictor].i;

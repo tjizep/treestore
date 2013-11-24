@@ -10,13 +10,3 @@
 #define TREESTORE_API __declspec(dllimport)
 #endif
 
-// This class is exported from the treestore.dll
-class TREESTORE_API Ctreestore {
-public:
-	Ctreestore(void);
-	// TODO: add your methods here.
-};
-
-extern TREESTORE_API int ntreestore;
-
-TREESTORE_API int fntreestore(void);

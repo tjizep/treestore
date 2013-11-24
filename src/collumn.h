@@ -379,7 +379,7 @@ namespace collums{
 					nst::u64 bytes_used = cached * sizeof(_Stored) *2;
 					NS_STORAGE::remove_total_use((*cache).data.capacity()* sizeof(_Stored)*2);
 					(*cache).data.clear();
-					if(btree_totl_used + nst::total_use + bytes_used > treestore_mem_use){
+					if(calc_total_use() + bytes_used > treestore_mem_use){
 						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
 						(*cache).unload();
 						return false;
@@ -479,7 +479,7 @@ namespace collums{
 
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-				if(NS_STORAGE::total_use+btree_totl_used+col_size*sizeof(_Stored) > treestore_mem_use){
+				if(calc_total_use()+col_size*sizeof(_Stored) > treestore_mem_use){
 					return result;
 				}
 				if(get_g_cache().count(name)==0){
@@ -519,7 +519,7 @@ namespace collums{
 		void load_cache(){
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
-				if((NS_STORAGE::total_use+btree_totl_used+col.size()*sizeof(_Stored)*2) < treestore_mem_use){
+				if((calc_total_use()+col.size()*sizeof(_Stored)*2) < treestore_mem_use){
 					
 					_cache = load_cache(storage.get_name(),col.size());
 				}
@@ -814,11 +814,11 @@ namespace collums{
 			return r;
 		}
 		NS_STORAGE::u8* _append( _BufferSize count ){
-
 			NS_STORAGE::u8* r = _resize_buffer( size + count ) + size;
 			size += count ;
 			return r;
 		}
+		
 
 		/// sign sensitive memcmp compatible int encoding
 		/// with a transitive and simmetric property
@@ -1068,6 +1068,443 @@ namespace collums{
 			return reader;
 		};
 	};
+	class DynamicKey{
+	public:
+
+		enum StoredType{
+			I1 = 1,
+			I2 ,
+			I4 ,
+			I8 ,
+			R4 ,
+			R8 ,
+			S 
+
+		};
+
+		typedef unsigned char	uchar;	/* Short for unsigned char */
+		typedef signed char int8;       /* Signed integer >= 8  bits */
+		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
+		typedef short int16;
+		typedef unsigned short uint16;
+		typedef int int32;
+		typedef unsigned int uint32;
+		typedef unsigned long	ulong;		  /* Short for unsigned long */
+		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
+		typedef long long longlong;
+		typedef longlong int64;
+		typedef ulonglong uint64;
+
+		static const size_t MAX_BYTES = 255;
+		static const size_t MAX_CONST_BYTES = 16;
+		typedef NS_STORAGE::u32 row_type ;
+
+		typedef NS_STORAGE::u8 _size_type;
+		typedef NS_STORAGE::u8 _BufferSize;
+
+	protected:
+		NS_STORAGE::u8 buf[MAX_CONST_BYTES];
+		_BufferSize bytes;// bytes within dyn or static buffer
+		_BufferSize size;// bytes used
+
+
+		inline NS_STORAGE::u8 *extract_ptr(){
+			return (NS_STORAGE::u8*)(*(nst::u64*)(buf));
+		}
+		inline const NS_STORAGE::u8 *extract_ptr() const {
+			return (const NS_STORAGE::u8*)(*(const nst::u64*)(buf));
+		}
+		inline NS_STORAGE::u8* data(){
+
+			if(bytes <= MAX_CONST_BYTES){
+				return buf;
+			}
+			return extract_ptr();
+		}
+		inline const NS_STORAGE::u8* data() const{
+
+			if(bytes <= MAX_CONST_BYTES){
+				return buf;
+			}
+			return extract_ptr();
+		}
+		inline NS_STORAGE::u8* _resize_buffer(_BufferSize nbytes){
+
+			using namespace NS_STORAGE;
+			NS_STORAGE::u8* r = data();
+			if(nbytes > bytes){
+				add_btree_totl_used (nbytes);
+				NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
+				memcpy(nbuf, r, std::min<size_t>(nbytes, size));
+				if(bytes > MAX_CONST_BYTES){
+					remove_btree_totl_used (bytes);
+					delete r;
+				}
+				*(nst::u64*)buf = (nst::u64)nbuf;
+				bytes = (_BufferSize)nbytes;
+				r = nbuf;
+			}
+			return r;
+		}
+		NS_STORAGE::u8* _append( _BufferSize count ){
+			
+			NS_STORAGE::u8* r = _resize_buffer( size + count ) + size;
+			size += count ;
+			return r;
+		}
+
+		/// 1st level
+		void addDynInt(nst::i64 v){
+			*_append(1) = DynamicKey::I8;
+			*(nst::i64*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u64 v){
+			*_append(1) = DynamicKey::I8;
+			*(nst::u64*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i32 v){
+			*_append(1) = DynamicKey::I4;
+			*(nst::i32*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u32 v){
+			*_append(1) = DynamicKey::I4;
+			*(nst::u32*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i16 v){
+			*_append(1) = DynamicKey::I2;
+			*(nst::i16*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u16 v){
+			*_append(1) = DynamicKey::I2;
+			*(nst::u16*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i8 v){
+			*_append(1) = DynamicKey::I1;
+			*(nst::i8*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u8 v){
+			*_append(1) = DynamicKey::I1;
+			*(nst::u8*)_append(sizeof(v)) =  v;
+		}
+		void addDynReal(double v){
+			*_append(1) = DynamicKey::R8;
+			*(double*)_append(sizeof(v)) = v;
+		}
+		void addDynReal(float v){
+			*_append(1) = DynamicKey::R4;
+			*(float*)_append(sizeof(v)) = v;
+		}
+	public:	
+		void add(const char* k, size_t s){
+			size_t sad = s;
+			*_append(1) = DynamicKey::S;
+			( *(nst::u16*)_append(2)) = (nst::u16)sad; 
+			if(sad > 0){
+				memcpy(_append(sad), k, sad);
+			}
+		}
+	public:	
+		row_type row;
+	public:
+		/// 2nd level
+		void addf8(double v){
+
+			addDynReal(v);
+		}
+
+		void add1(char c){
+			addDynInt(c);
+			
+		}
+
+		void addu1(unsigned char c){
+
+			addDynInt(c);
+			
+		}
+
+		void addf4(float v){
+
+			addDynReal(v);
+		}
+
+		void add8(long long v){
+			addDynInt(v);
+			
+		}
+
+		void addu8(unsigned long long v){
+
+			addDynInt(v);
+			
+		}
+
+		void add4(long v){
+
+			addDynInt(v);
+			
+		}
+
+		void addu4(unsigned int v){
+
+			addDynInt(v);
+			
+		}
+
+		void add2(short v){
+
+			addDynInt(v);
+		}
+
+		void addu2(unsigned short v){
+
+			addDynInt(v);
+		}
+		/// 3d level
+		void add(const FloatStored & v){
+
+			addf4(v.get_value());
+		}
+
+		void add(const DoubleStored & v){
+
+			addf8(v.get_value());
+		}
+		void add(const ShortStored& v){
+
+			add2(v.get_value());
+		}
+
+		void add(const UShortStored& v){
+
+			addu2(v.get_value());
+		}
+
+		void add(const CharStored& v){
+
+			add1(v.get_value());
+		}
+
+		void add(const UCharStored& v){
+
+			addu1(v.get_value());
+		}
+
+		void add(const IntStored& v){
+
+			add4(v.get_value());
+		}
+
+		void add(const UIntStored& v){
+
+			addu4(v.get_value());
+		}
+
+		void add(const LongIntStored& v){
+
+			add8(v.get_value());
+		}
+
+		void add(const ULongIntStored& v){
+
+			addu8(v.get_value());
+		}
+
+		void add(const BlobStored& v){
+
+			add(v.get_value(),v.get_size());
+		}
+
+		void add(const VarCharStored& v){
+
+			add(v.get_value(),v.get_size()-1);
+		}
+
+		void addTerm(const char* k, size_t s){
+			add(k, s);
+		}
+
+		void clear(){
+			
+			size = 0;
+			row = 0;
+			data()[0] = 0;
+		}
+
+		~DynamicKey(){
+
+			if(bytes > MAX_CONST_BYTES){
+				remove_btree_totl_used (bytes);
+				delete data();
+			}
+		}
+
+		DynamicKey():bytes(MAX_CONST_BYTES),size(0),row(0){//
+			//buf[0] = 0;
+		}
+
+		DynamicKey(const StaticKey& right):bytes(MAX_CONST_BYTES),size(0),row(0){//
+			*this = right;
+		}
+
+		inline bool left_equal_key(const DynamicKey& right) const {
+			//if( size != right.size ) return false;
+			if( size == 0 ) return false;
+
+			int r = memcmp(data(), right.data(), std::min<_BufferSize>(size,right.size) );
+			return r == 0;
+		}
+		
+		inline bool equal_key(const DynamicKey& right) const {
+			if( size != right.size ) return false;
+			int r = memcmp(data(), right.data(), size );
+			return r == 0;
+
+		}
+
+		DynamicKey& operator=(const DynamicKey& right){
+			_resize_buffer(right.size);
+			memcpy(data(), right.data(), right.size);
+
+			size = right.size;
+			row = right.row;
+			return *this;
+		}
+		inline operator size_t() const {
+			size_t r = 0;
+			MurmurHash3_x86_32(data(), size, 0, &r);
+			return r;
+		}
+		inline bool operator<(const DynamicKey& right) const {
+
+			
+			const nst::u8 *ld = data();
+			const nst::u8 *rd = right.data();
+			nst::u8 lt = *ld;
+			nst::u8 rt = *rd;
+			int r = 0,l=0,ll=0;	
+			while(lt == rt){
+				switch(lt){
+				case DynamicKey::I1 :
+					l=1;
+					if(*(char*)ld < *(char*)rd)
+						return true;
+					else if(*(char*)ld > *(char*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I2:
+					l = 2;
+					if(*(short*)ld < *(short*)rd)
+						return true;
+					else if(*(short*)ld > *(short*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I4:
+					l = 4;
+					if(*(long*)ld < *(long*)rd)
+						return true;
+					else if(*(long*)ld > *(long*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I8 :
+					l = 8;
+					if(*(nst::i64*)ld < *(nst::i64*)rd)
+						return true;
+					else if(*(nst::i64*)ld > *(nst::i64*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);					
+					if(*(float*)ld < *(float*)rd)
+						return true;
+					else if(*(float*)ld > *(float*)rd)
+						return false;
+					else r = 0;
+
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);					
+					if(*(double*)ld < *(double*)rd)
+						return true;
+					else if(*(double*)ld > *(double*)rd)
+						return false;
+					else r = 0; 
+					break;
+				case DynamicKey::S:
+
+					r = memcmp(ld+2, rd+2, std::min<nst::i16>(*(const nst::i16*)rd, *(const nst::i16*)ld));
+					if(r !=0) return r<0;
+					if(*(const nst::i16*)rd != *(const nst::i16*)ld)
+						return (*(const nst::i16*)rd < *(const nst::i16*)ld);
+					break;
+				};
+				if( r != 0 ) break;
+				++l;
+				ld += l;
+				rd += l;
+				ll += l;
+				if(ll >= size) break;
+				if(ll >= right.size) break;
+				lt = *ld;
+				rt = *rd;
+			}
+			if(r != 0) return r < 0;
+			if(size != right.size)
+				return size < right.size;
+			return (row < right.row);
+		}
+
+		inline bool operator!=(const DynamicKey& right) const {
+			if(size != right.size) return true;
+			int r = memcmp(data(), right.data(), size);
+			if(r != 0) return true;
+			return (row != right.row);
+		}
+
+		inline bool operator==(const DynamicKey& right) const {
+			return !(*this != right);
+		}
+
+		NS_STORAGE::u32 stored() const {
+			return NS_STORAGE::leb128::signed_size((*this).size)+(*this).size+NS_STORAGE::leb128::signed_size((*this).row);
+		};
+
+		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
+			using namespace NS_STORAGE;
+			buffer_type::iterator writer = w;
+			writer = leb128::write_signed(writer, row);
+			writer = leb128::write_signed(writer, size);
+
+			const u8 * end = data()+size;
+			for(const u8 * d = data(); d < end; ++d,++writer){
+				*writer = *d;
+			}
+			return writer;
+		};
+
+		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+			using namespace NS_STORAGE;
+			buffer_type::const_iterator reader = r;
+			row = leb128::read_signed(reader);
+			size_t size = leb128::read_signed(reader);
+			if(size > MAX_BYTES){
+				size = MAX_BYTES;
+			}
+			u8 * end = _resize_buffer(size)+size;
+			for(u8 * d = data(); d < end; ++d,++reader){
+				*d = *reader;
+			}
+			if(size < MAX_CONST_BYTES){
+				buf[size] = 0;
+			}
+			(*this).size = size;
+			return reader;
+		};
+	};
 	void test_ints(){
 		typedef collums::StaticKey _Sk;
 		typedef std::map<_Sk, int> _TestMap;
@@ -1112,7 +1549,7 @@ namespace collums{
 	class col_index{
 	public:
 		typedef stored::IntTypeStored<char> index_value;
-		typedef StaticKey index_key;//StaticKey
+		typedef DynamicKey index_key;//StaticKey
 		stored::abstracted_storage storage;
 		typedef stx::btree_map<index_key, index_value, stored::abstracted_storage> _IndexMap;
 		typedef _IndexMap::iterator iterator_type;
