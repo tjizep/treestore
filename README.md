@@ -1,8 +1,8 @@
 treestore
 =========
 
-treestore MySQL Storage Engine version 0.2
-------------------------------------------
+treestore MySQL Storage Engine version 0.2 (alpha)
+--------------------------------------------------
 
 Treestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
 
@@ -45,9 +45,16 @@ Building
 
 GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
 
-TODO
-----
+TODO FOR GA 0.3
+---------------
 
  1. Interpolation encoding on collumn id
- 2. Integrate with MariaDB
- 3. Expose Virtual col for fast table offsets
+ 2. Replication
+ 3. Multi threaded writes
+ 
+ TODO
+ ----
+
+ 4. Integrate with MariaDB
+ 5. Expose Virtual col for fast table offsets
+ 6. Resolve some memory release issues
