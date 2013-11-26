@@ -776,10 +776,14 @@ namespace collums{
 
 
 		inline NS_STORAGE::u8 *extract_ptr(){
-			return (NS_STORAGE::u8*)(*(size_t*)(buf));
+			 NS_STORAGE::u8 * r;
+			 memcpy(&r, buf, sizeof(NS_STORAGE::u8 *));
+			return r;
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
+			 NS_STORAGE::u8 * r;
+			 memcpy(&r, buf, sizeof(NS_STORAGE::u8 *));
+			return r;
 		}
 		inline NS_STORAGE::u8* data(){
 
@@ -808,7 +812,7 @@ namespace collums{
 					delete r;
 				}
 				memcpy(buf, &nbuf, sizeof(u8*));
-				bytes = (u32)nbytes;
+				bytes = (_BufferSize)nbytes;
 				r = nbuf;
 			}
 			return r;
@@ -1096,55 +1100,35 @@ namespace collums{
 		typedef ulonglong uint64;
 
 		static const size_t MAX_BYTES = 255;
-		static const size_t MAX_CONST_BYTES = 16;
+		static const size_t MAX_CONST_BYTES = 9;
 		typedef NS_STORAGE::u32 row_type ;
 
-		typedef NS_STORAGE::u8 _size_type;
-		typedef NS_STORAGE::u8 _BufferSize;
+		typedef NS_STORAGE::u16 _size_type;
+		typedef NS_STORAGE::u16 _BufferSize;
 
 	protected:
-		NS_STORAGE::u8 buf[MAX_CONST_BYTES];
-		_BufferSize bytes;// bytes within dyn or static buffer
+		//NS_STORAGE::u8 buf[MAX_CONST_BYTES];
+		std::string buf;
+		//_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 
-
-		inline NS_STORAGE::u8 *extract_ptr(){
-			return (NS_STORAGE::u8*)(*(nst::u64*)(buf));
-		}
-		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*(const nst::u64*)(buf));
-		}
 		inline NS_STORAGE::u8* data(){
 
-			if(bytes <= MAX_CONST_BYTES){
-				return buf;
-			}
-			return extract_ptr();
+			return (NS_STORAGE::u8*)&buf[0];
 		}
 		inline const NS_STORAGE::u8* data() const{
 
-			if(bytes <= MAX_CONST_BYTES){
-				return buf;
-			}
-			return extract_ptr();
+			return (const NS_STORAGE::u8*)&buf[0];
 		}
 		inline NS_STORAGE::u8* _resize_buffer(_BufferSize nbytes){
 
 			using namespace NS_STORAGE;
-			NS_STORAGE::u8* r = data();
-			if(nbytes > bytes){
-				add_btree_totl_used (nbytes);
-				NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
-				memcpy(nbuf, r, std::min<size_t>(nbytes, size));
-				if(bytes > MAX_CONST_BYTES){
-					remove_btree_totl_used (bytes);
-					delete r;
-				}
-				*(nst::u64*)buf = (nst::u64)nbuf;
-				bytes = (_BufferSize)nbytes;
-				r = nbuf;
+			if(buf.size() < nbytes){
+				nst::i64 d = buf.capacity();
+				buf.resize(nbytes);
+				add_btree_totl_used (buf.capacity()-d);
 			}
-			return r;
+			return data();
 		}
 		NS_STORAGE::u8* _append( _BufferSize count ){
 			
@@ -1328,22 +1312,23 @@ namespace collums{
 			
 			size = 0;
 			row = 0;
-			data()[0] = 0;
+			if(!buf.empty())
+				data()[0] = 0;
 		}
 
 		~DynamicKey(){
 
-			if(bytes > MAX_CONST_BYTES){
-				remove_btree_totl_used (bytes);
-				delete data();
-			}
+			//if(bytes > MAX_CONST_BYTES){
+			remove_btree_totl_used (buf.capacity());
+				//delete data();
+			//}
 		}
 
-		DynamicKey():bytes(MAX_CONST_BYTES),size(0),row(0){//
+		DynamicKey():size(0),row(0){//
 			//buf[0] = 0;
 		}
 
-		DynamicKey(const StaticKey& right):bytes(MAX_CONST_BYTES),size(0),row(0){//
+		DynamicKey(const StaticKey& right):size(0),row(0){//
 			*this = right;
 		}
 
@@ -1386,26 +1371,26 @@ namespace collums{
 			while(lt == rt){
 				switch(lt){
 				case DynamicKey::I1 :
-					l=1;
-					if(*(char*)ld < *(char*)rd)
+					l=sizeof(nst::i8);
+					if(*(nst::i8*)ld < *(nst::i8*)rd)
 						return true;
-					else if(*(char*)ld > *(char*)rd)
+					else if(*(nst::i8*)ld > *(nst::i8*)rd)
 						return false;
 					else r = 0;
 					break;
 				case DynamicKey::I2:
-					l = 2;
-					if(*(short*)ld < *(short*)rd)
+					l = sizeof(nst::i16);
+					if(*(nst::i16*)ld < *(nst::i16*)rd)
 						return true;
-					else if(*(short*)ld > *(short*)rd)
+					else if(*(nst::i16*)ld > *(nst::i16*)rd)
 						return false;
 					else r = 0;
 					break;
 				case DynamicKey::I4:
-					l = 4;
-					if(*(long*)ld < *(long*)rd)
+					l = sizeof(nst::i32);
+					if(*(nst::i32*)ld < *(nst::i32*)rd)
 						return true;
-					else if(*(long*)ld > *(long*)rd)
+					else if(*(nst::i32*)ld > *(nst::i32*)rd)
 						return false;
 					else r = 0;
 					break;
@@ -1560,7 +1545,7 @@ namespace collums{
 
 
 			std::string name;
-			size_t col_size;
+			
 		protected:
 			bool scan_index(){
 				stored::abstracted_storage storage(name);

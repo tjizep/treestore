@@ -1051,7 +1051,7 @@ namespace storage{
 		/// (it changes busy to false only once unless allocate is called)
 		void complete(){
 			NS_STORAGE::synchronized s(lock);
-
+			allocated_version = 0;
 			if(busy){
 				if(nullptr != result){
 					up_use(reflect_block_use(result)); /// update changes made to last allocation
@@ -1060,7 +1060,7 @@ namespace storage{
 				busy = false;
 				lock.unlock();
 			}
-			allocated_version = 0;
+			
 		}
 	public:
 		/// start a transaction valid during the lifetime of this storage

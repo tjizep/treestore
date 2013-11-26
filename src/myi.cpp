@@ -271,7 +271,7 @@ public:
 		if(calc_total_use() > treestore_mem_use){
 			(*this).reduce();
 
-			printf("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			stored::reduce_all();
 
 			}

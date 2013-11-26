@@ -70,9 +70,9 @@ namespace tree_stored{
 		}
 
 		bool load(){
-
+			
 			if(!loaded){
-				if(total_cache_size+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)MAX_PC_MEM){
+				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)treestore_mem_use){
 					return false;
 				}
 				stx::storage::scoped_ulock ul((*this).plock);
@@ -158,8 +158,7 @@ namespace tree_stored{
 			if(!enabled) return;
 			if(iter.invalid()) return;
 			stx::storage::scoped_ulock ul((*this).plock);
-			load();
-			if(!loaded) return;
+			if(!load()) return;
 			size_t h = ((size_t)iter.key()) % HASH_SIZE;
 			store_pos = sec_cache.size();
 			
