@@ -75,7 +75,7 @@ namespace tree_stored{
 				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)treestore_mem_use){
 					return false;
 				}
-				stx::storage::scoped_ulock ul((*this).plock);
+				stx::storage::syncronized ul((*this).plock);
 				using namespace NS_STORAGE;
 				if(cache_index.empty()){
 					cache_index.resize(HASH_SIZE);
@@ -134,7 +134,7 @@ namespace tree_stored{
 
 		const CompositeStored*  predict_row(_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
-			stx::storage::scoped_ulock ul((*this).plock);
+			stx::storage::syncronized ul((*this).plock);
 			return _int_predict_row(predictor, out, input);
 
 
@@ -157,7 +157,7 @@ namespace tree_stored{
 		void store(const BasicIterator & iter){
 			if(!enabled) return;
 			if(iter.invalid()) return;
-			stx::storage::scoped_ulock ul((*this).plock);
+			stx::storage::syncronized ul((*this).plock);
 			if(!load()) return;
 			size_t h = ((size_t)iter.key()) % HASH_SIZE;
 			store_pos = sec_cache.size();
@@ -181,7 +181,7 @@ namespace tree_stored{
 		/// remove everything
 
 		void clear(){
-			stx::storage::scoped_ulock ul((*this).plock);
+			stx::storage::syncronized ul((*this).plock);
 			if(!cache_index.empty()){
 				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(_Rid)*HASH_SIZE);
 				cache_index.clear();
@@ -215,7 +215,7 @@ namespace tree_stored{
 
 	typedef std::unordered_map<std::string, _PredictiveCache*> _PCaches;
 	_PredictiveCache* get_pcache(std::string name){
-		stx::storage::scoped_ulock ul(plock);
+		stx::storage::syncronized ul(plock);
 		static _PCaches pc;
 		_PredictiveCache * r = pc[name];
 		if(r == nullptr){

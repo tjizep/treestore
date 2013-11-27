@@ -1,7 +1,7 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include <windows.h>
 #include "Poco/Mutex.h"
-typedef Poco::ScopedLockWithUnlock<Poco::Mutex> scoped_ulock;
+typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;
 static Poco::Mutex _c_lock;
 
 ptrdiff_t btree_totl_used = 0;
@@ -9,12 +9,12 @@ ptrdiff_t btree_totl_instances = 0;
 
 void add_btree_totl_used(ptrdiff_t added){
 	if(added){
-		scoped_ulock l(_c_lock);
+		syncronized l(_c_lock);
 		btree_totl_used += added;
 	}
 }
 void remove_btree_totl_used(ptrdiff_t removed){
-	scoped_ulock l(_c_lock);
+	syncronized l(_c_lock);
 	btree_totl_used -= removed;
 }
 

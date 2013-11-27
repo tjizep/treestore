@@ -80,7 +80,7 @@ long long calc_total_use(){
 void print_read_lookups(){
 	return;
 	if(os::millis()-ltime > 1000){
-		stx::storage::scoped_ulock ul(plock);
+		stx::storage::syncronized ul(plock);
 		if(os::millis()-ltime > 1000){
 			if(ltime){
 				printf
@@ -233,7 +233,7 @@ public:
 			printf("Invalid argument to release thread\n");
 			return ;
 		}
-		NS_STORAGE::scoped_ulock ul(tlock);
+		NS_STORAGE::syncronized ul(tlock);
 
 		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
 			if((*t) == tt){
@@ -245,7 +245,7 @@ public:
 	}
 
 	tree_stored::tree_thread * reuse_thread(){
-		NS_STORAGE::scoped_ulock ul(tlock);
+		NS_STORAGE::syncronized ul(tlock);
 		tree_stored::tree_thread * r = NULL;
 		Poco::Thread::TID curt = Poco::Thread::currentTid();
 
@@ -278,7 +278,7 @@ public:
 	}
 
 	void reduce(){
-		NS_STORAGE::scoped_ulock ul(tlock);
+		NS_STORAGE::syncronized ul(tlock);
 		/*for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 			if((*t)->get_locks()==0)
 				(*t)->reduce_tables();

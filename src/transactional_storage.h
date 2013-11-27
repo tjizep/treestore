@@ -252,7 +252,7 @@ namespace storage{
 	using namespace Poco::Data;
 	//using Poco::Data::Session;
 	//using Poco::Data::Statement;
-	typedef Poco::ScopedLockWithUnlock<Poco::Mutex> scoped_ulock;
+	typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;
 	/// Exceptions that may be thrown in various circumstances
 	class InvalidAddressException : public std::exception{
 	public: /// The address required cannot exist
@@ -723,7 +723,7 @@ namespace storage{
 					{
 
 						if(read == how){
-							bool noreadcache  = false;
+							bool noreadcache = !modified();
 							if(noreadcache){
 								read_block.clear();
 								read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
@@ -956,7 +956,7 @@ namespace storage{
 
 		void discard(){
 
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			if(references == 0){
 				if(_session!=nullptr && !transient){
 					(*this).begin_new();
@@ -985,7 +985,7 @@ namespace storage{
 		/// initialize a specific address to exist if it didn't before otherwise return
 
 		void initialize(const address_type& which){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			if(!(*this).get_buffer(which)){
 				result = new block_descriptor(); //std::make_shared<block_descriptor>();
 				result->set_storage_action(create);
@@ -998,7 +998,7 @@ namespace storage{
 		/// return the last allocated address
 
 		address_type last() const{
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 
 			return (*this).next;
 		}
@@ -1071,7 +1071,7 @@ namespace storage{
 		/// start a transaction valid during the lifetime of this storage
 
 		void begin(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 
 			if(!is_new){ /// this flag is used to supress file creation
 				_begin();
@@ -1081,12 +1081,12 @@ namespace storage{
 		/// this version ignores the is_new flag and starts a transaction
 		/// anyway
 		void begin_new(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			_begin();
 			if(!is_new){}
 		}
 		void open(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			(*this).open_session();
 		}
 		/// close all handles and opened files and release memory held in caches, unwritten pages are not flushed
@@ -1095,12 +1095,12 @@ namespace storage{
 		}
 		/// engages an instance reference
 		void engage(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 
 			++references;
 		}
 		void release(){ //s an instance reference
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			if(references>0)
 				--references;
 			//printf("references for %s reached %ld\n", name.c_str(), (long)references);
@@ -1131,7 +1131,7 @@ namespace storage{
 		/// commit a transaction valid during the lifetime of this storage
 
 		void commit(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			if(transacted){
 				flush_back(0.0, false); /// write all changes to disk or pigeons etc.
 			}
@@ -1146,7 +1146,7 @@ namespace storage{
 
 		void journal(const std::string& name){
 			_Addresses todo;
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			get_addresses(todo);
 			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
 				stream_address at = (*a);
@@ -1160,22 +1160,22 @@ namespace storage{
 
 		}
 		void flush(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			flush_back(0.0, false); /// write all changes to disk or pigeons etc.
 
 		}
 		/// reverse any changes made by the current transaction
 
 		void rollback(){
-			scoped_ulock ul(lock);
+			syncronized ul(lock);
 			if(transacted)
 				get_session() << "rollback;", now;
 			transacted = false;
 		}
-		void reduce(bool write_all = false){
-			scoped_ulock ul(lock);
+		void reduce(){
+			syncronized ul(lock);
 			//printf("reducing storage %s\n", get_name().c_str());
-			flush_back(0.1,true,write_all);
+			flush_back(0.1,true,modified());
 		}
 	};
 
@@ -1285,13 +1285,13 @@ namespace storage{
 
 		/// sets the previous version of this version
 		void set_previous(version_based_allocator_ptr based){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			(*this).based = based;
 		}
 
 		/// return the previous version of this version if there is one
 		version_based_allocator_ptr get_previous(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			return (*this).based;
 		}
 
@@ -1318,13 +1318,13 @@ namespace storage{
 
 		/// notify the addition of a new reader
 		void add_reader(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			(*this).readers++;
 		}
 
 		/// notify the release of an existing reader
 		void remove_reader(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if((*this).readers == 0){
 				throw InvalidReaderCount();
 			}
@@ -1397,7 +1397,7 @@ namespace storage{
 		/// determine if the input is actually one of the base version end states
 
 		bool is_end(const block_type &r) const {
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			const version_based_allocator * b  =this;
 			while(b!=nullptr){
 				if(b->get_allocator().is_end(r)){
@@ -1490,7 +1490,7 @@ namespace storage{
 
 		}
 		void complete(){
-			//scoped_ulock _sync(*lock);
+			//syncronized _sync(*lock);
 			get_allocator().complete();
 			if(last_base != nullptr){
 				last_base->get_allocator().complete();
@@ -1499,44 +1499,44 @@ namespace storage{
 			(*lock).unlock();
 		}
 		void begin(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->begin();
 		}
 		/// special case only called by mvcc_coordinator
 		void begin_new(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->begin_new();
 		}
 
 		void commit(){
 
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->commit();
 		}
 		void flush(){
 
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->flush();
 		}
 
 		/// write the allocated data to the global journal
 		void journal(const std::string &name){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->journal(name);
 		}
 		/// return the last address allocated during the lifetime of this version
 		address_type last() const {
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			return allocations->last();
 		}
 
 		bool modified() const {
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				return allocations->modified();
 			return false;
@@ -1652,7 +1652,7 @@ namespace storage{
 		/// i.e. storages.size()==1
 		void merge_down()
 		{
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 
 			if(!storages.empty())
 			{
@@ -1828,7 +1828,7 @@ namespace storage{
 		/// engages the instance - its resources may not be released if references > 0
 
 		void engage(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			if(references==0)
 				initial->engage();
 			++references;
@@ -1838,7 +1838,7 @@ namespace storage{
 		/// releases a reference to this coordinatron
 
 		void release(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			--references;
 			/// TODO: if references == 0 the handles held to resources
 			///	need to let go so that maintenance can happen (i.e. drop table)
@@ -1854,10 +1854,10 @@ namespace storage{
 		/// reduces use
 
 		void reduce(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				(*c)->get_allocator().reduce(true);
+				(*c)->get_allocator().reduce();
 				
 			}
 			
@@ -1867,7 +1867,7 @@ namespace storage{
 		/// smart pointers are not thread safe so only use them internally
 
 		version_storage_type* begin(){
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			/// TODODONE: reuse an existing unmerged transaction - possibly share unmerged transactions
 			/// TODODONE: lazy create unmerged transactions only when a write occurs
 			/// TODO: optimize mergeable transactions
@@ -1897,12 +1897,12 @@ namespace storage{
 		/// return the transaction order of this coordinator
 
 		u64 get_order() const {
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			return (*this).order;
 		}
 
 		u32 transactions_away() const {
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 			return active_transactions;
 		}
 		/// finish a version and commit it to storage
@@ -1912,7 +1912,7 @@ namespace storage{
 
 		void commit(version_storage_type* transaction){
 
-			scoped_ulock _sync(*lock);
+			syncronized _sync(*lock);
 
 			//printf("[COMMIT MVCC] [%s] %lld at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
 			--active_transactions;
