@@ -593,9 +593,10 @@ namespace storage{
 		void flush_back
 		(	double factor = 0.75
 		,	bool release = true
+		,	bool write_all = false
 		){
 			if(result != nullptr){
-				up_use(reflect_block_use(*result));
+				//up_use(reflect_block_use(*result));
 				result = nullptr;
 			}
 
@@ -616,7 +617,7 @@ namespace storage{
 
 			u64 mods = 0;
 			for(typename _Blocks::iterator b = blocks.begin(); b != blocks.end(); ++b){
-				if((*b).second->is_modified()){
+				if(write_all || (*b).second->is_modified()){
 					/// write blocks will be written in address order
 					by_address.push_back(*b);
 					mods++;
@@ -957,18 +958,22 @@ namespace storage{
 
 			scoped_ulock ul(lock);
 			if(references == 0){
-				if(_session!=nullptr){
+				if(_session!=nullptr && !transient){
 					(*this).begin_new();
 					(*this).commit();
 				}
 				if(_session!=nullptr){
-					printf(" discarding storage %s\n",name.c_str());
-					rollback();
+					if (!transient){
+						printf(" discarding storage %s\n",name.c_str());
+						rollback();
+					}else
+						printf(" discarding transient %s\n",name.c_str());
 					insert_stmt = nullptr;
 					get_stmt = nullptr;
 					_session = nullptr;
 				}
 				for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
+					up_use( reflect_block_use((*a).second) );
 					down_use( get_block_use((*a).second) );
 					delete (*a).second;
 				}
@@ -1167,10 +1172,10 @@ namespace storage{
 				get_session() << "rollback;", now;
 			transacted = false;
 		}
-		void reduce(){
+		void reduce(bool write_all = false){
 			scoped_ulock ul(lock);
 			//printf("reducing storage %s\n", get_name().c_str());
-			flush_back(0.1);
+			flush_back(0.1,true,write_all);
 		}
 	};
 
@@ -1721,11 +1726,13 @@ namespace storage{
 
 					}else{
 						if(recovery){
+							printf("recovery ??\n");
 
 							(*c)->begin_new();
 							(*c)->commit();
-
+							
 						}
+						
 						merged.push_back((*c));
 					}
 				}
@@ -1739,7 +1746,7 @@ namespace storage{
 						throw InvalidVersion();
 					}
 					(*c)->set_previous(prev);
-					(*c)->set_permanent();
+					
 					if(prev && (*c)->get_version() <= prev->get_version())
 						throw InvalidWriterOrder();
 					verify[(*c)->get_version()] = (*c);
@@ -1850,10 +1857,8 @@ namespace storage{
 			scoped_ulock _sync(*lock);
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				if((*c)->is_unused())
-				{
-					(*c)->get_allocator().reduce();
-				}
+				(*c)->get_allocator().reduce(true);
+				
 			}
 			
 		}
@@ -1871,6 +1876,7 @@ namespace storage{
 			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()));
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
+			
 			storage_versions[b->get_version()] = b;
 			if(!storages.empty()){
 				b->set_previous(storages.back());
@@ -1997,11 +2003,12 @@ namespace storage{
 		virtual void journal_commit() {
 
 			//merge_down();
-
+			synchronized _sync(*lock);
 			save_recovery_info();
 
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
+				(*c)->set_permanent();
 				(*c)->begin_new();
 
 				(*c)->commit();

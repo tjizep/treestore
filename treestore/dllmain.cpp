@@ -8,8 +8,10 @@ ptrdiff_t btree_totl_used = 0;
 ptrdiff_t btree_totl_instances = 0;
 
 void add_btree_totl_used(ptrdiff_t added){
-	scoped_ulock l(_c_lock);
-	btree_totl_used += added;
+	if(added){
+		scoped_ulock l(_c_lock);
+		btree_totl_used += added;
+	}
 }
 void remove_btree_totl_used(ptrdiff_t removed){
 	scoped_ulock l(_c_lock);

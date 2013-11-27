@@ -89,7 +89,7 @@ void print_read_lookups(){
 				,   (nst::lld)hash_hits
 				,   (nst::lld)hash_predictions
 				,   (nst::lld)read_lookups
-				,   (double)btree_totl_used/(1024.0*1024.0)
+				,   (double)calc_total_use()/(1024.0*1024.0)
 				,   (nst::lld)btree_totl_instances
 				);
 			}
@@ -333,7 +333,7 @@ tree_stored::tree_thread* updated_thread_from_thd(THD* thd){
 class ha_treestore: public handler{
 public:
 
-	static const int TREESTORE_MAX_KEY_LENGTH = collums::StaticKey::MAX_BYTES;
+	static const int TREESTORE_MAX_KEY_LENGTH = collums::DynamicKey::MAX_BYTES;
 	std::string path;
 	tree_stored::tree_table::ptr tt;
 	tree_stored::tree_table::_TableMap::iterator r;

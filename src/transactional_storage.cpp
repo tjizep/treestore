@@ -10,10 +10,16 @@ namespace storage{
 	Poco::UInt64 last_flush_time = os::millis() ;
 	extern void add_total_use(long long added){
 		scoped_ulock l(_c_lock);
+		if(added < 0){
+			printf("adding neg val\n");
+		}
 		total_use += added;
 	}
 	extern void remove_total_use(long long removed){
 		scoped_ulock l(_c_lock);
+		if(removed > total_use){
+			printf("removing more than added\n");
+		}
 		total_use -= removed;
 	}
 
