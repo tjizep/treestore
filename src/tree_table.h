@@ -936,8 +936,10 @@ namespace tree_stored{
 
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
-				if(!(*field)->is_null() && cols[(*field)->field_index]){
-					cols[(*field)->field_index]->add_row(_row_count, *field);
+				if(bitmap_is_set(table->write_set, (*field)->field_index)){
+					if(!(*field)->is_null() && cols[(*field)->field_index]){
+						cols[(*field)->field_index]->add_row(_row_count, *field);
+					}
 				}
 			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
@@ -975,6 +977,7 @@ namespace tree_stored{
 
 		}
 		void write(_Rid rid, TABLE* table){
+			/// erase_row_index must be called before this function
 			check_load(table);
 			if(!changed)
 			{
@@ -984,8 +987,10 @@ namespace tree_stored{
 
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
-				if(!(*field)->is_null() && cols[(*field)->field_index]){
-					cols[(*field)->field_index]->add_row(rid, *field);
+				if(bitmap_is_set(table->write_set, (*field)->field_index)){
+					if(!(*field)->is_null() && cols[(*field)->field_index]){
+						cols[(*field)->field_index]->add_row(rid, *field);
+					}
 				}
 			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){

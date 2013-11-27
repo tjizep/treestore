@@ -675,7 +675,7 @@ namespace collums{
 					return se;
 				
 				if(se.null())
-					return se;
+					return empty;
 
 			}
 			
@@ -759,27 +759,24 @@ namespace collums{
 			if((*this).rows > 0) --(*this).rows;
 	
 			if(has_cache()){
-				if(get_cache().data.size() > row){
-					NS_STORAGE::synchronized synch(get_cache().lock);
-					if(get_cache().data.size() > row){
+				
+				NS_STORAGE::synchronized synch(get_cache().lock);
+				if(has_cache() && get_cache().data.size() > row){
 
-						get_cache().data[row].invalidate();
-					}
+					get_cache().data[row].invalidate();
 				}
+				
 			}
 		}
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
 			if(has_cache()){
-				if(get_cache().data.size() > row){
+			
+				NS_STORAGE::synchronized synch(get_cache().lock);
+				if(has_cache() && get_cache().data.size() > row){
 
-					NS_STORAGE::synchronized synch(get_cache().lock);
-					if(get_cache().data.size() > row){
-
-						get_cache().data[row].invalidate();
-					}
-
-				}
+					get_cache().data[row].invalidate();
+				}	
 			}
 			col[row] = s;
 			modified = true;
