@@ -66,16 +66,23 @@ NS_STORAGE::u64 hash_predictions =0;
 static NS_STORAGE::u64 last_read_lookups ;
 static NS_STORAGE::u64 total_cache_size=0;
 static NS_STORAGE::u64 ltime = 0;
-LONGLONG treestore_mem_use = 0;
-static MYSQL_SYSVAR_LONGLONG(mem_use, treestore_mem_use,
+LONGLONG treestore_max_mem_use = 0;
+LONGLONG treestore_current_mem_use = 0;
+static MYSQL_SYSVAR_LONGLONG(max_mem_use, treestore_max_mem_use,
   PLUGIN_VAR_RQCMDARG,
   "The ammount of memory used before treestore starts flushing caches etc.",
+  NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
+
+static MYSQL_SYSVAR_LONGLONG(current_mem_use, treestore_current_mem_use,
+  PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
+  "The current ammount of memory used by treestore",
   NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
 
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 long long calc_total_use(){
-	return NS_STORAGE::total_use+btree_totl_used+total_cache_size;
+	treestore_current_mem_use =  NS_STORAGE::total_use+btree_totl_used+total_cache_size;
+	return treestore_current_mem_use;
 }
 void print_read_lookups(){
 	return;
@@ -107,6 +114,7 @@ void print_read_lookups(){
 typedef std::map<std::string, _FileNames > _Extensions;
 
 Poco::Mutex tree_stored::tree_table::shared_lock;
+Poco::Mutex single_writer_lock;
 tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 
 // w.t.f.
@@ -125,10 +133,10 @@ namespace tree_stored{
 		int get_locks() const {
 			return locks;
 		}
-		tree_thread() : locks(0),changed(false){
+		tree_thread() : locks(0),changed(false),writing(false){
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
-			DBUG_PRINT("info",(" *** Tree Store (eyore) memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L)));
+			DBUG_PRINT("info",(" *** Tree Store (eyore) memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
 		}
 		Poco::Thread::TID get_created_tid() const {
 			return (*this).created_tid;
@@ -169,12 +177,18 @@ namespace tree_stored{
 			printf("cleared %lld tables\n", (NS_STORAGE::lld)tables.size());
 			tables.clear();
 		}
+		bool writing;
 		tree_table * lock(TABLE *table_arg, bool writer){
 			tree_table * result = NULL;
+			if(writer){
+				single_writer_lock.lock();
+					
+			}
 			synchronized _s(p2_lock);
 			result = compose_table(table_arg);
 			result->lock(writer);
 			if(!locks){
+				
 				hash_hits = 0;
 				read_lookups = 0;
 
@@ -183,16 +197,21 @@ namespace tree_stored{
 			return result;
 		}
 		void release(TABLE *table_arg){
+			bool writer = changed;
 			compose_table(table_arg)->unlock(&p2_lock);
 			if(1==locks){
 				if(changed)
 					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
 				check_use();
 				print_read_lookups();
+				
 				changed = false;
 			}
 			--locks;
-
+			if(writer){
+				single_writer_lock.unlock();
+					
+			}
 		}
 		void reduce_tables(){
 			if(!locks){
@@ -204,8 +223,8 @@ namespace tree_stored{
 
 		}
 		void check_use(){
-			if(calc_total_use() > treestore_mem_use){
-				if(!locks){
+			if(calc_total_use() > treestore_max_mem_use){
+				if(!(*this).changed){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 						(*t).second->check_use();
 					}
@@ -268,7 +287,7 @@ public:
 	}
 
 	void check_use(){
-		if(calc_total_use() > treestore_mem_use){
+		if(calc_total_use() > treestore_max_mem_use){
 			(*this).reduce();
 
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
@@ -1043,10 +1062,10 @@ int treestore_db_init(void *p)
 						sizeof(HeapFragValue))
 	)
 	{
-		//printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L));
+		//printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));
 	}
 #endif
-	printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_mem_use/(1024*1024L));
+	printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));
 	DBUG_ENTER("treestore_db_init");
 	//initialize_loggers();
 
@@ -1071,7 +1090,8 @@ int treestore_done(void *p)
 	return 0;
 }
 static struct st_mysql_sys_var* treestore_system_variables[]= {
-  MYSQL_SYSVAR(mem_use),
+  MYSQL_SYSVAR(max_mem_use),
+  MYSQL_SYSVAR(current_mem_use),
   NULL
 };
 

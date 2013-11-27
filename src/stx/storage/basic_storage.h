@@ -10,7 +10,7 @@
 #include <lz4.h>
 #include <stdio.h>
 /// memuse variables
-extern LONGLONG treestore_mem_use ;
+extern LONGLONG treestore_max_mem_use ;
 extern ptrdiff_t  _reported_memory_size();
 extern long long calc_total_use();
 

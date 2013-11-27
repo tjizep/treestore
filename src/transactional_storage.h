@@ -672,6 +672,8 @@ namespace storage{
 					break;
 				}
 			}
+			(*this).changed.clear();
+			(*this).changes = 0;
 		}
 
 		void print_use(){
@@ -685,7 +687,7 @@ namespace storage{
 			print_use();
 
 			//if(total_use > limit){
-			if(calc_total_use() > treestore_mem_use){
+			if(calc_total_use() > treestore_max_mem_use){
 				if(get_use() > 1024*1024*2){
 					//ptrdiff_t before = get_use();
 
@@ -709,7 +711,8 @@ namespace storage{
 		block_type & _allocate(address_type& which, storage_action how){
 
 			lock.lock();
-
+			if(how != read)
+				++((*this).changes);
 			busy = true;
 			allocated_version = 0;
 			check_use();
@@ -723,7 +726,7 @@ namespace storage{
 					{
 
 						if(read == how){
-							bool noreadcache = !modified();
+							bool noreadcache = false; //!modified();
 							if(noreadcache){
 								read_block.clear();
 								read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
@@ -769,7 +772,7 @@ namespace storage{
 			}
 			if(result->get_storage_action() != read){
 				changed.insert(which); /// this action flags a change
-				++changes;
+				
 			}
 
 			up_use(reflect_block_use(result));
@@ -1133,7 +1136,7 @@ namespace storage{
 		void commit(){
 			syncronized ul(lock);
 			if(transacted){
-				flush_back(0.0, false); /// write all changes to disk or pigeons etc.
+				flush_back(0.0, true, true); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1174,8 +1177,10 @@ namespace storage{
 		}
 		void reduce(){
 			syncronized ul(lock);
+			if(modified()) return;
 			//printf("reducing storage %s\n", get_name().c_str());
-			flush_back(0.1,true,modified());
+			if((*this)._use > 1024*1024*2)
+				flush_back(0.1,true,modified());
 		}
 	};
 
@@ -1726,8 +1731,7 @@ namespace storage{
 
 					}else{
 						if(recovery){
-							printf("recovery ??\n");
-
+							
 							(*c)->begin_new();
 							(*c)->commit();
 							

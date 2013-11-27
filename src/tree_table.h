@@ -919,7 +919,10 @@ namespace tree_stored{
 			}else
 			{
 				
-				if(::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD)
+				if
+				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
+					||	calc_total_use() > treestore_max_mem_use
+				)
 					rollback();
 			}
 		}

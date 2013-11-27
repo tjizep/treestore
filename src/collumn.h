@@ -381,7 +381,7 @@ namespace collums{
 					nst::u64 bytes_used = cached * sizeof(_Stored) ;
 					NS_STORAGE::remove_total_use((*cache).data.capacity()* sizeof(_Stored));
 					(*cache).data.clear();
-					if(calc_total_use() + bytes_used > treestore_mem_use){
+					if(calc_total_use() + bytes_used > treestore_max_mem_use){
 						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
 						(*cache).unload();
 						return false;
@@ -483,7 +483,7 @@ namespace collums{
 
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-				if(calc_total_use()+col_size*sizeof(_Stored) > treestore_mem_use){
+				if(calc_total_use()+col_size*sizeof(_Stored) > treestore_max_mem_use){
 					return result;
 				}
 				if(get_g_cache().count(name)==0){
@@ -523,7 +523,7 @@ namespace collums{
 		void load_cache(){
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
-				if((calc_total_use()+col.size()*sizeof(_Stored)) < treestore_mem_use){
+				if((calc_total_use()+col.size()*sizeof(_Stored)) < treestore_max_mem_use){
 					
 					_cache = load_cache(storage.get_name(),col.size());
 				}
@@ -576,6 +576,7 @@ namespace collums{
 				if(_cache != nullptr && _cache->available)
 				{
 					if(_cache->users==0){
+						printf("releasing col cache %s\n", storage.get_name().c_str());
 						_cache->unload();
 					};
 				}
@@ -737,12 +738,13 @@ namespace collums{
 		}
 
 		void reduce_use(){
-			col.reduce_use();
-			if(calc_total_use() > treestore_mem_use){
+			
+			//if(calc_total_use() > treestore_max_mem_use){
+				col.reduce_use();
 				release_cache();
 				unload_cache();
 				reset_cache_locals();
-			}
+			//}
 		}
 
 		ImplIterator<_ColMap> find(_Rid rid){
@@ -824,7 +826,7 @@ namespace collums{
 		typedef longlong int64;
 		typedef ulonglong uint64;
 
-		static const size_t MAX_BYTES = 26;
+		static const size_t MAX_BYTES = 2048;
 		
 		typedef _Rid row_type ;
 

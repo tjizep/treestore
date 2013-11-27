@@ -72,7 +72,7 @@ namespace tree_stored{
 		bool load(){
 			
 			if(!loaded){
-				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)treestore_mem_use){
+				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)treestore_max_mem_use){
 					return false;
 				}
 				stx::storage::syncronized ul((*this).plock);
