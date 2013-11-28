@@ -19,7 +19,7 @@ Features
 
  5. B+ TREE indexes AND tables
 
- 6. variable row size
+ 6. variable row size, theres no minimum row size, unused fields in a row arent stored unlike table structures 
 
  7. portable collumns
 
@@ -55,6 +55,8 @@ TODO FOR GA 0.3
  TODO
  ----
 
- 4. Integrate with MariaDB
- 5. Expose Virtual col for fast table offsets
- 6. Resolve some memory release issues
+ 1. Integrate with MariaDB
+ 2. Expose Virtual col for fast table offsets
+ 3. Resolve some memory release issues
+ 4. Text index
+ 5. Spatial index
