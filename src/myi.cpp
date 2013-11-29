@@ -575,6 +575,11 @@ public:
 
 		DBUG_RETURN(to);
 	}
+	int start_stmt(THD *thd, thr_lock_type lock_type){
+		int r= external_lock(thd, lock_type);
+  
+		return r;
+	}
 	// tscan 2
 	int external_lock(THD *thd, int lock_type){
 		DBUG_ENTER("::external_lock");
@@ -583,6 +588,7 @@ public:
 			return 0;
 		}
 		bool writer = false;
+		printf(" *[%s] %s \n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));

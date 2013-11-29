@@ -536,6 +536,7 @@ namespace tree_stored{
 
 		void load(TABLE *table_arg){
 			clear();
+			printf("load table %s\n", table_arg->alias);
 			(*this).load_indexes(table_arg);
 			(*this).load_cols(table_arg);
 			(*this).calc_density(table_arg);
