@@ -499,7 +499,9 @@ namespace collums{
 			NS_STORAGE::synchronized slock(result->lock);
 			if(!result->loaded){
 				result->loaded = true;
-				get_loader().add(new ColLoader(name, result, col.size()));
+				 ColLoader l(name, result, col.size());
+				 l.doTask();
+				//get_loader().add(new ColLoader(name, result, col.size()));
 			}
 
 			return result;
@@ -737,16 +739,17 @@ namespace collums{
 			reset_cache_locals();
 		}
 
-		void reduce_use(){
+		void reduce_cache_use(){
 			
-			//if(calc_total_use() > treestore_max_mem_use){
-				col.reduce_use();
+			if(calc_total_use() > treestore_max_mem_use){				
 				release_cache();
 				unload_cache();
 				reset_cache_locals();
-			//}
+			}
 		}
-
+		void reduce_tree_use(){
+			col.reduce_use();
+		}
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));
 		}
@@ -827,10 +830,11 @@ namespace collums{
 		
 		typedef _Rid row_type ;
 
-		typedef NS_STORAGE::u16 _size_type;
-		typedef NS_STORAGE::u16 _BufferSize;
+		typedef NS_STORAGE::u8 _size_type;
+		typedef NS_STORAGE::u8 _BufferSize;
 
 	protected:
+		//std::string buf;
 		std::string buf;
 		_BufferSize size;// bytes used
 
@@ -1037,7 +1041,7 @@ namespace collums{
 			
 			size = 0;
 			row = 0;
-			if(!buf.empty())
+			//if(!buf.empty())
 				data()[0] = 0;
 		}
 
@@ -1417,9 +1421,13 @@ namespace collums{
 		}
 
 		void rollback(){
-			index.reduce_use();
-			if(modified)
-				storage.rollback();
+			if(modified){
+			
+				index.reduce_use();
+			
+				
+			}
+			storage.rollback();
 			modified = false;
 		}
 

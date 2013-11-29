@@ -62,7 +62,9 @@ namespace tree_stored{
 		virtual void compose(_Rid r, CompositeStored& comp)=0;
 		virtual void compose(CompositeStored & to, Field* f,const uchar * n_ptr, uint flags)=0;
 		virtual bool equal(_Rid row, Field* f)=0;
-		virtual void reduce_use() = 0;
+		virtual void reduce_cache_use() = 0;
+		virtual void reduce_col_use() = 0;
+		
 		virtual void seek_retrieve(_Rid row, Field* f) = 0;
 		virtual nst::u32 get_rows_per_key() = 0;
 		virtual void flush() = 0;
@@ -162,8 +164,11 @@ namespace tree_stored{
 		virtual void rollback() {
 			col.rollback();
 		}
-		virtual void reduce_use() {
-			col.reduce_use();
+		virtual void reduce_col_use() {
+			col.reduce_tree_use();
+		}
+		virtual void reduce_cache_use() {
+			col.reduce_cache_use();
 		}
 	};
 
@@ -558,7 +563,11 @@ namespace tree_stored{
 			}
 
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				(*c)->reduce_use();
+				(*c)->reduce_col_use();
+
+			}
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_cache_use();
 
 			}
 			get_table().reduce_use();
@@ -571,7 +580,11 @@ namespace tree_stored{
 				(*x)->clear_cache();
 			}
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				(*c)->reduce_use();
+				(*c)->reduce_col_use();
+
+			}
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_cache_use();
 
 			}
 		}

@@ -50,7 +50,7 @@ ENGINE="TREESTORE"
 
 #include "sql_table.h"                          // tablename_to_filename
 #include "sql_class.h"                          // THD
-      // SSV
+    
 
 #include <limits>
 
@@ -588,7 +588,8 @@ public:
 			return 0;
 		}
 		bool writer = false;
-		printf(" *[%s] %s \n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str);
+		double MB = 1024.0*1024.0;
+		printf(" *[%s] %s %.4g %.4g %.4g\n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str, (double)NS_STORAGE::total_use/MB,(double)btree_totl_used/MB,(double)total_cache_size/MB);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));
