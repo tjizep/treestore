@@ -589,7 +589,7 @@ public:
 		}
 		bool writer = false;
 		double MB = 1024.0*1024.0;
-		printf(" *[%s] %s <mem: coldata %.4g treedata %.4g p-cache %.4g (MB)>\n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str, (double)NS_STORAGE::total_use/MB,(double)btree_totl_used/MB,(double)total_cache_size/MB);
+		printf(" *[%s] %s <mem: cd %.4g td %.4g p-cache %.4g (MB)>\n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str, (double)NS_STORAGE::total_use/MB,(double)btree_totl_used/MB,(double)total_cache_size/MB);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));

@@ -521,9 +521,9 @@ namespace collums{
 			NS_STORAGE::synchronized slock(result->lock);
 			if(!result->loaded){
 				result->loaded = true;
-				 ColLoader l(name, result, col.size());
-				 l.doTask();
-				//get_loader().add(new ColLoader(name, result, col.size()));
+				 //ColLoader l(name, result, col.size());
+				 //l.doTask();
+				get_loader().add(new ColLoader(name, result, col.size()));
 			}
 
 			return result;
@@ -847,46 +847,54 @@ namespace collums{
 		typedef long long longlong;
 		typedef longlong int64;
 		typedef ulonglong uint64;
-#ifdef _USE_STATIC_BUF_
-		static const size_t MAX_BYTES = 19;
-#else
+		typedef std::vector<nst::u8> _Data;
+
 		static const size_t MAX_BYTES = 2048;
-#endif		
+	
 		typedef _Rid row_type ;
 
 		typedef NS_STORAGE::u8 _size_type;
 		typedef NS_STORAGE::u8 _BufferSize;
 
 	protected:
-#ifdef _USE_STATIC_BUF_
-		char buf[19];
+
+		nst::u8 buf[sizeof(_Data)];
 		_BufferSize bs;// bytes used
-#else
-		std::string buf;
-#endif	
-		inline NS_STORAGE::u8* data(){
 
-			return (NS_STORAGE::u8*)&buf[0];
+		inline _Data& get_Data(){
+			return *(_Data*)&buf[0];
 		}
-		inline const NS_STORAGE::u8* data() const{
-
-			return (const NS_STORAGE::u8*)&buf[0];
+		inline const _Data& get_Data() const {
+			return *(const _Data*)&buf[0];
 		}
-		inline NS_STORAGE::u8* _resize_buffer(_BufferSize nbytes){
+		inline nst::u8* data(){
+			if(bs==sizeof(_Data))
+				return &(get_Data())[0];
+			return &buf[0];
+		}
+		inline const nst::u8* data() const{
+			if(bs==sizeof(_Data))
+				return &(get_Data())[0];
+			return &buf[0];
+		}
+		inline nst::u8* _resize_buffer(_BufferSize nbytes){
 
 			using namespace NS_STORAGE;
-#ifdef _USE_STATIC_BUF_
+
+			if(nbytes >= sizeof(_Data) && bs < nbytes){
+				bs = sizeof(_Data);
+				new (&get_Data()) _Data();
+			}else
 				bs = nbytes;
-#else
-			if(buf.capacity() < nbytes){
-				std::string empty;
-				nst::i64 d = buf.capacity();
-				if(d == empty.capacity())	
-					d = 0;
-				add_btree_totl_used (buf.capacity()-d);
+			if(bs==sizeof(_Data)){
+				if(get_Data().capacity() < nbytes){				
+					nst::i64 d = get_Data().capacity();
+					get_Data().resize(nbytes);
+					add_btree_totl_used (get_Data().capacity()-d);
+				}else
+					get_Data().resize(nbytes);			
 			}
-			buf.resize(nbytes);			
-#endif		
+	
 			return data();
 		}
 		NS_STORAGE::u8* _append( _BufferSize count ){
@@ -950,11 +958,9 @@ namespace collums{
 		row_type row;
 	public:
 		size_t size() const {
-#ifdef _USE_STATIC_BUF_
+			if(bs==sizeof(_Data))
+				return get_Data().size();
 			return bs;
-#else
-			return buf.size();
-#endif
 		}
 		/// 2nd level
 		void addf8(double v){
@@ -1075,36 +1081,28 @@ namespace collums{
 		}
 
 		void clear(){
-#ifdef _USE_STATIC_BUF_
-			bs = 0;
-			buf[0] = 0;
-#endif
+
 			row = 0;
-			
-			buf.clear();
+			if(bs==sizeof(_Data)){			
+				get_Data().clear();
+			}else
+				bs = 0;
 		}
 
 		~DynamicKey(){
-#ifndef _USE_STATIC_BUF_
-			std::string empty;
-			if(empty.capacity() != buf.capacity())
-				remove_btree_totl_used (buf.capacity());
-#endif
+			if(bs==sizeof(_Data))
+				remove_btree_totl_used (get_Data().capacity());
 		}
 
 		DynamicKey():
-#ifdef _USE_STATIC_BUF_
 			bs(0),
-#endif
 			row(0)
 		{
 			
 		}
 
 		DynamicKey(const DynamicKey& right):
-#ifdef _USE_STATIC_BUF_
 			bs(0),
-#endif
 			row(0)
 		{
 			*this = right;

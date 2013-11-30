@@ -49,7 +49,7 @@ namespace tree_stored{
 	};
 	/// The predictive cache acts like an adaptive 'derandomizer'
 	struct _PredictiveCache{
-		static const NS_STORAGE::u64 CIRC_SIZE = 7000000;/// about 128 MB shared - the cachedrow is 32 bytes
+		static const NS_STORAGE::u64 CIRC_SIZE = 3000000;/// about 128 MB shared - the cachedrow is 32 bytes
 		static const NS_STORAGE::u64 HASH_SIZE = 32452843; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const _Rid STORE_INF = (_Rid)-1;
 		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(true),loaded(false){
@@ -159,8 +159,9 @@ namespace tree_stored{
 			if(iter.invalid()) return;
 			stx::storage::syncronized ul((*this).plock);
 			if(!load()) return;
-			size_t h = ((size_t)iter.key()) % HASH_SIZE;
 			store_pos = sec_cache.size();
+			if(store_pos >= CIRC_SIZE) return;
+			size_t h = ((size_t)iter.key()) % HASH_SIZE;
 			
 			size_t s = cache_index[h];
 			if(s == 0){
