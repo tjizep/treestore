@@ -148,6 +148,10 @@ namespace storage{
 	{
 	public:
 		virtual void journal_commit() = 0;
+		/// notify particpants that the journal synch has started
+		virtual void journal_synch_start() = 0;
+		virtual void journal_synch_end() = 0;
+		
 		virtual std::string get_name() const = 0;
 		bool participating;
 		journal_participant():participating(false){};
@@ -672,8 +676,10 @@ namespace storage{
 					break;
 				}
 			}
-			(*this).changed.clear();
-			(*this).changes = 0;
+			if(write_all){
+				//(*this).changed.clear();
+				//(*this).changes = 0;
+			}
 		}
 
 		void print_use(){
@@ -1136,7 +1142,7 @@ namespace storage{
 		void commit(){
 			syncronized ul(lock);
 			if(transacted){
-				flush_back(0.0, true, true); /// write all changes to disk or pigeons etc.
+				flush_back(0.0, false, true); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1177,10 +1183,10 @@ namespace storage{
 		}
 		void reduce(){
 			syncronized ul(lock);
-			if(modified()) return;
+			if(modified()) flush_back(0.0,true,modified());
 			//printf("reducing storage %s\n", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.1,true,modified());
+				flush_back(0.5,true,modified());
 		}
 	};
 
@@ -1628,6 +1634,8 @@ namespace storage{
 		mutex_ptr lock;						/// lock for access to member data from different threads
 
 		bool recovery;						/// flags recovery mode so that journal isnt used
+
+		bool journal_synching;				/// the journal is synching and transaction state should be kept
 	private:
 		void save_recovery_info(){
 			std::string names;
@@ -1658,6 +1666,9 @@ namespace storage{
 		void merge_down()
 		{
 			syncronized _sync(*lock);
+
+			/// changing the transactional state during a journal synch cannot be recovered
+			if(journal_synching) return;
 
 			if(!storages.empty())
 			{
@@ -1697,8 +1708,8 @@ namespace storage{
 							if(!(*i)->is_unused()){
 								throw InvalidVersion();
 							}
+						
 							latest->copy((*i).get());		/// latest -> i
-
 							latest->set_merged();	/// flagged as copied or merged
 							latest = (*i);
 
@@ -1763,7 +1774,7 @@ namespace storage{
 				save_recovery_info();
 				/// algorithm error
 				//if((*storages.begin()) != initial) {}; ///algorithm error
-
+				
 			}
 		}
 
@@ -1781,7 +1792,7 @@ namespace storage{
 		,	initial(initial)
 		,   lock(std::make_shared<Poco::Mutex>())
 		,	recovery(false)
-
+		,	journal_synching(false)
 		{
 			//initial->engage();
 			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
@@ -1992,9 +2003,7 @@ namespace storage{
 			}
 
 			storage_versions.erase(transaction->get_version());
-			//delete transaction;
-			merge_down();		/// merge unused transaction versions
-								/// releasing any held resources
+			
 		}
 
 		void set_recovery(bool recovery){
@@ -2006,10 +2015,10 @@ namespace storage{
 		/// commit its storage
 		virtual void journal_commit() {
 
-			//merge_down();
+			
 			synchronized _sync(*lock);
-			save_recovery_info();
-
+		
+			
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
 				(*c)->set_permanent();
@@ -2019,7 +2028,14 @@ namespace storage{
 
 			}
 		}
-
+		virtual void journal_synch_start(){
+			synchronized _sync(*lock);
+			journal_synching = true;
+		}
+		virtual void journal_synch_end(){
+			synchronized _sync(*lock);
+			journal_synching = false;
+		}
 		virtual std::string get_name() const {
 			return this->initial->get_name();
 		}

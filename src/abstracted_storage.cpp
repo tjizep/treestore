@@ -274,16 +274,22 @@ public:
 		Poco::File jf(journal_name);
 		if(jf.exists()){
 
-			if(jf.getSize() > 1024ll*1024ll*1024ll*8ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
+			if(jf.getSize() > 1024ll*1024ll*1024ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
 
 				printf("journal file > n GB compacting\n");
 				//compact();
 				log_journal(journal_name,"commit",0);
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
+					(*p).second->journal_synch_start();
+				}
+				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 					/// test if the data files have not been deleted
 					if(is_valid_storage_directory((*p).second->get_name())){
 						(*p).second->journal_commit();
 					}
+				}
+				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
+					(*p).second->journal_synch_end();
 				}
 				printf("journal file compacting complete\n");
 				journal_ostr.close();
