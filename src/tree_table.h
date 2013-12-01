@@ -937,7 +937,7 @@ namespace tree_stored{
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use
 				)
-					rollback();
+					rollback();/// relieves the version load when new data is added to the collums
 			}
 		}
 		void write(TABLE* table){
