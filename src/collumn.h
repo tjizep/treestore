@@ -255,9 +255,9 @@ namespace collums{
 		static const nst::u16 F_INVALID = 4;
 		struct _StoredEntry{
 
-			_StoredEntry(const _Stored& key):key(key){};//,flags(F_INVALID)
+			_StoredEntry(const _Stored& key):key(key),flags(F_INVALID){};
 
-			_StoredEntry(){};//:flags(0)
+			_StoredEntry():flags(0){};
 
 			_StoredEntry &operator=(const _Stored& key){
 				(*this).key = key;
@@ -274,29 +274,29 @@ namespace collums{
 				return key;
 			}
 			void nullify(){
-				nst::u16 flags = 0;
+				//nst::u16 flags = 0;
 				flags &= (~F_NOT_NULL);
 			}
 			bool null(){
-				nst::u16 flags = 0;
+				//nst::u16 flags = 0;
 				return ( ( flags & F_NOT_NULL ) == 0);
 			}
 			bool invalid() const {
-				nst::u16 flags = 0;
+				//nst::u16 flags = 0;
 				return ( ( flags & F_INVALID ) != 0);
 			}
 			bool valid() const {
-				nst::u16 flags = 0;
+				//nst::u16 flags = 0;
 				return ( ( flags & F_INVALID ) == 0);
 			}
 			void invalidate(){
-				//flags |= F_INVALID;
+				flags |= F_INVALID;
 			}
 			void validate(){
-				//flags &= (~F_INVALID);
+				flags &= (~F_INVALID);
 			}
 			_Stored key;
-			//nst::u16 flags;
+			nst::u16 flags;
 
 
 		};
@@ -311,20 +311,20 @@ namespace collums{
 			bool available;
 			bool loaded;
 			_Cache data;
-			_Flags invalid;
-			_Flags null;
+			//_Flags invalid;
+			//_Flags null;
 			void resize(nst::i64 size){
 				data.resize(size);
-				invalid.resize(size);
-				null.resize(size);
+				//invalid.resize(size);
+				//null.resize(size);
 			}
 			void clear(){
 				data.clear();
-				invalid.clear();
-				null.clear();
+				//invalid.clear();
+				//null.clear();
 			}
 			nst::i64 calc_use(){
-				return data.capacity()* sizeof(_Stored)+invalid.capacity()/8+null.capacity()/8;
+				return data.capacity()* sizeof(_StoredEntry);//+invalid.capacity()/8+null.capacity()/8;
 			}
 			Poco::Mutex lock;
 			_Rid density;
@@ -335,8 +335,8 @@ namespace collums{
 				NS_STORAGE::remove_total_use(calc_use());
 				loaded = false;
 				available = false;
-				invalid.clear();
-				null.clear();
+				//invalid.clear();
+				//null.clear();
 				data.clear();
 				data.~_Cache();
 				new (&data) _Cache();
@@ -400,7 +400,7 @@ namespace collums{
 				if(!col.empty()){
 					--c;
 					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
-					nst::u64 bytes_used = cached * sizeof(_Stored) ;
+					nst::u64 bytes_used = cached * sizeof(_StoredEntry) ;
 					NS_STORAGE::remove_total_use((*cache).calc_use());
 					(*cache).clear();
 					if(calc_total_use() + bytes_used > treestore_max_mem_use){
@@ -434,7 +434,7 @@ namespace collums{
 					/// nullify the gaps
 					if((*cache).data.size() > kv){
 						for(_Rid n = prev; n < kv; ++n){
-							(*cache).null[n] = true;
+							(*cache).data[n].nullify();
 						}
 						(*cache).data[kv] = c.data();
 						prev = kv;
@@ -443,7 +443,9 @@ namespace collums{
 
 					if(cached > FACTOR){
 						if(ctr % ( cached/ FACTOR ) ==0){
-							col.reduce_use();
+							if(calc_total_use() > treestore_max_mem_use){
+								col.reduce_use();
+							}
 							//double MB = 1024.0*1024.0;
 							//printf("mem use loading col %.4g MB\n", (double)(btree_totl_used + nst::total_use )/MB);
 						}
@@ -536,6 +538,7 @@ namespace collums{
 		_CacheEntry * _cache;
 		_Nulls * _nulls;
 		_StoredEntry * cache_r;
+
 		_Stored empty;
 		_Rid cache_size;
 		_Rid rows;
@@ -695,10 +698,10 @@ namespace collums{
 			if( has_cache() && cache_size > row )
 			{
 				_StoredEntry & se = cache_r[row];
-				if(!(*_cache).invalid[row])
+				if(se.valid())
 					return se;
 				
-				if((*_cache).null[row])
+				if(se.null())
 					return empty;
 
 			}
@@ -788,7 +791,7 @@ namespace collums{
 				NS_STORAGE::synchronized synch(get_cache().lock);
 				if(has_cache() && get_cache().data.size() > row){
 
-					get_cache().invalid[row] = true;
+					get_cache().data[row].invalidate();
 				}
 				
 			}
@@ -800,7 +803,7 @@ namespace collums{
 				NS_STORAGE::synchronized synch(get_cache().lock);
 				if(has_cache() && get_cache().data.size() > row){
 
-					get_cache().invalid[row] = true;
+					get_cache().data[row].invalidate();
 				}	
 			}
 			col[row] = s;
