@@ -486,7 +486,7 @@ public:
 	}
 
 	ulong index_flags(uint,uint,bool) const{
-		return ( HA_READ_NEXT | HA_READ_RANGE | HA_READ_PREV ); //HA_READ_ORDER|
+		return ( HA_READ_ORDER|HA_READ_NEXT | HA_READ_RANGE | HA_READ_PREV ); //
 	}
 	uint max_supported_record_length() const { return HA_MAX_REC_LENGTH; }
 	uint max_supported_keys()          const { return MAX_KEY; }
@@ -495,8 +495,8 @@ public:
 	uint max_supported_key_part_length() const { return TREESTORE_MAX_KEY_LENGTH; }
 	const key_map *keys_to_use_for_scanning() { return &key_map_full; }
 	Table_flags table_flags(void) const{
-		return (	HA_PRIMARY_KEY_REQUIRED_FOR_POSITION |// HA_TABLE_SCAN_ON_INDEX |HA_PRIMARY_KEY_IN_READ_INDEX |
-					 HA_FILE_BASED |
+		return (	HA_PRIMARY_KEY_REQUIRED_FOR_POSITION |HA_PRIMARY_KEY_IN_READ_INDEX |HA_TABLE_SCAN_ON_INDEX |// 
+					 HA_FILE_BASED | HA_STATS_RECORDS_IS_EXACT |
 					/*| HA_REC_NOT_IN_SEQ | HA_AUTO_PART_KEY | HA_CAN_INDEX_BLOBS |*/
 					/*HA_NO_PREFIX_CHAR_KEYS |HA_BINLOG_ROW_CAPABLE | HA_BINLOG_STMT_CAPABLE |*/
 					 HA_PRIMARY_KEY_REQUIRED_FOR_DELETE |
@@ -911,6 +911,12 @@ public:
 
 	int index_first(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
+		
+		DBUG_ENTER("index_first");
+		ha_statistic_increment(&SSV::ha_read_first_count);
+
+		r = index_read(buf, NULL, 0, HA_READ_AFTER_KEY);
+
 		DBUG_RETURN(r);
 	}
 

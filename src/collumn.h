@@ -1090,8 +1090,11 @@ namespace collums{
 		}
 
 		~DynamicKey(){
-			if(bs==sizeof(_Data))
+			if(bs==sizeof(_Data)){
 				remove_btree_totl_used (get_Data().capacity());
+				get_Data().~_Data();
+				bs = 0;
+			}
 		}
 
 		DynamicKey():

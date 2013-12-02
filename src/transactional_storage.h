@@ -732,7 +732,7 @@ namespace storage{
 					{
 
 						if(read == how){
-							bool noreadcache = !modified();
+							bool noreadcache = false; //!modified();
 							if(noreadcache){
 								read_block.clear();
 								read_block.insert(read_block.begin(), current_block.begin(), current_block.end());

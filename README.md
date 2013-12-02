@@ -1,10 +1,10 @@
 treestore
 =========
 
-treestore MySQL Storage Engine version 0.2 (alpha)
+TuReestore MySQL Storage Engine version 0.2 (beta)
 --------------------------------------------------
 
-Treestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
+TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
 
 Features
 --------
@@ -33,7 +33,7 @@ Features
 
  12. Very Efficient sparse collumn storage due to 11 and differencial encoding
 
- 13. High performance - usually more than 200% on tpc-h (HammerDB)
+ 13. High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
 
 Configuration
 -------------
@@ -44,6 +44,25 @@ Building
 --------
 
 GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
+
+Benchmarks
+----------
+
+Machine
++ Core i7 3770s 
++ 16 GB RAM
++ Western Digital Green 1.5 TB hardrive
+
+Load
+TPC-H Scale 1 all queries
+
+Results (hot start 0.5 % variance)
+InnoDB 76 secs 
+Treestore 32 secs
+
+Results (cold start +-30% variance)
+Inno DB 660 secs
+TuReestore 180 secs
 
 TODO FOR GA 0.3
 ---------------
