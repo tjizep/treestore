@@ -1075,7 +1075,7 @@ int treestore_db_init(void *p)
 						sizeof(HeapFragValue))
 	)
 	{
-		//printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));
+		printf(" *** Tree Store (eyore) using low fragmentation heap\n");
 	}
 #endif
 	printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));

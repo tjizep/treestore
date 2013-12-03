@@ -9,31 +9,32 @@ TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
 Features
 --------
 
- 1. Collumn oriented
+ +Collumn oriented
 
- 2. ACID Compliant through Multi version concurrency (READ COMMITTED isolation only)
+ +ACID Compliant through Multi version concurrency (READ COMMITTED isolation only)
 
- 3. Global journal provides cross database consistency and durability
+ +Global journal provides cross database consistency and durability
 
- 4. Very small data size
+ +Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 
- 5. B+ TREE indexes AND tables
+ +B+ TREE indexes AND tables
 
- 6. variable row size, theres no minimum row size, unused fields in a row arent stored unlike table structures 
+ +variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
 
- 7. portable collumns
+ +portable collumns
 
- 8. 2 Level CPU Cache Aware Predictive Hash Table for unique index optimization
+ +2 Level CPU Cache Aware Predictive Hash Table for unique index optimization
 
- 9. Simple and easy to change code base
+ +Simple and easy to change code base
 
- 10. STL like internal data structures for index and collumn storage
+ +STL like internal data structures for index and collumn storage
 
- 11. No NULL storage format i.e .no extra bit for NULL values
+ +No NULL storage format i.e .no extra bit for NULL values
 
- 12. Very Efficient sparse collumn storage due to 11 and differencial encoding
+ +Very Efficient sparse collumn storage due to 11 and differencial encoding
 
- 13. High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
+ +High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
+
 
 Configuration
 -------------
