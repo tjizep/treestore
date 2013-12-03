@@ -53,17 +53,18 @@ Machine
 + Core i7 3770s 
 + 16 GB RAM
 + Western Digital Green 1.5 TB hardrive
++ Windows 8.1 x64
 
 Load
-TPC-H Scale 1 all queries
++TPC-H Scale 1 all queries
 
 Results (hot start 0.5 % variance)
-InnoDB 76 secs 
-Treestore 32 secs
++InnoDB 76 secs 
++Treestore 32 secs
 
 Results (cold start +-30% variance)
-Inno DB 660 secs
-TuReestore 180 secs
++Inno DB 660 secs
++TuReestore 180 secs
 
 TODO FOR GA 0.3
 ---------------
