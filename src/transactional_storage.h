@@ -151,7 +151,7 @@ namespace storage{
 		/// notify particpants that the journal synch has started
 		virtual void journal_synch_start() = 0;
 		virtual void journal_synch_end() = 0;
-		
+		virtual bool is_singular() const = 0;
 		virtual std::string get_name() const = 0;
 		bool participating;
 		journal_participant():participating(false){};
@@ -1920,6 +1920,7 @@ namespace storage{
 			syncronized _sync(*lock);
 			return active_transactions;
 		}
+
 		/// finish a version and commit it to storage
 		/// the commit is coordinated with other mvcc storages
 		/// via the journal
@@ -2027,6 +2028,10 @@ namespace storage{
 				(*c)->commit();
 
 			}
+		}
+		virtual bool is_singular() const {
+			synchronized _sync(*lock);
+			return ((*this).storages.size() == 1);
 		}
 		virtual void journal_synch_start(){
 			synchronized _sync(*lock);
