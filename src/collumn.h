@@ -216,29 +216,85 @@ namespace collums{
 		typedef typename stored::IntTypeStored<_Rid> _StoredRowId;
 		stored::abstracted_storage storage;
 
+		
 		struct int_terpolator{
+			
 
-			/// function assumes a list of monotonously ascending integer values
-			inline bool can(const _StoredRowId& first, const _StoredRowId& last, int size) const
+			/// function assumes a list of increasing integer values
+			inline bool encoded(bool multi) const
 			{
-				return false; //size > 0;
+				return !multi; // only encodes uniques;
+			}
+			typedef nst::u16 count_t; 
+			/// decode mixed run length and delta for simple sequences
+			void decode(nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
+				count_t k = 0, m = occupants - 1;
+				nst::i32 rl = 0;
+				reader = keys[k++].read(reader);
+				for(; k < occupants; ){
+					rl = nst::leb128::read_signed(reader);
+					if(!rl){
+						rl = nst::leb128::read_signed(reader);
+						count_t e = std::min<count_t>(k+rl,occupants);
+						count_t j = k;
+						for(; j < e; ++j){
+							keys[j].set_value(keys[j-1].get_value() + 1);
+						}
+						k = j;
+					}else{
+						keys[k].set_value(rl + keys[k-1].get_value());
+						++k;
+
+					}
+				}				
 			}
 
-			inline bool asc() const
-			{
-				return true;
+			/// encoding mixes run length and delta encoding for simple sequences
+			int encoded_size(const _StoredRowId* keys, count_t occupants) const {
+				count_t k = 0, m = occupants - 1;
+				nst::i32 rl = 0;
+				int size = keys[k++].stored();
+				
+				for(; k < occupants; ++k){
+					// works with keys[k] < 0 too
+					if(keys[k].get_value() - keys[k-1].get_value() == 1 &&  k < m){
+						// halts when k == m
+						++rl;
+					}else if(rl > 3){
+						++rl;
+						size += nst::leb128::signed_size((nst::i64)0);
+						size += nst::leb128::signed_size((nst::i64)rl);
+						rl = 0;						
+					}else{
+						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
+							size += nst::leb128::signed_size((nst::i64)keys[j].get_value() - keys[j-1].get_value());
+						}
+					}
+				}
+				return size;
 			}
+			
+			void encode(nst::buffer_type::iterator& writer,const _StoredRowId* keys, count_t occupants) const {
+				count_t k = 0, m = occupants - 1;
+				nst::i32 rl = 0;
+				writer = keys[k++].store(writer);
 
-			inline _StoredRowId diff(const _StoredRowId &larger, const _StoredRowId &smaller) const
-			{
-				_StoredRowId r = larger.get_value() - smaller.get_value();
-				return r;
-			}
-
-			inline _StoredRowId add(const _StoredRowId &larger, const _StoredRowId &smaller) const
-			{
-				_StoredRowId r = larger.get_value() + smaller.get_value();
-				return r;
+				for(; k < occupants; ++k){
+					// works with keys[k] < 0 too
+					if(keys[k].get_value() - keys[k-1].get_value() == 1 &&  k < m){
+						// halts when k == m
+						++rl;
+					}else if(rl > 3){
+						++rl;
+						writer = nst::leb128::write_signed(writer, (nst::i64)0);
+						writer = nst::leb128::write_signed(writer, (nst::i64)rl);
+						rl = 0;						
+					}else{
+						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
+							writer = nst::leb128::write_signed(writer, keys[j].get_value() - keys[j-1].get_value());
+						}
+					}
+				}
 			}
 
 			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
@@ -246,6 +302,40 @@ namespace collums{
 				if(last.get_value()>first.get_value())
 					return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
 				return 0;
+			}
+
+			void test_sequence(_StoredRowId *sequence,_StoredRowId *decoded,int _TestSize){
+				nst::buffer_type output;
+				output.resize(encoded_size(sequence, _TestSize));
+				encode(output.begin(), sequence, _TestSize);
+				decode(output.begin(), decoded, _TestSize);
+				if(memcmp(sequence,decoded,sizeof(decoded))!=0){
+					printf("Test failed\n");
+				}
+			}
+			void test_encode(){
+				if(1){
+					const int _TestSize = 10;
+					_StoredRowId sequence[_TestSize] = {0,1,2,3,4,5,6,7,8,9};
+					_StoredRowId decoded[_TestSize];
+					test_sequence(sequence, decoded, _TestSize);
+				}
+				if(2){
+					const int _TestSize = 10;
+					_StoredRowId sequence[_TestSize] = {0,1,2,3,5,6,7,8,9,10};
+					_StoredRowId decoded[_TestSize];
+					test_sequence(sequence, decoded, _TestSize);
+				}
+				if(3){
+					const int _TestSize = 15;
+					_StoredRowId sequence[_TestSize] = {0,2,4,8,10,11,12,13,14,15,17,18,20,21,22};
+					_StoredRowId decoded[_TestSize];
+					test_sequence(sequence, decoded, _TestSize);
+					for(int i = 0 ; i < _TestSize; ++i){
+						printf("%ld\n",decoded[i].get_value());
+					}
+
+				}
 			}
 		};
 		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, int_terpolator> _ColMap;
@@ -648,7 +738,11 @@ namespace collums{
 		{
 			rows = (_Rid)col.size();
 			
-
+#ifdef _DEBUG
+			
+			int_terpolator t;
+			t.test_encode();
+#endif		
 		}
 
 		~collumn(){

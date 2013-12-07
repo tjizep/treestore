@@ -142,24 +142,18 @@ namespace stx
 	template<typename _KeyType>
 	struct interpolator{
 
-		inline bool can(const _KeyType&, const _KeyType&, int ) const {
+		inline bool encoded( bool ) const {
 			return false;
 		}
 
-		inline int interpolate(const _KeyType&, const _KeyType&, const _KeyType&, int) const {
+		inline void encode(nst::buffer_type::iterator&, const _KeyType*, nst::u16) const {
+			
+		}
+		inline void decode(nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {	
+		}
+
+		int encoded_size(const _KeyType*, nst::u16){
 			return 0;
-		}
-
-		inline bool asc() const {
-			return false;
-		}
-
-		inline _KeyType diff(const _KeyType& a, const _KeyType&) const {
-			return a;
-		}
-
-		inline _KeyType add(const _KeyType& a, const _KeyType&) const {
-			return a;
 		}
 	};
 
@@ -1044,25 +1038,7 @@ namespace stx
 				register unsigned int l = 0, ll=llb, h = o;
 
 				/// multiple search type lower bound function
-				if(interp.can(keys[0],keys[o-1],o)){
-					/// interpolated search if available
-					ll = interp.interpolate(key, keys[0], keys[o-1], o);
-					if(ll >0) --ll;
-					if(ll < h && key_less(keys[ll],key)){
-						++ll;
-						if(ll < h && key_less(keys[ll],key)){
-						}else return ll;
-						++ll;
-						if(ll < h && key_less(keys[ll],key)){
-						}else return ll;
-						++ll;
-						if(ll < h && key_less(keys[ll],key)){
-						}else return ll;
-					}
-
-
-
-				}else if(do_llb){
+				if(do_llb){
 					/// history optimized linear search
 					unsigned int llo = std::min<unsigned int>(o,llb+3);
 					while (ll < llo && key_less(keys[ll],key)) ++ll;
@@ -1405,13 +1381,9 @@ namespace stx
 				sa = leb128::read_signed(reader);
 				next.set_context(context);
 				next.set_where(sa);
-				if(interp.asc()){
-					key_type prev;
-					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage.retrieve(reader,keys[k]);
-						keys[k] = interp.add(keys[k], prev);
-						prev = keys[k];
-					}
+				if(interp.encoded(btree::allow_duplicates)){
+					interp.decode(reader, keys, (*this).get_occupants());
+					
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage.retrieve(reader, keys[k]);
@@ -1441,12 +1413,10 @@ namespace stx
 				storage_use += leb128::signed_size((*this).level);
 				storage_use += leb128::signed_size(preceding.get_where());
 				storage_use += leb128::signed_size(next.get_where());
-				if(interp.asc()){
-					key_type prev;
+				if(interp.encoded(btree::allow_duplicates)){
+					storage_use += interp.encoded_size(keys, (*this).get_occupants());
 					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage_use += storage.store_size(interp.diff(keys[k],prev));
 						storage_use += storage.store_size(values[k]);
-						prev = keys[k];
 					}
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -1461,12 +1431,8 @@ namespace stx
 
 				writer = leb128::write_signed(writer, preceding.get_where());
 				writer = leb128::write_signed(writer, next.get_where());
-				if(interp.asc()){
-					key_type prev;
-					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage.store(writer, interp.diff(keys[k],prev));
-						prev = keys[k];
-					}
+				if(interp.encoded(btree::allow_duplicates)){
+					interp.encode(writer, keys, (*this).get_occupants());
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage.store(writer, keys[k]);

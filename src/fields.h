@@ -76,6 +76,10 @@ namespace stored{
 		inline void set_value(_IntType nv) {
 			value = nv;
 		}
+		
+		explicit IntTypeStored(_IntType i):value(i){
+		}
+
 		IntTypeStored():value(0){
 		}
 		IntTypeStored (const _IntType& init):value(init){
@@ -95,6 +99,7 @@ namespace stored{
 		inline bool operator==(const IntTypeStored& right) const {
 			return (value == right.value);
 		}
+		
 		NS_STORAGE::u32 stored() const {
 			return NS_STORAGE::leb128::signed_size((NS_STORAGE::i64)value);
 		};

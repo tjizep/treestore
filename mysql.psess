@@ -108,6 +108,9 @@
     <Report>
       <Path>mysql131202(2).vspx</Path>
     </Report>
+    <Report>
+      <Path>mysql131207.vspx</Path>
+    </Report>
   </Reports>
   <Launches>
     <Binary>
