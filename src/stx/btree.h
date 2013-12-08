@@ -175,7 +175,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be 
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 2048
+			keys_per_page = 512
 		};
 	};
 
@@ -3033,6 +3033,9 @@ namespace stx
 		}
 		/// writes all modified pages to storage and frees all surface nodes
 		void reduce_use(){
+			flush_buffers(true);
+		}
+		void flush_buffers(bool reduce){
 
 			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;
@@ -3043,59 +3046,61 @@ namespace stx
 			this->last_surface.unload();
 
 			flush_recursive(flushed,root);
-			typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
-			typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
-			_ToDelete td;
+			if(reduce){
+				typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
+				typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
+				_ToDelete td;
 
-			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
-				td.push_back((*n));
-			}
-			for(typename _ToDelete::iterator t = td.begin(); t != td.end(); ++t){
-				typename node::ptr np = (*t).second;
-				np.set_where((*t).first);
-				np.flush(*this);
-			}
-			if(shared.nodes != NULL){
-				nst::synchronized synched(shared.get_named_mutex());
-				typename _AddressedVersionNodes::iterator h;
-				_ToDeleteSurface td;
 				for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
-					stream_address w = (*n).first;
+					td.push_back((*n));
+				}
+				for(typename _ToDelete::iterator t = td.begin(); t != td.end(); ++t){
+					typename node::ptr np = (*t).second;
+					np.set_where((*t).first);
+					np.flush(*this);
+				}
+				if(shared.nodes != NULL){
+					nst::synchronized synched(shared.get_named_mutex());
+					typename _AddressedVersionNodes::iterator h;
+					_ToDeleteSurface td;
+					for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+						stream_address w = (*n).first;
 
-					_AddressPair ap = make_ap(w);
+						_AddressPair ap = make_ap(w);
 
-					h = (*shared.nodes).find(ap);
+						h = (*shared.nodes).find(ap);
 
-					if(h!=(*shared.nodes).end()){
-						if((*n).second == (*h).second){
-							if(!(*n).second->issurfacenode()){
-								throw malformed_page_exception();
-							}
-							surface_node * sn = static_cast<surface_node*>((*n).second);
-							if(!sn->shared){
-								throw malformed_page_exception();
-							}
-							if(sn->a_refs <= 0){
-								throw malformed_page_exception();
-							}
-							if(sn->unshare()){
+						if(h!=(*shared.nodes).end()){
+							if((*n).second == (*h).second){
+								if(!(*n).second->issurfacenode()){
+									throw malformed_page_exception();
+								}
+								surface_node * sn = static_cast<surface_node*>((*n).second);
+								if(!sn->shared){
+									throw malformed_page_exception();
+								}
+								if(sn->a_refs <= 0){
+									throw malformed_page_exception();
+								}
+								if(sn->unshare()){
 
-								td.push_back(std::make_pair((*n).first, sn));
-								(*shared.nodes).erase(ap);
+									td.push_back(std::make_pair((*n).first, sn));
+									(*shared.nodes).erase(ap);
+								}
 							}
 						}
 					}
-				}
-				for(typename _ToDeleteSurface::iterator t = td.begin(); t != td.end(); ++t){
+					for(typename _ToDeleteSurface::iterator t = td.begin(); t != td.end(); ++t){
 
-					typename node::ptr np = (*t).second;
-					np.set_where((*t).first);
-					--((*t).second->refs); /// remove the reference set by shared
-					np.flush(*this);
+						typename node::ptr np = (*t).second;
+						np.set_where((*t).first);
+						--((*t).second->refs); /// remove the reference set by shared
+						np.flush(*this);
+					}
 				}
+				if(save_tot > btree_totl_used)
+					BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());	
 			}
-			if(save_tot > btree_totl_used)
-				BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());
 		}
 	private:
 		// *** Node Object Allocation and Deallocation Functions

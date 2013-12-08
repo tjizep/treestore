@@ -540,7 +540,11 @@ public:
 	/// reduce the tree memory use by storing pages to alternate storage
 
     void reduce_use(){
-		tree.reduce_use();
+		tree.flush_buffers(true);
+	}
+	/// store written pages
+	 void flush_buffers(){
+		tree.flush_buffers(false);
 	}
 	// *** Public Erase Functions
 

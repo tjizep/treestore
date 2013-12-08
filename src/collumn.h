@@ -814,7 +814,7 @@ namespace collums{
 			if(modified)
 			{
 				printf("flushing %s\n", storage.get_name().c_str());
-				col.flush();
+				col.flush_buffers();
 				//col.reduce_use();
 				storage.commit();
 			}
@@ -822,7 +822,7 @@ namespace collums{
 		}
 		void commit1(){
 			if(modified){
-				col.reduce_use();
+				col.flush_buffers();
 				
 			}
 			release_cache();
@@ -1582,7 +1582,7 @@ namespace collums{
 				// this doesnt seem to work
 				// index.flush();
 				// !!! this seems to work
-				index.reduce_use();
+				index.flush_buffers();
 				
 			}
 		}
