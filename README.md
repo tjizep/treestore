@@ -65,12 +65,11 @@ Results (cold start +-30% variance)
 TODO FOR GA 0.3
 ---------------
 
- 1. Interpolation encoding on collumn id
- 2. Replication
- 3. Multi threaded writes
+ 1. Replication
+ 2. Multi threaded writes
  
- TODO
- ----
+TODO
+----
 
  1. Integrate with MariaDB
  2. Expose Virtual col for fast table offsets
