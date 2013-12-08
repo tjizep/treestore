@@ -425,9 +425,9 @@ public:
 	}
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
-			tt = get_thread()->compose_table((*this).table);
-			tt->check_load((*this).table);
+			tt = get_thread()->compose_table((*this).table);			
 		}
+		tt->check_load((*this).table);
 		return tt;
 	}
 	void clear_selection(_Selection & selected){

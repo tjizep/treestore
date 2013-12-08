@@ -822,7 +822,7 @@ namespace collums{
 		}
 		void commit1(){
 			if(modified){
-				col.flush_buffers();
+				col.reduce_use();
 				
 			}
 			release_cache();
