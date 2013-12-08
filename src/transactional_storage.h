@@ -151,7 +151,7 @@ namespace storage{
 		/// notify particpants that the journal synch has started
 		virtual void journal_synch_start() = 0;
 		virtual void journal_synch_end() = 0;
-		virtual bool is_singular() const = 0;
+		virtual bool make_singular() = 0;
 		virtual std::string get_name() const = 0;
 		bool participating;
 		journal_participant():participating(false){};
@@ -2029,8 +2029,10 @@ namespace storage{
 
 			}
 		}
-		virtual bool is_singular() const {
+		virtual bool make_singular()  {
 			synchronized _sync(*lock);
+			merge_down();
+
 			return ((*this).storages.size() == 1);
 		}
 		virtual void journal_synch_start(){

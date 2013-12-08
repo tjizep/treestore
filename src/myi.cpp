@@ -66,17 +66,53 @@ NS_STORAGE::u64 hash_predictions =0;
 static NS_STORAGE::u64 last_read_lookups ;
 static NS_STORAGE::u64 total_cache_size=0;
 static NS_STORAGE::u64 ltime = 0;
+
+/// instances of config variables
 LONGLONG treestore_max_mem_use = 0;
 LONGLONG treestore_current_mem_use = 0;
+LONGLONG treestore_journal_lower_max = 0;
+LONGLONG treestore_journal_upper_max = 0;
+LONGLONG treestore_journal_size = 0;
+
+
+static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
+  PLUGIN_VAR_RQCMDARG,
+  "The size the journal reaches before the journal export is attempted",
+  NULL, NULL, 1*1024*1024*1024LL, 256*1024*1024LL, LONGLONG_MAX, 1024*1024LL);
+
+static MYSQL_SYSVAR_LONGLONG(journal_upper_max, treestore_journal_upper_max,
+  PLUGIN_VAR_RQCMDARG,
+  "The size the journal reaches before all new transactional locking is aborted",
+  NULL, NULL, 16LL*1024LL*1024LL*1024LL, 256*1024*1024LL, LONGLONG_MAX, 1024*1024LL);
+
+static MYSQL_SYSVAR_LONGLONG(journal_size, treestore_journal_size,
+  PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
+  "The current journal size",
+  NULL, NULL, 1*1024*1024*1024LL, 128*1024*1024LL, LONGLONG_MAX, 1024*1024LL);
+
 static MYSQL_SYSVAR_LONGLONG(max_mem_use, treestore_max_mem_use,
   PLUGIN_VAR_RQCMDARG,
   "The ammount of memory used before treestore starts flushing caches etc.",
-  NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
+  NULL, NULL, 1024*1024*1024LL, 32*1024*1024LL, LONGLONG_MAX, 1024*1024L);
+
 
 static MYSQL_SYSVAR_LONGLONG(current_mem_use, treestore_current_mem_use,
   PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
   "The current ammount of memory used by treestore",
-  NULL, NULL, 128*1024*1024L, 5*1024*1024L, LONGLONG_MAX, 1024*1024L);
+  NULL, NULL, 128*1024*1024LL, 256*1024*1024LL, LONGLONG_MAX, 1024*1024L);
+
+/// accessors for journal stats
+void set_treestore_journal_size(nst::u64 ns){
+	treestore_journal_size = ns;
+}
+
+nst::u64 get_treestore_journal_size(){
+	return treestore_journal_size ;
+}
+nst::u64 get_treestore_journal_lower_max(){
+	return treestore_journal_lower_max ;
+}
+/// <-journal stats.
 
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
@@ -177,6 +213,16 @@ namespace tree_stored{
 			printf("cleared %lld tables\n", (NS_STORAGE::lld)tables.size());
 			tables.clear();
 		}
+		void check_journal(){
+			if(get_treestore_journal_size() > treestore_journal_upper_max){
+				synchronized _s(p2_lock);
+				if(!locks){
+					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+						(*t).second->rollback();
+					}
+				}
+			}
+		}
 		bool writing;
 		tree_table * lock(TABLE *table_arg, bool writer){
 			tree_table * result = NULL;
@@ -200,8 +246,11 @@ namespace tree_stored{
 			bool writer = changed;
 			compose_table(table_arg)->unlock(&p2_lock);
 			if(1==locks){
-				if(changed)
+				if
+				(	changed
+				)
 					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
+				
 				check_use();
 				print_read_lookups();
 				
@@ -293,7 +342,7 @@ public:
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			stored::reduce_all();
 
-			}
+		}
 	}
 
 	void reduce(){
@@ -302,6 +351,12 @@ public:
 			if((*t)->get_locks()==0)
 				(*t)->reduce_tables();
 		}*/
+	}
+	void check_journal(){
+		nst::synchronized ss(tlock);
+		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+			(*t)->check_journal();
+		}
 	}
 };
 
@@ -591,7 +646,25 @@ public:
 		double MB = 1024.0*1024.0;
 		printf(" *[%s] %s <mem: cd %.4g td %.4g p-cache %.4g (MB)>\n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str, (double)NS_STORAGE::total_use/MB,(double)btree_totl_used/MB,(double)total_cache_size/MB);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
+		if(thread->get_locks()==0){
+			while
+			(	get_treestore_journal_size() > treestore_journal_upper_max
+			)
+			{
+				st.check_journal();
+				NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
+#ifdef _MSC_VER
+				Poco::Thread::__sleep(100);
+#else
+				Poco::Thread::sleep(100);
+#endif
+			}
+		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
+			if(get_treestore_journal_size() > treestore_journal_upper_max){
+				
+				return HA_ERR_LOCK_TABLE_FULL;
+			}
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));
 			if(lock_type == F_WRLCK){
 				writer = true;
@@ -607,7 +680,9 @@ public:
 				clear_selection(selected);
 				/// (*this).tt = 0;
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
+				
 			}
+			
 		}
 
 
@@ -1107,6 +1182,9 @@ int treestore_done(void *p)
 static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(max_mem_use),
   MYSQL_SYSVAR(current_mem_use),
+  MYSQL_SYSVAR(journal_size),
+  MYSQL_SYSVAR(journal_lower_max),
+  MYSQL_SYSVAR(journal_upper_max),
   NULL
 };
 

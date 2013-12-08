@@ -46,6 +46,13 @@ namespace stored{
 #include <Poco/BinaryWriter.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/File.h>
+
+extern void set_treestore_journal_size(nst::u64 ns);
+
+extern nst::u64 get_treestore_journal_size();
+
+extern nst::u64 get_treestore_journal_lower_max();
+
 static Poco::Mutex llock;
 std::ofstream creation("allocations.txt", std::ios::app);
 
@@ -273,13 +280,14 @@ public:
 		journal_ostr.rdbuf()->pubsync();
 		Poco::File jf(journal_name);
 		if(jf.exists()){
-
-			if(jf.getSize() > 1024ll*1024ll*1024ll*1ll || bytes_used > 1024ll*1024ll*1024ll*1ll){
+			set_treestore_journal_size( jf.getSize() );
+			if(jf.getSize() > get_treestore_journal_lower_max() ){
 				nst::u64 singles = 0;
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-					singles += (*p).second->is_singular() ? 1 : 0;
+					singles += (*p).second->make_singular() ? 1 : 0;
 				}
 				if(singles == participants.size()){
+					set_treestore_journal_size( 0 );
 					printf("journal file > n GB compacting\n");
 					//compact();
 					log_journal(journal_name,"commit",0);
@@ -300,6 +308,7 @@ public:
 					jf.remove();
 					sequence = 0;
 					journal_ostr.open(journal_name, std::ios::binary);
+					set_treestore_journal_size( jf.getSize() );
 				}
 			}
 		}

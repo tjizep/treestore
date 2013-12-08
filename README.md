@@ -18,14 +18,19 @@ Features
 + Simple and easy to change code base
 + STL like internal data structures for index and collumn storage
 + No NULL storage format i.e .no extra bit for NULL values
-+ Very Efficient sparse collumn storage due to 11 and differencial encoding
++ Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
 
 
 Configuration
 -------------
 
++ treestore_mem_use
 The mysql system variable treestore_mem_use can be used to limit the treestore memory use
++ treestore_journal_lower_max
+Used to set lower limit at which the journal is merged back to collum storages
++ treestore_journal_upper_max
+If the journal reaches this limit then no new transactions are started and the journal is merged back
 
 Building
 --------
@@ -40,6 +45,11 @@ Machine
 + 16 GB RAM
 + Western Digital Green 1.5 TB hardrive
 + Windows 8.1 x64
+
+Software
++ Mysql 5.6.13
++ HammerDB 2.1.4
++ Treestore 0.2 beta
 
 Load
 + TPC-H Scale 1 all queries
