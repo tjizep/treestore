@@ -588,7 +588,12 @@ namespace tree_stored{
 			reduce_use();
 
 		}
+		void reduce_cache_use(){
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_cache_use();
 
+			}
+		}
 		inline const CompositeStored& get_index_query() const {
 			return temp;
 		}
@@ -923,7 +928,11 @@ namespace tree_stored{
 				/// locks so that all the storages can commit atomically allowing
 				/// other transactions to start on the same version
 				synchronized _s(*p2_lock);
+				
 				commit2();
+				if(calc_total_use() > treestore_max_mem_use){
+					stored::reduce_all();
+				}
 				changed = false;
 			}else
 			{

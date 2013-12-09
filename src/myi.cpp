@@ -120,29 +120,8 @@ long long calc_total_use(){
 	treestore_current_mem_use =  NS_STORAGE::total_use+btree_totl_used+total_cache_size;
 	return treestore_current_mem_use;
 }
-void print_read_lookups(){
-	return;
-	if(os::millis()-ltime > 1000){
-		stx::storage::syncronized ul(plock);
-		if(os::millis()-ltime > 1000){
-			if(ltime){
-				printf
-				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n"
-				,   (nst::lld)read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups)
-				,   (nst::lld)hash_hits
-				,   (nst::lld)hash_predictions
-				,   (nst::lld)read_lookups
-				,   (double)calc_total_use()/(1024.0*1024.0)
-				,   (nst::lld)btree_totl_instances
-				);
-			}
-			last_read_lookups = read_lookups;
-			hash_hits = 0;
-			hash_predictions = 0;
-			ltime = ::os::millis();
-		}
-	}
-}
+void print_read_lookups();
+
 #include "tree_stored.h"
 #include "conversions.h"
 #include "tree_index.h"
@@ -262,26 +241,25 @@ namespace tree_stored{
 					
 			}
 		}
+		private:
 		void reduce_tables(){
 			synchronized _s(p2_lock);
 			if(!locks){
 				printf("reducing idle thread %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					(*t).second->check_use();
+					if((*t).second)
+						(*t).second->check_use();
+					else
+						printf("table entry %s is NULL\n", (*t).first.c_str());
 				}
 			}
 
 		}
+		public:
 		void check_use(){
-			if(calc_total_use() > treestore_max_mem_use){
-				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-				stored::reduce_all();
-
-				if(!(*this).changed){
-					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-						(*t).second->check_use();
-					}
-				}				
+			if(calc_total_use() > treestore_max_mem_use){				
+				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));				
+				reduce_tables();	
 			}
 		}
 	};
@@ -337,11 +315,13 @@ public:
 	}
 
 	void check_use(){
+		/// TODO: this isnt safe yet (reducing another threads memory use)
+		// return;
 		if(calc_total_use() > treestore_max_mem_use){
 			(*this).reduce();
 
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-			stored::reduce_all();
+			//stored::reduce_all();
 
 		}
 	}
@@ -350,7 +330,7 @@ public:
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 			if((*t)->get_locks()==0)/// this should ignore busy threads
-				(*t)->reduce_tables();
+				(*t)->check_use();
 		}
 	}
 	void check_journal(){
@@ -362,7 +342,30 @@ public:
 };
 
 static static_threads st;
+void print_read_lookups(){
 
+	if(os::millis()-ltime > 1000){
+		st.check_use();
+		stx::storage::syncronized ul(plock);
+		if(os::millis()-ltime > 1000){
+			if(ltime){
+				printf
+				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n"
+				,   (nst::lld)read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups)
+				,   (nst::lld)hash_hits
+				,   (nst::lld)hash_predictions
+				,   (nst::lld)read_lookups
+				,   (double)calc_total_use()/(1024.0*1024.0)
+				,   (nst::lld)btree_totl_instances
+				);
+			}
+			last_read_lookups = read_lookups;
+			hash_hits = 0;
+			hash_predictions = 0;
+			ltime = ::os::millis();
+		}
+	}
+}
 tree_stored::tree_thread** thd_to_tree_thread(THD* thd){
 	return(tree_stored::tree_thread**) thd_ha_data(thd, static_treestore_hton );
 }
@@ -683,7 +686,7 @@ public:
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 				
 			}
-			
+			st.check_use();
 		}
 
 
@@ -695,7 +698,6 @@ public:
 		row = 0;
 		tt = NULL;
 		st.check_use();
-		get_thread()->check_use();
 		
 		clear_selection(selected);
 		last_resolved = 0;
@@ -727,8 +729,8 @@ public:
 		statistic_increment(table->in_use->status_var.ha_delete_count,&LOCK_status);
 
 		get_tree_table()->erase(last_resolved, (*this).table);
-		get_thread()->check_use();
-		st.check_use();
+		
+		
 		return 0;
 	}
 
@@ -739,8 +741,7 @@ public:
 		if (table->next_number_field && buf == table->record[0])
 			update_auto_increment();
 		get_tree_table()->write((*this).table);
-		get_thread()->check_use();
-		st.check_use();
+		
 		return 0;
 	}
 

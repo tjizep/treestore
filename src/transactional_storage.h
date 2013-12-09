@@ -677,8 +677,8 @@ namespace storage{
 				}
 			}
 			if(write_all){
-				//(*this).changed.clear();
-				//(*this).changes = 0;
+				(*this).changed.clear();
+				(*this).changes = 0;
 			}
 		}
 
@@ -1183,10 +1183,10 @@ namespace storage{
 		}
 		void reduce(){
 			syncronized ul(lock);
-			if(modified()) flush_back(0.0,true,modified());
+			if(modified()) flush_back(0.0,true,false);
 			//printf("reducing storage %s\n", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.5,true,modified());
+				flush_back(0.5,true,false);
 		}
 	};
 
