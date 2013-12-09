@@ -59,7 +59,7 @@ Results (hot start 0.5 % variance)
 + Treestore 32 secs
 
 Results (cold start +-30% variance)
-+ Inno DB 660 secs
++ InnoDB 660 secs
 + TuReestore 180 secs
 
 TODO FOR GA 0.3
