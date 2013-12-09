@@ -552,11 +552,6 @@ namespace tree_stored{
 			//printf("reducing cols+index use\n");
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				(*x)->clear_cache();
-
-			}
-
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 
 				(*x)->index.reduce_use();
 

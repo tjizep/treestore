@@ -860,7 +860,7 @@ namespace collums{
 
 		void reduce_cache_use(){
 			
-			if(calc_total_use() > treestore_max_mem_use){				
+			if(calc_total_use() > treestore_max_mem_use/2){				
 				release_cache();
 				unload_cache();
 				reset_cache_locals();
@@ -1236,7 +1236,7 @@ namespace collums{
 		}
 		inline bool operator<(const DynamicKey& right) const {
 
-			
+			/// partitions the order in a hierarchy
 			const nst::u8 *ld = data();
 			const nst::u8 *rd = right.data();
 			nst::u8 lt = *ld;
@@ -1311,7 +1311,10 @@ namespace collums{
 				lt = *ld;
 				rt = *rd;
 			}
-			if(r != 0) return r < 0;
+			if(rt != lt) 
+				return lt - rt; //total order on types first
+			if(r != 0) 
+				return r < 0;
 			if(size() != right.size())
 				return size() < right.size();
 			return (row < right.row);

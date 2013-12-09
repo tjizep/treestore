@@ -263,6 +263,7 @@ namespace tree_stored{
 			}
 		}
 		void reduce_tables(){
+			synchronized _s(p2_lock);
 			if(!locks){
 				printf("reducing idle thread %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
@@ -273,14 +274,14 @@ namespace tree_stored{
 		}
 		void check_use(){
 			if(calc_total_use() > treestore_max_mem_use){
+				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+				stored::reduce_all();
+
 				if(!(*this).changed){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 						(*t).second->check_use();
 					}
-				}
-				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-				stored::reduce_all();
-
+				}				
 			}
 		}
 	};
@@ -347,10 +348,10 @@ public:
 
 	void reduce(){
 		NS_STORAGE::syncronized ul(tlock);
-		/*for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
-			if((*t)->get_locks()==0)
+		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+			if((*t)->get_locks()==0)/// this should ignore busy threads
 				(*t)->reduce_tables();
-		}*/
+		}
 	}
 	void check_journal(){
 		nst::synchronized ss(tlock);
@@ -693,8 +694,9 @@ public:
 	int rnd_init(bool scan){
 		row = 0;
 		tt = NULL;
-		get_thread()->check_use();
 		st.check_use();
+		get_thread()->check_use();
+		
 		clear_selection(selected);
 		last_resolved = 0;
 		selected = get_tree_table()->create_output_selection(table);
