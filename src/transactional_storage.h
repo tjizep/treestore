@@ -1142,7 +1142,7 @@ namespace storage{
 		void commit(){
 			syncronized ul(lock);
 			if(transacted){
-				flush_back(0.0, false, true); /// write all changes to disk or pigeons etc.
+				flush_back(0.0, true, true); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1183,7 +1183,8 @@ namespace storage{
 		}
 		void reduce(){
 			syncronized ul(lock);
-			if(modified()) flush_back(0.0,true,false);
+			if(modified()) return;
+			
 			//printf("reducing storage %s\n", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
 				flush_back(0.5,true,false);
@@ -1638,24 +1639,26 @@ namespace storage{
 		bool journal_synching;				/// the journal is synching and transaction state should be kept
 	private:
 		void save_recovery_info(){
-			std::string names;
-			typename storage_container::iterator c = storages.begin();
-			typename storage_container::iterator c_begin = ++c;
-			for(; c != storages.end(); ++c)
-			{
-				if( c != c_begin )
-					names += ",";
-				std::string n = (*c)->get_allocator().get_name();
-				names += n;
+			if(storages.size() > 1){
+				std::string names;
+				typename storage_container::iterator c = storages.begin();
+				typename storage_container::iterator c_begin = ++c;
+				for(; c != storages.end(); ++c)
+				{
+					if( c != c_begin )
+						names += ",";
+					std::string n = (*c)->get_allocator().get_name();
+					names += n;
+				}
+
+			
+				stream_address addr = INTITIAL_ADDRESS;
+				buffer_type& content = initial->allocate(addr, create);
+				content.resize(names.size());
+				if(names.size() > 0)
+					memcpy(&content[0], &names[0], names.size());
+				initial->complete();
 			}
-
-
-			stream_address addr = INTITIAL_ADDRESS;
-			buffer_type& content = initial->allocate(addr, create);
-			content.resize(names.size());
-			if(names.size() > 0)
-				memcpy(&content[0], &names[0], names.size());
-			initial->complete();
 		}
 	public:
 
@@ -1801,7 +1804,7 @@ namespace storage{
 			storages.push_back(b);
 			std::string names;
 			stream_address addr = INTITIAL_ADDRESS;
-			buffer_type& content = initial->allocate(addr, create);
+			buffer_type& content = initial->allocate(addr, read);
 			if(!initial->is_end(content) && content.size() > 0){
 				names.resize(content.size());
 				memcpy(&names[0], &content[0], names.size());
@@ -1859,7 +1862,7 @@ namespace storage{
 			///	need to let go so that maintenance can happen (i.e. drop table)
 			if(0==references){
 
-				merge_down();
+				/// merge_down();
 				if(storages.size()==1){
 					initial->release();
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
@@ -1870,11 +1873,13 @@ namespace storage{
 
 		void reduce(){
 			syncronized _sync(*lock);
+			
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
 				(*c)->get_allocator().reduce();
 				
 			}
+			
 			
 		}
 
