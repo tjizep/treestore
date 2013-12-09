@@ -939,7 +939,7 @@ namespace tree_stored{
 				
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-					||	calc_total_use() > treestore_max_mem_use
+					||	calc_total_use() > treestore_max_mem_use*0.8f
 				)
 					rollback();/// relieves the version load when new data is added to the collums
 			}

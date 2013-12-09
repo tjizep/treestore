@@ -33,6 +33,7 @@ namespace stored{
 		return r;
 	}
 	void reduce_all(){
+		
 		nst::synchronized ll(m);
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
 			(*a).second->reduce();

@@ -321,7 +321,7 @@ public:
 			(*this).reduce();
 
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-			//stored::reduce_all();
+			stored::reduce_all();
 
 		}
 	}
