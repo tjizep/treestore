@@ -574,10 +574,11 @@ namespace tree_stored{
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->clear_cache();
 			}
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
-
 			}
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_cache_use();
 

@@ -5,7 +5,12 @@ typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;
 static Poco::Mutex _c_lock;
 namespace stx{
 namespace storage{
-	Poco::Int64 total_use = 0;
+	long long total_use = 0;
+	
+	long long buffer_use = 0;
+
+	long long col_use = 0;
+
 	Poco::UInt64 ptime = os::millis() ;
 	Poco::UInt64 last_flush_time = os::millis() ;
 	extern void add_total_use(long long added){
@@ -23,6 +28,29 @@ namespace storage{
 		total_use -= removed;
 	}
 
+	extern void add_buffer_use(long long added){
+		syncronized l(_c_lock);
+		total_use += added;
+		buffer_use += added;
+	}
+	
+	extern void remove_buffer_use(long long removed){
+		syncronized l(_c_lock);
+		total_use -= removed;
+		buffer_use -= removed;
+	}
+	
+	extern void add_col_use(long long added){
+		syncronized l(_c_lock);
+		total_use += added;
+		col_use += added;
+	}
+	
+	extern void remove_col_use(long long removed){
+		syncronized l(_c_lock);
+		total_use -= removed;
+		col_use -= removed;
+	}
 
 }
 }

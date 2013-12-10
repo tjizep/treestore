@@ -648,7 +648,16 @@ public:
 		}
 		bool writer = false;
 		double MB = 1024.0*1024.0;
-		printf(" *[%s] %s <mem: cd %.4g td %.4g p-cache %.4g (MB)>\n", lock_type == F_UNLCK ? "unlocking":"locking", table->s->normalized_path.str, (double)NS_STORAGE::total_use/MB,(double)btree_totl_used/MB,(double)total_cache_size/MB);
+		printf
+		(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+		,	lock_type == F_UNLCK ? "-":"+"
+		,	table->s->normalized_path.str
+		,	(double)calc_total_use()/MB
+		,	(double)nst::buffer_use/MB
+		,	(double)nst::col_use/MB
+		,	(double)btree_totl_used/MB
+		,	(double)total_cache_size/MB
+		);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
 			while

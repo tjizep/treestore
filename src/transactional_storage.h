@@ -76,9 +76,19 @@ namespace NS_STORAGE = stx::storage;
 namespace stx{
 namespace storage{
 
+	extern void add_buffer_use(long long added);
+	extern void remove_buffer_use(long long removed);
+	
 	extern void add_total_use(long long added);
 	extern void remove_total_use(long long removed);
+	
+	extern void add_col_use(long long added);
+	extern void remove_col_use(long long removed);
+
 	extern long long total_use;
+	extern long long buffer_use;
+	extern long long col_use;
+
 	extern Poco::UInt64 ptime;
 	extern Poco::UInt64 last_flush_time;		/// last time it released memory to disk
 	/// defines a concurrently accessable transactional storage providing ACID properties
@@ -87,6 +97,7 @@ namespace storage{
 
 	/// a name factory for some persistent allocators
 	struct default_name_factory{
+
 		std::string name;
 
 		default_name_factory(const std::string &name) : name(name){
@@ -582,11 +593,11 @@ namespace storage{
 		/// of the total use to release i.e. a value of 0 releases all
 		/// the default value will release 25% of the total used memory
 		void up_use(ptrdiff_t change){
-			add_total_use (change);
+			add_buffer_use (change);
 			_use += change;
 		}
 		void down_use(ptrdiff_t change){
-			remove_total_use (change);
+			remove_buffer_use (change);
 			_use -= change;
 		}
 		inline ptrdiff_t get_use() const {

@@ -395,26 +395,23 @@ namespace collums{
 		struct _CacheEntry{
 			_CacheEntry() : available(false), loaded(false),density(1),users(0){};
 			~_CacheEntry(){
-				NS_STORAGE::remove_total_use(calc_use());
+				NS_STORAGE::remove_col_use(calc_use());
 				
 			}
 			bool available;
 			bool loaded;
 			_Cache data;
-			//_Flags invalid;
-			//_Flags null;
+			
 			void resize(nst::i64 size){
 				data.resize(size);
-				//invalid.resize(size);
-				//null.resize(size);
+				
 			}
 			void clear(){
 				data.clear();
-				//invalid.clear();
-				//null.clear();
+				
 			}
 			nst::i64 calc_use(){
-				return data.capacity()* sizeof(_StoredEntry);//+invalid.capacity()/8+null.capacity()/8;
+				return data.capacity()* sizeof(_StoredEntry);
 			}
 			Poco::Mutex lock;
 			_Rid density;
@@ -422,11 +419,10 @@ namespace collums{
 			void unload(){
 				nst::synchronized _l(lock);
 				//printf("unloading col cache\n");
-				NS_STORAGE::remove_total_use(calc_use());
+				NS_STORAGE::remove_col_use(calc_use());
 				loaded = false;
 				available = false;
-				//invalid.clear();
-				//null.clear();
+				
 				data.clear();
 				data.~_Cache();
 				new (&data) _Cache();
@@ -491,7 +487,7 @@ namespace collums{
 					--c;
 					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
 					nst::u64 bytes_used = cached * sizeof(_StoredEntry) ;
-					NS_STORAGE::remove_total_use((*cache).calc_use());
+					nst::remove_col_use((*cache).calc_use());
 					(*cache).clear();
 					if(calc_total_use() + bytes_used > treestore_max_mem_use){
 						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
@@ -500,7 +496,7 @@ namespace collums{
 					}
 					
 					(*cache).resize(cached);
-					NS_STORAGE::add_total_use((*cache).calc_use());
+					nst::add_col_use((*cache).calc_use());
 				}
 				const _Rid FACTOR = 50;
 				_Rid prev = 0;
@@ -535,9 +531,7 @@ namespace collums{
 						if(ctr % ( cached/ FACTOR ) ==0){
 							if(calc_total_use() > treestore_max_mem_use){
 								col.reduce_use();
-							}
-							//double MB = 1024.0*1024.0;
-							//printf("mem use loading col %.4g MB\n", (double)(btree_totl_used + nst::total_use )/MB);
+							}							
 						}
 					}
 				}
@@ -589,8 +583,30 @@ namespace collums{
 			static _Caches _g_cache;
 			return _g_cache;
 		}
-		//static _Nulls _g_nulls;
+		
+		void unload_cache(std::string name){
+			_CacheEntry * entry= 0;
 
+
+			{
+				NS_STORAGE::synchronized ll(get_mutex());
+				if(get_g_cache().count(name)==0){
+
+					return;
+
+				}
+				entry = get_g_cache()[name].get() ;
+				NS_STORAGE::synchronized slock(entry->lock);
+				if(entry != nullptr && entry->available)
+				{
+					if(entry->users==0){
+						printf("releasing col cache %s\n", storage.get_name().c_str());
+						entry->unload();
+					};
+				}
+			}
+
+		}
 		_CacheEntry* load_cache(std::string name, size_t col_size){
 			_CacheEntry * result = 0;
 
@@ -640,7 +656,7 @@ namespace collums{
 		void load_cache(){
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
-				if((calc_total_use()+col.size()*sizeof(_Stored)) < treestore_max_mem_use){
+				if((calc_total_use()+col.size()*sizeof(_StoredEntry)) < treestore_max_mem_use){
 					
 					_cache = load_cache(storage.get_name(),col.size());
 				}
@@ -697,6 +713,8 @@ namespace collums{
 						_cache->unload();
 					};
 				}
+			}else{
+				unload_cache(storage.get_name());
 			}
 		}
 		void check_cache(){
@@ -713,9 +731,9 @@ namespace collums{
 					if(cache_size != col.size())
 					{
 						
-						_cache->unload();
-						get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
-						reset_cache_locals();
+						//_cache->unload();
+						//get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
+						//reset_cache_locals();
 					}
 				}
 			}
@@ -860,7 +878,7 @@ namespace collums{
 
 		void reduce_cache_use(){
 			
-			if(calc_total_use() > treestore_max_mem_use/2){				
+			if(calc_total_use() > treestore_max_mem_use){				
 				release_cache();
 				unload_cache();
 				reset_cache_locals();
