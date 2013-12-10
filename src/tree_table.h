@@ -561,6 +561,7 @@ namespace tree_stored{
 				(*c)->reduce_col_use();
 
 			}
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_cache_use();
 
@@ -584,6 +585,24 @@ namespace tree_stored{
 
 			}
 		}
+		void reduce_use_indexes(){
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
+				(*x)->clear_cache();
+			}
+		}
+
+		void reduce_use_collum_trees(){
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_col_use();
+			}
+		}
+
+		void reduce_use_collum_caches(){
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_cache_use();
+			}
+		}
+
 		void check_use(){
 
 			reduce_use();

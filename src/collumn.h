@@ -878,11 +878,11 @@ namespace collums{
 
 		void reduce_cache_use(){
 			
-			if(calc_total_use() > treestore_max_mem_use){				
+			//if(calc_total_use() > treestore_max_mem_use){				
 				release_cache();
 				unload_cache();
 				reset_cache_locals();
-			}
+			//}
 		}
 		void reduce_tree_use(){
 			col.reduce_use();

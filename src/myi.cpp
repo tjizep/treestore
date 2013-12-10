@@ -230,7 +230,7 @@ namespace tree_stored{
 				)
 					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
 				
-				check_use();
+				
 				print_read_lookups();
 				
 				changed = false;
@@ -242,13 +242,40 @@ namespace tree_stored{
 			}
 		}
 		private:
-		void reduce_tables(){
+		void reduce_col_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				printf("reducing idle thread %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				printf("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second)
-						(*t).second->check_use();
+						(*t).second->reduce_use_collum_trees();
+					else
+						printf("table entry %s is NULL\n", (*t).first.c_str());
+				}
+			}
+
+		}
+
+		void reduce_index_trees(){
+			synchronized _s(p2_lock);
+			if(!locks){
+				printf("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+					if((*t).second)
+						(*t).second->reduce_use_indexes();
+					else
+						printf("table entry %s is NULL\n", (*t).first.c_str());
+				}
+			}
+
+		}
+		void reduce_col_caches(){
+			synchronized _s(p2_lock);
+			if(!locks){
+				printf("reducing idle thread collum caches %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+					if((*t).second)
+						(*t).second->reduce_use_collum_caches();
 					else
 						printf("table entry %s is NULL\n", (*t).first.c_str());
 				}
@@ -256,10 +283,22 @@ namespace tree_stored{
 
 		}
 		public:
-		void check_use(){
-			if(calc_total_use() > treestore_max_mem_use){				
-				DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));				
-				reduce_tables();	
+		void check_use_col_trees(){
+			if(calc_total_use() > treestore_max_mem_use){			
+								
+				reduce_col_trees();	
+			}
+		}
+		void check_use_col_caches(){
+			if(calc_total_use() > treestore_max_mem_use){			
+							
+				reduce_col_caches();	
+			}
+		}
+		void check_use_indexes(){
+			if(calc_total_use() > treestore_max_mem_use){			
+							
+				reduce_index_trees();	
 			}
 		}
 	};
@@ -319,20 +358,43 @@ public:
 		// return;
 		if(calc_total_use() > treestore_max_mem_use){
 			(*this).reduce();
-
+		
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			stored::reduce_all();
 
 		}
 	}
-
+private:
 	void reduce(){
 		NS_STORAGE::syncronized ul(tlock);
-		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if((*t)->get_locks()==0)/// this should ignore busy threads
-				(*t)->check_use();
+				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
+					(*t)->check_use_col_trees();
+		}
+		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
+			if((*t)->get_locks()==0)/// this should ignore busy threads
+				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
+					(*t)->check_use_col_trees();
+		}
+		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
+			if((*t)->get_locks()==0)/// this should ignore busy threads
+				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
+					(*t)->check_use_col_caches();
+		}
+		if(calc_total_use() > treestore_max_mem_use){
+			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+				
+				if ((*t)->get_created_tid() == Poco::Thread::currentTid()){
+					(*t)->check_use_col_trees();
+					(*t)->check_use_col_caches();
+					(*t)->check_use_indexes();
+					break;
+				}
+			}
 		}
 	}
+public:
 	void check_journal(){
 		nst::synchronized ss(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
