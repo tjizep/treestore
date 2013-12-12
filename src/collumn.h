@@ -932,8 +932,8 @@ namespace collums{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 14> BlobStored;
-	typedef stored::Blobule<true, 14> VarCharStored;
+	typedef stored::Blobule<false, 24> BlobStored;
+	typedef stored::Blobule<true, 24> VarCharStored;
 
 
 	class DynamicKey{
@@ -992,7 +992,7 @@ namespace collums{
 				return &(get_Data())[0];
 			return &buf[0];
 		}
-		inline nst::u8* _resize_buffer(_BufferSize nbytes){
+		inline nst::u8* _resize_buffer(size_t nbytes){
 
 			using namespace NS_STORAGE;
 
@@ -1000,7 +1000,7 @@ namespace collums{
 				bs = sizeof(_Data);
 				new (&get_Data()) _Data();
 			}else
-				bs = nbytes;
+				bs = (_BufferSize)nbytes;
 			if(bs==sizeof(_Data)){
 				if(get_Data().capacity() < nbytes){				
 					nst::i64 d = get_Data().capacity();
@@ -1432,10 +1432,9 @@ namespace collums{
 		typedef stx::btree_map<index_key, index_value, stored::abstracted_storage> _IndexMap;
 		typedef _IndexMap::iterator iterator_type;
 		typedef ImplIterator<_IndexMap> IndexIterator;
-
+		typedef std::vector<index_key> _KeyBuffer;
 		class IndexScanner : public Poco::Notification{
 		protected:
-
 
 			std::string name;
 			
@@ -1532,8 +1531,6 @@ namespace collums{
 
 		void scan(){
 
-
-
 		}
 
 		std::string get_name() const {
@@ -1565,10 +1562,26 @@ namespace collums{
 		IndexIterator find(const index_key& k){
 			return IndexIterator (index, index.find(k));
 		}
-
+		/// buffer for adding keys sorted
+		static const int MAX_KEY_BUFFER = 1024*1024*6;
+		_KeyBuffer buffer;
+		void flush_key_buffer(){
+		
+			std::sort(buffer.begin(), buffer.end());
+			for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
+				index.insert((*b),'0');
+			}
+			buffer.clear();
+		}
 		void add(const index_key& k, const index_value& v){
 			modified = true;
-			index.insert(k,'0');
+			if(buffer.empty()) 
+				buffer.reserve(MAX_KEY_BUFFER);
+			if(buffer.size() < MAX_KEY_BUFFER){
+				buffer.push_back(k);
+			}else{
+				flush_key_buffer();
+			}
 		}
 
 		void remove(const index_key& k){
@@ -1589,7 +1602,7 @@ namespace collums{
 
 		void rollback(){
 			if(modified){
-			
+				buffer.clear();
 				index.reduce_use();
 			
 				
@@ -1603,6 +1616,7 @@ namespace collums{
 				// this doesnt seem to work
 				// index.flush();
 				// !!! this seems to work
+				flush_key_buffer();
 				index.flush_buffers();
 				
 			}

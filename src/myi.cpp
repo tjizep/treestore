@@ -135,8 +135,8 @@ tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 // w.t.f.
 // The handlerton asks for extensions when the table defs are already destroyed 
 static _Extensions save_extensions;
-
 namespace tree_stored{
+	//ColAdderManager col_adder;
 
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	class tree_thread{
@@ -573,7 +573,7 @@ public:
 			stats.data_file_length = get_tree_table()->table_size();
 			stats.block_size = 4096;
 			stats.records = std::max<tree_stored::_Rid>(2, get_tree_table()->row_count());
-			stats.mean_rec_length = stats.data_file_length / stats.records;
+			stats.mean_rec_length =(ulong) stats.data_file_length / stats.records;
 
 		}
 		for (ulong	i = 0; i < table->s->keys; i++) {
@@ -609,7 +609,7 @@ public:
 	ulong index_flags(uint,uint,bool) const{
 		return ( HA_READ_ORDER|HA_READ_NEXT | HA_READ_RANGE | HA_READ_PREV ); //
 	}
-	uint max_supported_record_length() const { return HA_MAX_REC_LENGTH; }
+	uint max_supported_record_length() const { return HA_MAX_REC_LENGTH*8; }
 	uint max_supported_keys()          const { return MAX_KEY; }
 	uint max_supported_key_parts()     const { return MAX_REF_PARTS; }
 	uint max_supported_key_length()    const { return TREESTORE_MAX_KEY_LENGTH; }
@@ -1196,6 +1196,11 @@ static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 #include "Poco/Logger.h"
 #include "Poco/SimpleFileChannel.h"
 #include "Poco/AutoPtr.h"
+
+ColAdderManager & get_col_adder(){
+	static ColAdderManager _adder(4);
+	return _adder;
+}
 /// example code
 void initialize_loggers(){
 	using Poco::Logger;

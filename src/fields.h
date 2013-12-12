@@ -58,8 +58,8 @@ namespace NS_STORAGE = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
 namespace stored{
 
-	static const double	MB = 1024.0*1024.0;
-	static const double	GB = 1024*1024*1024;
+	static const double	MB = 1024.0f*1024.0f;
+	static const double	GB = 1024.0f*1024.0f*1024.0f;
 
 	inline double units(NS_STORAGE::u64 in, double unit){
 		return in / unit;

@@ -161,6 +161,18 @@ namespace asynchronous{
 			queue.enqueueNotification(note);
 
 		}
-
+		
+	};
+	class AbstractWorker : public Poco::Notification{
+	public:
+		AbstractWorker(){
+		}
+		void doTask(){
+			work();
+		}
+		virtual void work() = 0;
+		virtual ~AbstractWorker(){
+		}
+		typedef Poco::AutoPtr<AbstractWorker> Ptr;
 	};
 };

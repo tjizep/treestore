@@ -40,6 +40,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "system_timers.h"
 
 typedef std::vector<std::string> _FileNames;
+
+	
+typedef asynchronous::QueueManager<asynchronous::AbstractWorker> ColAdderManager;
+
+extern ColAdderManager & get_col_adder();
 namespace tree_stored{
 	class InvalidTablePointer : public std::exception{
 	public:
@@ -74,25 +79,85 @@ namespace tree_stored{
 		virtual void rollback() = 0;
 	};
 
+	
+
 	template <typename _Fieldt>
 	class my_collumn : public abstract_my_collumn{
 	protected:
 		typedef typename collums::collumn<_Fieldt> _Colt;
+		typedef std::vector<std::pair<_Rid,_Fieldt> > _RowBuffer;
 		_Colt col;
 		_Fieldt temp;
 		conversions convertor;
+		static const int MAX_BUFFERED_ROWS = 10000;
+		class ColAdder : public asynchronous::AbstractWorker{
+		protected:
+			_Colt &col;
+			Poco::AtomicCounter &workers_away;
+			_RowBuffer buffer;
+		public:
+			
+			ColAdder(_Colt &col,Poco::AtomicCounter &workers_away):workers_away(workers_away),col(col){
+			}
+			void add(_Rid r,const _Fieldt & val){
+				buffer.push_back(std::make_pair(r,val));
+			}
+			size_t size() const {
+				return buffer.size();
+			}
 
+			virtual void work(){
+				for(_RowBuffer::iterator r = buffer.begin(); r != buffer.end(); ++r){	
+					col.add((*r).first, (*r).second);
+				}
+				--workers_away;
+				buffer.clear();
+			}
+			virtual ~ColAdder(){
+				
+			}
+		};
+
+		ColAdder * worker;
+		Poco::AtomicCounter workers_away;
+		void wait_for_workers(){
+			#ifdef _MSC_VER
+			while (workers_away>0) Poco::Thread::__sleep(20);
+			#else
+			while (workers_away>0) Poco::Thread::sleep(20);
+			#endif
+		}
+		void add_worker(){
+			if(worker!=nullptr){	
+				if(worker->size() < MAX_BUFFERED_ROWS){
+					worker->work();
+					delete worker;
+				}else{
+					get_col_adder().add(worker);
+					++workers_away;
+				}
+				worker = nullptr;
+			}
+		}
 	public:
 
-		my_collumn(std::string name) : col(name){
+		my_collumn(std::string name) : col(name),worker(nullptr){
 
 		}
 		virtual ~my_collumn(){
+			wait_for_workers();
 		}
-
+		
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
-			col.add(row, temp);
+			if(worker == nullptr){
+				worker = new ColAdder(col,workers_away);
+			}
+			worker->add(row, temp);
+			if(worker->size() >= MAX_BUFFERED_ROWS){
+				add_worker();
+			}
+			
 		}
 
 		virtual void erase_row(collums::_Rid row){
@@ -151,6 +216,9 @@ namespace tree_stored{
 			col.flush();
 		}
 		virtual void commit1() {
+			add_worker();
+			
+			wait_for_workers();
 			col.commit1();
 		}
 
@@ -159,9 +227,15 @@ namespace tree_stored{
 		}
 
 		virtual void begin(bool read) {
+			wait_for_workers();
 			col.tx_begin(read);
 		}
 		virtual void rollback() {
+			if(worker!=nullptr){	
+				delete worker;
+				worker = nullptr;
+			}
+			wait_for_workers();
 			col.rollback();
 		}
 		virtual void reduce_col_use() {
