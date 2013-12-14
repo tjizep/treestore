@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.2 (beta)
+TuReestore MySQL Storage Engine version 0.25 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
@@ -20,7 +20,7 @@ Features
 + No NULL storage format i.e .no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
-
++ Multi threaded bulk loads - bulk loads are threaded for further performance gains
 
 Configuration
 -------------
@@ -66,7 +66,7 @@ TODO FOR GA 0.3
 ---------------
 
  1. Replication
- 2. Multi threaded writes
+ 2. DONE: Multi threaded writes
  
 TODO
 ----
