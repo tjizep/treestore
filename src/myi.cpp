@@ -1196,10 +1196,16 @@ static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 #include "Poco/Logger.h"
 #include "Poco/SimpleFileChannel.h"
 #include "Poco/AutoPtr.h"
-
-ColAdderManager & get_col_adder(){
-	static ColAdderManager _adder(4);
-	return _adder;
+namespace storage_workers{
+	unsigned int ctr = 0;
+	unsigned int get_next_counter(){
+		return ++ctr;
+	}
+	const int MAX_WORKER_MANAGERS = 4;
+	extern _WorkerManager & get_threads(unsigned int which){
+		static _WorkerManager _adders[MAX_WORKER_MANAGERS] = {1,1,1,1};
+		return _adders[which % MAX_WORKER_MANAGERS];
+	}
 }
 /// example code
 void initialize_loggers(){

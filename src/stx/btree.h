@@ -707,9 +707,9 @@ namespace stx
 
 			/// if the state is set to loaded and a valid wHere is set the proxy will change state to unloaded
 
-			void unload(){
+			void unload(bool release = true){
 				save(*get_context());
-				if((*this).get_state()==loaded && super::w){
+				if(release && (*this).get_state()==loaded && super::w){
 					unref();
 					get_context()->free_node(static_cast<_Loaded*>((*this).ptr),(*this).get_where());
 					(*this).ptr = NULL_REF;
@@ -717,14 +717,13 @@ namespace stx
 				}
 			}
 
-			void flush(btree & b)
+			void flush(btree & b,bool release = true)
 			{
 				(*this).context = &b;
 				(*this).save(b);
 				if((*this).ptr != NULL_REF && (*this).get_state() == loaded) {
 					update_links(static_cast<_Loaded*>(rget()));
-
-					unload();
+					unload(release);
 				}
 
 			}
@@ -3046,19 +3045,20 @@ namespace stx
 			this->last_surface.unload();
 
 			flush_recursive(flushed,root);
-			if(reduce){
-				typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
-				typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
-				_ToDelete td;
+			
+			typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
+			typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
+			_ToDelete td;
 
-				for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
-					td.push_back((*n));
-				}
-				for(typename _ToDelete::iterator t = td.begin(); t != td.end(); ++t){
-					typename node::ptr np = (*t).second;
-					np.set_where((*t).first);
-					np.flush(*this);
-				}
+			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+				td.push_back((*n));
+			}
+			for(typename _ToDelete::iterator t = td.begin(); t != td.end(); ++t){
+				typename node::ptr np = (*t).second;
+				np.set_where((*t).first);
+				np.flush(*this,reduce);
+			}
+			if(reduce){
 				if(shared.nodes != NULL){
 					nst::synchronized synched(shared.get_named_mutex());
 					typename _AddressedVersionNodes::iterator h;

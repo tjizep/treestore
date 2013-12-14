@@ -76,7 +76,11 @@ namespace tree_stored{
 		void begin(bool read){
 			index.begin(read);
 		}
-		
+
+		void commit1_asynch(){
+			index.commit1_asynch();
+		}
+
 		void commit1(){
 			index.commit1();
 		}

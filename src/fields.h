@@ -54,6 +54,15 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 #include "abstracted_storage.h"
 
+namespace storage_workers{
+	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
+	
+
+	extern unsigned int get_next_counter();
+	extern const int MAX_WORKER_MANAGERS;
+	extern _WorkerManager & get_threads(unsigned int id);
+};
+
 namespace NS_STORAGE = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
 namespace stored{
@@ -64,6 +73,7 @@ namespace stored{
 	inline double units(NS_STORAGE::u64 in, double unit){
 		return in / unit;
 	}
+
 	template<typename _IntType>
 	class IntTypeStored {
 	protected:

@@ -41,10 +41,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 typedef std::vector<std::string> _FileNames;
 
-	
-typedef asynchronous::QueueManager<asynchronous::AbstractWorker> ColAdderManager;
 
-extern ColAdderManager & get_col_adder();
 namespace tree_stored{
 	class InvalidTablePointer : public std::exception{
 	public:
@@ -74,6 +71,7 @@ namespace tree_stored{
 		virtual nst::u32 get_rows_per_key() = 0;
 		virtual void flush() = 0;
 		virtual void begin(bool read) = 0;
+		virtual void commit1_asynch() = 0;
 		virtual void commit1() = 0;
 		virtual void commit2() = 0;
 		virtual void rollback() = 0;
@@ -89,14 +87,27 @@ namespace tree_stored{
 		_Colt col;
 		_Fieldt temp;
 		conversions convertor;
+		unsigned int wid;
 		static const int MAX_BUFFERED_ROWS = 10000;
 		class ColAdder : public asynchronous::AbstractWorker{
 		protected:
 			_Colt &col;
 			Poco::AtomicCounter &workers_away;
 			_RowBuffer buffer;
+		protected:
+			void flush_data(){
+				if(!buffer.empty()){
+					for(_RowBuffer::iterator r = buffer.begin(); r != buffer.end(); ++r){	
+						col.add((*r).first, (*r).second);
+					}
+					col.flush2();
+					buffer.clear();
+				}
+			}
 		public:
-			
+			void clear(){
+				buffer.clear();
+			}
 			ColAdder(_Colt &col,Poco::AtomicCounter &workers_away):workers_away(workers_away),col(col){
 			}
 			void add(_Rid r,const _Fieldt & val){
@@ -107,33 +118,37 @@ namespace tree_stored{
 			}
 
 			virtual void work(){
-				for(_RowBuffer::iterator r = buffer.begin(); r != buffer.end(); ++r){	
-					col.add((*r).first, (*r).second);
-				}
+				flush_data();
 				--workers_away;
-				buffer.clear();
+				
 			}
 			virtual ~ColAdder(){
-				
+				flush_data();
 			}
 		};
 
 		ColAdder * worker;
 		Poco::AtomicCounter workers_away;
 		void wait_for_workers(){
+			destroy_worker();
 			#ifdef _MSC_VER
 			while (workers_away>0) Poco::Thread::__sleep(20);
 			#else
 			while (workers_away>0) Poco::Thread::sleep(20);
 			#endif
 		}
+		void destroy_worker(){
+			if(worker!=nullptr){	
+				worker->clear();
+				delete worker;
+			}
+		}
 		void add_worker(){
 			if(worker!=nullptr){	
-				if(worker->size() < MAX_BUFFERED_ROWS){
-					worker->work();
+				if(workers_away == 0 && worker->size() < MAX_BUFFERED_ROWS){				
 					delete worker;
 				}else{
-					get_col_adder().add(worker);
+					storage_workers::get_threads(wid).add(worker);
 					++workers_away;
 				}
 				worker = nullptr;
@@ -141,15 +156,22 @@ namespace tree_stored{
 		}
 	public:
 
-		my_collumn(std::string name) : col(name),worker(nullptr){
+		my_collumn(std::string name) 
+		:	col(name)
+		,	worker(nullptr)
+		,	wid(storage_workers::get_next_counter())
+		{
 
 		}
 		virtual ~my_collumn(){
+			
 			wait_for_workers();
+			
 		}
 		
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
+			//col.add(row, temp);
 			if(worker == nullptr){
 				worker = new ColAdder(col,workers_away);
 			}
@@ -215,10 +237,13 @@ namespace tree_stored{
 		virtual void flush() {
 			col.flush();
 		}
-		virtual void commit1() {
+		virtual void commit1_asynch() {
 			add_worker();
+		}
+		virtual void commit1() {
 			
 			wait_for_workers();
+			col.reduce_tree_use();
 			col.commit1();
 		}
 
@@ -231,10 +256,7 @@ namespace tree_stored{
 			col.tx_begin(read);
 		}
 		virtual void rollback() {
-			if(worker!=nullptr){	
-				delete worker;
-				worker = nullptr;
-			}
+			
 			wait_for_workers();
 			col.rollback();
 		}
@@ -545,6 +567,13 @@ namespace tree_stored{
 		}
 
 		void commit1(){
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
+				(*x)->commit1_asynch();
+			}
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->commit1_asynch();
+
+			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->commit1();
 			}

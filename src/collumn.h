@@ -599,7 +599,7 @@ namespace collums{
 				NS_STORAGE::synchronized slock(entry->lock);
 				if(entry != nullptr && entry->available)
 				{
-					if(entry->users==0){
+					if(entry->users == 0){
 						printf("releasing col cache %s\n", storage.get_name().c_str());
 						entry->unload();
 					};
@@ -837,6 +837,12 @@ namespace collums{
 				storage.commit();
 			}
 			modified = false;
+		}
+		void flush2(){
+			if(modified){
+				col.flush_buffers();
+				
+			}
 		}
 		void commit1(){
 			if(modified){
@@ -1433,13 +1439,14 @@ namespace collums{
 		typedef _IndexMap::iterator iterator_type;
 		typedef ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key> _KeyBuffer;
-		class IndexScanner : public Poco::Notification{
+		
+		class IndexScanner : public asynchronous::AbstractWorker
+		{
 		protected:
-
-			std::string name;
-			
+			std::string name;	
 		protected:
-			bool scan_index(){
+			bool scan_index()
+			{
 				stored::abstracted_storage storage(name);
 				storage.begin();
 				storage.set_transaction_r(true);
@@ -1460,90 +1467,162 @@ namespace collums{
 				storage.rollback();
 				return true;
 			}
+
+
 		public:
 			IndexScanner(std::string name)
 			:	name(name)
 			{
-
 			}
 
-			virtual void doTask(){
-
-				(*this).scan_index();
-
+			virtual void work()
+			{
+				scan_index();
 			}
 
-			virtual ~IndexScanner(){
-
+			virtual ~IndexScanner()
+			{
 			}
-		public:
-			typedef Poco::AutoPtr<IndexScanner> Ptr;
+	
 		};
 
-		typedef asynchronous::QueueManager<IndexScanner> IndexScannerManager;
+		class IndexLoader : public asynchronous::AbstractWorker
+		{
+		protected:
+			Poco::AtomicCounter &loaders_away;
+			_IndexMap &index;
+			_KeyBuffer buffer;
+			bool flush_keys;
+		public:
+			void flush_key_buffer(){
+				if(!buffer.empty()){
+					std::sort(buffer.begin(), buffer.end());
+				
+					for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
+						index.insert((*b),'0');
+					}
+					if(flush_keys){
+						index.flush_buffers();
+					}
+					buffer.clear();
+				}
+			}
+			
+		public:
+			static const int MAX_KEY_BUFFER = 3000000;
+			static const int MIN_KEY_BUFFER = 10000;
+			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away) 
+			:	loaders_away(loaders_away)
+			,	index(index)
+			,	flush_keys(true)
+			{
+			}
+			void clear(){
+				buffer.clear();
+			}
+			size_t size() const {
+				return buffer.size();
+			}
+			bool is_minimal() const {
+				return ((*this).size() < MIN_KEY_BUFFER);
+			}
+			
+			void set_flush()
+			{
+				(*this).flush_keys = true; 
+			}
 
-		IndexScannerManager &get_scanner(){
-			static IndexScannerManager scanner(1);
-			return scanner;
-		}
+			bool add(const index_key& k, const index_value& v)
+			{
+				if(buffer.empty()) 
+					buffer.reserve(MAX_KEY_BUFFER);
+				
+				buffer.push_back(k);			
+				
+				return buffer.size() < MAX_KEY_BUFFER;
+			}
+
+			virtual ~IndexLoader()
+			{
+				flush_key_buffer();
+			}
+
+			virtual void work(){
+				flush_key_buffer();
+				--loaders_away;
+			}
+		};
 	private:
-		_IndexMap index;
-		
+		_IndexMap index;		
 		_IndexMap::iterator the_end;
 		bool modified;
+		IndexLoader * loader;
+		Poco::AtomicCounter loaders_away;
+		unsigned int wid;
 	private:
-
+		void destroy_loader(){
+			if(loader != nullptr){
+				loader->clear();
+				delete loader;
+			}
+		}
+		void wait_for_loaders(){
+			destroy_loader();
+			#ifdef _MSC_VER
+			while (loaders_away>0) Poco::Thread::__sleep(20);
+			#else
+			while (loaders_away>0) Poco::Thread::sleep(20);
+			#endif
+		}
 	public:
 
 		col_index(std::string name)
 		:	storage(name)
-		,	index(storage)
-	
+		,	index(storage)	
 		,	modified(false)
+		,	loader(nullptr)
+		,	wid(storage_workers::get_next_counter())
 		{
 			using namespace NS_STORAGE;
-			//printf("sizeof(index_key):%lld\n",(u64)sizeof(index_key));
 			the_end = index.end();
 			index.share(name);
-
-			//get_scanner().add(new IndexScanner(storage.get_name()));
-
 		}
 
 		~col_index(){
+			wait_for_loaders();
 			storage.close();
 		}
+
 		void set_end(){
 			the_end = index.end();
 		}
 
 		void reduce_use(){
 			index.reduce_use();
-
 		}
+
 		void share(){
-
-			//index.share(storage.get_name());
 		}
-		void unshare(){
 
+		void unshare(){
 		}
 
 		void scan(){
-
 		}
 
 		std::string get_name() const {
 			return storage.get_name();
 		}
+		
 		IndexIterator first(){
 			return IndexIterator (index, index.begin());
 		}
+
 		void from_initializer(IndexIterator& out, const _IndexMap::iterator::initializer_pair& ip){
 			out.from_initializer(index, ip);
 		}
-		void lower_(IndexIterator& out,  const index_key& k){
 
+		void lower_(IndexIterator& out,  const index_key& k){
 			out.set(index.lower_bound(k),the_end,index);
 		}
 
@@ -1562,25 +1641,18 @@ namespace collums{
 		IndexIterator find(const index_key& k){
 			return IndexIterator (index, index.find(k));
 		}
-		/// buffer for adding keys sorted
-		static const int MAX_KEY_BUFFER = 1024*1024*6;
-		_KeyBuffer buffer;
-		void flush_key_buffer(){
 		
-			std::sort(buffer.begin(), buffer.end());
-			for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
-				index.insert((*b),'0');
-			}
-			buffer.clear();
-		}
 		void add(const index_key& k, const index_value& v){
 			modified = true;
-			if(buffer.empty()) 
-				buffer.reserve(MAX_KEY_BUFFER);
-			if(buffer.size() < MAX_KEY_BUFFER){
-				buffer.push_back(k);
-			}else{
-				flush_key_buffer();
+			//index.insert(k,'0');
+			if(loader==nullptr){
+				loader = new IndexLoader(index, loaders_away);
+			}
+			if(!loader->add(k,v)){
+				storage_workers::get_threads(wid).add(loader);
+				++loaders_away;
+			
+				loader = nullptr;
 			}
 		}
 
@@ -1594,30 +1666,38 @@ namespace collums{
 			index.flush();
 			set_end();
 		}
+
 		void begin(bool read){
 			stored::abstracted_tx_begin(read, storage, index);
 			set_end();
-
 		}
 
 		void rollback(){
 			if(modified){
-				buffer.clear();
+				wait_for_loaders();
 				index.reduce_use();
-			
 				
 			}
 			storage.rollback();
 			modified = false;
 		}
-
+		void commit1_asynch(){
+			if(loader){
+				if(loaders_away==0 && loader->is_minimal()){				
+					delete loader;
+				}else{
+					storage_workers::get_threads(wid).add(loader);
+					++loaders_away;
+				}
+				loader = nullptr;
+			}
+		}
 		void commit1(){
 			if(modified){
-				// this doesnt seem to work
-				// index.flush();
-				// !!! this seems to work
-				flush_key_buffer();
-				index.flush_buffers();
+				
+				wait_for_loaders();
+				
+				//index.flush_buffers();
 				
 			}
 		}
