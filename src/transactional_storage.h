@@ -978,10 +978,10 @@ namespace storage{
 
 			syncronized ul(lock);
 			if(references == 0){
-				if(_session!=nullptr && !transient){
+				/*if(_session!=nullptr && !transient){
 					(*this).begin_new();
 					(*this).commit();
-				}
+				}*/
 				if(_session!=nullptr){
 					if (!transient){
 						printf(" discarding storage %s\n",name.c_str());
