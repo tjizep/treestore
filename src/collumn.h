@@ -1336,7 +1336,7 @@ namespace collums{
 				rt = *rd;
 			}
 			if(rt != lt) 
-				return lt - rt; //total order on types first
+				return lt < rt; //total order on types first
 			if(r != 0) 
 				return r < 0;
 			if(size() != right.size())
@@ -1356,7 +1356,7 @@ namespace collums{
 		}
 
 		NS_STORAGE::u32 stored() const {
-			return NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row);
+			return (NS_STORAGE::u32)(NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row));
 		};
 
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
@@ -1568,7 +1568,7 @@ namespace collums{
 		}
 		void wait_for_loaders(){
 			destroy_loader();
-			os::zzzz(20);
+			while(loaders_away > 0) os::zzzz(20);
 			
 		}
 	public:
