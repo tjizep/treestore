@@ -131,11 +131,9 @@ namespace tree_stored{
 		Poco::AtomicCounter workers_away;
 		void wait_for_workers(){
 			destroy_worker();
-			#ifdef _MSC_VER
-			while (workers_away>0) Poco::Thread::__sleep(20);
-			#else
-			while (workers_away>0) Poco::Thread::sleep(20);
-			#endif
+			
+			while (workers_away>0) os::zzzz(20);
+			
 		}
 		void destroy_worker(){
 			if(worker!=nullptr){	
@@ -698,6 +696,7 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
+			get_table().reduce_use();
 		}
 
 		void reduce_use_collum_caches(){
@@ -1059,10 +1058,11 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				
+				bool rolling = false;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-					||	calc_total_use() > treestore_max_mem_use*0.8f
+					||	calc_total_use() > treestore_max_mem_use*0.7f
+					||  rolling
 				)
 					rollback();/// relieves the version load when new data is added to the collums
 			}

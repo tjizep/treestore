@@ -229,8 +229,7 @@ namespace tree_stored{
 				(	changed
 				)
 					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
-				
-				
+								
 				print_read_lookups();
 				
 				changed = false;
@@ -241,7 +240,7 @@ namespace tree_stored{
 					
 			}
 		}
-		private:
+		public:
 		void reduce_col_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
@@ -362,6 +361,16 @@ public:
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			stored::reduce_all();
 
+		}
+	}
+	void release_trees(){
+		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
+			if((*t)->get_locks()==0)/// this should ignore busy threads
+				if ((*t)->get_created_tid() != Poco::Thread::currentTid()){
+					(*t)->reduce_col_trees();
+					(*t)->reduce_index_trees();
+
+				}
 		}
 	}
 private:
@@ -728,11 +737,7 @@ public:
 			{
 				st.check_journal();
 				NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
-#ifdef _MSC_VER
-				Poco::Thread::__sleep(100);
-#else
-				Poco::Thread::sleep(100);
-#endif
+				os::zzzz(100);
 			}
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
@@ -750,9 +755,13 @@ public:
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
 			thread->release(table);
 			if(thread->get_locks()==0){
-				clear_thread(thd);
-				st.release_thread(thread);
+				//thread->reduce_index_trees();
+				//thread->reduce_col_trees();
 				clear_selection(selected);
+				
+				clear_thread(thd);
+				
+				st.release_thread(thread);
 				/// (*this).tt = 0;
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 				

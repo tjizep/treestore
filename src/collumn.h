@@ -454,7 +454,7 @@ namespace collums{
 
 			}
 		};
-		class ColLoader : public Poco::Notification{
+		class ColLoader : public  asynchronous::AbstractWorker{
 		protected:
 			std::string name;
 
@@ -555,26 +555,21 @@ namespace collums{
 
 			}
 
-			virtual void doTask(){
+			virtual void work(){
 				(*this).load_into_cache(col_size);
 
 			}
 			virtual ~ColLoader(){
 
 			}
-		public:
-			typedef Poco::AutoPtr<ColLoader> Ptr;
+		
 		};
 		typedef std::vector<char>    _Nulls;
 
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
-		typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
+		//typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
 		static const int MAX_THREADS = 1;
 
-		ColLoaderManager &get_loader(){
-			static ColLoaderManager loader(MAX_THREADS);
-			return loader;
-		}
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
 			return m;
@@ -628,10 +623,15 @@ namespace collums{
 
 			NS_STORAGE::synchronized slock(result->lock);
 			if(!result->loaded){
+				
 				result->loaded = true;
 				 //ColLoader l(name, result, col.size());
 				 //l.doTask();
-				get_loader().add(new ColLoader(name, result, col.size()));
+				
+				using namespace storage_workers;
+				
+				get_threads(get_next_counter()).add(new ColLoader(name, result, col.size()));
+				
 			}
 
 			return result;
@@ -694,7 +694,7 @@ namespace collums{
 		void release_cache(){
 			if(_cache != nullptr)
 			{
-				NS_STORAGE::synchronized slock(_cache->lock);
+				NS_STORAGE::synchronized crit(_cache->lock);
 				if(_cache != nullptr && _cache->available)
 				{
 					_cache->users--;
@@ -1568,11 +1568,8 @@ namespace collums{
 		}
 		void wait_for_loaders(){
 			destroy_loader();
-			#ifdef _MSC_VER
-			while (loaders_away>0) Poco::Thread::__sleep(20);
-			#else
-			while (loaders_away>0) Poco::Thread::sleep(20);
-			#endif
+			os::zzzz(20);
+			
 		}
 	public:
 
