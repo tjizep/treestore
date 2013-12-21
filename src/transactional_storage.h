@@ -905,7 +905,15 @@ namespace storage{
 			is_new = !df.exists();
 			if(!is_new){
 				get_session();
+				/// readahead io opt
+				/*for(nst::stream_address a= 1; a < next; a+=7){
+					nst::stream_address toget = a;
+					get_buffer(toget);
+					
+				}*/
+
 			}
+
 		}
 		virtual std::string get_name() const {
 			return (*this).name;
