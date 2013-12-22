@@ -41,6 +41,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+
+
 #include <stx/storage/types.h>
 #include <stx/storage/basic_storage.h>
 
@@ -59,8 +61,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/LogFile.h"
 #include "Poco/StringTokenizer.h"
 #include "Poco/Timestamp.h"
-#include <lz4.h>
-
+#include <Poco/BinaryWriter.h>
+#include <Poco/BinaryReader.h>
+#include <Poco/File.h>
 ///:sqlite_storage
 
 /// TODO: initialize 'next' to address of last block available
@@ -75,7 +78,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 namespace NS_STORAGE = stx::storage;
 namespace stx{
 namespace storage{
-
+	
 	extern void add_buffer_use(long long added);
 	extern void remove_buffer_use(long long removed);
 	
@@ -906,12 +909,8 @@ namespace storage{
 			if(!is_new){
 				get_session();
 				/// readahead io opt
-				/*for(nst::stream_address a= 1; a < next; a+=7){
-					nst::stream_address toget = a;
-					get_buffer(toget);
-					
-				}*/
-
+				os::read_ahead(get_storage_path() + name);
+				
 			}
 
 		}
