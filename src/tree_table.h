@@ -299,10 +299,10 @@ namespace tree_stored{
 		typedef stored::IntTypeStored<_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
-		struct shared_data{
+		struct shared_data{			
 			shared_data(){
-			}
-			nst::u64 last_write_lock_time;
+			}	
+			nst::u64 last_write_lock_time;			
 		};
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
@@ -482,7 +482,7 @@ namespace tree_stored{
 		_FileNames file_names;
 		_Rid _row_count;
 		int locks;
-
+		nst::u64 last_lock_time;	
 	public:
 
 
@@ -491,6 +491,7 @@ namespace tree_stored{
 		,	_row_count(0)
 		,	storage(table_arg->s->path.str)
 		,	table(nullptr)
+		,	last_lock_time(os::micros())
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -700,9 +701,12 @@ namespace tree_stored{
 		}
 
 		void reduce_use_collum_caches(){
+			/// reduce on table granularity
+			
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_cache_use();
 			}
+			
 		}
 
 		void check_use(){
@@ -1015,7 +1019,9 @@ namespace tree_stored{
 			out = indexes[ax]->index.find(temp);
 		}
 
-
+		nst::u64 get_last_lock_time() const {
+			return last_lock_time;
+		}
 		void init_rowcount(){
 			_TableMap::iterator t = get_table().end();
 			_row_count = 0;
@@ -1032,6 +1038,7 @@ namespace tree_stored{
 			changed = writer;
 			if(changed)
 				 (*this).share->last_write_lock_time = ::os::millis();
+			last_lock_time = os::micros();
 			begin(!changed);
 
 		}

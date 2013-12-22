@@ -144,6 +144,8 @@ namespace tree_stored{
 		int locks;
 		bool changed;
 		Poco::Thread::TID created_tid;
+		bool writing;
+
 	public:
 		int get_locks() const {
 			return locks;
@@ -202,7 +204,7 @@ namespace tree_stored{
 				}
 			}
 		}
-		bool writing;
+		
 		tree_table * lock(TABLE *table_arg, bool writer){
 			tree_table * result = NULL;
 			if(writer){
@@ -244,7 +246,7 @@ namespace tree_stored{
 		void reduce_col_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				printf("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				DBUG_PRINT("info","reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second)
 						(*t).second->reduce_use_collum_trees();
@@ -258,7 +260,7 @@ namespace tree_stored{
 		void reduce_index_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				printf("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				DBUG_PRINT("info","reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second)
 						(*t).second->reduce_use_indexes();
@@ -271,12 +273,25 @@ namespace tree_stored{
 		void reduce_col_caches(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				printf("reducing idle thread collum caches %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0));
+				DBUG_PRINT("info","reducing idle thread collum caches %.4g MiB\n",(double)calc_total_use()/(1024.0*1024.0));
+				typedef std::multimap<nst::u64, tree_stored::tree_table::ptr> _LastUsedTimes;
+				_LastUsedTimes lru;
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					if((*t).second)
-						(*t).second->reduce_use_collum_caches();
-					else
-						printf("table entry %s is NULL\n", (*t).first.c_str());
+					if((*t).second){
+						DBUG_PRINT("info","adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time());
+						lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
+					}else
+						DBUG_PRINT("info","table entry %s is NULL\n", (*t).first.c_str());
+				}
+				size_t full = lru.size();
+				size_t factor = (size_t)(lru.size() *0.75);
+				
+				for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end();++l){				
+					if(full > factor || calc_total_use() > treestore_max_mem_use){
+						
+						(*l).second->reduce_use_collum_caches();
+					}
+					--full;
 				}
 			}
 
@@ -395,8 +410,8 @@ private:
 			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 				
 				if ((*t)->get_created_tid() == Poco::Thread::currentTid()){
-					(*t)->check_use_col_trees();
 					(*t)->check_use_col_caches();
+					(*t)->check_use_col_trees();					
 					(*t)->check_use_indexes();
 					break;
 				}
