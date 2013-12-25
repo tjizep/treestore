@@ -11,6 +11,7 @@ Features
 + ACID Compliant through Multi version concurrency (READ COMMITTED isolation only)
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
++ Good write performance iunder transactional and bulk loads
 + B+ TREE indexes AND tables
 + variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
 + portable collumns
