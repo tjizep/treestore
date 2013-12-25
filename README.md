@@ -12,6 +12,8 @@ Features
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads
++ High read performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
+Technical
 + B+ TREE indexes AND tables
 + variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
 + portable collumns
@@ -20,7 +22,7 @@ Features
 + STL like internal data structures for index and collumn storage
 + No NULL storage format i.e .no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
-+ High performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
+
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 
 Configuration
