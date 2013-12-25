@@ -7,13 +7,18 @@ TuReestore MySQL Storage Engine version 0.25 (beta)
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
 
 Features
+--------
+
 + Collumn oriented
 + ACID Compliant through Multi version concurrency (READ COMMITTED isolation only)
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads
 + High read performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
+
 Technical
+---------
+
 + B+ TREE indexes AND tables
 + variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
 + portable collumns
@@ -22,17 +27,16 @@ Technical
 + STL like internal data structures for index and collumn storage
 + No NULL storage format i.e .no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
-
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 
 Configuration
 -------------
 
-+ treestore_mem_use
++ *treestore_mem_use*
 The mysql system variable treestore_mem_use can be used to limit the treestore memory use
-+ treestore_journal_lower_max
++ *treestore_journal_lower_max*
 Used to set lower limit at which the journal is merged back to collum storages
-+ treestore_journal_upper_max
++ *treestore_journal_upper_max*
 If the journal reaches this limit then no new transactions are started and the journal is merged back
 
 Building
