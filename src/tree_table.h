@@ -483,6 +483,7 @@ namespace tree_stored{
 		_Rid _row_count;
 		int locks;
 		nst::u64 last_lock_time;	
+		nst::u64 last_unlock_time;	
 	public:
 
 
@@ -492,6 +493,7 @@ namespace tree_stored{
 		,	storage(table_arg->s->path.str)
 		,	table(nullptr)
 		,	last_lock_time(os::micros())
+		,	last_unlock_time(os::micros())		
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1022,6 +1024,11 @@ namespace tree_stored{
 		nst::u64 get_last_lock_time() const {
 			return last_lock_time;
 		}
+
+		nst::u64 get_last_unlock_time() const {
+			return last_unlock_time;
+		}
+
 		void init_rowcount(){
 			_TableMap::iterator t = get_table().end();
 			_row_count = 0;
@@ -1042,7 +1049,9 @@ namespace tree_stored{
 			begin(!changed);
 
 		}
+		
 		static const nst::u64 READER_ROLLBACK_THRESHHOLD = 10000ll;/// in millis
+
 		private:
 			
 			
@@ -1073,7 +1082,9 @@ namespace tree_stored{
 				)
 					rollback();/// relieves the version load when new data is added to the collums
 			}
+			last_unlock_time = os::micros();
 		}
+
 		void write(TABLE* table){
 			check_load(table);
 			if(!changed)
@@ -1107,6 +1118,7 @@ namespace tree_stored{
 			}
 			_row_count++;
 		}
+
 		void erase(_Rid rid, TABLE* table){
 			check_load(table);
 			if(!changed)
@@ -1124,6 +1136,7 @@ namespace tree_stored{
 			}
 
 		}
+		
 		void write(_Rid rid, TABLE* table){
 			/// erase_row_index must be called before this function
 			check_load(table);
@@ -1152,6 +1165,7 @@ namespace tree_stored{
 			}
 
 		}
+		
 		void erase_row_index(_Rid rid){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
@@ -1163,6 +1177,7 @@ namespace tree_stored{
 				(*x)->index.remove(temp);
 			}
 		}
+		
 		_Rid row_count() const {
 			return get_table().size();
 		}

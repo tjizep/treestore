@@ -135,9 +135,9 @@ tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 // w.t.f.
 // The handlerton asks for extensions when the table defs are already destroyed 
 static _Extensions save_extensions;
-namespace tree_stored{
-	//ColAdderManager col_adder;
 
+namespace tree_stored{
+	
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	class tree_thread{
 	protected:
@@ -153,7 +153,7 @@ namespace tree_stored{
 		tree_thread() : locks(0),changed(false),writing(false){
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
-			DBUG_PRINT("info",(" *** Tree Store (eyore) memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
+			DBUG_PRINT("info",(" *** Tree Store (eyore) mem use configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
 		}
 		Poco::Thread::TID get_created_tid() const {
 			return (*this).created_tid;
@@ -163,7 +163,9 @@ namespace tree_stored{
 			DBUG_PRINT("info",("tree thread removed\n"));
 
 		}
+
 		_Tables tables;
+
 		void modify(){
 			changed = true;
 		}
@@ -187,6 +189,7 @@ namespace tree_stored{
 
 			return t;
 		}
+
 		void clear(){
 			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 				delete (*t).second;
@@ -194,6 +197,7 @@ namespace tree_stored{
 			printf("cleared %lld tables\n", (NS_STORAGE::lld)tables.size());
 			tables.clear();
 		}
+
 		void check_journal(){
 			if(get_treestore_journal_size() > treestore_journal_upper_max){
 				synchronized _s(p2_lock);
@@ -223,6 +227,7 @@ namespace tree_stored{
 			++locks;
 			return result;
 		}
+
 		void release(TABLE *table_arg){
 			bool writer = changed;
 			compose_table(table_arg)->unlock(&p2_lock);
@@ -243,6 +248,7 @@ namespace tree_stored{
 			}
 		}
 		public:
+
 		void reduce_col_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
@@ -268,8 +274,8 @@ namespace tree_stored{
 						printf("table entry %s is NULL\n", (*t).first.c_str());
 				}
 			}
-
 		}
+
 		void reduce_col_caches(){
 			synchronized _s(p2_lock);
 			if(!locks){
@@ -279,7 +285,7 @@ namespace tree_stored{
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second){
 						DBUG_PRINT("info","adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time());
-						lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
+						lru.insert(std::make_pair((*t).second->get_last_unlock_time(), (*t).second));
 					}else
 						DBUG_PRINT("info","table entry %s is NULL\n", (*t).first.c_str());
 				}
