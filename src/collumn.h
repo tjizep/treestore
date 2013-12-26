@@ -395,6 +395,7 @@ namespace collums{
 
 		};
 		typedef std::vector<_StoredEntry> _Cache;
+		
 		typedef std::vector<nst::u8> _Flags;
 		struct _CacheEntry{
 			_CacheEntry() : available(false), loaded(false),density(1),users(0){};
@@ -404,6 +405,7 @@ namespace collums{
 			}
 			bool available;
 			bool loaded;
+			
 			_Cache data;
 			_Flags flags;
 			void resize(nst::i64 size){
@@ -470,6 +472,7 @@ namespace collums{
 
 			_CacheEntry* cache;
 			size_t col_size;
+			bool lazy;
 			void calc_density(){
 				/// get a 5% sample
 				Density d;
@@ -513,54 +516,61 @@ namespace collums{
 				nst::u8 * flags = &(*cache).flags[0];
 				nst::u64 nulls = 0;
 				_Rid kv = 0;
-				for(c = col.begin(); c != e; ++c){
-					kv = c.key().get_value();
-					if(e != col.end()){
-						e = col.end();
+				if(lazy){
+					for(_Rid r = 0; r < cached; ++r){
+						flags[r] = F_INVALID;
+					}
+				}else{
+					for(c = col.begin(); c != e; ++c){
+						kv = c.key().get_value();
+						if(e != col.end()){
+							e = col.end();
 						
-						printf("tx bug 1 iterator should stop %s\n",storage.get_name().c_str());
-						break;
-					}
-					if(kv < ctr){
-						printf("tx bug 2 iterator should stop  %s\n",storage.get_name().c_str());
-						break;
-					}
-					if(cached <= kv){
-						e = col.end();
-						printf("tx bug 3 iterator should stop %s\n",storage.get_name().c_str());
-						break;
-					}
-					/// nullify the gaps
-					if((*cache).data.size() > kv){
-						if(kv > 0){
-							for(_Rid n = prev; n < kv-1; ++n){
-								(*cache).data[n].nullify(flags[n]);
-								++nulls;
+							printf("tx bug 1 iterator should stop %s\n",storage.get_name().c_str());
+							break;
+						}
+						if(kv < ctr){
+							printf("tx bug 2 iterator should stop  %s\n",storage.get_name().c_str());
+							break;
+						}
+						if(cached <= kv){
+							e = col.end();
+							printf("tx bug 3 iterator should stop %s\n",storage.get_name().c_str());
+							break;
+						}
+						/// nullify the gaps
+						if((*cache).data.size() > kv){
+							if(kv > 0){
+								for(_Rid n = prev; n < kv-1; ++n){
+									(*cache).data[n].nullify(flags[n]);
+									++nulls;
+								}
+							}
+							(*cache).data[kv] = c.data();
+							prev = kv;
+						}
+						ctr++;
+
+						if(cached > FACTOR){
+							if(ctr % ( cached/ FACTOR ) ==0){
+								if(calc_total_use() > treestore_max_mem_use){
+									col.reduce_use();
+								}							
 							}
 						}
-						(*cache).data[kv] = c.data();
-						prev = kv;
 					}
-					ctr++;
-
-					if(cached > FACTOR){
-						if(ctr % ( cached/ FACTOR ) ==0){
-							if(calc_total_use() > treestore_max_mem_use){
-								col.reduce_use();
-							}							
+					if(kv > 0){
+						for(_Rid n = prev; n < kv-1; ++n){
+							(*cache).data[n].nullify(flags[n]);
+							++nulls;
 						}
 					}
-				}
-				if(kv > 0){
-					for(_Rid n = prev; n < kv-1; ++n){
-						(*cache).data[n].nullify(flags[n]);
-						++nulls;
+				
+					if(nulls == 0){
+						nst::remove_col_use((*cache).calc_use());
+						(*cache).flags.swap(_Flags());
+						nst::add_col_use((*cache).calc_use());
 					}
-				}
-				if(nulls == 0){
-					nst::remove_col_use((*cache).calc_use());
-					(*cache).flags.swap(_Flags());
-					nst::add_col_use((*cache).calc_use());
 				}
 				col.reduce_use();
 				calc_density();
@@ -571,10 +581,11 @@ namespace collums{
 				return true;
 			}
 		public:
-			ColLoader(std::string name,_CacheEntry * cache, size_t col_size)
+			ColLoader(std::string name,_CacheEntry * cache, bool lax, size_t col_size)
 			:	name(name)
 			,	cache(cache)
 			,	col_size(col_size)
+			,	lazy(false)
 			{
 				cache->available = false;
 				cache->loaded = true;
@@ -628,7 +639,7 @@ namespace collums{
 			}
 
 		}
-		_CacheEntry* load_cache(std::string name, size_t col_size){
+		_CacheEntry* load_cache(std::string name, bool lazy, size_t col_size){
 			_CacheEntry * result = 0;
 
 
@@ -656,7 +667,7 @@ namespace collums{
 				
 				using namespace storage_workers;
 				
-				get_threads(get_next_counter()).add(new ColLoader(name, result, col.size()));
+				get_threads(get_next_counter()).add(new ColLoader(name, result, lazy, col.size()));
 				
 			}
 
@@ -664,9 +675,9 @@ namespace collums{
 		}
 	private:
 		_ColMap col;
+		typedef typename _ColMap::iterator _ColIter;
 		typename _ColMap::iterator cend;
 		typename _ColMap::iterator ival;
-		
 		_CacheEntry * _cache;
 		_Nulls * _nulls;
 		_StoredEntry * cache_r;
@@ -677,15 +688,17 @@ namespace collums{
 		_Rid rows;
 		nst::u32 rows_per_key;
 		bool modified;
+		bool lazy;
 		inline bool has_cache() const {
 			return _cache != nullptr && _cache->available;
 		}
 		void load_cache(){
+			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
 				if((calc_total_use()+col.size()*sizeof(_StoredEntry)) < treestore_max_mem_use){
 					
-					_cache = load_cache(storage.get_name(),col.size());
+					_cache = load_cache(storage.get_name(),lazy,col.size());
 				}
 			}
 		}
@@ -703,6 +716,7 @@ namespace collums{
 			cache_r = nullptr;
 			cache_f = nullptr;
 			_cache = nullptr;
+			ival = col.end();
 		}
 		void engage_cache(){
 			if(_cache != nullptr)
@@ -772,13 +786,16 @@ namespace collums{
 			}
 		}
 	public:
+		void set_lazy(bool dl){
+			(*this).lazy= dl;
+		}
 		_Rid get_rows() const {
 			return  (_Rid)col.size();
 		}
 
 
 		typedef ImplIterator<_ColMap> iterator_type;
-		collumn(std::string name)
+		collumn(std::string name, bool load = false)
 		:	storage(name)
 		,	col(storage)
 		
@@ -786,6 +803,7 @@ namespace collums{
 		,	_nulls(nullptr)
 		,	rows_per_key(0)
 		,	modified(false)
+		,	lazy(load)
 		{
 			rows = (_Rid)col.size();
 			
@@ -856,16 +874,18 @@ namespace collums{
 				}
 
 			}
-			
-
+		
 			ival = col.find(row);
-
-			if(ival != cend)
-			{
-				return ival.data();
+				
+			if(nullptr != cache_r && lazy){
 			}
-
-			return empty;
+			
+			if(ival == cend || ival.key().get_value() != row)
+			{
+				return empty;	
+			}
+			return ival.data();
+			
 		}
 		void flush(){
 			if(modified)

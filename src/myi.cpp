@@ -73,6 +73,7 @@ LONGLONG treestore_current_mem_use = 0;
 LONGLONG treestore_journal_lower_max = 0;
 LONGLONG treestore_journal_upper_max = 0;
 LONGLONG treestore_journal_size = 0;
+my_bool treestore_efficient_text = FALSE;
 
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
@@ -100,6 +101,12 @@ static MYSQL_SYSVAR_LONGLONG(current_mem_use, treestore_current_mem_use,
   PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
   "The current ammount of memory used by treestore",
   NULL, NULL, 128*1024*1024LL, 256*1024*1024LL, LONGLONG_MAX, 1024*1024L);
+
+static MYSQL_SYSVAR_BOOL(efficient_text, treestore_efficient_text,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "Uses more efficient in memory text, varchar and varbinary storage"
+  "Default is false",
+  NULL, NULL, FALSE);
 
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
@@ -1300,6 +1307,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(journal_size),
   MYSQL_SYSVAR(journal_lower_max),
   MYSQL_SYSVAR(journal_upper_max),
+  MYSQL_SYSVAR(efficient_text),
   NULL
 };
 

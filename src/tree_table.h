@@ -40,7 +40,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "system_timers.h"
 
 typedef std::vector<std::string> _FileNames;
-
+extern my_bool treestore_efficient_text;
 
 namespace tree_stored{
 	class InvalidTablePointer : public std::exception{
@@ -154,8 +154,8 @@ namespace tree_stored{
 		}
 	public:
 
-		my_collumn(std::string name) 
-		:	col(name)
+		my_collumn(std::string name, bool do_load) 
+		:	col(name, do_load)
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
 		{
@@ -328,65 +328,68 @@ namespace tree_stored{
 						// ERROR ??
 						break;
 					case HA_KEYTYPE_FLOAT:
-						cols[(*field)->field_index] = new my_collumn<FloatStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<FloatStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_DOUBLE:
-						cols[(*field)->field_index] = new my_collumn<DoubleStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<DoubleStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_SHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<ShortStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<ShortStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_LONG_INT:
-						cols[(*field)->field_index] = new my_collumn<IntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<IntStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_USHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<UShortStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<UShortStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_ULONG_INT:
-						cols[(*field)->field_index] = new my_collumn<ULongIntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_LONGLONG:
-						cols[(*field)->field_index] = new my_collumn<LongIntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<LongIntStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_ULONGLONG:
-						cols[(*field)->field_index] = new my_collumn<ULongIntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<ULongIntStored>(path+TABLE_SEP()+(*field)->field_name, false);
 						break;
 					case HA_KEYTYPE_INT24:
-						cols[(*field)->field_index] = new my_collumn<IntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<IntStored>(path+TABLE_SEP()+(*field)->field_name, false);
 						break;
 					case HA_KEYTYPE_UINT24:
-						cols[(*field)->field_index] = new my_collumn<UIntStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<UIntStored>(path+TABLE_SEP()+(*field)->field_name, false);
 						break;
 					case HA_KEYTYPE_INT8:
-						cols[(*field)->field_index] = new my_collumn<CharStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<CharStored>(path+TABLE_SEP()+(*field)->field_name,false);
 						break;
 					case HA_KEYTYPE_BIT:
-						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name,false);
 
 						break;
 
 					case HA_KEYTYPE_NUM:			/* Not packed num with pre-space */
 					case HA_KEYTYPE_TEXT:			/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<VarCharStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<VarCharStored>(path+TABLE_SEP()+(*field)->field_name,treestore_efficient_text);
 						break;
 
 					case HA_KEYTYPE_BINARY:			/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name,treestore_efficient_text);
 						break;
 					/* Varchar (0-255 bytes) with length packed with 1 byte */
 					case HA_KEYTYPE_VARTEXT1:               /* Key is sorted as letters */
 					/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARTEXT2:		/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<VarCharStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<VarCharStored>(path+TABLE_SEP()+(*field)->field_name,treestore_efficient_text);
 						break;
 					case HA_KEYTYPE_VARBINARY1:             /* Key is sorted as unsigned chars length packed with 1 byte*/
 						/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARBINARY2:		/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name);
+						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name,treestore_efficient_text);
 						break;
 
 					default:
 						//TODO: ERROR ??
+						/// default to var bin
+						cols[(*field)->field_index] = new my_collumn<BlobStored>(path+TABLE_SEP()+(*field)->field_name,treestore_efficient_text);
+						
 						break; //do nothing pass
 				}//switch
 
@@ -1074,7 +1077,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				bool rolling = true;
+				bool rolling = false;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use*0.7f

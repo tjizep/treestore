@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.25 (beta)
+TuReestore MySQL Storage Engine version 0.26 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
@@ -38,6 +38,9 @@ The mysql system variable treestore_mem_use can be used to limit the treestore m
 Used to set lower limit at which the journal is merged back to collum storages
 + *treestore_journal_upper_max*
 If the journal reaches this limit then no new transactions are started and the journal is merged back
++ *treestore_efficient_text*
+Defaults to FALSE. If set to TRUE treestore will use much less memory (usually half) at the expense of performance. 
+Experiment your milage may vary
 
 Building
 --------
