@@ -699,6 +699,8 @@ namespace tree_stored{
 		}
 
 		void reduce_use_collum_trees(){
+			if(!locks)
+				rollback();
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
@@ -1077,7 +1079,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				bool rolling = true;
+				bool rolling = false;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use*0.7f

@@ -311,10 +311,10 @@ namespace tree_stored{
 		}
 		public:
 		void check_use_col_trees(){
-			if(calc_total_use() > treestore_max_mem_use){			
+			//if(calc_total_use() > treestore_max_mem_use){			
 								
 				reduce_col_trees();	
-			}
+			//}
 		}
 		void check_use_col_caches(){
 			if(calc_total_use() > treestore_max_mem_use){			
@@ -385,6 +385,8 @@ public:
 		// return;
 		if(calc_total_use() > treestore_max_mem_use){
 			(*this).reduce();
+		}
+		if(calc_total_use() > treestore_max_mem_use){
 		
 			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			stored::reduce_all();

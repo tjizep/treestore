@@ -99,7 +99,7 @@ namespace tree_stored{
 		}
 		
 		void clear_cache(){
-			
+			index.reduce_use();
 		}
 		void reduce_cache(){
 			
