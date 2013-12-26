@@ -155,6 +155,10 @@ namespace tree_stored{
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
+			if(calc_total_use() > (nst::u64)treestore_max_mem_use){
+				clear();
+				return;
+			}
 			if(!enabled) return;
 			if(iter.invalid()) return;
 			stx::storage::syncronized ul((*this).plock);
