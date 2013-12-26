@@ -999,8 +999,8 @@ namespace collums{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 24> BlobStored;
-	typedef stored::Blobule<true, 24> VarCharStored;
+	typedef stored::Blobule<false, 12> BlobStored;
+	typedef stored::Blobule<true, 12> VarCharStored;
 
 
 	class DynamicKey{
