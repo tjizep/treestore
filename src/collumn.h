@@ -489,7 +489,7 @@ namespace collums{
 				_ColMap col(storage);
 
 
-				col.share(storage.get_name());
+				//col.share(storage.get_name());
 				//col.reload();
 				_Rid ctr = 0;
 				
@@ -572,9 +572,11 @@ namespace collums{
 						nst::add_col_use((*cache).calc_use());
 					}
 				}
-				col.reduce_use();
 				calc_density();
 				storage.rollback();
+				
+				col.reduce_use();
+				
 				cache->available = true;
 
 
@@ -662,8 +664,8 @@ namespace collums{
 			if(!result->loaded){
 				
 				result->loaded = true;
-				 //ColLoader l(name, result, col.size());
-				 //l.doTask();
+				 //ColLoader l(name, result, lazy, col.size());
+				// l.doTask();
 				
 				using namespace storage_workers;
 				
@@ -693,6 +695,7 @@ namespace collums{
 			return _cache != nullptr && _cache->available;
 		}
 		void load_cache(){
+			
 			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
@@ -1513,7 +1516,7 @@ namespace collums{
 				storage.set_transaction_r(true);
 
 				_IndexMap index(storage);
-				index.share(storage.get_name());
+				//index.share(storage.get_name());
 
 				iterator_type s = index.begin();
 				iterator_type e = index.end();

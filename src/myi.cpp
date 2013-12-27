@@ -291,20 +291,16 @@ namespace tree_stored{
 				_LastUsedTimes lru;
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second){
-						DBUG_PRINT("info", ("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time()));
+						printf("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time());
 						lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
 					}else
 						DBUG_PRINT("info", ("table entry %s is NULL\n", (*t).first.c_str()));
 				}
-				size_t full = lru.size();
-				size_t factor = (size_t)(lru.size() *0.55);
-				
-				for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end();++l){				
-					if(full > factor || calc_total_use() > treestore_max_mem_use){
-						
-						(*l).second->reduce_use_collum_caches();
-					}
-					--full;
+				size_t pos = 0;
+				size_t factor =0;// (size_t)(lru.size() *0.55);
+				for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end() && pos < factor;++l,++pos){				
+					(*l).second->reduce_use_collum_caches();				
+
 				}
 			}
 
@@ -317,16 +313,16 @@ namespace tree_stored{
 			//}
 		}
 		void check_use_col_caches(){
-			if(calc_total_use() > treestore_max_mem_use){			
+			//if(calc_total_use() > treestore_max_mem_use){			
 							
 				reduce_col_caches();	
-			}
+			//}
 		}
 		void check_use_indexes(){
-			if(calc_total_use() > treestore_max_mem_use){			
+			//if(calc_total_use() > treestore_max_mem_use){			
 							
 				reduce_index_trees();	
-			}
+			//}
 		}
 	};
 }
@@ -386,12 +382,10 @@ public:
 		if(calc_total_use() > treestore_max_mem_use){
 			(*this).reduce();
 		}
-		if(calc_total_use() > treestore_max_mem_use){
 		
-			DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-			stored::reduce_all();
-
-		}
+	}
+	void reduce_all(){
+		(*this).reduce();
 	}
 	void release_trees(){
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
@@ -421,7 +415,7 @@ private:
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
 					(*t)->check_use_col_caches();
 		}
-		if(calc_total_use() > treestore_max_mem_use){
+		//if(calc_total_use() > treestore_max_mem_use){
 			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 				
 				if ((*t)->get_created_tid() == Poco::Thread::currentTid()){					
@@ -431,7 +425,7 @@ private:
 					break;
 				}
 			}
-		}
+		//}
 	}
 public:
 	void check_journal(){
@@ -793,6 +787,24 @@ public:
 				
 				st.release_thread(thread);
 				/// (*this).tt = 0;
+				st.check_use();
+				/// for testing
+				//st.reduce_all();
+				if(calc_total_use() > treestore_max_mem_use){
+		
+					DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+					stored::reduce_all();
+
+				}
+				printf
+				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+				,	"transaction complete"
+				,	(double)calc_total_use()/MB
+				,	(double)nst::buffer_use/MB
+				,	(double)nst::col_use/MB
+				,	(double)btree_totl_used/MB
+				,	(double)total_cache_size/MB
+				);
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 				
 			}
@@ -1240,9 +1252,9 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 4;
+	const int MAX_WORKER_MANAGERS = 3;
 	extern _WorkerManager & get_threads(unsigned int which){
-		static _WorkerManager _adders[MAX_WORKER_MANAGERS] = {1,1,1,1};
+		static _WorkerManager _adders[MAX_WORKER_MANAGERS] = {1,1,1};
 		return _adders[which % MAX_WORKER_MANAGERS];
 	}
 }
