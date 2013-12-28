@@ -13,8 +13,8 @@ Features
 + ACID Compliant through Multi version concurrency (READ COMMITTED isolation only)
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
-+ Good write performance under transactional and bulk loads
-+ High read performance - always more than 200% performance on tpc-h (HammerDB) and more, much moar when running from cold cache
++ Good write performance under transactional and bulk loads, similar or exceeding row databases
++ High read performance - average increase of 200% performance on tpc-h (HammerDB) and more when running from cold cache
 
 Technical
 ---------
@@ -25,7 +25,7 @@ Technical
 + 2 Level CPU Cache Aware Predictive Hash Table for unique index optimization
 + Simple and easy to change code base
 + STL like internal data structures for index and collumn storage
-+ No NULL storage format i.e .no extra bit for NULL values
++ No NULL storage format i.e no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 
@@ -68,7 +68,7 @@ Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
 + Treestore 32 secs
 
-Results (cold start +-30% variance)
+Results (cold start 30 % variance)
 + InnoDB 660 secs
 + TuReestore 180 secs
 

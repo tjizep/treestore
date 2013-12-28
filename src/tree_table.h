@@ -1079,7 +1079,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				bool rolling = true;
+				bool rolling = false;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use*0.7f
