@@ -48,52 +48,143 @@ namespace tree_stored{
 
 
 	//typedef ColIndex::index_key CompositeStored;
+	
 	class conversions{
 	public:
+		
+		typedef std::vector<_Rid> _DataMapper;
+		typedef std::vector<uchar> _Data;
+
 		enum{
 			f_use_var_header = 1
 		};
-		std::string temp_data;
+	private:
+		static const nst::u64 MAX_CONVERT_CACHE = 1024*1024*128;
 		String  attribute;
 		String *r;
-		conversions() : attribute(32768) {
-			temp_data.resize(32768);
-			attribute.set_charset(system_charset_info);
-			//attr = new String(&temp_data[0], (uint32)temp_data.size(), system_charset_info);
+		_Rid row_count;
+		_Rid * mapped;
+		uchar * daata;
+
+		_DataMapper mapper;		
+		_Data data;
+	private:
+		void set_row_count(_Rid row_count){
+			(*this).row_count = row_count; 
+			
 		}
+		inline bool mapped_to_field(_Rid row, Field * f) const {
+			return false;
+			/// this is experimental code to cache converted values : does not work yet
+			if(nullptr != mapped && row < row_count){
+				_Rid m = mapped[row];
+				if(m){
+					uchar * p = &daata[m-1];
+					f->ptr = p;
+					return true;
+				}
+
+			}
+			return false;
+		}
+		void append_field(Field * f, _Rid row ){
+			return;
+			/// this is experimental code to cache converted values : does not work yet
+			if(row > 0ul){
+				grow_row(row);
+				size_t s = data.size();
+				uint32 dl = f->data_length();
+				if(s+dl < MAX_CONVERT_CACHE){
+					data.resize(dl+s);
+					daata = &data[0];
+					memcpy(&data[s], f->ptr, dl);
+					mapped[row] = s+1;
+				}
+			}
+		}
+	public:	
+		conversions() : attribute(32768),row_count(0),mapped(nullptr),daata(nullptr) {
+			attribute.set_charset(system_charset_info);
+		}
+		
 		~conversions(){
 		}
-		inline void fset(Field * f, const FloatStored &fs){
+		
+		void grow_row(_Rid row){
+			return;
+			if(row_count <= row){
+				if(data.capacity() < MAX_CONVERT_CACHE)
+					data.reserve(MAX_CONVERT_CACHE);
+				set_row_count(row);
+				mapper.resize(row_count);
+				mapped = &mapper[0];
+			}
+		}
+		
+		
+
+		/// setters ts->mysql
+		void fset(_Rid row, Field * f, const FloatStored &fs){
+			if(mapped_to_field(row, f)) return;
 			f->store(fs.get_value());
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const DoubleStored &ds){
+		
+		void fset(_Rid row, Field * f, const DoubleStored &ds){
+			if(!mapped_to_field(row, f))
 			f->store(ds.get_value());
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const ShortStored& s){
+		
+		void fset(_Rid row, Field * f, const ShortStored& s){
+			if(mapped_to_field(row, f)) return;
 			f->store(s.get_value(),false);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const UShortStored& us){
+		
+		void fset(_Rid row, Field * f, const UShortStored& us){
+			if(mapped_to_field(row, f)) return;
 			f->store(us.get_value(),true);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const CharStored& c){
+
+		void fset(_Rid row, Field * f, const CharStored& c){
+			if(mapped_to_field(row, f)) return;
 			f->store(c.get_value(),false);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const UCharStored& uc ){
+
+		void fset(_Rid row, Field * f, const UCharStored& uc ){
+			if(mapped_to_field(row, f)) return;
 			f->store(uc.get_value());
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const IntStored& i){
-			f->store(i.get_value(),false);
+
+		void fset(_Rid row, Field * f, const IntStored& i){
+			if(mapped_to_field(row, f)) return;
+				f->store(i.get_value(),false);
 		}
-		inline void fset(Field * f, const UIntStored& ui){
+
+		void fset(_Rid row, Field * f, const UIntStored& ui){
+			if(mapped_to_field(row, f)) return;
 			f->store(ui.get_value(),true);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const LongIntStored& li){
+
+		void fset(_Rid row, Field * f, const LongIntStored& li){
+			if(mapped_to_field(row, f)) return;
 			f->store(li.get_value(),false);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const ULongIntStored& uli){
+		
+		void fset(_Rid row, Field * f, const ULongIntStored& uli){
+			if(mapped_to_field(row, f)) return;
 			f->store(uli.get_value(),true);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const BlobStored& b){
+		
+		void fset(_Rid row, Field * f, const BlobStored& b){
+			if(mapped_to_field(row, f)) return;
 			char * ptr = (char *)f->ptr;
 			if(f->type() == MYSQL_TYPE_VARCHAR){
 				Field_varstring * fv = (Field_varstring*)f;
@@ -108,8 +199,11 @@ namespace tree_stored{
 				else
 					int2store(ptr, cl);
 			}else f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
+			append_field(f, row);
 		}
-		inline void fset(Field * f, const VarCharStored& b){
+		
+		void fset(_Rid row, Field * f, const VarCharStored& b){
+			if(mapped_to_field(row, f)) return;
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
 			if(et == MYSQL_TYPE_VARCHAR){
@@ -136,7 +230,9 @@ namespace tree_stored{
 				}
 
 			}else f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
+			append_field(f, row);
 		}
+		/// getters mysql->ts
 		inline void fget(FloatStored &fs, Field * f, const uchar*, uint flags){
 			fs.set_value((float)f->val_real());
 		}
@@ -192,7 +288,8 @@ namespace tree_stored{
 			b.setterm(r->ptr(),r->length());//
 		}
 
-		/// direct getters
+		/// direct getters into the composite type for indexes
+
 		inline void fadd(CompositeStored& to, FloatStored &fs, Field * f, const uchar*, uint flags){
 			to.addf4((float)f->val_real());
 

@@ -691,10 +691,13 @@ namespace collums{
 		nst::u32 rows_per_key;
 		bool modified;
 		bool lazy;
+		
 		inline bool has_cache() const {
 			return _cache != nullptr && _cache->available;
 		}
+
 		void load_cache(){
+		
 			
 			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){

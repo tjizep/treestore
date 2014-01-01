@@ -87,7 +87,7 @@ namespace tree_stored{
 		_Colt col;
 		_Fieldt temp;
 		conversions convertor;
-		unsigned int wid;
+		unsigned int wid;/// worker id for table loading
 		static const int MAX_BUFFERED_ROWS = 10000;
 		class ColAdder : public asynchronous::AbstractWorker{
 		protected:
@@ -159,7 +159,7 @@ namespace tree_stored{
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
 		{
-
+			convertor.grow_row(col.get_rows());
 		}
 		virtual ~my_collumn(){
 			
@@ -210,7 +210,8 @@ namespace tree_stored{
 		virtual bool equal(_Rid row, Field* f){
 			convertor.fget(temp, f, NULL, 0);
 			const _Fieldt& t = col.seek_by_cache(row);
-			if(col.is_null(t)) return false;
+			if(col.is_null(t))
+				return f->is_null();
 			return (t==temp);
 		}
 
@@ -220,7 +221,7 @@ namespace tree_stored{
 				f->set_null();
 			}else{
 				f->set_notnull();
-				convertor.fset(f, t);
+				convertor.fset(row, f, t);
 			}
 		}
 
@@ -272,12 +273,14 @@ namespace tree_stored{
 		selection_tuple()
 		:	col(NULL)
 		,	field(NULL)
+		,	saved_ptr(NULL)
 		{
 		}
 
 		selection_tuple(const selection_tuple& right)
 		:	col(NULL)
 		,	field(NULL)
+		,	saved_ptr(NULL)
 		{
 			*this = right;
 		}
@@ -285,9 +288,22 @@ namespace tree_stored{
 		selection_tuple& operator=(const selection_tuple& right){
 			col = right.col;
 			field = right.field;
-
+			saved_ptr = right.saved_ptr;
 			return *this;
 		}
+
+		void save_ptr(){
+			saved_ptr = NULL;
+			if(field != NULL)
+				saved_ptr = field->ptr;
+		}
+
+		void restore_ptr(){
+			if(field != NULL)
+				field->ptr = saved_ptr;
+
+		}
+		uchar * saved_ptr;
 		abstract_my_collumn * col;
 		Field * field;
 
@@ -1219,7 +1235,7 @@ namespace tree_stored{
 					selection.field = (*field);
 					//selection.iter = selection.col->create_iterator(selection.col->stored_rows());
 					//selection.iter->set_by_cache();
-
+					selection.save_ptr();
 					r.push_back(selection);
 
 				}

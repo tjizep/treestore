@@ -11,7 +11,7 @@ namespace os{
 	inline void read_ahead(std::string name){
 		std::ifstream data_istr(name, std::ios::binary);
 		Poco::BinaryReader reader(data_istr);
-		char buffer[4096];
+		char buffer[16384];
 		Poco::UInt64 bc = 0;
 		while(reader.good()){
 			reader.readRaw(buffer,sizeof(buffer));

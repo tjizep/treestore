@@ -41,6 +41,7 @@ If the journal reaches this limit then no new transactions are started and the j
 + **treestore_efficient_text**
 Defaults to FALSE. If set to TRUE treestore will use much less memory (usually half) at the expense of performance. 
 Experiment - your milage may vary
++ **treestore_current_mem_use** can be queried to retrieve the current treestore memory use
 
 Building
 --------

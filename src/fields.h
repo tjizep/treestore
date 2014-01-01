@@ -222,6 +222,7 @@ namespace stored{
 	template<bool CHAR_LIKE, int _ConstSize = 16>
 	class Blobule {
 	public:
+		
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
 	protected:
 		typedef NS_STORAGE::u8 _size_type;

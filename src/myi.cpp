@@ -530,7 +530,9 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-
+		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
+			(*s).restore_ptr();		
+		}
 		selected.clear();
 	}
 
