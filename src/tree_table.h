@@ -159,7 +159,7 @@ namespace tree_stored{
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
 		{
-			convertor.grow_row(col.get_rows());
+		
 		}
 		virtual ~my_collumn(){
 			

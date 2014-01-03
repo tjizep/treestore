@@ -51,19 +51,28 @@ namespace tree_stored{
 	
 	class conversions{
 	public:
-		
-		typedef std::vector<_Rid> _DataMapper;
+		typedef _Rid _StorageType;
+		static const _StorageType INVALID_STORAGE = (_StorageType)-1;
+		struct _RowLength{
+			_RowLength() : length(0), storage(INVALID_STORAGE){
+
+			}
+			nst::u16 length;
+			_StorageType storage;
+		};
+		typedef std::vector<_RowLength> _DataMapper;
 		typedef std::vector<uchar> _Data;
 
 		enum{
 			f_use_var_header = 1
 		};
 	private:
-		static const nst::u64 MAX_CONVERT_CACHE = 1024*1024*128;
+		static const bool _CONVERSION_CACHE_ = true;
+		static const nst::u64 MAX_CONVERT_CACHE = 1024*1024*64;
 		String  attribute;
 		String *r;
 		_Rid row_count;
-		_Rid * mapped;
+		_RowLength * mapped;
 		uchar * daata;
 
 		_DataMapper mapper;		
@@ -73,32 +82,76 @@ namespace tree_stored{
 			(*this).row_count = row_count; 
 			
 		}
-		inline bool mapped_to_field(_Rid row, Field * f) const {
-			return false;
-			/// this is experimental code to cache converted values : does not work yet
-			if(nullptr != mapped && row < row_count){
-				_Rid m = mapped[row];
-				if(m){
-					uchar * p = &daata[m-1];
-					f->ptr = p;
-					return true;
-				}
+		void map_to_field(const _RowLength& m, Field_new_decimal * f) const {
+			uchar * p = &daata[m.storage];
+			f->bin_size = m.length;
+			//f->ptr = p;
+			memcpy(f->ptr, p, m.length);
+		}
 
+		void map_to_field(const _RowLength& m, Field_long * f) const {
+			uchar * p = &daata[m.storage];
+			
+			memcpy(f->ptr, p, m.length);
+		}
+
+		template<typename _MyFieldType>
+		bool mapped_to_field(_Rid row, _MyFieldType * f) const {
+			if(_CONVERSION_CACHE_){
+				/// this is experimental code to cache converted values : does not work yet
+				if(nullptr != mapped && row < row_count){
+					
+					_RowLength m = mapped[row];
+					if(m.storage != INVALID_STORAGE ){
+						map_to_field(m, f);
+						
+						return true;
+					}
+
+				}
+				
 			}
 			return false;
 		}
-		void append_field(Field * f, _Rid row ){
-			return;
-			/// this is experimental code to cache converted values : does not work yet
-			if(row > 0ul){
-				grow_row(row);
-				size_t s = data.size();
-				uint32 dl = f->data_length();
-				if(s+dl < MAX_CONVERT_CACHE){
-					data.resize(dl+s);
-					daata = &data[0];
-					memcpy(&data[s], f->ptr, dl);
-					mapped[row] = s+1;
+		
+		void append_field(Field_long * f, _Rid row ){
+			if(_CONVERSION_CACHE_){
+				/// this is experimental code to cache converted values : does not work yet
+				if(row > 0ul){
+					grow_row(row);
+					size_t s = data.size();
+					uint32 dl = f->data_length();
+					if(s+dl < data.capacity()){
+
+						data.resize(dl+s);
+						daata = &data[0];
+						memcpy(&data[s], f->ptr, dl);
+						_RowLength rl;
+						rl.length = dl;
+						rl.storage = s;
+						mapped[row] = rl;
+					}
+				}
+			}
+		}
+
+		void append_field(Field_new_decimal * f, _Rid row ){
+			if(_CONVERSION_CACHE_){
+				/// this is experimental code to cache converted values : does not work yet
+				if(row > 0ul){
+					grow_row(row);
+					size_t s = data.size();
+					uint32 dl = f->bin_size;
+					if(s+dl < data.capacity()){
+
+						data.resize(dl+s);
+						daata = &data[0];
+						memcpy(&data[s], f->ptr, dl);
+						_RowLength rl;
+						rl.length = dl;
+						rl.storage = s;
+						mapped[row] = rl;
+					}
 				}
 			}
 		}
@@ -111,80 +164,88 @@ namespace tree_stored{
 		}
 		
 		void grow_row(_Rid row){
-			return;
-			if(row_count <= row){
-				if(data.capacity() < MAX_CONVERT_CACHE)
-					data.reserve(MAX_CONVERT_CACHE);
-				set_row_count(row);
-				mapper.resize(row_count);
-				mapped = &mapper[0];
+			if(_CONVERSION_CACHE_){
+				if(row_count <= row){
+					if(data.capacity() < MAX_CONVERT_CACHE)
+						data.reserve(MAX_CONVERT_CACHE);
+					set_row_count(row);
+					if(mapper.size() < row_count+1){
+						mapper.resize(row_count*2+1);
+						mapped = &mapper[0];
+					}
+				}
 			}
 		}
 		
 		
 
 		/// setters ts->mysql
+		
 		void fset(_Rid row, Field * f, const FloatStored &fs){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(fs.get_value());
-			append_field(f, row);
+			
 		}
 		
 		void fset(_Rid row, Field * f, const DoubleStored &ds){
-			if(!mapped_to_field(row, f))
+			
 			f->store(ds.get_value());
-			append_field(f, row);
+			
 		}
 		
 		void fset(_Rid row, Field * f, const ShortStored& s){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(s.get_value(),false);
-			append_field(f, row);
+			
 		}
 		
 		void fset(_Rid row, Field * f, const UShortStored& us){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(us.get_value(),true);
-			append_field(f, row);
+			
 		}
-
+		
 		void fset(_Rid row, Field * f, const CharStored& c){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(c.get_value(),false);
-			append_field(f, row);
+			
 		}
-
+		
 		void fset(_Rid row, Field * f, const UCharStored& uc ){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(uc.get_value());
-			append_field(f, row);
+			
 		}
-
+		
 		void fset(_Rid row, Field * f, const IntStored& i){
-			if(mapped_to_field(row, f)) return;
-				f->store(i.get_value(),false);
+			f->store(i.get_value(),false);
+			
 		}
-
+		 
 		void fset(_Rid row, Field * f, const UIntStored& ui){
-			if(mapped_to_field(row, f)) return;
+		
 			f->store(ui.get_value(),true);
-			append_field(f, row);
+			
 		}
-
+	
 		void fset(_Rid row, Field * f, const LongIntStored& li){
-			if(mapped_to_field(row, f)) return;
+			
 			f->store(li.get_value(),false);
-			append_field(f, row);
+			
 		}
 		
 		void fset(_Rid row, Field * f, const ULongIntStored& uli){
-			if(mapped_to_field(row, f)) return;
-			f->store(uli.get_value(),true);
-			append_field(f, row);
-		}
 		
+			f->store(uli.get_value(),true);
+			
+		}
+		void fset(_Rid row, Field_new_decimal * f, const BlobStored& b){
+			memcpy(f->ptr, b.chars(), b.get_size());
+			f->bin_size = b.get_size();
+		}
+		_declspec(noinline) 
 		void fset(_Rid row, Field * f, const BlobStored& b){
-			if(mapped_to_field(row, f)) return;
+			
 			char * ptr = (char *)f->ptr;
 			if(f->type() == MYSQL_TYPE_VARCHAR){
 				Field_varstring * fv = (Field_varstring*)f;
@@ -198,12 +259,15 @@ namespace tree_stored{
 					*ptr= (uchar) cl;
 				else
 					int2store(ptr, cl);
-			}else f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
-			append_field(f, row);
+			}else if(f->type()==MYSQL_TYPE_NEWDECIMAL){
+				fset(row, (Field_new_decimal*)f, b);
+			}else
+				f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
+			
 		}
-		
+		_declspec(noinline) 
 		void fset(_Rid row, Field * f, const VarCharStored& b){
-			if(mapped_to_field(row, f)) return;
+			
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
 			if(et == MYSQL_TYPE_VARCHAR){
@@ -230,7 +294,7 @@ namespace tree_stored{
 				}
 
 			}else f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
-			append_field(f, row);
+			
 		}
 		/// getters mysql->ts
 		inline void fget(FloatStored &fs, Field * f, const uchar*, uint flags){
@@ -263,7 +327,14 @@ namespace tree_stored{
 		inline void fget(ULongIntStored& uli, Field * f, const uchar*, uint flags){
 			uli.set_value(f->val_int());
 		}
+		inline void fget(BlobStored& b, Field_new_decimal * f, const uchar*n_ptr, uint flags){
+			b.set((const char *)f->ptr,f->bin_size);
+		}
 		inline void fget(BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
+			if(f->type()==MYSQL_TYPE_NEWDECIMAL){
+				fget(b, dynamic_cast<Field_new_decimal*>(f),n_ptr, flags);		
+				return;
+			}
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);

@@ -37,6 +37,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "collumn.h"
 namespace tree_stored{
 	typedef collums::_Rid _Rid;
+	static const _Rid MAX_ROWS = collums::MAX_ROWS;
 	typedef collums::col_index ColIndex;
 	typedef ColIndex::IndexIterator IndexIterator ;
 	typedef ColIndex::index_key CompositeStored;

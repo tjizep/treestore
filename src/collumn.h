@@ -45,7 +45,7 @@ namespace nst = NS_STORAGE;
 namespace collums{
 
 	typedef NS_STORAGE::u32 _Rid;
-
+	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
 	class AbstractedIterator{
 	public:
 		AbstractedIterator(){
