@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.26 (beta)
+TuReestore MySQL Storage Engine version 0.27 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
@@ -43,6 +43,15 @@ Defaults to FALSE. If set to TRUE treestore will use much less memory (usually h
 Experiment - your milage may vary
 + **treestore_current_mem_use** can be queried to retrieve the current treestore memory use
 
+Changes
+-------
+
+0.27 beta
+---------
+
+1. Changed decimal format for improved performance 10% - 100 % in some cases that involve only decimal fields
+2. fixed decimal index order bug
+
 Building
 --------
 
@@ -60,18 +69,18 @@ Machine
 Software
 + Mysql 5.6.13
 + HammerDB 2.1.4
-+ Treestore 0.2 beta
++ Treestore 0.27 beta
 
 Load
 + TPC-H Scale 1 all queries
 
 Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
-+ Treestore 32 secs
++ Treestore 30 secs
 
 Results (cold start 30 % variance)
 + InnoDB 660 secs
-+ TuReestore 180 secs
++ TuReestore 105 secs
 
 TODO FOR GA 0.3
 ---------------
@@ -87,3 +96,4 @@ TODO
  3. Resolve some memory release issues
  4. Text index
  5. Spatial index
+
