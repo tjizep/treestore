@@ -56,32 +56,17 @@ namespace tree_stored{
 	
 	class conversions{
 	public:
-		typedef _Rid _StorageType;
-		static const _StorageType INVALID_STORAGE = (_StorageType)-1;
-		struct _RowLength{
-			_RowLength() : length(0), storage(INVALID_STORAGE){
-
-			}
-			nst::u16 length;
-			_StorageType storage;
-		};
-		typedef std::vector<_RowLength> _DataMapper;
-		typedef std::vector<uchar> _Data;
-
+		
 		enum{
 			f_use_var_header = 1
 		};
 	private:
-		static const bool _CONVERSION_CACHE_ = true;
-		static const nst::u64 MAX_CONVERT_CACHE = 1024*1024*64;
+		
 		String  attribute;
 		String *r;
 		
-
-		
 	private:
-		
-		
+			
 	public:	
 		conversions() : attribute(32768) {
 			attribute.set_charset(system_charset_info);
@@ -90,12 +75,7 @@ namespace tree_stored{
 		~conversions(){
 		}
 		
-		void grow_row(_Rid row){
 		
-		}
-		
-		
-
 		/// setters ts->mysql
 		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const FloatStored &fs){
@@ -133,14 +113,13 @@ namespace tree_stored{
 			f->store(uc.get_value());
 			
 		}
+
 		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * fl, const IntStored& i){
 			Field_long * f = (Field_long*)fl;
-			//f->store(i.get_value(),false);
-			
-			*(long*)f->ptr = i.value;
-			
+			longstore(f->ptr, i.value);	
 		}
+
 		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const UIntStored& ui){
 		
