@@ -76,7 +76,7 @@ Load
 
 Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
-+ Treestore 30 secs
++ Treestore 29 secs
 
 Results (cold start 30 % variance)
 + InnoDB 660 secs

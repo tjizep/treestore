@@ -76,7 +76,7 @@ namespace stored{
 
 	template<typename _IntType>
 	class IntTypeStored {
-	protected:
+	public:
 		_IntType value;
 	public:
 		inline _IntType get_value() const {

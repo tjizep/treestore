@@ -44,6 +44,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include <mysql.h>
 #include <mysql/plugin.h>
+#ifdef _MSC_VER
+#define CONVERSION_NOINLINE_ //_declspec(noinline) 
+#else
+#define CONVERSION_NOINLINE_ 
+#endif
 namespace tree_stored{
 
 
@@ -71,92 +76,14 @@ namespace tree_stored{
 		static const nst::u64 MAX_CONVERT_CACHE = 1024*1024*64;
 		String  attribute;
 		String *r;
-		_Rid row_count;
-		_RowLength * mapped;
-		uchar * daata;
-
-		_DataMapper mapper;		
-		_Data data;
-	private:
-		void set_row_count(_Rid row_count){
-			(*this).row_count = row_count; 
-			
-		}
-		void map_to_field(const _RowLength& m, Field_new_decimal * f) const {
-			uchar * p = &daata[m.storage];
-			f->bin_size = m.length;
-			//f->ptr = p;
-			memcpy(f->ptr, p, m.length);
-		}
-
-		void map_to_field(const _RowLength& m, Field_long * f) const {
-			uchar * p = &daata[m.storage];
-			
-			memcpy(f->ptr, p, m.length);
-		}
-
-		template<typename _MyFieldType>
-		bool mapped_to_field(_Rid row, _MyFieldType * f) const {
-			if(_CONVERSION_CACHE_){
-				/// this is experimental code to cache converted values : does not work yet
-				if(nullptr != mapped && row < row_count){
-					
-					_RowLength m = mapped[row];
-					if(m.storage != INVALID_STORAGE ){
-						map_to_field(m, f);
-						
-						return true;
-					}
-
-				}
-				
-			}
-			return false;
-		}
 		
-		void append_field(Field_long * f, _Rid row ){
-			if(_CONVERSION_CACHE_){
-				/// this is experimental code to cache converted values : does not work yet
-				if(row > 0ul){
-					grow_row(row);
-					size_t s = data.size();
-					uint32 dl = f->data_length();
-					if(s+dl < data.capacity()){
 
-						data.resize(dl+s);
-						daata = &data[0];
-						memcpy(&data[s], f->ptr, dl);
-						_RowLength rl;
-						rl.length = dl;
-						rl.storage = s;
-						mapped[row] = rl;
-					}
-				}
-			}
-		}
-
-		void append_field(Field_new_decimal * f, _Rid row ){
-			if(_CONVERSION_CACHE_){
-				/// this is experimental code to cache converted values : does not work yet
-				if(row > 0ul){
-					grow_row(row);
-					size_t s = data.size();
-					uint32 dl = f->bin_size;
-					if(s+dl < data.capacity()){
-
-						data.resize(dl+s);
-						daata = &data[0];
-						memcpy(&data[s], f->ptr, dl);
-						_RowLength rl;
-						rl.length = dl;
-						rl.storage = s;
-						mapped[row] = rl;
-					}
-				}
-			}
-		}
+		
+	private:
+		
+		
 	public:	
-		conversions() : attribute(32768),row_count(0),mapped(nullptr),daata(nullptr) {
+		conversions() : attribute(32768) {
 			attribute.set_charset(system_charset_info);
 		}
 		
@@ -164,86 +91,80 @@ namespace tree_stored{
 		}
 		
 		void grow_row(_Rid row){
-			if(_CONVERSION_CACHE_){
-				if(row_count <= row){
-					if(data.capacity() < MAX_CONVERT_CACHE)
-						data.reserve(MAX_CONVERT_CACHE);
-					set_row_count(row);
-					if(mapper.size() < row_count+1){
-						mapper.resize(row_count*2+1);
-						mapped = &mapper[0];
-					}
-				}
-			}
+		
 		}
 		
 		
 
 		/// setters ts->mysql
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const FloatStored &fs){
 			
 			f->store(fs.get_value());
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const DoubleStored &ds){
 			
 			f->store(ds.get_value());
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const ShortStored& s){
 			
 			f->store(s.get_value(),false);
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const UShortStored& us){
 			
 			f->store(us.get_value(),true);
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const CharStored& c){
 			
 			f->store(c.get_value(),false);
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const UCharStored& uc ){
 			
 			f->store(uc.get_value());
 			
 		}
-		
-		void fset(_Rid row, Field * f, const IntStored& i){
-			f->store(i.get_value(),false);
+		CONVERSION_NOINLINE_ 
+		void fset(_Rid row, Field * fl, const IntStored& i){
+			Field_long * f = (Field_long*)fl;
+			//f->store(i.get_value(),false);
+			
+			*(long*)f->ptr = i.value;
 			
 		}
-		 
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const UIntStored& ui){
 		
 			f->store(ui.get_value(),true);
 			
 		}
-	
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const LongIntStored& li){
 			
 			f->store(li.get_value(),false);
 			
 		}
-		
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const ULongIntStored& uli){
 		
 			f->store(uli.get_value(),true);
 			
 		}
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field_new_decimal * f, const BlobStored& b){
 			memcpy(f->ptr, b.chars(), b.get_size());
 			f->bin_size = b.get_size();
 		}
-		_declspec(noinline) 
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const BlobStored& b){
 			
 			char * ptr = (char *)f->ptr;
@@ -265,7 +186,7 @@ namespace tree_stored{
 				f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
 			
 		}
-		_declspec(noinline) 
+		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * f, const VarCharStored& b){
 			
 			enum_field_types et = f->type();
