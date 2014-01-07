@@ -215,12 +215,138 @@ namespace tree_stored{
 			return (t==temp);
 		}
 
+		
+
+		template<typename _PredictedFieldType>
+		struct _PredictorContext{
+			void store(_Rid row, const _PredictedFieldType& t ){
+			}
+			const _Fieldt* find(_Rid row){
+				return nullptr;
+			}
+		};
+
+		template<typename _StoredType>
+		struct _SimplePredictorContextImplmentor{
+			enum {
+				MaxStored = 8000000,
+				MaxMapped = 500000
+			};
+			typedef _Rid _MappingPrimitive;
+
+			nst::u64 mapper_size;
+			mutable nst::u64 finds;
+			mutable nst::u64 predicted;
+			mutable nst::u64 unpredicted;
+			mutable nst::u64 nothing;
+
+			typedef std::pair<_MappingPrimitive,_StoredType> _StorePair;
+			typedef std::vector<_StorePair> _StoredData;
+			typedef std::vector<_Rid> _DataMap;
+			
+			_StoredData stored;
+			
+			_DataMap mapping;
+
+			_MappingPrimitive store_pos;
+
+			mutable _MappingPrimitive last_found;
+
+			_SimplePredictorContextImplmentor(){
+				mapping.resize(MaxMapped);
+				stored.resize(MaxStored+1);
+				store_pos = 1;
+				last_found = 0;
+				predicted = 0;
+				unpredicted = 0;
+				nothing = 0;
+				finds = 0;
+			}
+
+			~_SimplePredictorContextImplmentor(){
+			
+			}
+			
+			const _StoredType* find(_Rid row) const {
+				//++finds;
+				//if(finds % 1000000 == 0){
+				//	printf("finds %lld, predicted %lld, unpredicted %lld, not found %lld\n", finds, predicted, unpredicted, nothing);
+				//}
+				/**/
+				if(last_found < stored.size()-4){
+						
+					for(int i=0;i<4;++i){
+						if(stored[++last_found].first == row){						
+							//++predicted;
+							return &(stored[last_found].second);
+						}
+					
+					}
+				}
+				//last_found = 0;
+				_MappingPrimitive m = mapping[row  % MaxMapped] ;
+				if(m != 0){
+					_MappingPrimitive e =  m + 3;
+					while (m < e){
+						if(stored[m].first == row){
+							last_found = m;
+							//++unpredicted;
+							return &(stored[m].second);
+						}
+						++m;
+					}
+
+				}
+				++nothing;
+				return nullptr;
+			}
+			
+			void store(_Rid row, const _StoredType& data){
+				if(store_pos < MaxStored){
+					_MappingPrimitive m = store_pos++;
+					//if(row % 4 == 0)
+						mapping[row % MaxMapped] = m ;
+
+					stored[m] = std::make_pair(row, data);
+				}
+			}
+		};
+
+		
+#define _EXPERIMENT_PCACHEx
+#ifdef _EXPERIMENT_PCACHE
+		template<>
+		struct _PredictorContext<IntStored>{
+			//_PredictorContextImplmentor<IntStored> implementation;
+			_SimplePredictorContextImplmentor<IntStored> implementation;
+			
+			void store(_Rid row, const IntStored& t ){
+				implementation.store(row, t);
+			}
+			
+			const _Fieldt* find(_Rid row){
+				return implementation.find(row);
+			}
+		};
+#endif
+		_PredictorContext<_Fieldt> predictor;
 		virtual void seek_retrieve(_Rid row, Field* f) {
+			
+			const _Fieldt * predicted = predictor.find(row);
+			if(predicted!=nullptr){
+				f->set_notnull();
+				convertor.fset(row, f, * predicted);
+				return;
+			}
 			const _Fieldt& t = col.seek_by_cache(row);
+
 			if(col.is_null(t)){
 				f->set_null();
 			}else{
 				f->set_notnull();
+				
+				predictor.store(row, t);
+				
 				convertor.fset(row, f, t);
 			}
 		}

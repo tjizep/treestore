@@ -76,7 +76,7 @@ Load
 
 Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
-+ Treestore 29 secs
++ Treestore 27 secs
 
 Results (cold start 30 % variance)
 + InnoDB 660 secs
@@ -96,4 +96,5 @@ TODO
  3. Resolve some memory release issues
  4. Text index
  5. Spatial index
-
+ 6. embedded interface to javascript and lua allowing manipulation and queries without a SQL interpreter
+ 7. internal mysql function to executed embedded lua and javascript interfaces

@@ -238,11 +238,11 @@ namespace collums{
 						count_t e = std::min<count_t>(k+rl,occupants);
 						count_t j = k;
 						for(; j < e; ++j){
-							keys[j].set_value(keys[j-1].get_value() + 1);
+							keys[j].set_value(keys[j-1].value + 1);
 						}
 						k = j;
 					}else{
-						keys[k].set_value(rl + keys[k-1].get_value());
+						keys[k].set_value(rl + keys[k-1].value);
 						++k;
 
 					}
@@ -257,7 +257,7 @@ namespace collums{
 				
 				for(; k < occupants; ++k){
 					// works with keys[k] < 0 too
-					if(keys[k].get_value() - keys[k-1].get_value() == 1 &&  k < m){
+					if(keys[k].value - keys[k-1].value == 1 &&  k < m){
 						// halts when k == m
 						++rl;
 					}else if(rl > 3){
@@ -267,7 +267,7 @@ namespace collums{
 						rl = 0;						
 					}else{
 						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
-							size += nst::leb128::signed_size((nst::i64)keys[j].get_value() - keys[j-1].get_value());
+							size += nst::leb128::signed_size((nst::i64)keys[j].value - keys[j-1].value);
 						}
 					}
 				}
@@ -281,7 +281,7 @@ namespace collums{
 
 				for(; k < occupants; ++k){
 					// works with keys[k] < 0 too
-					if(keys[k].get_value() - keys[k-1].get_value() == 1 &&  k < m){
+					if(keys[k].value - keys[k-1].value == 1 &&  k < m){
 						// halts when k == m
 						++rl;
 					}else if(rl > 3){
@@ -291,7 +291,7 @@ namespace collums{
 						rl = 0;						
 					}else{
 						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
-							writer = nst::leb128::write_signed(writer, keys[j].get_value() - keys[j-1].get_value());
+							writer = nst::leb128::write_signed(writer, keys[j].value - keys[j-1].value);
 						}
 					}
 				}

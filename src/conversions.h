@@ -117,6 +117,7 @@ namespace tree_stored{
 		CONVERSION_NOINLINE_ 
 		void fset(_Rid row, Field * fl, const IntStored& i){
 			Field_long * f = (Field_long*)fl;
+			long t = i.value;
 			longstore(f->ptr, i.value);	
 		}
 
@@ -204,22 +205,22 @@ namespace tree_stored{
 			ds.set_value(f->val_real());
 		}
 		inline void fget(ShortStored& s, Field * f, const uchar*, uint flags){
-			s.set_value((short)f->val_int());
+			s.set_value((int16)f->val_int());
 		}
 		inline void fget(UShortStored& us, Field * f, const uchar*, uint flags){
-			us.set_value((unsigned short)f->val_int());
+			us.set_value((uint16)f->val_int());
 		}
 		inline void fget(CharStored& c, Field * f, const uchar*, uint flags){
-			c.set_value((char)f->val_int());
+			c.set_value((int8)f->val_int());
 		}
 		inline void fget(UCharStored& uc , Field * f, const uchar*, uint flags){
-			uc.set_value((unsigned char)f->val_int());
+			uc.set_value((uint8)f->val_int());
 		}
 		inline void fget(IntStored& i, Field * f, const uchar*, uint flags){
-			i.set_value((int)f->val_int());
+			i.set_value((int32)f->val_int());
 		}
 		inline void fget(UIntStored& ui, Field * f, const uchar*, uint flags){
-			ui.set_value((unsigned int)f->val_int());
+			ui.set_value((uint32)f->val_int());
 		}
 		inline void fget(LongIntStored& li, Field * f, const uchar*, uint flags){
 			li.set_value(f->val_int());
@@ -270,27 +271,27 @@ namespace tree_stored{
 
 		}
 		inline void fadd(CompositeStored& to, ShortStored& s, Field * f, const uchar*, uint flags){
-			to.add2((short)f->val_int());
+			to.add2((nst::i16)f->val_int());
 
 		}
 		inline void fadd(CompositeStored& to, UShortStored& us, Field * f, const uchar*, uint flags){
-			to.addu2((unsigned short)f->val_int());
+			to.addu2((nst::u16)f->val_int());
 
 		}
 		inline void fadd(CompositeStored& to, CharStored& c, Field * f, const uchar*, uint flags){
-			to.add1((char)f->val_int());
+			to.add1((nst::i8)f->val_int());
 
 		}
 		inline void fadd(CompositeStored& to, UCharStored& uc , Field * f, const uchar*, uint flags){
-			to.addu1((unsigned char)f->val_int());
+			to.addu1((nst::u8)f->val_int());
 
 		}
 		inline void fadd(CompositeStored& to, IntStored& i, Field * f, const uchar*, uint flags){
-			to.add4((int)f->val_int());
+			to.add4((nst::i32)f->val_int());
 
 		}
 		inline void fadd(CompositeStored& to, UIntStored& ui, Field * f, const uchar*, uint flags){
-			to.addu4((unsigned int)f->val_int());
+			to.addu4((nst::u32)f->val_int());
 
 		}
 
