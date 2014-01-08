@@ -65,6 +65,7 @@ This table supplies configuration options for sacrificing performance for less m
 + The **Medium** option has the best performance versus memory use characteristics
 + The **Low** option will use less than double the space use on disk which is usually **very** low on compressible data
 + The **Lowest** option will only cache the encoded blocks on disk which is usually **extremely** small 
+
 Changes
 -------
 
