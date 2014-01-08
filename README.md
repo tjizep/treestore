@@ -52,7 +52,8 @@ Defaults to false. releases shared tree cached pages on every unlock also releas
 Time Performance versus Space performance
 -----------------------------------------
 
-This table supplies configuration options for sacrificing performance for less memory use try different options for your workload
+This table supplies configuration options for sacrificing performance for less memory use. try different options for your workload. 
+The **Medium** option has the best performance versus memory use characteristics
 
 | Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  |
 | -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:|
