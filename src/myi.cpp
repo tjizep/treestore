@@ -77,6 +77,7 @@ my_bool treestore_efficient_text = FALSE;
 char treestore_collumn_cache = TRUE;
 char treestore_predictive_hash = TRUE;
 char treestore_reduce_tree_use_on_unlock = FALSE;
+char treestore_reduce_index_tree_use_on_unlock = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -126,7 +127,14 @@ static MYSQL_SYSVAR_BOOL(reduce_tree_use_on_unlock, treestore_reduce_tree_use_on
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "enables or disables reducing tree use on unlock - causes reader transactions to release locks and rollback too"
   "Default is false (no reducing)",
-  NULL, NULL, TRUE);
+  NULL, NULL, FALSE);
+
+static MYSQL_SYSVAR_BOOL(reduce_index_tree_use_on_unlock, treestore_reduce_index_tree_use_on_unlock,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables reducing index tree use on unlock -inneffective without treestore_reduce_tree_use_on_unlock "
+  "Default is false (no reducing)",
+  NULL, NULL, FALSE);
+
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
 	treestore_journal_size = ns;
@@ -800,9 +808,12 @@ public:
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
 			thread->release(table);
 			if(thread->get_locks()==0){
-				//thread->reduce_index_trees();
-				if(treestore_reduce_tree_use_on_unlock==TRUE)
+				//
+				if(treestore_reduce_tree_use_on_unlock==TRUE){
 					thread->reduce_col_trees();
+					if(treestore_reduce_index_tree_use_on_unlock==TRUE)
+						thread->reduce_index_trees();
+				}
 				clear_selection(selected);
 				
 				clear_thread(thd);
@@ -1349,6 +1360,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(collumn_cache),
   MYSQL_SYSVAR(predictive_hash),
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
+  MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
   NULL
 };
 

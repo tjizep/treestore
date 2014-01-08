@@ -54,16 +54,17 @@ Time Performance versus Space performance
 
 This table supplies configuration options for sacrificing performance for less memory use. try different options for your workload. 
 
-| Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  |
-| -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:|
-| Low                  | false                               | false                    | true                                 |
-| Medium               | false                               | true                     | true                                 |
-| High                 | false                               | true                     | false                                |
-| Highest              | true                                | true                     | false                                |
+| Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  | treestore_reduce_index_tree_use_on_unlock |
+| -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:| -----------------------------------------:|
+| Lowest               | false                               | false                    | true                                 | true                                  |
+| Low                  | false                               | false                    | true                                 | false                                     |
+| Medium               | false                               | true                     | true                                 | false                                     |
+| High                 | false                               | true                     | false                                | false                                     |
+| Highest              | true                                | true                     | false                                | false                                     |
 
 + The **Medium** option has the best performance versus memory use characteristics
 + The **Low** option will use less than double the space use on disk which is usually **very** low on compressible data
-
++ The **Lowest** option will only cache the encoded blocks on disk which is usually **extremely** small 
 Changes
 -------
 
@@ -115,7 +116,7 @@ TODO
 
  1. Integrate with MariaDB
  2. Expose Virtual col for fast table offsets
- 3. Resolve some memory release issues
+ 3. DONE: Resolve some memory release issues
  4. Text index
  5. Spatial index
  6. embedded interface to javascript and lua allowing manipulation and queries without a SQL interpreter
