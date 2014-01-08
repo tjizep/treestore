@@ -149,7 +149,7 @@ namespace tree_stored{
 			
 			char * ptr = (char *)f->ptr;
 			if(f->type() == MYSQL_TYPE_VARCHAR){
-				Field_varstring * fv = (Field_varstring*)f;
+				Field_varstring * fv =static_cast< Field_varstring*>(f);
 				uint lb = fv->length_bytes;
 				uint fl = fv->field_length;
 				uint cl = (uint)b.get_size();
@@ -161,7 +161,7 @@ namespace tree_stored{
 				else
 					int2store(ptr, cl);
 			}else if(f->type()==MYSQL_TYPE_NEWDECIMAL){
-				fset(row, (Field_new_decimal*)f, b);
+				fset(row, static_cast<Field_new_decimal*>(f), b); /// dynamic cast has really bad runtime performance
 			}else
 				f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
 			
@@ -172,7 +172,7 @@ namespace tree_stored{
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
 			if(et == MYSQL_TYPE_VARCHAR){
-				Field_varstring * fv = (Field_varstring*)f;
+				Field_varstring * fv = static_cast< Field_varstring*>(f);
 				uint lb = fv->length_bytes;
 				uint fl = fv->field_length;
 				uint cl = (uint)b.get_size() - 1;
@@ -184,7 +184,7 @@ namespace tree_stored{
 				else
 					int2store(ptr, cl);
 			}else if(et == MYSQL_TYPE_STRING){
-				Field_string * fv = (Field_string*)f;
+				Field_string * fv = static_cast<Field_string*>(f);
 				uint lb = fv->field_length;
 				uint cl = (uint)b.get_size() - 1;
 				if(cl < lb){
@@ -233,7 +233,7 @@ namespace tree_stored{
 		}
 		inline void fget(BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(f->type()==MYSQL_TYPE_NEWDECIMAL){
-				fget(b, dynamic_cast<Field_new_decimal*>(f),n_ptr, flags);		
+				fget(b, static_cast<Field_new_decimal*>(f),n_ptr, flags);		
 				return;
 			}
 			if(flags & f_use_var_header){

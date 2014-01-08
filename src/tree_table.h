@@ -313,7 +313,7 @@ namespace tree_stored{
 		};
 
 		
-#define _EXPERIMENT_PCACHEx
+#define _EXPERIMENT_PCACHEv
 #ifdef _EXPERIMENT_PCACHE
 		template<>
 		struct _PredictorContext<IntStored>{
@@ -1221,7 +1221,7 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				bool rolling = false;
+				bool rolling = treestore_reduce_tree_use_on_unlock;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use*0.7f

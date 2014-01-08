@@ -74,7 +74,9 @@ LONGLONG treestore_journal_lower_max = 0;
 LONGLONG treestore_journal_upper_max = 0;
 LONGLONG treestore_journal_size = 0;
 my_bool treestore_efficient_text = FALSE;
-
+char treestore_collumn_cache = TRUE;
+char treestore_predictive_hash = TRUE;
+char treestore_reduce_tree_use_on_unlock = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -108,6 +110,23 @@ static MYSQL_SYSVAR_BOOL(efficient_text, treestore_efficient_text,
   "Default is false",
   NULL, NULL, FALSE);
 
+static MYSQL_SYSVAR_BOOL(collumn_cache, treestore_collumn_cache,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables collumn cache"
+  "Default is true (enabled)",
+  NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(predictive_hash, treestore_predictive_hash,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables predictive hash cache"
+  "Default is true (enabled)",
+  NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(reduce_tree_use_on_unlock, treestore_reduce_tree_use_on_unlock,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables reducing tree use on unlock - causes reader transactions to release locks and rollback too"
+  "Default is false (no reducing)",
+  NULL, NULL, TRUE);
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
 	treestore_journal_size = ns;
@@ -782,7 +801,8 @@ public:
 			thread->release(table);
 			if(thread->get_locks()==0){
 				//thread->reduce_index_trees();
-				//thread->reduce_col_trees();
+				if(treestore_reduce_tree_use_on_unlock==TRUE)
+					thread->reduce_col_trees();
 				clear_selection(selected);
 				
 				clear_thread(thd);
@@ -1315,8 +1335,10 @@ int treestore_db_init(void *p)
 
 int treestore_done(void *p)
 {
+
 	return 0;
 }
+
 static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(max_mem_use),
   MYSQL_SYSVAR(current_mem_use),
@@ -1324,6 +1346,9 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(journal_lower_max),
   MYSQL_SYSVAR(journal_upper_max),
   MYSQL_SYSVAR(efficient_text),
+  MYSQL_SYSVAR(collumn_cache),
+  MYSQL_SYSVAR(predictive_hash),
+  MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   NULL
 };
 

@@ -53,7 +53,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <conio.h>
 #endif
 #include "abstracted_storage.h"
-
+extern	char treestore_collumn_cache ;
+extern  char treestore_predictive_hash ;
+extern  char treestore_reduce_tree_use_on_unlock;
 namespace storage_workers{
 	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
 	

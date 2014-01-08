@@ -697,7 +697,7 @@ namespace collums{
 		}
 
 		void load_cache(){
-		
+			if(treestore_collumn_cache==FALSE) return;
 			
 			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){

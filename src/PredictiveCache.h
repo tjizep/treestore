@@ -52,7 +52,7 @@ namespace tree_stored{
 		static const NS_STORAGE::u64 CIRC_SIZE = 4000000;/// about 128 MB shared - the cachedrow is 32 bytes
 		static const NS_STORAGE::u64 HASH_SIZE = 32452843; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const _Rid STORE_INF = (_Rid)-1;
-		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(true),loaded(false){
+		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash==TRUE),loaded(false){
 
 		}
 		~_PredictiveCache(){

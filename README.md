@@ -41,7 +41,25 @@ If the journal reaches this limit then no new transactions are started and the j
 + **treestore_efficient_text**
 Defaults to FALSE. If set to TRUE treestore will use much less memory (usually half) at the expense of performance. 
 Experiment - your milage may vary
++ **treestore_predictive_hash**
+Defaults to true. enables/disables the predictive hash can improve performance on some queries
++ **treestore_collumn_cache**
+Defaults to true. enables/disables the collumn cash should be left enabled
++ **treestore_reduce_tree_use_on_unlock**
+Defaults to false. releases shared tree cached pages on every unlock also releases readlocks every time. Its a good option for memory constrained environments 
 + **treestore_current_mem_use** can be queried to retrieve the current treestore memory use
+
+Time Performance versus Space performance
+-----------------------------------------
+
+This table supplies configuration options for sacrificing performance for less memory use try different options for your workload
+
+| Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  |
+| -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:|
+| Low                  | false                               | false                    | true                                 |
+| Medium               | false                               | true                     | true                                 |
+| High                 | false                               | true                     | false                                |
+| Highest              | true                                | true                     | false                                |
 
 Changes
 -------
@@ -51,6 +69,7 @@ Changes
 
 1. Changed decimal format for improved performance 10% - 100 % in some cases that involve only decimal fields
 2. fixed decimal index order bug
+3. Configuration additions
 
 Building
 --------
