@@ -49,10 +49,10 @@ namespace tree_stored{
 	};
 	/// The predictive cache acts like an adaptive 'derandomizer'
 	struct _PredictiveCache{
-		static const NS_STORAGE::u64 CIRC_SIZE = 4000000;/// about 128 MB shared - the cachedrow is 32 bytes
-		static const NS_STORAGE::u64 HASH_SIZE = 32452843; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
+		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
+		static const NS_STORAGE::u64 HASH_SIZE = 15485863; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const _Rid STORE_INF = (_Rid)-1;
-		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash==TRUE),loaded(false){
+		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
 
 		}
 		~_PredictiveCache(){
@@ -79,21 +79,22 @@ namespace tree_stored{
 				using namespace NS_STORAGE;
 				if(cache_index.empty()){
 					cache_index.resize(HASH_SIZE);
-					sec_cache.reserve(CIRC_SIZE);
-					total_cache_size+=(sizeof(CachedRow)*CIRC_SIZE + sizeof(_Rid)*HASH_SIZE);
+					sec_cache.reserve(CIRC_SIZE/32);
+					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(_Rid)*HASH_SIZE);
 					printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
 				}
 				loaded = true;
 			}
 			return loaded;
 		}
+		/// TODO: NB: the return value should be const 
 		const CompositeStored* _int_predict_row(_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
 			using namespace NS_STORAGE;
 			if(predictor){
 				predictor++;
 				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
-
+				
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
 					if(sec_cache[predictor].k.left_equal_key(input) ){
@@ -174,8 +175,9 @@ namespace tree_stored{
 			CachedRow cr;
 			cr.i = iter.construction();
 			cr.k = iter.key();
+			total_cache_size-=(sizeof(CachedRow)*sec_cache.capacity());
 			sec_cache.push_back(cr);
-
+			total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity());
 		}
 
 		void reduce(){

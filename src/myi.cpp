@@ -166,12 +166,22 @@ Poco::Mutex tree_stored::tree_table::shared_lock;
 Poco::Mutex single_writer_lock;
 tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 
+collums::_LockedRowData* collums::get_locked_rows(const std::string& name){
+	static collums::_RowDataCache rdata;
+	return rdata.get_for_table(name);
+}
+
 // w.t.f.
 // The handlerton asks for extensions when the table defs are already destroyed 
 static _Extensions save_extensions;
 
 namespace tree_stored{
-	
+	class tt{
+		int x;
+	public:
+		tt(int x):x(x){
+		}
+	};
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	class tree_thread{
 	protected:
@@ -580,10 +590,8 @@ public:
 
 	int rnd_pos(uchar * buf,uchar * pos){
 		memcpy(&row, pos, sizeof(row));
-		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);
-			sel.col->seek_retrieve(row, sel.field);
-		}
+		resolve_selection(row);
+		
 		return 0;
 	}
 
@@ -872,10 +880,8 @@ public:
 		}
 		last_resolved = (*this).r.key().get_value();
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
-		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);
-			sel.col->seek_retrieve(last_resolved, sel.field);
-		}
+		resolve_selection(last_resolved);
+		
 		++((*this).r);
 		DBUG_RETURN(0);
 	}
@@ -981,28 +987,41 @@ public:
 	{
 		return input.row;
 	}
+	void resolve_selection(tree_stored::_Rid row){
+		last_resolved = row;
+		collums::_LockedRowData * lrd = get_tree_table()->get_row_datas();
+		if(lrd && row < lrd->rows.size() ){
+			collums::_RowData& rd = lrd->rows[row];
+			if(rd.empty()){
+				nst::synchronized sr(lrd->lock);
+				rd.resize(sizeof(nst::u16)*get_tree_table()->get_col_count());
+			}
 
-	void resolve_selection_from_index(uint ax, const tree_stored::CompositeStored& iinfo){
+			for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
+				tree_stored::selection_tuple & sel = (*s);
+				sel.col->seek_retrieve(sel.field, row, rd);						
+			}
+
+		}else{
+			for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
+				tree_stored::selection_tuple & sel = (*s);
+				sel.col->seek_retrieve(row,sel.field);			
+			}
+		}
+	}
+	void resolve_selection_from_index(uint ax,  const tree_stored::CompositeStored& iinfo){
 
 		using namespace NS_STORAGE;
 
 		tree_stored::_Rid row = key_to_rid(ax, iinfo);
 		last_resolved = row;
-		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
-			tree_stored::selection_tuple & sel = (*s);
-			sel.col->seek_retrieve(row,sel.field);
-		}
-
+		resolve_selection(row);
 	}
-	void resolve_selection_only_from_index(uint ax){
-
-		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();
-		resolve_selection_from_index(ax, iinfo);
-
-	}
+	
+	
 	void resolve_selection_from_index(uint ax){
 
-		const tree_stored::CompositeStored& iinfo = index_iterator.get_key();
+		tree_stored::CompositeStored& iinfo = index_iterator.get_key();
 		resolve_selection_from_index(ax, iinfo);
 
 	}

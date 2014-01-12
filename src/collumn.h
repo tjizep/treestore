@@ -166,6 +166,11 @@ namespace collums{
 			return i.key();
 		}
 
+		key_type& get_key() {
+			return i.key();
+		}
+
+
 		data_type& get_value(){
 			return i.data();
 		}
@@ -209,6 +214,41 @@ namespace collums{
 		}
 	};
 
+	typedef std::vector<nst::u8> _RowData;
+	
+	struct _LockedRowData{
+		std::vector<_RowData> rows;	
+		Poco::Mutex lock;
+	};
+
+	struct _RowDataCache{
+		typedef std::shared_ptr<_LockedRowData> _SharedRowData;
+		typedef std::unordered_map<std::string,_SharedRowData> _NamedRowData;
+		
+		_NamedRowData cache;
+		Poco::Mutex lock;
+
+		_LockedRowData* get_for_table(const std::string& name){
+			nst::synchronized sync(lock);
+			_SharedRowData result;
+			_NamedRowData::iterator n = cache.find(name);
+			if(n != cache.end()){
+				result = (*n).second;
+			}else{
+				result = std::make_shared<_LockedRowData>();
+				cache[name] = result;
+			}
+			return result.get();
+		}
+		void remove(const std::string& name){
+			nst::synchronized sync(lock);
+			_LockedRowData* rows = get_for_table(name);
+			nst::synchronized sync_rows(rows->lock);
+			rows->rows.clear();
+		}
+	};
+	
+	extern _LockedRowData* get_locked_rows(const std::string& name);
 
 	template<typename _Stored>
 	class collumn {
@@ -381,6 +421,7 @@ namespace collums{
 				
 				return ( ( flags & F_INVALID ) == 0);
 			}
+
 			void invalidate(nst::u8& flags){
 				
 				flags |= F_INVALID;
@@ -441,6 +482,7 @@ namespace collums{
 				
 			}
 		};
+
 		class Density{
 		public:
 			Density(){
@@ -466,6 +508,7 @@ namespace collums{
 
 			}
 		};
+
 		class ColLoader : public  asynchronous::AbstractWorker{
 		protected:
 			std::string name;
@@ -576,7 +619,7 @@ namespace collums{
 				storage.rollback();
 				
 				col.reduce_use();
-				
+				storage.reduce();
 				cache->available = true;
 
 
@@ -606,9 +649,7 @@ namespace collums{
 		typedef std::vector<char>    _Nulls;
 
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
-		//typedef asynchronous::QueueManager<ColLoader> ColLoaderManager;
-		static const int MAX_THREADS = 1;
-
+		
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
 			return m;
@@ -664,12 +705,12 @@ namespace collums{
 			if(!result->loaded){
 				
 				result->loaded = true;
-				 //ColLoader l(name, result, lazy, col.size());
-				// l.doTask();
+				ColLoader l(name, result, lazy, col.size());
+				l.doTask();
 				
 				using namespace storage_workers;
 				
-				get_threads(get_next_counter()).add(new ColLoader(name, result, lazy, col.size()));
+				//get_threads(get_next_counter()).add(new ColLoader(name, result, lazy, col.size()));
 				
 			}
 
@@ -1204,7 +1245,7 @@ namespace collums{
 
 			addDynInt(v);
 		}
-		/// 3d level
+		/// 3rd level
 		void add(const FloatStored & v){
 
 			addf4(v.get_value());
@@ -1576,7 +1617,7 @@ namespace collums{
 			}
 			
 		public:
-			static const int MAX_KEY_BUFFER = 3000000;
+			static const int MAX_KEY_BUFFER = 3000000;/// size of the write key buffer
 			static const int MIN_KEY_BUFFER = 10000;
 			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away) 
 			:	loaders_away(loaders_away)
@@ -1745,6 +1786,9 @@ namespace collums{
 			storage.rollback();
 			modified = false;
 		}
+		void reduce_storage(){
+			storage.reduce();
+		}
 		void commit1_asynch(){
 			if(loader){
 				if(loaders_away==0 && loader->is_minimal()){				
@@ -1764,6 +1808,7 @@ namespace collums{
 				//index.flush_buffers();
 				
 			}
+			storage.reduce();
 		}
 
 		void commit2(){

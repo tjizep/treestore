@@ -1656,6 +1656,8 @@ namespace stx
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
 				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());
+				BTREE_ASSERT(!(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0));
+				throw std::exception();
 			}
 			nst::version_type version = get_storage()->get_allocated_version();
 			_AddressPair ap = std::make_pair(w, version);
@@ -1831,14 +1833,21 @@ namespace stx
 			inline iterator(typename btree::surface_node::ptr l, unsigned short s)
 				: currnode(l), current_slot(s)
 			{ }
+
 			/// Initializing-Constructor-pair of a mutable iterator
 			inline iterator(const initializer_pair& initializer)
 				: currnode(initializer.first), current_slot(initializer.second)
 			{ }
+
 			/// Copy-constructor from a reverse iterator
 			inline iterator(const reverse_iterator &it)
 				: currnode(it.currnode), current_slot(it.current_slot)
 			{ }
+
+			/// The next to operators have been comented out since they will cause
+			/// problems in shared mode because they cannot 'render' logical
+			/// keys, (keys pointed to but  not  loaded) may be fixed with 
+			/// hackery but not likely
 
 			/// Dereference the iterator, this is not a value_type& because key and
 			/// value are not stored together
@@ -3147,7 +3156,7 @@ namespace stx
 		typename surface_node::ptr allocate_surface(stream_address w = 0)
 		{
 			if(nodes_loaded.count(w)){
-				BTREE_PRINT("btree::allocate surface loading a new version of %ld\n",w);
+				BTREE_PRINT("btree::allocate surface loading a new version of %lld\n",(nst::lld)w);
 			}
 			change_use(sizeof(surface_node),0,sizeof(surface_node));
 

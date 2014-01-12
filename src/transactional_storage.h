@@ -653,6 +653,7 @@ namespace storage{
 
 			}
 			if(!mods && get_use() <= (before*factor)){
+				/// printf("reduced storage %s\n", get_name().c_str());
 				return;
 			}
 
@@ -1205,7 +1206,7 @@ namespace storage{
 			
 			//printf("reducing storage %s\n", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.8,true,false);
+				flush_back(0.0,true,false);
 		}
 	};
 

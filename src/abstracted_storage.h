@@ -114,7 +114,7 @@ namespace stored{
 		}
 
 		void reduce(){
-
+			get_allocations().reduce();
 		}
 
 		abstracted_storage(std::string name)
