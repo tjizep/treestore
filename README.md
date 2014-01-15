@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.27 (beta)
+TuReestore MySQL Storage Engine version 0.28 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
@@ -15,6 +15,7 @@ Features
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads, similar or exceeding row databases
 + High read performance - average increase of 200% performance on tpc-h (HammerDB) and more when running from cold cache
++ In memory compression without performance loss
 
 Technical
 ---------
@@ -28,6 +29,7 @@ Technical
 + No NULL storage format i.e no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
++ Currently simple entropy coding is used for in memory compression more advanced tokenized schemes on the way
 
 Configuration
 -------------
