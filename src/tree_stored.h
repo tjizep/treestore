@@ -36,15 +36,15 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define _TREE_STORED_H_CEP2013_
 #include "collumn.h"
 namespace tree_stored{
-	typedef collums::_Rid _Rid;
-	static const _Rid MAX_ROWS = collums::MAX_ROWS;
+	
 	typedef collums::col_index ColIndex;
 	typedef ColIndex::IndexIterator IndexIterator ;
 	typedef ColIndex::index_key CompositeStored;
 	typedef ColIndex::iterator_type BasicIterator;
-	typedef std::vector<int> _Parts;
 
-	typedef collums::FloatStored FloatStored ;
+	
+
+	/*typedef collums::FloatStored FloatStored ;
 	typedef collums::DoubleStored DoubleStored ;
 	typedef collums::ShortStored ShortStored;
 	typedef collums::UShortStored UShortStored;
@@ -55,6 +55,6 @@ namespace tree_stored{
 	typedef collums::LongIntStored LongIntStored;
 	typedef collums::ULongIntStored ULongIntStored;
 	typedef collums::BlobStored BlobStored;
-	typedef collums::VarCharStored VarCharStored;
+	typedef collums::VarCharStored VarCharStored;*/
 };
 #endif

@@ -78,7 +78,9 @@ namespace stored{
 
 	template<typename _IntType>
 	class IntTypeStored {
+
 	public:
+		typedef _IntType value_type;
 		_IntType value;
 	public:
 		inline _IntType get_value() const {
@@ -488,5 +490,403 @@ namespace stored{
 
 
 
+};
+namespace stored{
+	typedef NS_STORAGE::u32 _Rid;
+	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
+
+	typedef std::vector<int> _Parts;
+	typedef stored::FTypeStored<float> FloatStored ;
+	typedef stored::FTypeStored<double> DoubleStored ;
+	typedef stored::IntTypeStored<short> ShortStored;
+	typedef stored::IntTypeStored<NS_STORAGE::u16> UShortStored;
+	typedef stored::IntTypeStored<NS_STORAGE::i8> CharStored;
+	typedef stored::IntTypeStored<NS_STORAGE::u8> UCharStored;
+	typedef stored::IntTypeStored<NS_STORAGE::i32> IntStored;
+	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
+	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
+	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
+	typedef stored::Blobule<false, 12> BlobStored;
+	typedef stored::Blobule<true, 12> VarCharStored;
+
+	template<class _Data>
+		struct entropy_t{
+			nst::u64 samples;
+
+			entropy_t():samples(0){
+					
+			}
+			void sample(const _Data& data){
+				++samples;
+			}
+			nst::u64 get_samples() const {
+				return samples;
+			}
+			nst::u64 get_entropy() const {
+				return samples;
+			}
+		};
+
+		template<>
+		struct entropy_t<stored::IntStored>{
+			typedef stored::IntStored _Sampled;
+			typedef std::unordered_map<nst::i64,nst::u64> _Histogram;
+			nst::u64 samples;
+			_Histogram histogram;
+
+			entropy_t():samples(0){
+					
+			}
+			void sample(const _Sampled & data){
+				histogram[data.get_value()]++;
+			}
+			nst::u64 get_samples() const {
+				return samples;
+			}
+			nst::u64 get_entropy() const {
+				return histogram.size();
+			}
+
+		};
+
+		template<typename _IntType>
+		struct int_entropy_t{
+			typedef _IntType _Sampled;
+			typedef std::map<typename _Sampled, nst::u64> _Histogram;
+			nst::u64 samples;
+
+			_Histogram histogram;
+				
+			int_entropy_t():samples(0){
+					
+			}
+			void clear(){
+				samples = 0;
+				histogram.clear();
+			}
+			void sample(const _IntType& data){
+				histogram[data]++;
+				++samples;
+			}
+
+			nst::u64 get_samples() const {
+				return samples;
+			}
+
+			nst::u64 get_entropy(){
+				return histogram.size();
+			}
+
+		};
+
+		
+		class UninitializedCodeException : public std::exception{
+		public :
+			/// the code has not been initialized
+			UninitializedCodeException() throw(){
+				printf("*********** UninitializedCodeException\n");
+			}
+			~UninitializedCodeException(){};
+		};
+		/// class for fixed size entropy coded buffer
+		template<class _IntType>
+		struct int_fix_encoded_buffer{
+			typedef nst::u16 _BucketType;/// use a configurable bucket type for larger code size performance
+			static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
+			typedef int_entropy_t<_IntType> _Entropy;
+			
+			typedef std::map< typename _IntType, _BucketType> _CodeMap;
+			typedef std::vector<typename _IntType> _DeCodeMap;
+			typedef std::vector<_BucketType> _Data;
+			_Entropy stats;
+			_CodeMap codes;
+			_DeCodeMap decodes;
+			_Data data;
+			typename _IntType _null_val;
+			_BucketType code_size;
+			int_fix_encoded_buffer() : code_size(0){
+			}
+
+			size_t capacity() const {
+				return sizeof(typename _IntType)*(codes.size()+decodes.size())+data.capacity();
+			}
+
+			_Entropy& get_stats(){
+				return stats;
+			}
+			void clear(){
+				code_size = 0;
+				stats.clear();
+				codes.clear();
+				decodes.clear();
+				data.clear();
+			}
+			
+			/// Find smallest X in 2^X >= value
+			inline nst::u32 bit_log2(nst::u32 value){
+				nst::u32 bit;
+				for (bit=0 ; value > 1 ; value>>=1, bit++) ;
+				return bit;
+			}
+
+			bool empty() const {
+				return code_size == 0;
+			}
+
+			void resize(_Rid rows){
+				if(code_size==0) throw UninitializedCodeException();
+				data.resize(((rows*code_size)/BUCKET_BITS)+1);
+			}
+
+			
+			void encode(_Rid row, typename const _IntType &val){
+				if(codes.count(val)){
+					_BucketType bucket_start;
+					_BucketType code = codes[val];
+					nst::u32 bits_done = row * code_size;
+					nst::u32 code_left = code_size;
+					_BucketType* current = &data[bits_done / BUCKET_BITS]; /// the first bucket where all the action happens
+					do{	/// write over BUCKET_BITS-bit buckets
+						bucket_start = bits_done & (BUCKET_BITS-1);/// where to begin in the bucket
+						_BucketType todo = std::min<_BucketType>(code_left, BUCKET_BITS-bucket_start);
+						*current &= ~(((1 << todo) - 1) << bucket_start); /// clean the destination like 11100001
+						*current |=  ( (_BucketType)( code & ( (1 << todo)-1 ) ) ) << bucket_start ;						
+						code = (code >> todo);/// drop the bits written ready for next bucket/iteration
+						bits_done += todo;
+						code_left -= todo;
+						if( ( bits_done & (BUCKET_BITS-1) ) == 0){
+							++current; /// increment the bucket
+						}
+					}while(code_left > 0 );
+
+				}else
+					throw UninitializedCodeException();
+			}
+		
+			typename const _IntType& decode(_Rid row) const {
+				_BucketType code = 0;
+				if(code_size > 0){
+					_BucketType bucket_start, bucket;
+					nst::u32 bit_start = row * code_size;				
+					const _BucketType* current = &data[bit_start / BUCKET_BITS];			
+					nst::u32 code_left = code_size;
+					nst::u32 code_complete = 0;
+					for(;;){	/// read from BUCKET_BITS-bit buckets
+						bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
+						_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);
+						bucket = (*current >> bucket_start)& ( ( 1 << todo ) - 1);
+												
+						code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens				
+						
+						bit_start += todo;						
+						code_complete += todo;
+						if(code_complete > code_size )
+							throw UninitializedCodeException();
+						if(code_complete == code_size )
+							break;
+
+						if( ( bit_start & (BUCKET_BITS-1) ) == 0){
+							++current; /// increment the bucket
+						}
+					}
+					return decodes[code];
+				}else
+					throw UninitializedCodeException();
+				return _null_val;
+			}
+			bool initialize(_Rid rows){
+
+				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < 1<<16){
+					
+					_Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
+					nst::u64 mfreq = 0;
+					nst::u32 words = 0;
+					
+					for(;h != (*this).stats.histogram.end();++h){
+						if(mfreq < (*h).second) mfreq = (*h).second;
+						codes[(*h).first] = words;
+						decodes.resize(words+1);
+						decodes[words] = (*h).first;
+						++words;
+						
+					}
+					
+					if(words > 0){
+						
+						code_size = bit_log2((nst::u32)words) + 1;
+							
+					
+						resize(rows);
+					}
+					
+					
+				}
+				return code_size > 0;
+
+			}
+			void optimize(){
+				(*this).codes.clear();
+				(*this).stats.clear();
+			}
+		};	/// fixed in encoded buffer
+		/// entropy coding decission class
+		template<typename _D>
+		class standard_entropy_coder{
+		private:
+			nst::u64 bsamples;
+			_D empty_Val;
+		public:
+			standard_entropy_coder():bsamples(0){
+			}
+			bool empty() const {
+				return true;
+			}
+			void clear(){				
+			}
+			
+			void sample(const _D &data){
+				++bsamples;
+			}
+			void finish(_Rid rows){
+			}
+			bool applicable() const {
+				return false;
+			}
+			bool good() const {
+				return false;
+			}
+			void set(_Rid rid, const _D& data){
+
+			}
+			void optimize(){
+			}
+			const _D& get(_Rid _Rid) const {
+				return empty_Val;
+			}
+			nst::u64 get_entropy() const {
+				return 0;
+			}
+			size_t capacity() const {
+				return 0;
+			}
+		};
+#define _ENTROPY_CODING_
+#ifdef _ENTROPY_CODING_
+		template<>
+		struct standard_entropy_coder<IntStored >{
+			typedef IntStored _DataType;
+			int_fix_encoded_buffer<_DataType> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const IntStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const IntStored& data){
+				coder.encode(row, data);
+			}
+			const IntStored& get( _Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		template<>
+		struct standard_entropy_coder<UIntStored >{
+			typedef UIntStored _DataType;
+			int_fix_encoded_buffer<_DataType> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const UIntStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const UIntStored& data){
+				coder.encode(row, data);
+			}
+			const UIntStored&  get(_Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		
+		template<>
+		struct standard_entropy_coder<BlobStored >{
+			int_fix_encoded_buffer<BlobStored> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const BlobStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const BlobStored& data){
+				coder.encode(row, data);
+			}
+			const BlobStored& get(_Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		/**/
+#endif
 };
 #endif

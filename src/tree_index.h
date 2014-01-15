@@ -44,7 +44,7 @@ namespace tree_stored{
 		
 		CachedRow empty;
 	private:
-		_Rid get_rid(const CompositeStored& input){
+		stored::_Rid get_rid(const CompositeStored& input){
 			return input.row;
 			
 		}
@@ -53,10 +53,10 @@ namespace tree_stored{
 		
 		int ix;
 		int fields_indexed;
-		_Parts parts;
-		_Parts density;
+		stored::_Parts parts;
+		stored::_Parts density;
 		ColIndex index;
-		_Rid predictor;
+		stored::_Rid predictor;
 		bool unique;
 		tree_index(std::string name, bool unique)
 		:	index(name)	, predictor(0), unique(unique)

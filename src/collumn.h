@@ -43,9 +43,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "NotificationQueueWorker.h"
 namespace nst = NS_STORAGE;
 namespace collums{
+		typedef stored::_Rid _Rid;
+	
 
-	typedef NS_STORAGE::u32 _Rid;
-	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
+
+	
 	class AbstractedIterator{
 	public:
 		AbstractedIterator(){
@@ -383,6 +385,9 @@ namespace collums{
 		static const nst::u16 F_NOT_NULL = 1;
 		static const nst::u16 F_CHANGED = 2;
 		static const nst::u16 F_INVALID = 4;
+		
+
+	
 		struct _StoredEntry{
 
 			_StoredEntry(const _Stored& key):key(key){};//,flags(F_INVALID)
@@ -438,35 +443,114 @@ namespace collums{
 		typedef std::vector<_StoredEntry> _Cache;
 		
 		typedef std::vector<nst::u8> _Flags;
+
 		struct _CacheEntry{
-			_CacheEntry() : available(false), loaded(false),density(1),users(0){};
+			typedef stored::standard_entropy_coder<_Stored> _Encoded;
+			_CacheEntry() : available(false), loaded(false),density(1),users(0),_data(nullptr),rows_cached(0){};//
 			~_CacheEntry(){
 				NS_STORAGE::remove_col_use(calc_use());
-				
+				rows_cached = 0;
 			}
 			bool available;
 			bool loaded;
-			
-			_Cache data;
+
 			_Flags flags;
+		private:
+			_Encoded encoded;
+			_Cache data;
+			_StoredEntry * _data;
+			_StoredEntry _temp;
+			_Rid rows_cached;
+		public:
 			void resize(nst::i64 size){
 				data.resize(size);
 				flags.resize(size);
+				rows_cached = (stored::_Rid)size;
+				_data = & data[0];
+			}
+			void invalidate(_Rid row){
+				nst::u8 & flags = (*this).flags[row];
+				_temp.invalidate(flags);
+			}
+			void nullify(_Rid row){
+				nst::u8 & flags = (*this).flags[row];
+				_temp.nullify(flags);
 			}
 			void clear(){
 				data.swap(_Cache());
 				flags.swap(_Flags());
+				encoded.clear();
 			}
+			void encode(_Rid row){
+				encoded.set(row, data[row]);
+			}
+			
+			_Rid size() const {
+				return rows_cached;
+			}
+			
+			const _Stored& get(_Rid row) const {
+				if(encoded.good()){
+					
+					return encoded.get(row);;
+				}else
+					return _data[row].key;
+			}
+
+			void set_data(_Rid row, const _StoredEntry& d){
+				if(row < rows_cached){
+					if(_data!=nullptr)
+						_data[row] = d;
+				}
+			}
+			/// subscript operator
+			const _Stored& operator[](_Rid at)  const {
+				return get(at);
+			}
+			bool empty() const {
+				return (encoded.empty() && data.empty());
+			}
+
+			void finish(stored::_Rid rows){
+				NS_STORAGE::remove_col_use(calc_use());
+				nst::i64 use_before = calc_use();
+				rows_cached = rows;
+				_data = & data[0];
+				for(stored::_Rid r = 0; r < rows_cached; ++r){
+					encoded.sample(_data[r].key);
+				}
+				encoded.finish(rows);
+				if(encoded.good()){
+					for(stored::_Rid r = 0; r < rows_cached; ++r){
+						encoded.set(r, _data[r].key);
+					}
+					if(calc_use() < use_before ){
+						data.swap(_Cache());
+						_data = nullptr;
+						encoded.optimize();
+						printf("compression reduced col from %.4g to %.4g MB\n", (double)use_before / units::MB,  (double)calc_use()/ units::MB);
+					}else{
+						encoded.clear();
+					}
+					
+				}
+				NS_STORAGE::add_col_use(calc_use());
+			}
+
 			nst::i64 calc_use(){
-				return data.capacity()* sizeof(_StoredEntry) + flags.capacity();
+				if(encoded.good()){
+					return encoded.capacity() + flags.capacity();
+				}else{
+					return data.capacity()* sizeof(_StoredEntry) + flags.capacity();
+				}
 			}
 			Poco::Mutex lock;
 			_Rid density;
 			nst::i64 users;
 			void make_flags(){
-				if(flags.size() != data.size()){
+				if(flags.size() != rows_cached){
 					NS_STORAGE::remove_col_use(flags.capacity());
-					flags.resize(data.size());
+					flags.resize(rows_cached);
 					NS_STORAGE::add_col_use(flags.capacity());
 				}
 			}
@@ -499,7 +583,7 @@ namespace collums{
 				//printf("calc %ld density sample\n",(long)SAMPLE);
 				for(_Rid r = 0;r<SAMPLE ; ++r){
 					_Rid sample = (std::rand()*std::rand()) % data.size();
-					uniques.insert(data[sample].key);
+					uniques.insert(data[sample]);
 				}
 				density = SAMPLE/std::max<_Rid>(1,(_Rid)uniques.size());
 				if(density >= 2){
@@ -519,11 +603,12 @@ namespace collums{
 			void calc_density(){
 				/// get a 5% sample
 				Density d;
-				d.measure((*cache).data);
+				d.measure((*cache));
 				(*cache).density = d.density;
 				//printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
 			}
 		protected:
+			
 			bool load_into_cache(size_t col_size){
 				
 				stored::abstracted_storage storage(name);
@@ -539,8 +624,10 @@ namespace collums{
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				nst::u64 cached = 0;
+				_Rid actual_rows = 0;
 				if(!col.empty()){
 					--c;
+					actual_rows = c.key().get_value() + 1;
 					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
 					nst::u64 bytes_used = cached * (sizeof(_StoredEntry) + 1);
 					nst::remove_col_use((*cache).calc_use());
@@ -554,18 +641,21 @@ namespace collums{
 					(*cache).resize(cached);
 					nst::add_col_use((*cache).calc_use());
 				}
-				const _Rid FACTOR = 50;
+				const _Rid FACTOR = 10;
 				_Rid prev = 0;
 				nst::u8 * flags = &(*cache).flags[0];
 				nst::u64 nulls = 0;
 				_Rid kv = 0;
+				_Stored temp;
 				if(lazy){
 					for(_Rid r = 0; r < cached; ++r){
 						flags[r] = F_INVALID;
 					}
 				}else{
+					
 					for(c = col.begin(); c != e; ++c){
 						kv = c.key().get_value();
+						
 						if(e != col.end()){
 							e = col.end();
 						
@@ -582,14 +672,17 @@ namespace collums{
 							break;
 						}
 						/// nullify the gaps
-						if((*cache).data.size() > kv){
+						_Rid cs = (*cache).size();
+						if((*cache).size() > kv){
 							if(kv > 0){
 								for(_Rid n = prev; n < kv-1; ++n){
-									(*cache).data[n].nullify(flags[n]);
+									(*cache).nullify(n);
 									++nulls;
 								}
 							}
-							(*cache).data[kv] = c.data();
+							temp = c.data();
+							
+							(*cache).set_data(kv, c.data());
 							prev = kv;
 						}
 						ctr++;
@@ -598,22 +691,24 @@ namespace collums{
 							if(ctr % ( cached/ FACTOR ) ==0){
 								if(calc_total_use() > treestore_max_mem_use){
 									col.reduce_use();
+									storage.reduce();
 								}							
 							}
 						}
 					}
 					if(kv > 0){
 						for(_Rid n = prev; n < kv-1; ++n){
-							(*cache).data[n].nullify(flags[n]);
+							(*cache).nullify(n);
 							++nulls;
 						}
 					}
-				
 					if(nulls == 0){
 						nst::remove_col_use((*cache).calc_use());
 						(*cache).flags.swap(_Flags());
 						nst::add_col_use((*cache).calc_use());
 					}
+					(*cache).finish(actual_rows);
+					
 				}
 				calc_density();
 				storage.rollback();
@@ -705,12 +800,12 @@ namespace collums{
 			if(!result->loaded){
 				
 				result->loaded = true;
-				ColLoader l(name, result, lazy, col.size());
-				l.doTask();
+				//ColLoader l(name, result, lazy, col.size());
+				//l.doTask();
 				
 				using namespace storage_workers;
 				
-				//get_threads(get_next_counter()).add(new ColLoader(name, result, lazy, col.size()));
+				get_threads( get_next_counter() ).add(new ColLoader(name, result, lazy, col.size()));
 				
 			}
 
@@ -723,9 +818,9 @@ namespace collums{
 		typename _ColMap::iterator ival;
 		_CacheEntry * _cache;
 		_Nulls * _nulls;
-		_StoredEntry * cache_r;
+		
 		nst::u8 * cache_f;
-
+		_StoredEntry user;
 		_Stored empty;
 		_Rid cache_size;
 		_Rid rows;
@@ -759,8 +854,7 @@ namespace collums{
 			return *_cache;
 		}
 		void reset_cache_locals(){
-			cache_size = 0;
-			cache_r = nullptr;
+			cache_size = 0;			
 			cache_f = nullptr;
 			_cache = nullptr;
 			ival = col.end();
@@ -771,7 +865,7 @@ namespace collums{
 				NS_STORAGE::synchronized slock(_cache->lock);
 				if(_cache != nullptr && _cache->available)
 				{
-					if(!get_cache().data.empty()){
+					if(!get_cache().empty()){
 						_cache->users++;
 						return;
 					}
@@ -812,10 +906,9 @@ namespace collums{
 				if(_cache->available)
 				{
 					
-					cache_size = (_Rid)get_cache().data.size();
+					cache_size = (_Rid)get_cache().size();
 
 					if(cache_size){
-						cache_r = &(get_cache().data[0]);
 						if(get_cache().flags.empty()){
 							cache_f = nullptr;
 						}else{
@@ -907,14 +1000,14 @@ namespace collums{
 
 			if( has_cache() && cache_size > row )
 			{
-				_StoredEntry & se = cache_r[row];
+				const _Stored & se = _cache->get(row);
 				
 				if(nullptr != cache_f ){
 					nst::u8 flags = cache_f[row];
-					if(se.valid(flags))
+					if(user.valid(flags))
 						return se;
 				
-					if(se.null(flags))
+					if(user.null(flags))
 						return empty;
 				}else{
 					return se;
@@ -924,9 +1017,7 @@ namespace collums{
 		
 			ival = col.find(row);
 				
-			if(nullptr != cache_r && lazy){
-			}
-			
+					
 			if(ival == cend || ival.key().get_value() != row)
 			{
 				return empty;	
@@ -1013,10 +1104,10 @@ namespace collums{
 			if(has_cache()){
 				
 				NS_STORAGE::synchronized synch(get_cache().lock);
-				if(has_cache() && get_cache().data.size() > row){
+				if(has_cache() && get_cache().size() > row){
 					get_cache().make_flags();
-					nst::u8 & flags = get_cache().flags[row];
-					get_cache().data[row].invalidate(flags);
+					
+					get_cache().invalidate(row);
 				}
 				
 			}
@@ -1026,29 +1117,16 @@ namespace collums{
 			if(has_cache()){
 			
 				NS_STORAGE::synchronized synch(get_cache().lock);
-				if(has_cache() && get_cache().data.size() > row){
+				if(has_cache() && get_cache().size() > row){
 					get_cache().make_flags();
-					nst::u8 & flags = get_cache().flags[row];
-					get_cache().data[row].invalidate(flags);
+					get_cache().invalidate(row);
 				}	
 			}
 			col[row] = s;
 			modified = true;
 		}
 	};
-	typedef stored::FTypeStored<float> FloatStored ;
-	typedef stored::FTypeStored<double> DoubleStored ;
-	typedef stored::IntTypeStored<short> ShortStored;
-	typedef stored::IntTypeStored<NS_STORAGE::u16> UShortStored;
-	typedef stored::IntTypeStored<NS_STORAGE::i8> CharStored;
-	typedef stored::IntTypeStored<NS_STORAGE::u8> UCharStored;
-	typedef stored::IntTypeStored<NS_STORAGE::i32> IntStored;
-	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
-	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
-	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 12> BlobStored;
-	typedef stored::Blobule<true, 12> VarCharStored;
-
+	
 
 	class DynamicKey{
 	public:
@@ -1246,61 +1324,61 @@ namespace collums{
 			addDynInt(v);
 		}
 		/// 3rd level
-		void add(const FloatStored & v){
+		void add(const stored::FloatStored & v){
 
 			addf4(v.get_value());
 		}
 
-		void add(const DoubleStored & v){
+		void add(const stored::DoubleStored & v){
 
 			addf8(v.get_value());
 		}
-		void add(const ShortStored& v){
+		void add(const stored::ShortStored& v){
 
 			add2(v.get_value());
 		}
 
-		void add(const UShortStored& v){
+		void add(const stored::UShortStored& v){
 
 			addu2(v.get_value());
 		}
 
-		void add(const CharStored& v){
+		void add(const stored::CharStored& v){
 
 			add1(v.get_value());
 		}
 
-		void add(const UCharStored& v){
+		void add(const stored::UCharStored& v){
 
 			addu1(v.get_value());
 		}
 
-		void add(const IntStored& v){
+		void add(const stored::IntStored& v){
 
 			add4(v.get_value());
 		}
 
-		void add(const UIntStored& v){
+		void add(const stored::UIntStored& v){
 
 			addu4(v.get_value());
 		}
 
-		void add(const LongIntStored& v){
+		void add(const stored::LongIntStored& v){
 
 			add8(v.get_value());
 		}
 
-		void add(const ULongIntStored& v){
+		void add(const stored::ULongIntStored& v){
 
 			addu8(v.get_value());
 		}
 
-		void add(const BlobStored& v){
+		void add(const stored::BlobStored& v){
 
 			add(v.get_value(),v.get_size());
 		}
 
-		void add(const VarCharStored& v){
+		void add(const stored::VarCharStored& v){
 
 			add(v.get_value(),v.get_size()-1);
 		}

@@ -44,11 +44,16 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include <mysql.h>
 #include <mysql/plugin.h>
+#include "fields.h"
 #ifdef _MSC_VER
 #define CONVERSION_NOINLINE_ //_declspec(noinline) 
 #else
 #define CONVERSION_NOINLINE_ 
 #endif
+namespace units{
+	static const double MB = 1024.0*1024.0;
+	static const double GB = 1024.0*1024.0*1024.0;
+}
 namespace tree_stored{
 
 
@@ -78,74 +83,74 @@ namespace tree_stored{
 		
 		/// setters ts->mysql
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const FloatStored &fs){
+		void fset(stored::_Rid row, Field * f, const stored::FloatStored &fs){
 			
 			f->store(fs.get_value());
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const DoubleStored &ds){
+		void fset(stored::_Rid row, Field * f, const stored::DoubleStored &ds){
 			
 			f->store(ds.get_value());
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const ShortStored& s){
+		void fset(stored::_Rid row, Field * f, const stored::ShortStored& s){
 			
 			f->store(s.get_value(),false);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const UShortStored& us){
+		void fset(stored::_Rid row, Field * f, const stored::UShortStored& us){
 			
 			f->store(us.get_value(),true);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const CharStored& c){
+		void fset(stored::_Rid row, Field * f, const stored::CharStored& c){
 			
 			f->store(c.get_value(),false);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const UCharStored& uc ){
+		void fset(stored::_Rid row, Field * f, const stored::UCharStored& uc ){
 			
 			f->store(uc.get_value());
 			
 		}
 
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * fl, const IntStored& i){
+		void fset(stored::_Rid row, Field * fl, const stored::IntStored& i){
 			Field_long * f = (Field_long*)fl;
 			long t = i.value;
 			longstore(f->ptr, i.value);	
 		}
 
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const UIntStored& ui){
+		void fset(stored::_Rid row, Field * f, const stored::UIntStored& ui){
 		
 			f->store(ui.get_value(),true);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const LongIntStored& li){
+		void fset(stored::_Rid row, Field * f, const stored::LongIntStored& li){
 			
 			f->store(li.get_value(),false);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const ULongIntStored& uli){
+		void fset(stored::_Rid row, Field * f, const stored::ULongIntStored& uli){
 		
 			f->store(uli.get_value(),true);
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field_new_decimal * f, const BlobStored& b){
+		void fset(stored::_Rid row, Field_new_decimal * f, const stored::BlobStored& b){
 			memcpy(f->ptr, b.chars(), b.get_size());
 			f->bin_size = b.get_size();
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const BlobStored& b){
+		void fset(stored::_Rid row, Field * f, const stored::BlobStored& b){
 			
 			char * ptr = (char *)f->ptr;
 			if(f->type() == MYSQL_TYPE_VARCHAR){
@@ -167,7 +172,7 @@ namespace tree_stored{
 			
 		}
 		CONVERSION_NOINLINE_ 
-		void fset(_Rid row, Field * f, const VarCharStored& b){
+		void fset(stored::_Rid row, Field * f, const stored::VarCharStored& b){
 			
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
@@ -198,40 +203,40 @@ namespace tree_stored{
 			
 		}
 		/// getters mysql->ts
-		inline void fget(FloatStored &fs, Field * f, const uchar*, uint flags){
+		inline void fget(stored::FloatStored &fs, Field * f, const uchar*, uint flags){
 			fs.set_value((float)f->val_real());
 		}
-		inline void fget(DoubleStored &ds, Field * f, const uchar*, uint flags){
+		inline void fget(stored::DoubleStored &ds, Field * f, const uchar*, uint flags){
 			ds.set_value(f->val_real());
 		}
-		inline void fget(ShortStored& s, Field * f, const uchar*, uint flags){
+		inline void fget(stored::ShortStored& s, Field * f, const uchar*, uint flags){
 			s.set_value((int16)f->val_int());
 		}
-		inline void fget(UShortStored& us, Field * f, const uchar*, uint flags){
+		inline void fget(stored::UShortStored& us, Field * f, const uchar*, uint flags){
 			us.set_value((uint16)f->val_int());
 		}
-		inline void fget(CharStored& c, Field * f, const uchar*, uint flags){
+		inline void fget(stored::CharStored& c, Field * f, const uchar*, uint flags){
 			c.set_value((int8)f->val_int());
 		}
-		inline void fget(UCharStored& uc , Field * f, const uchar*, uint flags){
+		inline void fget(stored::UCharStored& uc , Field * f, const uchar*, uint flags){
 			uc.set_value((uint8)f->val_int());
 		}
-		inline void fget(IntStored& i, Field * f, const uchar*, uint flags){
+		inline void fget(stored::IntStored& i, Field * f, const uchar*, uint flags){
 			i.set_value((int32)f->val_int());
 		}
-		inline void fget(UIntStored& ui, Field * f, const uchar*, uint flags){
+		inline void fget(stored::UIntStored& ui, Field * f, const uchar*, uint flags){
 			ui.set_value((uint32)f->val_int());
 		}
-		inline void fget(LongIntStored& li, Field * f, const uchar*, uint flags){
+		inline void fget(stored::LongIntStored& li, Field * f, const uchar*, uint flags){
 			li.set_value(f->val_int());
 		}
-		inline void fget(ULongIntStored& uli, Field * f, const uchar*, uint flags){
+		inline void fget(stored::ULongIntStored& uli, Field * f, const uchar*, uint flags){
 			uli.set_value(f->val_int());
 		}
-		inline void fget(BlobStored& b, Field_new_decimal * f, const uchar*n_ptr, uint flags){
+		inline void fget(stored::BlobStored& b, Field_new_decimal * f, const uchar*n_ptr, uint flags){
 			b.set((const char *)f->ptr,f->bin_size);
 		}
-		inline void fget(BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
+		inline void fget(stored::BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(f->type()==MYSQL_TYPE_NEWDECIMAL){
 				fget(b, static_cast<Field_new_decimal*>(f),n_ptr, flags);		
 				return;
@@ -247,7 +252,7 @@ namespace tree_stored{
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			b.set(r->ptr(),r->length());//
 		}
-		inline void fget(VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+		inline void fget(stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
@@ -262,50 +267,50 @@ namespace tree_stored{
 
 		/// direct getters into the composite type for indexes
 
-		inline void fadd(CompositeStored& to, FloatStored &fs, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::FloatStored &fs, Field * f, const uchar*, uint flags){
 			to.addf4((float)f->val_real());
 
 		}
-		inline void fadd(CompositeStored& to, DoubleStored &ds, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::DoubleStored &ds, Field * f, const uchar*, uint flags){
 			to.addf8(f->val_real());
 
 		}
-		inline void fadd(CompositeStored& to, ShortStored& s, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::ShortStored& s, Field * f, const uchar*, uint flags){
 			to.add2((nst::i16)f->val_int());
 
 		}
-		inline void fadd(CompositeStored& to, UShortStored& us, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::UShortStored& us, Field * f, const uchar*, uint flags){
 			to.addu2((nst::u16)f->val_int());
 
 		}
-		inline void fadd(CompositeStored& to, CharStored& c, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::CharStored& c, Field * f, const uchar*, uint flags){
 			to.add1((nst::i8)f->val_int());
 
 		}
-		inline void fadd(CompositeStored& to, UCharStored& uc , Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::UCharStored& uc , Field * f, const uchar*, uint flags){
 			to.addu1((nst::u8)f->val_int());
 
 		}
-		inline void fadd(CompositeStored& to, IntStored& i, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::IntStored& i, Field * f, const uchar*, uint flags){
 			to.add4((nst::i32)f->val_int());
 
 		}
-		inline void fadd(CompositeStored& to, UIntStored& ui, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::UIntStored& ui, Field * f, const uchar*, uint flags){
 			to.addu4((nst::u32)f->val_int());
 
 		}
 
-		inline void fadd(CompositeStored& to, LongIntStored& li, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::LongIntStored& li, Field * f, const uchar*, uint flags){
 			to.add8(f->val_int());
 
 		}
 
-		inline void fadd(CompositeStored& to, ULongIntStored& uli, Field * f, const uchar*, uint flags){
+		inline void fadd(CompositeStored& to, stored::ULongIntStored& uli, Field * f, const uchar*, uint flags){
 			to.addu8(f->val_int());
 
 		}
 
-		inline void fadd(CompositeStored& to, BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
+		inline void fadd(CompositeStored& to, stored::BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
@@ -319,7 +324,7 @@ namespace tree_stored{
 			to.add(r->ptr(),r->length());//
 		}
 
-		inline void fadd(CompositeStored& to, VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+		inline void fadd(CompositeStored& to, stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);

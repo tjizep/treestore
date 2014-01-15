@@ -51,7 +51,7 @@ namespace tree_stored{
 	struct _PredictiveCache{
 		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
 		static const NS_STORAGE::u64 HASH_SIZE = 15485863; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
-		static const _Rid STORE_INF = (_Rid)-1;
+		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
 		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
 
 		}
@@ -72,7 +72,7 @@ namespace tree_stored{
 		bool load(){
 			
 			if(!loaded){
-				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(_Rid)*HASH_SIZE > (nst::u64)treestore_max_mem_use){
+				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(stored::_Rid)*HASH_SIZE > (nst::u64)treestore_max_mem_use){
 					return false;
 				}
 				stx::storage::syncronized ul((*this).plock);
@@ -80,7 +80,7 @@ namespace tree_stored{
 				if(cache_index.empty()){
 					cache_index.resize(HASH_SIZE);
 					sec_cache.reserve(CIRC_SIZE/32);
-					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(_Rid)*HASH_SIZE);
+					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*HASH_SIZE);
 					printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
 				}
 				loaded = true;
@@ -88,7 +88,7 @@ namespace tree_stored{
 			return loaded;
 		}
 		/// TODO: NB: the return value should be const 
-		const CompositeStored* _int_predict_row(_Rid& predictor, BasicIterator& out, const CompositeStored& input){
+		const CompositeStored* _int_predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
 			using namespace NS_STORAGE;
 			if(predictor){
@@ -133,7 +133,7 @@ namespace tree_stored{
 
 		}
 
-		const CompositeStored*  predict_row(_Rid& predictor, BasicIterator& out, const CompositeStored& input){
+		const CompositeStored*  predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
 			stx::storage::syncronized ul((*this).plock);
 			return _int_predict_row(predictor, out, input);
@@ -190,7 +190,7 @@ namespace tree_stored{
 		void clear(){
 			stx::storage::syncronized ul((*this).plock);
 			if(!cache_index.empty()){
-				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(_Rid)*HASH_SIZE);
+				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(stored::_Rid)*HASH_SIZE);
 				cache_index.clear();
 				sec_cache.clear();
 				sec_cache.resize(1);
@@ -200,7 +200,7 @@ namespace tree_stored{
 		typedef std::vector<CachedRow> _SecCache;
 		typedef std::vector<unsigned int> _RowCache;
 
-		_Rid rows;
+		stored::_Rid rows;
 		_SecCache sec_cache;
 		_RowCache cache_index;
 		CachedRow empty_row;

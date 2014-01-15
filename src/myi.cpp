@@ -548,8 +548,8 @@ public:
 	tree_stored::tree_table::ptr tt;
 	tree_stored::tree_table::_TableMap::iterator r;
 	tree_stored::tree_table::_TableMap::iterator r_stop;
-	tree_stored::_Rid row;
-	tree_stored::_Rid last_resolved;
+	stored::_Rid row;
+	stored::_Rid last_resolved;
 	typedef tree_stored::_Selection  _Selection;
 	tree_stored::_Selection selected;// direct selection filter
 	tree_stored::IndexIterator index_iterator;
@@ -613,7 +613,7 @@ public:
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = get_tree_table()->table_size();
 			stats.block_size = 1;
-			stats.records = std::max<tree_stored::_Rid>(2, get_tree_table()->row_count());
+			stats.records = std::max<stored::_Rid>(2, get_tree_table()->row_count());
 		}
 
 		if(which & HA_STATUS_TIME) // - only update of stats->update_time required
@@ -633,7 +633,7 @@ public:
 			//stats.sortkey;
 			//stats.ref_length;
 			stats.block_size = 1;
-			stats.mrr_length_per_rec= sizeof(tree_stored::_Rid)+sizeof(void*);
+			stats.mrr_length_per_rec= sizeof(stored::_Rid)+sizeof(void*);
 			//handler::table->s->keys_in_use;
 			//handler::table->s->keys_for_keyread;
 
@@ -642,7 +642,7 @@ public:
 		if(which & HA_STATUS_VARIABLE) {// - records, deleted, data_file_length, index_file_length, delete_length, check_time, mean_rec_length
 			stats.data_file_length = get_tree_table()->table_size();
 			stats.block_size = 4096;
-			stats.records = std::max<tree_stored::_Rid>(2, get_tree_table()->row_count());
+			stats.records = std::max<stored::_Rid>(2, get_tree_table()->row_count());
 			stats.mean_rec_length =(ulong) stats.data_file_length / stats.records;
 
 		}
@@ -817,6 +817,7 @@ public:
 			thread->release(table);
 			if(thread->get_locks()==0){
 				//
+				thread->reduce_col_trees();
 				if(treestore_reduce_tree_use_on_unlock==TRUE){
 					thread->reduce_col_trees();
 					if(treestore_reduce_index_tree_use_on_unlock==TRUE)
@@ -980,14 +981,14 @@ public:
 		return 0;
 	}
 
-	inline tree_stored::_Rid key_to_rid
+	inline stored::_Rid key_to_rid
 	(	uint ax
 	,	const tree_stored::CompositeStored& input
 	)
 	{
 		return input.row;
 	}
-	void resolve_selection(tree_stored::_Rid row){
+	void resolve_selection(stored::_Rid row){
 		last_resolved = row;
 		collums::_LockedRowData * lrd = get_tree_table()->get_row_datas();
 		if(lrd && row < lrd->rows.size() ){
@@ -1013,7 +1014,7 @@ public:
 
 		using namespace NS_STORAGE;
 
-		tree_stored::_Rid row = key_to_rid(ax, iinfo);
+		stored::_Rid row = key_to_rid(ax, iinfo);
 		last_resolved = row;
 		resolve_selection(row);
 	}
@@ -1228,7 +1229,7 @@ public:
 
 	int iterations;
 
-	tree_stored::_Rid range_iterator;
+	stored::_Rid range_iterator;
 	virtual int read_range_first
 	(	const key_range *start_key
 	,	const key_range *end_key
