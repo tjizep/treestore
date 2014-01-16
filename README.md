@@ -29,7 +29,19 @@ Technical
 + No NULL storage format i.e no extra bit for NULL values
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
-+ Currently simple entropy coding is used for in memory compression more advanced tokenized schemes on the way
++ Simple entropy coding is used for in memory compression 
+
+Microsoft Windows Installation
+------------------------------
+
++ Download and install MySQL 5.6.13 x64 from [MySQL downloads](http://dev.mysql.com/downloads/mysql/)
++ Locate 'plugin' folder in MySQL installation directory
++ Copy treestore.dll from x64/Release to the previously located plugin folder
++ Install MSVC 11 x64 runtime dependencies from [MSVC Redistributable download](http://www.microsoft.com/en-za/download/details.aspx?id=30679)
++ Start MySQL
++ Using the client run the statement INSTALL PLUGIN TREESTORE SONAME 'treestore.dll'
++ use create table syntax with a suffix like engine='treestore'
+
 
 Configuration
 -------------
@@ -58,7 +70,7 @@ This table supplies configuration options for sacrificing performance for less m
 
 | Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  | treestore_reduce_index_tree_use_on_unlock |
 | -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:| -----------------------------------------:|
-| Lowest               | false                               | false                    | true                                 | true                                  |
+| Lowest               | false                               | false                    | true                                 | true                                      |
 | Low                  | false                               | false                    | true                                 | false                                     |
 | Medium               | false                               | true                     | true                                 | false                                     |
 | High                 | false                               | true                     | false                                | false                                     |
