@@ -83,8 +83,13 @@ This table supplies configuration options for sacrificing performance for less m
 Changes
 -------
 
+0.28 beta
+
+1. Added in memory collumn compression improving memory use by a lot
+2. do not load collumns which are not specified in a query
+3. compression improvement 
+
 0.27 beta
----------
 
 1. Changed decimal format for improved performance 10% - 100 % in some cases that involve only decimal fields
 2. fixed decimal index order bug
