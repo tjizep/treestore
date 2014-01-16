@@ -562,7 +562,8 @@ namespace stored{
 			}
 			void clear(){
 				samples = 0;
-				histogram.clear();
+				
+				histogram.swap(_Histogram());
 			}
 			void sample(const _IntType& data){
 				histogram[data]++;
@@ -608,7 +609,10 @@ namespace stored{
 			}
 
 			size_t capacity() const {
-				return sizeof(typename _IntType)*(codes.size()+decodes.size())+data.capacity();
+				size_t is = sizeof(typename _IntType);
+				size_t bs = sizeof(_BucketType);
+
+				return (is+bs)*codes.size()+is*decodes.capacity()+data.capacity()*bs;
 			}
 
 			_Entropy& get_stats(){
@@ -617,9 +621,9 @@ namespace stored{
 			void clear(){
 				code_size = 0;
 				stats.clear();
-				codes.clear();
-				decodes.clear();
-				data.clear();
+				codes.swap(_CodeMap());
+				decodes.swap(_DeCodeMap());
+				data.swap(_Data());
 			}
 			
 			/// Find smallest X in 2^X >= value
@@ -717,6 +721,7 @@ namespace stored{
 						++words;
 						
 					}
+					(*this).stats.clear();
 					
 					if(words > 0){
 						
@@ -732,7 +737,7 @@ namespace stored{
 
 			}
 			void optimize(){
-				(*this).codes.clear();
+				(*this).codes.swap(_CodeMap());
 				(*this).stats.clear();
 			}
 		};	/// fixed in encoded buffer
@@ -855,7 +860,118 @@ namespace stored{
 				return coder.capacity();
 			}
 		};
-		
+
+		template<>
+		struct standard_entropy_coder<ShortStored >{
+			int_fix_encoded_buffer<ShortStored> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const ShortStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const ShortStored& data){
+				coder.encode(row, data);
+			}
+			const ShortStored& get(_Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		template<>
+		struct standard_entropy_coder<UShortStored >{
+			int_fix_encoded_buffer<UShortStored> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const UShortStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const UShortStored& data){
+				coder.encode(row, data);
+			}
+			const UShortStored& get(_Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		template<>
+		struct standard_entropy_coder<VarCharStored >{
+			int_fix_encoded_buffer<VarCharStored> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			bool applicable() const {
+				return true;
+			}
+			void sample(const VarCharStored &data){
+				coder.get_stats().sample(data);
+			}
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const VarCharStored& data){
+				coder.encode(row, data);
+			}
+			const VarCharStored& get(_Rid row) const {
+				return coder.decode(row);
+			}	
+			nst::u64 get_entropy() const {
+				return 0;// coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
 		template<>
 		struct standard_entropy_coder<BlobStored >{
 			int_fix_encoded_buffer<BlobStored> coder;

@@ -510,30 +510,117 @@ namespace collums{
 			bool empty() const {
 				return (encoded.empty() && data.empty());
 			}
-
-			void finish(stored::_Rid rows,const std::string &name){
-				NS_STORAGE::remove_col_use(calc_use());
-				nst::i64 use_before = calc_use();
-				rows_cached = rows;
-				_data = & data[0];
-				for(stored::_Rid r = 0; r < rows_cached; ++r){
-					encoded.sample(_data[r].key);
+			
+			_Rid get_v_row_count(_ColMap&col){
+				_Rid r = 0;
+				typename _ColMap::iterator e = col.end();
+				typename _ColMap::iterator c = e;
+				if(!col.empty()){
+					--c;
+					r = c.key().get_value() + 1;
+					
 				}
-				encoded.finish(rows);
-				if(encoded.good()){
-					for(stored::_Rid r = 0; r < rows_cached; ++r){
-						encoded.set(r, _data[r].key);
+				return r;
+			}
+			void load_data(_ColMap &col){
+				const _Rid FACTOR = 10;
+				typename _ColMap::iterator e = col.end();
+				typename _ColMap::iterator c = e;
+				_Rid kv = 0;
+				_Rid ctr = 0;
+				_Rid prev = 0;
+				nst::u8 * flags = &(*this).flags[0];
+				nst::u64 nulls = 0;
+				
+				for(c = col.begin(); c != e; ++c){
+					kv = c.key().get_value();
+						
+					/// nullify the gaps
+					_Rid cs = (*this).size();
+					if((*this).size() > kv){
+						if(kv > 0){
+							for(_Rid n = prev; n < kv-1; ++n){
+								(*this).nullify(n);
+								++nulls;
+							}
+						}
+							
+						(*this).set_data(kv, c.data());
+						prev = kv;
 					}
-					if(calc_use() < use_before ){
-						data.swap(_Cache());
-						_data = nullptr;
+					ctr++;
+
+					if(rows_cached > FACTOR){
+						if(ctr % ( rows_cached / FACTOR ) ==0){
+							if(calc_total_use() > treestore_max_mem_use){
+								col.reduce_use();
+								//storage.reduce();
+							}							
+						}
+					}
+				}
+				if(kv > 0){
+					for(_Rid n = prev; n < kv-1; ++n){
+						(*this).nullify(n);
+						++nulls;
+					}
+				}
+				if(nulls == 0){
+					nst::remove_col_use(calc_use());
+					(*this).flags.swap(_Flags());
+					nst::add_col_use(calc_use());
+				}
+			}
+			void finish(_ColMap &col,const std::string &name){
+				NS_STORAGE::remove_col_use(calc_use());
+				rows_cached = get_v_row_count(col);
+				nst::i64 use_before = rows_cached * sizeof(typename _StoredEntry);
+				const _Rid FACTOR = 25;
+				typename _ColMap::iterator e = col.end();
+				typename _ColMap::iterator c = e;
+				_Rid ctr = 0;
+				for(c = col.begin(); c != e; ++c){
+					_Rid r = c.key().get_value();
+					encoded.sample(c.data());
+					++ctr;
+					if(rows_cached > FACTOR){
+						if(r % ( rows_cached / FACTOR ) ==0){
+							if(calc_total_use() > treestore_max_mem_use){
+								col.reduce_use();								
+							}							
+						}
+					}
+				}
+				col.reduce_use();		
+				encoded.finish(rows_cached);
+				if(encoded.good()){
+					for(c = col.begin(); c != e; ++c){
+						_Rid r = c.key().get_value();
+						encoded.set(r, c.data());
+						if(rows_cached > FACTOR){
+							if(r % ( rows_cached / FACTOR ) ==0){
+								if(calc_total_use() > treestore_max_mem_use){
+									col.reduce_use();								
+								}							
+							}
+						}
+					}								
+					if(calc_use() < use_before ){						
 						encoded.optimize();
 						printf("reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
 					}else{
 						printf("did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 						encoded.clear();
+						resize(rows_cached);
+						load_data(col);
 					}
 					
+				}else{
+					encoded.clear();
+					resize(rows_cached);
+					load_data(col);
+					
+					printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 				}
 				NS_STORAGE::add_col_use(calc_use());
 			}
@@ -638,79 +725,13 @@ namespace collums{
 						(*cache).unload();
 						return false;
 					}
-					
-					(*cache).resize(cached);
-					nst::add_col_use((*cache).calc_use());
+
 				}
 				const _Rid FACTOR = 10;
-				_Rid prev = 0;
-				nst::u8 * flags = &(*cache).flags[0];
-				nst::u64 nulls = 0;
+				
 				_Rid kv = 0;
-				_Stored temp;
-				if(lazy){
-					for(_Rid r = 0; r < cached; ++r){
-						flags[r] = F_INVALID;
-					}
-				}else{
-					
-					for(c = col.begin(); c != e; ++c){
-						kv = c.key().get_value();
-						
-						if(e != col.end()){
-							e = col.end();
-						
-							printf("tx bug 1 iterator should stop %s\n",storage.get_name().c_str());
-							break;
-						}
-						if(kv < ctr){
-							printf("tx bug 2 iterator should stop  %s\n",storage.get_name().c_str());
-							break;
-						}
-						if(cached <= kv){
-							e = col.end();
-							printf("tx bug 3 iterator should stop %s\n",storage.get_name().c_str());
-							break;
-						}
-						/// nullify the gaps
-						_Rid cs = (*cache).size();
-						if((*cache).size() > kv){
-							if(kv > 0){
-								for(_Rid n = prev; n < kv-1; ++n){
-									(*cache).nullify(n);
-									++nulls;
-								}
-							}
-							temp = c.data();
-							
-							(*cache).set_data(kv, c.data());
-							prev = kv;
-						}
-						ctr++;
-
-						if(cached > FACTOR){
-							if(ctr % ( cached/ FACTOR ) ==0){
-								if(calc_total_use() > treestore_max_mem_use){
-									col.reduce_use();
-									storage.reduce();
-								}							
-							}
-						}
-					}
-					if(kv > 0){
-						for(_Rid n = prev; n < kv-1; ++n){
-							(*cache).nullify(n);
-							++nulls;
-						}
-					}
-					if(nulls == 0){
-						nst::remove_col_use((*cache).calc_use());
-						(*cache).flags.swap(_Flags());
-						nst::add_col_use((*cache).calc_use());
-					}
-					(*cache).finish(actual_rows,storage.get_name());
-					
-				}
+				_Stored temp;			
+				(*cache).finish(col,storage.get_name());
 				calc_density();
 				storage.rollback();
 				
