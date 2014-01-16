@@ -572,6 +572,7 @@ namespace collums{
 				}
 			}
 			void finish(_ColMap &col,const std::string &name){
+				
 				NS_STORAGE::remove_col_use(calc_use());
 				rows_cached = get_v_row_count(col);
 				nst::i64 use_before = rows_cached * sizeof(typename _StoredEntry);
@@ -623,6 +624,7 @@ namespace collums{
 					printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 				}
 				NS_STORAGE::add_col_use(calc_use());
+				
 			}
 
 			nst::i64 calc_use(){
@@ -727,10 +729,8 @@ namespace collums{
 					}
 
 				}
-				const _Rid FACTOR = 10;
-				
-				_Rid kv = 0;
-				_Stored temp;			
+				//printf("load %s start system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
+			
 				(*cache).finish(col,storage.get_name());
 				calc_density();
 				storage.rollback();
@@ -738,7 +738,7 @@ namespace collums{
 				col.reduce_use();
 				storage.reduce();
 				cache->available = true;
-
+				//printf("load %s end system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
 
 				return true;
 			}
@@ -982,7 +982,11 @@ namespace collums{
 			
 			cend = col.end();
 			ival = cend;
-			
+			if(!modified){
+				load_cache();
+				check_cache();
+				engage_cache();
+			}
 			
 			//check_cache();
 
@@ -1081,11 +1085,7 @@ namespace collums{
 
 		void tx_begin(bool read){
 			stored::abstracted_tx_begin(read, storage, col);	
-			if(read){
-				load_cache();
-				check_cache();
-				engage_cache();
-			}
+			
 		}
 
 		void rollback(){
