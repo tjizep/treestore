@@ -511,7 +511,7 @@ namespace collums{
 				return (encoded.empty() && data.empty());
 			}
 
-			void finish(stored::_Rid rows){
+			void finish(stored::_Rid rows,const std::string &name){
 				NS_STORAGE::remove_col_use(calc_use());
 				nst::i64 use_before = calc_use();
 				rows_cached = rows;
@@ -528,8 +528,9 @@ namespace collums{
 						data.swap(_Cache());
 						_data = nullptr;
 						encoded.optimize();
-						printf("compression reduced col from %.4g to %.4g MB\n", (double)use_before / units::MB,  (double)calc_use()/ units::MB);
+						printf("reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
 					}else{
+						printf("did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 						encoded.clear();
 					}
 					
@@ -707,7 +708,7 @@ namespace collums{
 						(*cache).flags.swap(_Flags());
 						nst::add_col_use((*cache).calc_use());
 					}
-					(*cache).finish(actual_rows);
+					(*cache).finish(actual_rows,storage.get_name());
 					
 				}
 				calc_density();

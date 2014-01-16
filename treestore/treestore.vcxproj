@@ -143,7 +143,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(CPP_REPO)\poco-1.4.6p1-all\Foundation\include;$(CPP_REPO)\poco-1.4.6p1-all\Data\include;$(CPP_REPO)\poco-1.4.6p1-all\Util\include;$(CPP_REPO)\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\mysql-5.6.13\include;$(CPP_REPO)\mysql-5.6.13\sql;$(CPP_REPO)\mysql-5.6.13\bld\sql;$(CPP_REPO)\mysql-5.6.13\bld\include;$(CPP_REPO)\mysql-5.6.13\regex;$(CPP_REPO)\lz4-r101;$(CPP_REPO)\zlib-1.2.8;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <BufferSecurityCheck>true</BufferSecurityCheck>

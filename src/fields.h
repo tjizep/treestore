@@ -624,9 +624,16 @@ namespace stored{
 			
 			/// Find smallest X in 2^X >= value
 			inline nst::u32 bit_log2(nst::u32 value){
-				nst::u32 bit;
-				for (bit=0 ; value > 1 ; value>>=1, bit++) ;
-				return bit;
+								
+				nst::u32 log = 0; /// satisfies 2^0 = 1
+				nst::u32 bit  = 1; /// current value of 2^log
+			
+				while(bit < value){
+					bit = bit <<1;
+					++log;
+				}
+			
+				return log;
 			}
 
 			bool empty() const {
@@ -713,7 +720,7 @@ namespace stored{
 					
 					if(words > 0){
 						
-						code_size = bit_log2((nst::u32)words) + 1;
+						code_size = std::max<_BucketType>(1, bit_log2((nst::u32)words));
 							
 					
 						resize(rows);
