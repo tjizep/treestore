@@ -523,7 +523,7 @@ namespace collums{
 				return r;
 			}
 			void load_data(_ColMap &col){
-				const _Rid FACTOR = 10;
+				const _Rid CKECK = 1000000;
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid kv = 0;
@@ -549,15 +549,11 @@ namespace collums{
 						prev = kv;
 					}
 					ctr++;
-
-					if(rows_cached > FACTOR){
-						if(ctr % ( rows_cached / FACTOR ) ==0){
-							if(calc_total_use() > treestore_max_mem_use){
-								col.reduce_use();
-								//storage.reduce();
-							}							
-						}
+				
+					if(ctr % CKECK ==0){
+						col.reduce_use();														
 					}
+					
 				}
 				if(kv > 0){
 					for(_Rid n = prev; n < kv-1; ++n){
@@ -572,11 +568,11 @@ namespace collums{
 				}
 			}
 			void finish(_ColMap &col,const std::string &name){
-				
+				const _Rid CKECK = 1000000;
 				NS_STORAGE::remove_col_use(calc_use());
 				rows_cached = get_v_row_count(col);
 				nst::i64 use_before = rows_cached * sizeof(typename _StoredEntry);
-				const _Rid FACTOR = 25;
+	
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
@@ -584,12 +580,9 @@ namespace collums{
 					_Rid r = c.key().get_value();
 					encoded.sample(c.data());
 					++ctr;
-					if(rows_cached > FACTOR){
-						if(r % ( rows_cached / FACTOR ) ==0){
-							if(calc_total_use() > treestore_max_mem_use){
-								col.reduce_use();								
-							}							
-						}
+					if(r % CKECK ==0){
+						col.reduce_use();								
+						
 					}
 				}
 				col.reduce_use();		
@@ -598,13 +591,11 @@ namespace collums{
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());
-						if(rows_cached > FACTOR){
-							if(r % ( rows_cached / FACTOR ) ==0){
-								if(calc_total_use() > treestore_max_mem_use){
-									col.reduce_use();								
-								}							
-							}
+						
+						if(r % CKECK ==0){
+							col.reduce_use();										
 						}
+						
 					}								
 					if(calc_use() < use_before ){						
 						encoded.optimize();
