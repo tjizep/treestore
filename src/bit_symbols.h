@@ -26,21 +26,26 @@ public:
 		return code_size;
 	}
 
+	/// the code size can be any positive integer <= sizeof(_IntSymBolType)*8
 	void set_code_size(_BucketType code_size){
 		(*this).code_size = std::min<_BucketType>(sizeof(_IntSymBolType)*8,code_size);
 	}
-
+	/// create buckets by the ns
 	void resize(_IndexType ns){
 		data.resize(((ns*code_size)/BUCKET_BITS)+1);
 	}
 
+	/// the capacity in bytes of this bit symbol vector
 	size_t capacity() const {
 		return data.capacity()*sizeof(_BucketType);
 	}
 
+	/// remove data completely - requires resize to enable again
 	void clear(){
 		data.swap(_Data());
 	}
+	
+	/// write code_size bits at bit-index index
 	void set(_IndexType index, typename const _IntSymBolType &val){
 		_BucketType bucket_start;
 		_IntSymBolType code = val;
@@ -61,6 +66,7 @@ public:
 		}while(code_left > 0 );		
 	}
 		
+	/// read code_size bits at bit-index index
 	typename _IntSymBolType get(_IndexType index) const {
 		_IntSymBolType code = 0;
 		_BucketType bucket_start, bucket;
@@ -86,6 +92,10 @@ public:
 			}
 		}				
 		return code;
+	}
+
+	_IntSymBolType operator[](_IndexType index) const {
+		return get(index);
 	}
 };
 
