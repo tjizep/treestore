@@ -167,6 +167,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\abstracted_storage.h" />
+    <ClInclude Include="..\src\bit_symbols.h" />
     <ClInclude Include="..\src\collumn.h" />
     <ClInclude Include="..\src\conversions.h" />
     <ClInclude Include="..\src\fields.h" />

@@ -925,8 +925,7 @@ namespace tree_stored{
 		}
 
 		void reduce_use_collum_trees(){
-			if(!locks)
-				rollback();
+			
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}

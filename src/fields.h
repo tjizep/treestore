@@ -35,6 +35,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifndef CO_STORE_CEP20130823
 #define CO_STORE_CEP20130823
 #include <stx/storage/basic_storage.h>
+#include <bit_symbols.h>
 #include <stx/btree.h>
 #include <stx/btree_map>
 
@@ -592,6 +593,7 @@ namespace stored{
 		/// class for fixed size entropy coded buffer
 		template<class _IntType>
 		struct int_fix_encoded_buffer{
+			typedef symbol_vector<nst::u32> _Symbols;
 			typedef nst::u16 _BucketType;/// use a configurable bucket type for larger code size performance
 			static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
 			typedef int_entropy_t<_IntType> _Entropy;
@@ -602,7 +604,8 @@ namespace stored{
 			_Entropy stats;
 			_CodeMap codes;
 			_DeCodeMap decodes;
-			_Data data;
+			//_Data data;
+			_Symbols symbols;
 			typename _IntType _null_val;
 			_BucketType code_size;
 			int_fix_encoded_buffer() : code_size(0){
@@ -612,7 +615,7 @@ namespace stored{
 				size_t is = sizeof(typename _IntType);
 				size_t bs = sizeof(_BucketType);
 
-				return (is+bs)*codes.size()+is*decodes.capacity()+data.capacity()*bs;
+				return (is+bs)*codes.size()+is*decodes.capacity()+symbols.capacity();
 			}
 
 			_Entropy& get_stats(){
@@ -623,7 +626,7 @@ namespace stored{
 				stats.clear();
 				codes.swap(_CodeMap());
 				decodes.swap(_DeCodeMap());
-				data.swap(_Data());
+				symbols.clear();
 			}
 			
 			/// Find smallest X in 2^X >= value
@@ -646,30 +649,16 @@ namespace stored{
 
 			void resize(_Rid rows){
 				if(code_size==0) throw UninitializedCodeException();
-				data.resize(((rows*code_size)/BUCKET_BITS)+1);
+				symbols.resize(rows);
+
 			}
 
 			
 			void encode(_Rid row, typename const _IntType &val){
 				if(codes.count(val)){
-					_BucketType bucket_start;
-					_BucketType code = codes[val];
-					nst::u32 bits_done = row * code_size;
-					nst::u32 code_left = code_size;
-					_BucketType* current = &data[bits_done / BUCKET_BITS]; /// the first bucket where all the action happens
-					do{	/// write over BUCKET_BITS-bit buckets
-						bucket_start = bits_done & (BUCKET_BITS-1);/// where to begin in the bucket
-						_BucketType todo = std::min<_BucketType>(code_left, BUCKET_BITS-bucket_start);
-						*current &= ~(((1 << todo) - 1) << bucket_start); /// clean the destination like 11100001
-						*current |=  ( (_BucketType)( code & ( (1 << todo)-1 ) ) ) << bucket_start ;						
-						code = (code >> todo);/// drop the bits written ready for next bucket/iteration
-						bits_done += todo;
-						code_left -= todo;
-						if( ( bits_done & (BUCKET_BITS-1) ) == 0){
-							++current; /// increment the bucket
-						}
-					}while(code_left > 0 );
-
+					nst::u32 code = codes[val];
+					symbols.set(row, code);
+					
 				}else
 					throw UninitializedCodeException();
 			}
@@ -677,29 +666,7 @@ namespace stored{
 			typename const _IntType& decode(_Rid row) const {
 				_BucketType code = 0;
 				if(code_size > 0){
-					_BucketType bucket_start, bucket;
-					nst::u32 bit_start = row * code_size;				
-					const _BucketType* current = &data[bit_start / BUCKET_BITS];			
-					nst::u32 code_left = code_size;
-					nst::u32 code_complete = 0;
-					for(;;){	/// read from BUCKET_BITS-bit buckets
-						bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
-						_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);
-						bucket = (*current >> bucket_start)& ( ( 1 << todo ) - 1);
-												
-						code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens				
-						
-						bit_start += todo;						
-						code_complete += todo;
-						if(code_complete > code_size )
-							throw UninitializedCodeException();
-						if(code_complete == code_size )
-							break;
-
-						if( ( bit_start & (BUCKET_BITS-1) ) == 0){
-							++current; /// increment the bucket
-						}
-					}
+					code = symbols.get(row);
 					return decodes[code];
 				}else
 					throw UninitializedCodeException();
@@ -726,7 +693,7 @@ namespace stored{
 					if(words > 0){
 						
 						code_size = std::max<_BucketType>(1, bit_log2((nst::u32)words));
-							
+						symbols.set_code_size(code_size);	
 					
 						resize(rows);
 					}

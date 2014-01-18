@@ -78,6 +78,7 @@ char treestore_collumn_cache = TRUE;
 char treestore_predictive_hash = TRUE;
 char treestore_reduce_tree_use_on_unlock = FALSE;
 char treestore_reduce_index_tree_use_on_unlock = FALSE;
+char treestore_reduce_storage_use_on_unlock = TRUE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -128,6 +129,12 @@ static MYSQL_SYSVAR_BOOL(reduce_tree_use_on_unlock, treestore_reduce_tree_use_on
   "enables or disables reducing tree use on unlock - causes reader transactions to release locks and rollback too"
   "Default is false (no reducing)",
   NULL, NULL, FALSE);
+
+static MYSQL_SYSVAR_BOOL(reduce_storage_use_on_unlock, treestore_reduce_storage_use_on_unlock,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables reducing storage use on unlock"
+  "Default is TRUE ",
+  NULL, NULL, TRUE);
 
 static MYSQL_SYSVAR_BOOL(reduce_index_tree_use_on_unlock, treestore_reduce_index_tree_use_on_unlock,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
@@ -832,12 +839,13 @@ public:
 				st.check_use();
 				/// for testing
 				//st.reduce_all();
-				if(calc_total_use() > treestore_max_mem_use){
+				if(calc_total_use() > treestore_max_mem_use || treestore_reduce_storage_use_on_unlock){
 		
 					DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+					
 					stored::reduce_all();
-
 				}
+				
 				printf
 				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
 				,	"transaction complete"
@@ -1381,6 +1389,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(predictive_hash),
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
+  MYSQL_SYSVAR(reduce_storage_use_on_unlock),
   NULL
 };
 

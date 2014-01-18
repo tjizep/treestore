@@ -1669,9 +1669,14 @@ namespace stx
 					typename node::ptr ns = nt;
 					ns.set_where(w);
 					ns.set_context(this);
+					if(nt->level==0){ // its a surface		
+						typename surface_node::ptr s ;
+						nodes_loaded[w] = s.rget();
+					}
 					return ns;
 				}
 			}
+			
 			buffer_type buffer = dangling_buffer ;
 			get_storage()->complete();
 			if(lz4){
