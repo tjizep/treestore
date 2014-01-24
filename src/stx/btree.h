@@ -1219,6 +1219,9 @@ namespace stx
 				preceding = next = NULL_REF;
 
 			}
+			bool get_shared() const {
+				return (*this).shared ;
+			}
 			void set_shared(){
 				(*this).shared = true;
 				(*this).a_refs = (*this).refs;
@@ -1656,7 +1659,7 @@ namespace stx
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
 				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());
-				BTREE_ASSERT(!(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0));
+				BTREE_ASSERT(get_storage()->is_end(dangling_buffer) && dangling_buffer.size() > 0);
 				throw std::exception();
 			}
 			nst::version_type version = get_storage()->get_allocated_version();
@@ -1672,6 +1675,9 @@ namespace stx
 					if(nt->level==0){ // its a surface		
 						typename surface_node::ptr s ;
 						nodes_loaded[w] = s.rget();
+					}else{
+						/// should be an error
+						BTREE_ASSERT(nt->level == 0 && nt->get_shared());						
 					}
 					return ns;
 				}

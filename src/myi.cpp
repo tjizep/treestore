@@ -823,8 +823,7 @@ public:
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
 			thread->release(table);
 			if(thread->get_locks()==0){
-				//
-				thread->reduce_col_trees();
+				
 				if(treestore_reduce_tree_use_on_unlock==TRUE){
 					thread->reduce_col_trees();
 					if(treestore_reduce_index_tree_use_on_unlock==TRUE)

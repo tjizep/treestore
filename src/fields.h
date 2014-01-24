@@ -507,9 +507,10 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 12> BlobStored;
-	typedef stored::Blobule<true, 12> VarCharStored;
-
+	typedef stored::Blobule<false, 14> BlobStored;
+	typedef stored::Blobule<true, 14> VarCharStored;
+	static const nst::u32 MAX_HIST = 1 << 20;
+	static const nst::u32 MAX_ENTROPY = 1 << 16;
 	template<class _Data>
 		struct entropy_t{
 			nst::u64 samples;
@@ -539,7 +540,8 @@ namespace stored{
 					
 			}
 			void sample(const _Sampled & data){
-				histogram[data.get_value()]++;
+				if(histogram.size() < MAX_HIST)
+					histogram[data.get_value()]++;
 			}
 			nst::u64 get_samples() const {
 				return samples;
@@ -590,37 +592,39 @@ namespace stored{
 			}
 			~UninitializedCodeException(){};
 		};
+
 		/// class for fixed size entropy coded buffer
 		template<class _IntType>
 		struct int_fix_encoded_buffer{
-			typedef symbol_vector<nst::u32> _Symbols;
-			typedef nst::u16 _BucketType;/// use a configurable bucket type for larger code size performance
-			static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
+			typedef nst::u32 _CodeType;
+			typedef symbol_vector<_CodeType> _Symbols;
+			
 			typedef int_entropy_t<_IntType> _Entropy;
 			
-			typedef std::map< typename _IntType, _BucketType> _CodeMap;
+			typedef std::map< typename _IntType, _CodeType> _CodeMap;
 			typedef std::vector<typename _IntType> _DeCodeMap;
-			typedef std::vector<_BucketType> _Data;
+			
 			_Entropy stats;
 			_CodeMap codes;
 			_DeCodeMap decodes;
-			//_Data data;
+			
 			_Symbols symbols;
 			typename _IntType _null_val;
-			_BucketType code_size;
+			_CodeType code_size;
+			
 			int_fix_encoded_buffer() : code_size(0){
 			}
 
 			size_t capacity() const {
 				size_t is = sizeof(typename _IntType);
-				size_t bs = sizeof(_BucketType);
-
+				size_t bs = sizeof(_CodeType);
 				return (is+bs)*codes.size()+is*decodes.capacity()+symbols.capacity();
 			}
 
 			_Entropy& get_stats(){
 				return stats;
 			}
+
 			void clear(){
 				code_size = 0;
 				stats.clear();
@@ -656,7 +660,7 @@ namespace stored{
 			
 			void encode(_Rid row, typename const _IntType &val){
 				if(codes.count(val)){
-					nst::u32 code = codes[val];
+					_CodeType code = codes[val];
 					symbols.set(row, code);
 					
 				}else
@@ -664,7 +668,7 @@ namespace stored{
 			}
 		
 			typename const _IntType& decode(_Rid row) const {
-				_BucketType code = 0;
+				_CodeType code = 0;
 				if(code_size > 0){
 					code = symbols.get(row);
 					return decodes[code];
@@ -674,14 +678,13 @@ namespace stored{
 			}
 			bool initialize(_Rid rows){
 
-				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < 1<<16){
+				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
 					
 					_Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
-					nst::u64 mfreq = 0;
 					nst::u32 words = 0;
 					
 					for(;h != (*this).stats.histogram.end();++h){
-						if(mfreq < (*h).second) mfreq = (*h).second;
+						
 						codes[(*h).first] = words;
 						decodes.resize(words+1);
 						decodes[words] = (*h).first;
@@ -692,7 +695,7 @@ namespace stored{
 					
 					if(words > 0){
 						
-						code_size = std::max<_BucketType>(1, bit_log2((nst::u32)words));
+						code_size = std::max<_CodeType>(1, bit_log2((_CodeType)words));
 						symbols.set_code_size(code_size);	
 					
 						resize(rows);
@@ -708,7 +711,47 @@ namespace stored{
 				(*this).stats.clear();
 			}
 		};	/// fixed in encoded buffer
-		/// entropy coding decission class
+		
+		template<class _BufType>
+		class lz_buffer{
+		private:
+			_BufType _decoded_val;
+		public:
+			
+			lz_buffer(){
+			}
+
+			bool empty() const {
+				return true;
+			}
+			
+			void sample(const _BufType &data){
+			}
+
+			void resize(_Rid rows){
+			}
+			
+			size_t capacity() const {
+				return 0;
+			}
+
+			bool initialize(_Rid rows){
+				return true;
+			}
+			
+			void encode(_Rid row, const _BufType &val){
+				
+			}
+			
+			const _BufType& decode(_Rid row) const {
+				
+				return _decoded_val;
+			}
+			void optimize(){
+			}
+		};
+
+		/// entropy coding decision class
 		template<typename _D>
 		class standard_entropy_coder{
 		private:
@@ -789,6 +832,7 @@ namespace stored{
 				return coder.capacity();
 			}
 		};
+
 		template<>
 		struct standard_entropy_coder<UIntStored >{
 			typedef UIntStored _DataType;

@@ -1311,16 +1311,13 @@ namespace tree_stored{
 				changed = false;
 			}else
 			{
-				bool rolling = treestore_reduce_tree_use_on_unlock;
+				bool rolling = false; //treestore_reduce_tree_use_on_unlock;
 				if
 				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 					||	calc_total_use() > treestore_max_mem_use*0.7f
 					||  rolling
 				)
-					rollback();/// relieves the version load when new data is added to the collums
-				for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-					(*x)->reduce_cache();
-				}
+					rollback();/// relieves the version load when new data is added to the collums				
 			}
 			last_unlock_time = os::micros();
 		}
