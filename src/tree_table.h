@@ -623,16 +623,19 @@ namespace tree_stored{
 			_FileNames names;
 			std::string path = table_arg->s->path.str;
 			names.push_back(path);
+			std::string extension = TREESTORE_FILE_EXTENSION;
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string name = path;
 				name += INDEX_SEP();
 				name += pos->name;
+				//name += extension;
 				names.push_back(name);
 			}
 			for (Field **field=share->field ; *field ; field++){
 				std::string name = path;
 				name += TABLE_SEP();
 				name += (*field)->field_name;
+				//name += extension;
 				names.push_back(name);
 			}
 
@@ -838,6 +841,8 @@ namespace tree_stored{
 		}
 
 		void clear(){
+			
+			rollback();
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				delete (*x);

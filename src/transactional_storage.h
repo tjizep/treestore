@@ -34,6 +34,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _TRANSACTIONAL_STORAGE_H_
 #define _TRANSACTIONAL_STORAGE_H_
+#define TREESTORE_FILE_EXTENSION ""
+
 #include <stdlib.h>
 #include <memory>
 #include <string>
@@ -61,6 +63,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/LogFile.h"
 #include "Poco/StringTokenizer.h"
 #include "Poco/Timestamp.h"
+#include "Poco/DirectoryIterator.h"
 #include <Poco/BinaryWriter.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/File.h>
@@ -434,6 +437,8 @@ namespace storage{
 
 		std::string name;			/// external name to users of class
 
+		std::string extension;		/// extension of data file
+
 		u64 changes;				/// counts the changes made
 
 		version_type version;		/// the version of this allocator
@@ -536,7 +541,7 @@ namespace storage{
 
 		Session& get_session(){
 			if(_session == nullptr){
-				_session = std::make_shared<Session>("SQLite", get_storage_path() + name);//SessionFactory::instance().create
+				_session = std::make_shared<Session>("SQLite", get_storage_path() + name + extension);//SessionFactory::instance().create
 				is_new = false;
 				create_allocation_table();
 				create_statements();
@@ -893,6 +898,7 @@ namespace storage{
 		,   currently_active(0)         /// logical address after allocate and before complete is called
 		,	table_name("blocks")		/// table name - nothing special
         ,   name(namer.get_name())		/// storage name can be a path should contain only numbers and letters no seperators commans etc
+		,	extension(TREESTORE_FILE_EXTENSION) /// extension used by treestore
         ,	changes(0)					/// changes made since begin
         ,	version(0)					/// starts the version at 0
         ,	allocated_version(0)		/// the version after allocate
@@ -905,12 +911,12 @@ namespace storage{
 
 		{
 			using Poco::File;
-			File df (get_storage_path() + name );
+			File df (get_storage_path() + name + extension );
 			is_new = !df.exists();
 			if(!is_new){
 				get_session();
 				/// readahead io opt
-				os::read_ahead(get_storage_path() + name);
+				os::read_ahead(get_storage_path() + name + extension);
 				
 			}
 
@@ -930,7 +936,7 @@ namespace storage{
 				using Poco::File;
 				using Poco::Path;
 				try{
-					File df (get_name());
+					File df (get_name() + extension);
 					if(df.exists()){
 						df.remove();
 					}

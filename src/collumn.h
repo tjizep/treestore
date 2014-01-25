@@ -251,6 +251,9 @@ namespace collums{
 	};
 	
 	extern _LockedRowData* get_locked_rows(const std::string& name);
+	
+	extern void set_loading_data(const std::string& name, int loading);
+	extern int get_loading_data(const std::string& name);
 
 	template<typename _Stored>
 	class collumn {
@@ -694,7 +697,7 @@ namespace collums{
 				
 				stored::abstracted_storage storage(name);
 				storage.begin();
-				storage.set_transaction_r(true);
+				storage.set_reader();
 				_ColMap col(storage);
 
 
@@ -734,6 +737,7 @@ namespace collums{
 				return true;
 			}
 		public:
+
 			ColLoader(std::string name,_CacheEntry * cache, bool lax, size_t col_size)
 			:	name(name)
 			,	cache(cache)
@@ -742,12 +746,19 @@ namespace collums{
 			{
 				cache->available = false;
 				cache->loaded = true;
-
+				set_loading_data(name, 1);
 			}
 
 			virtual void work(){
-				(*this).load_into_cache(col_size);
-
+					
+				try{
+					(*this).load_into_cache(col_size);
+				}catch(std::exception&){
+					printf("Error during col cache loading/decoding\n");
+				}
+				set_loading_data(name, 0);
+				
+				
 			}
 			virtual ~ColLoader(){
 
@@ -762,6 +773,7 @@ namespace collums{
 			static Poco::Mutex m;
 			return m;
 		}
+
 		_Caches & get_g_cache(){
 			static _Caches _g_cache;
 			return _g_cache;
@@ -796,7 +808,7 @@ namespace collums{
 
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-				if(calc_total_use()+col_size*sizeof(_Stored) > treestore_max_mem_use){
+				if(calc_total_use() + col_size*sizeof(_Stored) > treestore_max_mem_use){
 					return result;
 				}
 				if(get_g_cache().count(name)==0){
@@ -969,6 +981,7 @@ namespace collums{
 
 		~collumn(){
 		}
+		
 		void initialize(bool by_tree){
 			
 			cend = col.end();
@@ -1005,13 +1018,16 @@ namespace collums{
 			}
 			return rows_per_key;
 		}
+		
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
+		
 		const _Stored& seek_by_tree(_Rid row) {
 
 			return seek_by_cache(row);
 		}
+		
 		const _Stored& seek_by_cache(_Rid row)  {
 
 
@@ -1042,6 +1058,7 @@ namespace collums{
 			return ival.data();
 			
 		}
+		
 		void flush(){
 			if(modified)
 			{
@@ -1052,12 +1069,14 @@ namespace collums{
 			}
 			modified = false;
 		}
+		
 		void flush2(){
 			if(modified){
 				col.flush_buffers();
 				
 			}
 		}
+		
 		void commit1(){
 			if(modified){
 				col.reduce_use();
@@ -1066,6 +1085,7 @@ namespace collums{
 			release_cache();
 			reset_cache_locals();
 		}
+
 		void commit2(){
 			if(modified){
 
@@ -1081,10 +1101,9 @@ namespace collums{
 
 		void rollback(){
 			if(modified){
-				//printf("releasing %s\n", storage.get_name().c_str());
 				col.flush();
-
 			}
+
 			col.reduce_use();
 			modified = false;
 			storage.rollback();
@@ -1092,17 +1111,16 @@ namespace collums{
 			reset_cache_locals();
 		}
 
-		void reduce_cache_use(){
-			
-			//if(calc_total_use() > treestore_max_mem_use){				
-				release_cache();
-				unload_cache();
-				reset_cache_locals();
-			//}
+		void reduce_cache_use(){				
+			release_cache();
+			unload_cache();
+			reset_cache_locals();
 		}
+
 		void reduce_tree_use(){
 			col.reduce_use();
 		}
+		
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));
 		}
@@ -1110,6 +1128,7 @@ namespace collums{
 		ImplIterator<_ColMap> begin(){
 			return ImplIterator<_ColMap> (col, col.begin());
 		}
+		
 		void erase(_Rid row){
 			col.erase(row);
 			if((*this).rows > 0) --(*this).rows;
@@ -1121,10 +1140,10 @@ namespace collums{
 					get_cache().make_flags();
 					
 					get_cache().invalidate(row);
-				}
-				
+				}				
 			}
 		}
+
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
 			if(has_cache()){

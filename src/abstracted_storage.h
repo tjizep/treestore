@@ -37,7 +37,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "stx/storage/basic_storage.h"
 #include "fields.h"
-#include "abstracted_storage.h"
 #include "MurmurHash3.h"
 #include <map>
 #include <vector>
@@ -192,6 +191,11 @@ namespace stored{
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
 		}
+
+		void set_reader(){
+			set_transaction_r(true);
+		}
+
 		void set_transaction_r(bool read){
 			if(_transaction==nullptr) 
 				throw TransactionNotStartedException();

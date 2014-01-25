@@ -168,20 +168,66 @@ void print_read_lookups();
 #include "tree_index.h"
 #include "tree_table.h"
 typedef std::map<std::string, _FileNames > _Extensions;
+typedef std::unordered_map<std::string, int > _LoadingData;
 
 Poco::Mutex tree_stored::tree_table::shared_lock;
 Poco::Mutex single_writer_lock;
+Poco::Mutex data_loading_lock;
 tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
+_LoadingData loading_data;
 
 collums::_LockedRowData* collums::get_locked_rows(const std::string& name){
 	static collums::_RowDataCache rdata;
 	return rdata.get_for_table(name);
 }
+void collums::set_loading_data(const std::string& name, int loading){
+	nst::synchronized sl(data_loading_lock);
+	loading_data[name] = loading;
+}
+int collums::get_loading_data(const std::string& name){
+	nst::synchronized sl(data_loading_lock);
+	return loading_data[name] ;///def false
+}
 
-// w.t.f.
 // The handlerton asks for extensions when the table defs are already destroyed 
-static _Extensions save_extensions;
 
+_FileNames extensions_from_table_name(const std::string& name){
+	using Poco::StringTokenizer;
+	using Poco::Path;
+	using Poco::DirectoryIterator;
+	StringTokenizer components(name, "\\/");
+	std::string path,filestart;
+
+	size_t e = (components.count()-1);
+	filestart = components[e];
+	filestart += "_";
+
+	for(size_t s = 0; s < e; ++s){
+		path += components[s] ;
+		if (s < e-1)
+			path += Path::separator();
+	}
+	_FileNames files;
+	for(DirectoryIterator d(path); d != DirectoryIterator();++d){
+		DBUG_PRINT("info",("scanning %s\n",d.name().c_str()));
+		if((*d).isFile()){
+			if(d.name().substr(0,filestart.size())==filestart && d.name() != filestart){
+				DBUG_PRINT("info",("found member table %s\n",d.name().c_str()));
+				std::string p = ".";
+				p += Path::separator();
+				p += (*d).path();
+				for(size_t pop = 0; pop < strlen(TREESTORE_FILE_EXTENSION);++pop){
+					p.pop_back();
+				}
+				
+				files.push_back(p);
+			}
+		}
+	}
+	DBUG_PRINT("info",("Found %lld files\n", (nst::lld)files.size()));
+	return files;
+
+}
 namespace tree_stored{
 	class tt{
 		int x;
@@ -233,7 +279,7 @@ namespace tree_stored{
 
 				t = new tree_table(table_arg);
 				tables[table_arg->s->path.str] = t;
-				save_extensions[table_arg->s->path.str] = t->get_file_names();
+				
 			}else{
 
 			}
@@ -589,7 +635,7 @@ public:
 	,	row(0)
 	,	last_resolved(0)
 	{
-
+		
 	}
 	~ha_treestore(){
 	}
@@ -679,7 +725,7 @@ public:
 	}
 
 	const char **bas_ext(void) const{
-		static const char * exts[] = {"", NullS};
+		static const char * exts[] = {TREESTORE_FILE_EXTENSION, NullS};
 		return exts;
 	}
 
@@ -748,15 +794,61 @@ public:
 		printf("open tt %s\n", table->alias);
 		return 0;
 	}
-	 int delete_table (const char * name){
-		 _FileNames files = save_extensions[name];
-		 DBUG_PRINT("info",("deleting files %s\n", name));
-		 for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
-			const char * name = (*f).c_str();
-			handler::delete_table(name);
-		 }
-		 return 0;
-	 }
+	
+	
+
+	int delete_table (const char * name){
+		DBUG_PRINT("info",("deleting files %s\n", name)); 
+		int r = 0;
+		
+		_FileNames files = extensions_from_table_name(name);
+			
+		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
+			while(collums::get_loading_data((*f))!=0){
+				os::zzzz(100);
+			}
+		} 
+
+		os::zzzz(330);
+		std::string extenstion = TREESTORE_FILE_EXTENSION;
+		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
+			
+			
+			std::string name = (*f);
+			using Poco::File;
+			using Poco::Path;
+			try{
+				std::string next = name + extenstion;
+				printf("deleting %s\n",next.c_str());
+				File df (next);
+				if(df.exists()){
+					df.remove();
+				}
+			}catch(std::exception& ){
+				printf("could not delete table file %s\n", name.c_str());
+				r = HA_ERR_NO_SUCH_TABLE;
+				
+			}
+			///
+		}
+		try{
+			using Poco::File;
+			using Poco::Path;
+			std::string nxt = name + extenstion;
+			printf("deleting %s\n",nxt.c_str());
+			File df (nxt);
+			if(df.exists()){
+				df.remove();
+			}
+		}catch(std::exception& ){
+			printf("could not delete table file %s\n", name);
+			r = HA_ERR_NO_SUCH_TABLE;
+			
+		}
+		
+		//r = handler::delete_table(name);
+		return r;
+	}
 	int close(void){
 		DBUG_PRINT("info",("closing tt %s\n", table->alias));
 		printf("closing tt %s\n", table->alias);
@@ -1400,7 +1492,7 @@ mysql_declare_plugin(treestore)
 	MYSQL_STORAGE_ENGINE_PLUGIN,
 		&treestore_storage_engine,
 		"TREESTORE",
-		"Christiaan Pretorius (c) 2013",
+		"Christiaan Pretorius (c) 2013,2014",
 		"TuReeStore MySQL storage engine",
 		PLUGIN_LICENSE_GPL,
 		treestore_db_init, /* Plugin Init */
