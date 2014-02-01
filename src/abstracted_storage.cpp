@@ -246,6 +246,7 @@ public:
 
 		}catch(...){
 			printf("unknown exception during recovery\n");
+			exit(-1);
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
 			std::string storage_name = (*p).first;
@@ -270,7 +271,7 @@ public:
 		journal_ostr.open(journal_name, o_mode);
 	}
 
-	void synch()
+	void synch(bool force)
 	{
 		nst::synchronized s(jlock);
 
@@ -282,7 +283,7 @@ public:
 		Poco::File jf(journal_name);
 		if(jf.exists()){
 			set_treestore_journal_size( jf.getSize() );
-			if(jf.getSize() > get_treestore_journal_lower_max() ){
+			if(force || jf.getSize() > get_treestore_journal_lower_max() ){
 				nst::u64 singles = 0;
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 					singles += (*p).second->make_singular() ? 1 : 0;
@@ -360,8 +361,8 @@ namespace storage{
 
 	/// ensures all journal entries are synched to storage
 
-	void journal::synch(){
-		js().synch();
+	void journal::synch(bool force){
+		js().synch(force);
 	}
 };
 };

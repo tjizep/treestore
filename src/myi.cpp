@@ -1,21 +1,9 @@
 #include "myi.h"
 
-/* Copyright (c) 2012, Christiaan Pretorius. All rights reserved.
-
-
+/* 
+Copyright (c) 2012,2013,2014 Christiaan Pretorius. All rights reserved.
 MySQL TreeStore Storage Engine
-
-myi.cpp - MySQL Storage Engine
-
-CREATE TABLE test_table (
-id     int(20) NOT NULL auto_increment,
-name   varchar(32) NOT NULL default '',
-other  int(20) NOT NULL default '0',
-PRIMARY KEY  (id),
-KEY name (name),
-KEY other_key (other))
-ENGINE="TREESTORE"
-
+myi.cpp - MySQL Storage Engine Interfaces
 
 */
 
@@ -189,45 +177,7 @@ int collums::get_loading_data(const std::string& name){
 	return loading_data[name] ;///def false
 }
 
-// The handlerton asks for extensions when the table defs are already destroyed 
 
-_FileNames extensions_from_table_name(const std::string& name){
-	using Poco::StringTokenizer;
-	using Poco::Path;
-	using Poco::DirectoryIterator;
-	StringTokenizer components(name, "\\/");
-	std::string path,filestart;
-
-	size_t e = (components.count()-1);
-	filestart = components[e];
-	filestart += "_";
-
-	for(size_t s = 0; s < e; ++s){
-		path += components[s] ;
-		if (s < e-1)
-			path += Path::separator();
-	}
-	_FileNames files;
-	for(DirectoryIterator d(path); d != DirectoryIterator();++d){
-		DBUG_PRINT("info",("scanning %s\n",d.name().c_str()));
-		if((*d).isFile()){
-			if(d.name().substr(0,filestart.size())==filestart && d.name() != filestart){
-				DBUG_PRINT("info",("found member table %s\n",d.name().c_str()));
-				std::string p = ".";
-				p += Path::separator();
-				p += (*d).path();
-				for(size_t pop = 0; pop < strlen(TREESTORE_FILE_EXTENSION);++pop){
-					p.pop_back();
-				}
-				
-				files.push_back(p);
-			}
-		}
-	}
-	DBUG_PRINT("info",("Found %lld files\n", (nst::lld)files.size()));
-	return files;
-
-}
 namespace tree_stored{
 	class tt{
 		int x;
@@ -359,7 +309,13 @@ namespace tree_stored{
 			}
 
 		}
-
+		void remove_table(const std::string name){
+			synchronized _s(p2_lock);
+			if(tables.count(name)){
+				delete tables[name];
+				tables.erase(name);
+			}
+		}
 		void reduce_index_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
@@ -426,7 +382,14 @@ private:
 	_Threads threads;
 	Poco::Mutex tlock;
 public:
+	void remove_table(const std::string &name){
+		NS_STORAGE::syncronized ul(tlock);
 
+		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
+			(*t)->remove_table(name);
+				
+		}
+	}
 	void release_thread(tree_stored::tree_thread * tt){
 		if(tt==NULL){
 			printf("Invalid argument to release thread\n");
@@ -746,7 +709,7 @@ public:
 					 HA_PRIMARY_KEY_REQUIRED_FOR_DELETE |
 					/* HA_NO_TRANSACTIONS   |*/
 					HA_PARTIAL_COLUMN_READ | HA_NULL_IN_KEY /*|HA_CAN_REPAIR*/
-);
+				);
 	}
 
 	double scan_time()
@@ -796,7 +759,108 @@ public:
 	}
 	
 	
+	_FileNames extensions_from_table_name(const std::string& name){
+		using Poco::StringTokenizer;
+		using Poco::Path;
+		using Poco::DirectoryIterator;
+		StringTokenizer components(name, "\\/");
+		std::string path,filestart;
 
+		size_t e = (components.count()-1);
+		filestart = components[e];
+		filestart += TREESTORE_FILE_SEPEARTOR;
+
+		for(size_t s = 0; s < e; ++s){
+			path += components[s] ;
+			if (s < e-1)
+				path += Path::separator();
+		}
+
+		_FileNames files;
+		for(DirectoryIterator d(path); d != DirectoryIterator();++d){
+			DBUG_PRINT("info",("scanning %s\n",d.name().c_str()));
+			if((*d).isFile()){
+				if(d.name().substr(0,filestart.size())==filestart && d.name() != filestart){
+					DBUG_PRINT("info",("found member table %s\n",d.name().c_str()));
+					std::string p = ".";
+					p += Path::separator();
+					p += (*d).path();
+					for(size_t pop = 0; pop < strlen(TREESTORE_FILE_EXTENSION);++pop){
+						p.pop_back();
+					}
+				
+					files.push_back(p);
+				}
+			}
+		}
+		DBUG_PRINT("info",("Found %lld files\n", (nst::lld)files.size()));
+		return files;
+
+	}
+
+	/// from and to are complete relative paths
+	int rename_table(const char *_from, const char *_to){
+		
+		DBUG_PRINT("info",("renaming files %s\n", name)); 
+	
+		
+		int r = 0;
+		std::string from = _from;
+		std::string to = _to;
+		
+		
+
+		_FileNames files = extensions_from_table_name(from);
+			
+		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
+			while(collums::get_loading_data((*f))!=0){
+				os::zzzz(100);
+			}
+		} 
+		
+		os::zzzz(130);
+		st.remove_table(from);
+
+		std::string extenstion = TREESTORE_FILE_EXTENSION;
+		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
+			
+			
+			std::string name = (*f);
+			using Poco::File;
+			using Poco::Path;
+			try{
+				std::string next = name + extenstion;
+				printf("renaming %s\n",next.c_str());
+				File df (next);
+				if(df.exists()){
+					std::string renamed = to + &next[from.length()];
+					df.moveTo(renamed);
+				}
+			}catch(std::exception& ){
+				printf("could not rename table file %s\n", name.c_str());
+				r = HA_ERR_NO_SUCH_TABLE;				
+			}
+			///
+		}
+		try{
+			using Poco::File;
+			using Poco::Path;
+			std::string nxt = from + extenstion;
+			printf("renaming %s\n",nxt.c_str());
+			File df (nxt);
+			if(df.exists()){
+				std::string renamed = to + &nxt[from.length()];
+				df.moveTo(renamed);
+			}
+		}catch(std::exception& ){
+			printf("could not rename table file %s\n", from.c_str());
+			r = HA_ERR_NO_SUCH_TABLE;
+			
+		}
+		
+		
+		return r;
+	}
 	int delete_table (const char * name){
 		DBUG_PRINT("info",("deleting files %s\n", name)); 
 		int r = 0;
@@ -809,7 +873,8 @@ public:
 			}
 		} 
 
-		os::zzzz(330);
+		os::zzzz(130);
+		st.remove_table(name);
 		std::string extenstion = TREESTORE_FILE_EXTENSION;
 		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
 			
@@ -878,16 +943,16 @@ public:
 			return 0;
 		}
 		bool writer = false;
-		double MB = 1024.0*1024.0;
+		
 		printf
 		(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
 		,	lock_type == F_UNLCK ? "-":"+"
 		,	table->s->normalized_path.str
-		,	(double)calc_total_use()/MB
-		,	(double)nst::buffer_use/MB
-		,	(double)nst::col_use/MB
-		,	(double)btree_totl_used/MB
-		,	(double)total_cache_size/MB
+		,	(double)calc_total_use()/units::MB
+		,	(double)nst::buffer_use/units::MB
+		,	(double)nst::col_use/units::MB
+		,	(double)btree_totl_used/units::MB
+		,	(double)total_cache_size/units::MB
 		);
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
@@ -940,11 +1005,11 @@ public:
 				printf
 				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
 				,	"transaction complete"
-				,	(double)calc_total_use()/MB
-				,	(double)nst::buffer_use/MB
-				,	(double)nst::col_use/MB
-				,	(double)btree_totl_used/MB
-				,	(double)total_cache_size/MB
+				,	(double)calc_total_use()/units::MB
+				,	(double)nst::buffer_use/units::MB
+				,	(double)nst::col_use/units::MB
+				,	(double)btree_totl_used/units::MB
+				,	(double)total_cache_size/units::MB
 				);
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 				
@@ -997,6 +1062,8 @@ public:
 
 	int write_row(byte * buf){
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
+		/// TODO: auto timestamps
+
 		//if (table->timestamp_field_type & TIMESTAMP_AUTO_SET_ON_INSERT)
 		//	table->timestamp_field->set_time();
 		if (table->next_number_field && buf == table->record[0])
@@ -1326,7 +1393,7 @@ public:
 		}
 	}
 
-	int iterations;
+	nst::u64 iterations;
 
 	stored::_Rid range_iterator;
 	virtual int read_range_first

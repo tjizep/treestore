@@ -1,23 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
-Copyright (c) 2008, 2009 Google Inc.
-Copyright (c) 2009, Percona Inc.
-Copyright (c) 2012, Facebook Inc.
 Copyright (c) 2013, Christiaan Pretorius
-
-Portions of this file contain modifications contributed and copyrighted by
-Google, Inc. Those modifications are gratefully acknowledged and are described
-briefly in the InnoDB documentation. The contributions by Google are
-incorporated with their permission, and subject to the conditions contained in
-the file COPYING.Google.
-
-Portions of this file contain modifications contributed and copyrighted
-by Percona Inc.. Those modifications are
-gratefully acknowledged and are described briefly in the InnoDB
-documentation. The contributions by Percona Inc. are incorporated with
-their permission, and subject to the conditions contained in the file
-COPYING.Percona.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -34,7 +17,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _TRANSACTIONAL_STORAGE_H_
 #define _TRANSACTIONAL_STORAGE_H_
+
+/// currently treestore doesn't use extensions
+/// should the need for them arise then this
+/// is where it should be changed
+
 #define TREESTORE_FILE_EXTENSION ""
+#define TREESTORE_FILE_SEPEARTOR "_"
 
 #include <stdlib.h>
 #include <memory>
@@ -64,16 +53,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/StringTokenizer.h"
 #include "Poco/Timestamp.h"
 #include "Poco/DirectoryIterator.h"
-#include <Poco/BinaryWriter.h>
-#include <Poco/BinaryReader.h>
-#include <Poco/File.h>
-///:sqlite_storage
+#include "Poco/BinaryWriter.h"
+#include "Poco/BinaryReader.h"
+#include "Poco/File.h"
 
-/// TODO: initialize 'next' to address of last block available
 
-///:mvcc controller
-
-/// TODO: unmerged version recovery
+/// TODODONE: initialize 'next' to address of last block available
+/// TODODONE: unmerged version recovery
 /// TODODONE: version storage naming
 /// TODODONE: merge versions on commit or if there are too many versions
 
@@ -168,6 +154,8 @@ namespace storage{
 		/// notify particpants that the journal synch has started
 		virtual void journal_synch_start() = 0;
 		virtual void journal_synch_end() = 0;
+		/// notify the participant that any stray versions should 
+		/// be merged
 		virtual bool make_singular() = 0;
 		virtual std::string get_name() const = 0;
 		bool participating;
@@ -199,7 +187,7 @@ namespace storage{
 
 		/// ensures all journal entries are synched to storage
 
-		void synch();
+		void synch(bool force = false);
 
 		/// called during startup to recover unwritten transactions
 
@@ -331,7 +319,7 @@ namespace storage{
 	};
 
 	class InvalidReaderCount : public std::exception{
-		public: /// A version has been released more than it was engaged
+		public: /// version released != engaged
 		InvalidReaderCount() throw() {
 		}
 	};
@@ -597,9 +585,7 @@ namespace storage{
 		};
 
 
-		/// flush any or all excess data to disk, the factor determines the fraction
-		/// of the total use to release i.e. a value of 0 releases all
-		/// the default value will release 25% of the total used memory
+		/// adds the argument change to the _use variable
 		void up_use(ptrdiff_t change){
 			add_buffer_use (change);
 			_use += change;
@@ -611,6 +597,11 @@ namespace storage{
 		inline ptrdiff_t get_use() const {
 			return _use;
 		}
+		
+		/// flush any or all excess data to disk, the factor determines the fraction
+		/// of the total use to release i.e. a value of 0 releases all
+		/// the default value will release 25% (1-0.75) of the total used memory
+
 		/// writes changed buffers to disk while [release]-ing until
 		/// the memory used is a [factor] of the original
 		void flush_back
@@ -992,12 +983,12 @@ namespace storage{
 
 			syncronized ul(lock);
 			if(references == 0){
-				/*if(_session!=nullptr && !transient){
+				if((*this).modified() && !transient){
 					(*this).begin_new();
 					(*this).commit();
-				}*/
+				}
 				if(_session!=nullptr){
-					if (!transient){
+					if (!transient){						
 						printf(" discarding storage %s\n",name.c_str());
 						rollback();
 					}else
