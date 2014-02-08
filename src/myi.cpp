@@ -1020,7 +1020,24 @@ public:
 
 		DBUG_RETURN(0);
 	}
+	const Item *cond_push_it(const Item *acon) { 
+		printf("Condition pushed\n");
+		Item::Type t = acon->type();
+		if(t == Item::FUNC_ITEM){
+			const Item_func* f = (const Item_func*)acon;
+			Item_func::Functype ft = f->functype();
+			
+			for(uint ac =0; ac < f->argument_count(); ++ac){
+				const Item * ia = f->arguments()[ac];
+				Item::Type it = ia->type();
+				printf("argument type\n");
+			}
+			printf("function type");
+		}
+		const char * n = acon->full_name();
+		return acon; 
 
+	};
 	// tscan 3
 	int rnd_init(bool scan){
 		row = 0;

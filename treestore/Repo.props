@@ -3,12 +3,17 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <CPP_REPO>C:\dev\cpp_all\repo</CPP_REPO>
+    <MYSQL_VERSION>mysql-5.6.16</MYSQL_VERSION>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
   <ItemGroup>
     <BuildMacro Include="CPP_REPO">
       <Value>$(CPP_REPO)</Value>
+    </BuildMacro>
+    <BuildMacro Include="MYSQL_VERSION">
+      <Value>$(MYSQL_VERSION)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
 </Project>
