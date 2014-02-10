@@ -60,7 +60,7 @@ extern  char treestore_predictive_hash ;
 extern  char treestore_reduce_tree_use_on_unlock;
 namespace storage_workers{
 	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
-	
+
 
 	extern unsigned int get_next_counter();
 	extern const int MAX_WORKER_MANAGERS;
@@ -92,7 +92,7 @@ namespace stored{
 		inline void set_value(_IntType nv) {
 			value = nv;
 		}
-		
+
 		explicit IntTypeStored(_IntType i):value(i){
 		}
 
@@ -115,7 +115,7 @@ namespace stored{
 		inline bool operator==(const IntTypeStored& right) const {
 			return (value == right.value);
 		}
-		
+
 		NS_STORAGE::u32 stored() const {
 			return NS_STORAGE::leb128::signed_size((NS_STORAGE::i64)value);
 		};
@@ -228,7 +228,7 @@ namespace stored{
 	template<bool CHAR_LIKE, int _ConstSize = 16>
 	class Blobule {
 	public:
-		
+
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
 	protected:
 		typedef NS_STORAGE::u8 _size_type;
@@ -510,6 +510,455 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
 	typedef stored::Blobule<false, 14> BlobStored;
 	typedef stored::Blobule<true, 14> VarCharStored;
+
+	class DynamicKey{
+	public:
+
+		enum StoredType{
+			I1 = 1,
+			I2 ,
+			I4 ,
+			I8 ,
+			R4 ,
+			R8 ,
+			S
+
+		};
+
+		typedef unsigned char	uchar;	/* Short for unsigned char */
+		typedef signed char int8;       /* Signed integer >= 8  bits */
+		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
+		typedef short int16;
+		typedef unsigned short uint16;
+		typedef int int32;
+		typedef unsigned int uint32;
+		typedef unsigned long	ulong;		  /* Short for unsigned long */
+		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
+		typedef long long longlong;
+		typedef longlong int64;
+		typedef ulonglong uint64;
+		typedef std::vector<nst::u8> _Data;
+
+		static const size_t MAX_BYTES = 2048;
+
+		typedef _Rid row_type ;
+
+		typedef NS_STORAGE::u8 _size_type;
+		typedef NS_STORAGE::u8 _BufferSize;
+
+	protected:
+
+		nst::u8 buf[sizeof(_Data)];
+		_BufferSize bs;// bytes used
+
+		inline _Data& get_Data(){
+			return *(_Data*)&buf[0];
+		}
+		inline const _Data& get_Data() const {
+			return *(const _Data*)&buf[0];
+		}
+		inline nst::u8* data(){
+			if(bs==sizeof(_Data))
+				return &(get_Data())[0];
+			return &buf[0];
+		}
+		inline const nst::u8* data() const{
+			if(bs==sizeof(_Data))
+				return &(get_Data())[0];
+			return &buf[0];
+		}
+		inline nst::u8* _resize_buffer(size_t nbytes){
+
+			using namespace NS_STORAGE;
+
+			if(nbytes >= sizeof(_Data) && bs < nbytes){
+				bs = sizeof(_Data);
+				new (&get_Data()) _Data();
+			}else
+				bs = (_BufferSize)nbytes;
+			if(bs==sizeof(_Data)){
+				if(get_Data().capacity() < nbytes){
+					nst::i64 d = get_Data().capacity();
+					get_Data().resize(nbytes);
+					add_btree_totl_used (get_Data().capacity()-d);
+				}else
+					get_Data().resize(nbytes);
+			}
+
+			return data();
+		}
+		NS_STORAGE::u8* _append( size_t count ){
+			size_t os = size();
+			NS_STORAGE::u8* r = _resize_buffer( os + count ) + os;
+
+			return r;
+		}
+
+		/// 1st level
+		void addDynInt(nst::i64 v){
+			*_append(1) = DynamicKey::I8;
+			*(nst::i64*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u64 v){
+			*_append(1) = DynamicKey::I8;
+			*(nst::u64*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i32 v){
+			*_append(1) = DynamicKey::I4;
+			*(nst::i32*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u32 v){
+			*_append(1) = DynamicKey::I4;
+			*(nst::u32*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i16 v){
+			*_append(1) = DynamicKey::I2;
+			*(nst::i16*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u16 v){
+			*_append(1) = DynamicKey::I2;
+			*(nst::u16*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::i8 v){
+			*_append(1) = DynamicKey::I1;
+			*(nst::i8*)_append(sizeof(v)) =  v;
+		}
+		void addDynInt(nst::u8 v){
+			*_append(1) = DynamicKey::I1;
+			*(nst::u8*)_append(sizeof(v)) =  v;
+		}
+		void addDynReal(double v){
+			*_append(1) = DynamicKey::R8;
+			*(double*)_append(sizeof(v)) = v;
+		}
+		void addDynReal(float v){
+			*_append(1) = DynamicKey::R4;
+			*(float*)_append(sizeof(v)) = v;
+		}
+	public:
+		void add(const char* k, size_t s){
+			size_t sad = s;
+			*_append(1) = DynamicKey::S;
+			( *(nst::u16*)_append(2)) = (nst::u16)sad;
+			if(sad > 0){
+				memcpy(_append(sad), k, sad);
+			}
+		}
+	public:
+		row_type row;
+	public:
+		int size() const {
+			if(bs==sizeof(_Data))
+				return get_Data().size();
+			return bs;
+		}
+		/// 2nd level
+		void addf8(double v){
+
+			addDynReal(v);
+		}
+
+		void add1(char c){
+			addDynInt(c);
+
+		}
+
+		void addu1(unsigned char c){
+
+			addDynInt(c);
+
+		}
+
+		void addf4(float v){
+
+			addDynReal(v);
+		}
+
+		void add8(long long v){
+			addDynInt((nst::i64)v);
+
+		}
+
+		void addu8(unsigned long long v){
+
+			addDynInt((nst::u64)v);
+
+		}
+
+		void add4(long v){
+
+			addDynInt(v);
+
+		}
+
+		void addu4(unsigned int v){
+
+			addDynInt(v);
+
+		}
+
+		void add2(short v){
+
+			addDynInt(v);
+		}
+
+		void addu2(unsigned short v){
+
+			addDynInt(v);
+		}
+		/// 3rd level
+		void add(const stored::FloatStored & v){
+
+			addf4(v.get_value());
+		}
+
+		void add(const stored::DoubleStored & v){
+
+			addf8(v.get_value());
+		}
+		void add(const stored::ShortStored& v){
+
+			add2(v.get_value());
+		}
+
+		void add(const stored::UShortStored& v){
+
+			addu2(v.get_value());
+		}
+
+		void add(const stored::CharStored& v){
+
+			add1(v.get_value());
+		}
+
+		void add(const stored::UCharStored& v){
+
+			addu1(v.get_value());
+		}
+
+		void add(const stored::IntStored& v){
+
+			add4(v.get_value());
+		}
+
+		void add(const stored::UIntStored& v){
+
+			addu4(v.get_value());
+		}
+
+		void add(const stored::LongIntStored& v){
+
+			add8(v.get_value());
+		}
+
+		void add(const stored::ULongIntStored& v){
+
+			addu8(v.get_value());
+		}
+
+		void add(const stored::BlobStored& v){
+
+			add(v.get_value(),v.get_size());
+		}
+
+		void add(const stored::VarCharStored& v){
+
+			add(v.get_value(),v.get_size()-1);
+		}
+
+		void addTerm(const char* k, size_t s){
+			add(k, s);
+		}
+
+		void clear(){
+
+			row = 0;
+			if(bs==sizeof(_Data)){
+				get_Data().clear();
+			}else
+				bs = 0;
+		}
+
+		~DynamicKey(){
+			if(bs==sizeof(_Data)){
+				remove_btree_totl_used (get_Data().capacity());
+				get_Data().~_Data();
+				bs = 0;
+			}
+		}
+
+		DynamicKey():
+			bs(0),
+			row(0)
+		{
+
+		}
+
+		DynamicKey(const DynamicKey& right):
+			bs(0),
+			row(0)
+		{
+			*this = right;
+		}
+
+		inline bool left_equal_key(const DynamicKey& right) const {
+			//if( size != right.size ) return false;
+			if( size() == 0 ) return false;
+
+			int r = memcmp(data(), right.data(), std::min<size_t>(size(),right.size()) );
+			return r == 0;
+		}
+
+		inline bool equal_key(const DynamicKey& right) const {
+			if( size() != right.size() ) return false;
+			int r = memcmp(data(), right.data(), size() );
+			return r == 0;
+
+		}
+
+		DynamicKey& operator=(const DynamicKey& right){
+			_resize_buffer(right.size());
+			memcpy(data(), right.data(), right.size());
+			row = right.row;
+			return *this;
+		}
+		inline operator size_t() const {
+			size_t r = 0;
+			MurmurHash3_x86_32(data(), size(), 0, &r);
+			return r;
+		}
+		bool operator<(const DynamicKey& right) const {
+
+			/// partitions the order in a hierarchy
+			const nst::u8 *ld = data();
+			const nst::u8 *rd = right.data();
+			nst::u8 lt = *ld;
+			nst::u8 rt = *rd;
+			int r = 0,l=0,ll=0;
+			while(lt == rt){
+				switch(lt){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					if(*(nst::i8*)ld < *(nst::i8*)rd)
+						return true;
+					else if(*(nst::i8*)ld > *(nst::i8*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					if(*(nst::i16*)ld < *(nst::i16*)rd)
+						return true;
+					else if(*(nst::i16*)ld > *(nst::i16*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					if(*(nst::i32*)ld < *(nst::i32*)rd)
+						return true;
+					else if(*(nst::i32*)ld > *(nst::i32*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::I8 :
+					l = 8;
+					if(*(nst::i64*)ld < *(nst::i64*)rd)
+						return true;
+					else if(*(nst::i64*)ld > *(nst::i64*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					if(*(float*)ld < *(float*)rd)
+						return true;
+					else if(*(float*)ld > *(float*)rd)
+						return false;
+					else r = 0;
+
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					if(*(double*)ld < *(double*)rd)
+						return true;
+					else if(*(double*)ld > *(double*)rd)
+						return false;
+					else r = 0;
+					break;
+				case DynamicKey::S:
+
+					r = memcmp(ld+2, rd+2, std::min<nst::i16>(*(const nst::i16*)rd, *(const nst::i16*)ld));
+					if(r !=0) return r<0;
+					if(*(const nst::i16*)rd != *(const nst::i16*)ld)
+						return (*(const nst::i16*)rd < *(const nst::i16*)ld);
+					break;
+				};
+				if( r != 0 ) break;
+				++l;
+				ld += l;
+				rd += l;
+				ll += l;
+				if(ll >= size()) break;
+				if(ll >= right.size()) break;
+				lt = *ld;
+				rt = *rd;
+			}
+			if(rt != lt)
+				return lt < rt; //total order on types first
+			if(r != 0)
+				return r < 0;
+			if(size() != right.size())
+				return size() < right.size();
+			return (row < right.row);
+		}
+
+		inline bool operator!=(const DynamicKey& right) const {
+			if(size() != right.size()) return true;
+			int r = memcmp(data(), right.data(), size());
+			if(r != 0) return true;
+			return (row != right.row);
+		}
+
+		inline bool operator==(const DynamicKey& right) const {
+			return !(*this != right);
+		}
+
+		NS_STORAGE::u32 stored() const {
+			return (NS_STORAGE::u32)(NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row));
+		};
+
+		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
+			using namespace NS_STORAGE;
+			buffer_type::iterator writer = w;
+			writer = leb128::write_signed(writer, row);
+			writer = leb128::write_signed(writer, size());
+
+			const u8 * end = data()+size();
+			for(const u8 * d = data(); d < end; ++d,++writer){
+				*writer = *d;
+			}
+			return writer;
+		};
+
+		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+			using namespace NS_STORAGE;
+			buffer_type::const_iterator reader = r;
+			row = leb128::read_signed(reader);
+			size_t s = leb128::read_signed(reader);
+			if(s > MAX_BYTES){
+				s = MAX_BYTES;
+			}
+			u8 * end = _resize_buffer(s)+s;
+			for(u8 * d = data(); d < end; ++d,++reader){
+				*d = *reader;
+			}
+
+
+			return reader;
+		};
+	};
+
 	static const nst::u32 MAX_HIST = 1 << 20;
 	static const nst::u32 MAX_ENTROPY = 1 << 16;
 	template<class _Data>
@@ -517,7 +966,7 @@ namespace stored{
 			nst::u64 samples;
 
 			entropy_t():samples(0){
-					
+
 			}
 			void sample(const _Data& data){
 				++samples;
@@ -538,7 +987,7 @@ namespace stored{
 			_Histogram histogram;
 
 			entropy_t():samples(0){
-					
+
 			}
 			void sample(const _Sampled & data){
 				if(histogram.size() < MAX_HIST)
@@ -556,18 +1005,18 @@ namespace stored{
 		template<typename _IntType>
 		struct int_entropy_t{
 			typedef _IntType _Sampled;
-			typedef std::map<typename _Sampled, nst::u64> _Histogram;
+			typedef std::map<_Sampled, nst::u64> _Histogram;
 			nst::u64 samples;
 
 			_Histogram histogram;
-				
+
 			int_entropy_t():samples(0){
-					
+
 			}
 			void clear(){
 				samples = 0;
-				
-				histogram.swap(_Histogram());
+                _Histogram h;
+				histogram.swap(h);
 			}
 			void sample(const _IntType& data){
 				histogram[data]++;
@@ -584,7 +1033,7 @@ namespace stored{
 
 		};
 
-		
+
 		class UninitializedCodeException : public std::exception{
 		public :
 			/// the code has not been initialized
@@ -595,29 +1044,29 @@ namespace stored{
 		};
 
 		/// class for fixed size entropy coded buffer
-		template<class _IntType>
+		template<typename _IntType>
 		struct int_fix_encoded_buffer{
 			typedef nst::u32 _CodeType;
 			typedef symbol_vector<_CodeType> _Symbols;
-			
+
 			typedef int_entropy_t<_IntType> _Entropy;
-			
-			typedef std::map< typename _IntType, _CodeType> _CodeMap;
-			typedef std::vector<typename _IntType> _DeCodeMap;
-			
+
+            typedef std::map<_IntType, _CodeType> _CodeMap;
+			typedef std::vector<_IntType> _DeCodeMap;
+
 			_Entropy stats;
 			_CodeMap codes;
 			_DeCodeMap decodes;
-			
+
 			_Symbols symbols;
-			typename _IntType _null_val;
+			_IntType _null_val;
 			_CodeType code_size;
-			
+
 			int_fix_encoded_buffer() : code_size(0){
 			}
 
 			size_t capacity() const {
-				size_t is = sizeof(typename _IntType);
+				size_t is = sizeof(_IntType);
 				size_t bs = sizeof(_CodeType);
 				return (is+bs)*codes.size()+is*decodes.capacity()+symbols.capacity();
 			}
@@ -627,24 +1076,26 @@ namespace stored{
 			}
 
 			void clear(){
+                _CodeMap c;
+                _DeCodeMap d;
 				code_size = 0;
 				stats.clear();
-				codes.swap(_CodeMap());
-				decodes.swap(_DeCodeMap());
+				codes.swap(c);
+				decodes.swap(d);
 				symbols.clear();
 			}
-			
+
 			/// Find smallest X in 2^X >= value
 			inline nst::u32 bit_log2(nst::u32 value){
-								
+
 				nst::u32 log = 0; /// satisfies 2^0 = 1
 				nst::u32 bit  = 1; /// current value of 2^log
-			
+
 				while(bit < value){
 					bit = bit <<1;
 					++log;
 				}
-			
+
 				return log;
 			}
 
@@ -658,17 +1109,17 @@ namespace stored{
 
 			}
 
-			
-			void encode(_Rid row, typename const _IntType &val){
+
+			void encode(_Rid row, const _IntType &val){
 				if(codes.count(val)){
 					_CodeType code = codes[val];
 					symbols.set(row, code);
-					
+
 				}else
 					throw UninitializedCodeException();
 			}
-		
-			typename const _IntType& decode(_Rid row) const {
+
+			const _IntType& decode(_Rid row) const {
 				_CodeType code = 0;
 				if(code_size > 0){
 					code = symbols.get(row);
@@ -680,58 +1131,59 @@ namespace stored{
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
-					
-					_Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
+
+					typename _Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
 					nst::u32 words = 0;
-					
+
 					for(;h != (*this).stats.histogram.end();++h){
-						
+
 						codes[(*h).first] = words;
 						decodes.resize(words+1);
 						decodes[words] = (*h).first;
 						++words;
-						
+
 					}
 					(*this).stats.clear();
-					
+
 					if(words > 0){
-						
+
 						code_size = std::max<_CodeType>(1, bit_log2((_CodeType)words));
-						symbols.set_code_size(code_size);	
-					
+						symbols.set_code_size(code_size);
+
 						resize(rows);
 					}
-					
-					
+
+
 				}
 				return code_size > 0;
 
 			}
 			void optimize(){
-				(*this).codes.swap(_CodeMap());
+                _CodeMap c;
+				(*this).codes.swap(c);
 				(*this).stats.clear();
 			}
 		};	/// fixed in encoded buffer
-		
+
 		template<class _BufType>
 		class lz_buffer{
 		private:
 			_BufType _decoded_val;
 		public:
-			
+
 			lz_buffer(){
 			}
 
 			bool empty() const {
 				return true;
 			}
-			
+
 			void sample(const _BufType &data){
 			}
 
 			void resize(_Rid rows){
 			}
-			
+
 			size_t capacity() const {
 				return 0;
 			}
@@ -739,13 +1191,13 @@ namespace stored{
 			bool initialize(_Rid rows){
 				return true;
 			}
-			
+
 			void encode(_Rid row, const _BufType &val){
-				
+
 			}
-			
+
 			const _BufType& decode(_Rid row) const {
-				
+
 				return _decoded_val;
 			}
 			void optimize(){
@@ -764,9 +1216,9 @@ namespace stored{
 			bool empty() const {
 				return true;
 			}
-			void clear(){				
+			void clear(){
 			}
-			
+
 			void sample(const _D &data){
 				++bsamples;
 			}
@@ -825,7 +1277,7 @@ namespace stored{
 			}
 			const IntStored& get( _Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}
@@ -864,7 +1316,7 @@ namespace stored{
 			}
 			const UIntStored&  get(_Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}
@@ -902,7 +1354,7 @@ namespace stored{
 			}
 			const ShortStored& get(_Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}
@@ -939,7 +1391,7 @@ namespace stored{
 			}
 			const UShortStored& get(_Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}
@@ -976,7 +1428,7 @@ namespace stored{
 			}
 			const VarCharStored& get(_Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}
@@ -1013,7 +1465,7 @@ namespace stored{
 			}
 			const BlobStored& get(_Rid row) const {
 				return coder.decode(row);
-			}	
+			}
 			nst::u64 get_entropy() const {
 				return 0;// coder.get_stats().get_entropy();
 			}

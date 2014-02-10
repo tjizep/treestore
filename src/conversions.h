@@ -46,9 +46,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <mysql/plugin.h>
 #include "fields.h"
 #ifdef _MSC_VER
-#define CONVERSION_NOINLINE_ //_declspec(noinline) 
+#define CONVERSION_NOINLINE_ //_declspec(noinline)
 #else
-#define CONVERSION_NOINLINE_ 
+#define CONVERSION_NOINLINE_
 #endif
 namespace units{
 	static const double MB = 1024.0*1024.0;
@@ -58,100 +58,100 @@ namespace tree_stored{
 
 
 	//typedef ColIndex::index_key CompositeStored;
-	
+
 	class conversions{
 	public:
-		
+
 		enum{
 			f_use_var_header = 1
 		};
 	private:
-		
+
 		String  attribute;
 		String *r;
-		
+
 	private:
-			
-	public:	
+
+	public:
 		conversions() : attribute(32768) {
 			attribute.set_charset(system_charset_info);
 		}
-		
+
 		~conversions(){
 		}
-		
-		
+
+
 		/// setters ts->mysql
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::FloatStored &fs){
-			
+
 			f->store(fs.get_value());
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::DoubleStored &ds){
-			
+
 			f->store(ds.get_value());
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::ShortStored& s){
-			
+
 			f->store(s.get_value(),false);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::UShortStored& us){
-			
+
 			f->store(us.get_value(),true);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::CharStored& c){
-			
+
 			f->store(c.get_value(),false);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::UCharStored& uc ){
-			
+
 			f->store(uc.get_value());
-			
+
 		}
 
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * fl, const stored::IntStored& i){
 			Field_long * f = (Field_long*)fl;
 			long t = i.value;
-			longstore(f->ptr, i.value);	
+			longstore(f->ptr, i.value);
 		}
 
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::UIntStored& ui){
-		
+
 			f->store(ui.get_value(),true);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::LongIntStored& li){
-			
+
 			f->store(li.get_value(),false);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::ULongIntStored& uli){
-		
+
 			f->store(uli.get_value(),true);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field_new_decimal * f, const stored::BlobStored& b){
 			memcpy(f->ptr, b.chars(), b.get_size());
 			f->bin_size = b.get_size();
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::BlobStored& b){
-			
+
 			char * ptr = (char *)f->ptr;
 			if(f->type() == MYSQL_TYPE_VARCHAR){
 				Field_varstring * fv =static_cast< Field_varstring*>(f);
@@ -169,11 +169,11 @@ namespace tree_stored{
 				fset(row, static_cast<Field_new_decimal*>(f), b); /// dynamic cast has really bad runtime performance
 			}else
 				f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
-			
+
 		}
-		CONVERSION_NOINLINE_ 
+		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::VarCharStored& b){
-			
+
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
 			if(et == MYSQL_TYPE_VARCHAR){
@@ -200,7 +200,7 @@ namespace tree_stored{
 				}
 
 			}else f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
-			
+
 		}
 		/// getters mysql->ts
 		inline void fget(stored::FloatStored &fs, Field * f, const uchar*, uint flags){
@@ -238,7 +238,7 @@ namespace tree_stored{
 		}
 		inline void fget(stored::BlobStored& b, Field * f, const uchar*n_ptr, uint flags){
 			if(f->type()==MYSQL_TYPE_NEWDECIMAL){
-				fget(b, static_cast<Field_new_decimal*>(f),n_ptr, flags);		
+				fget(b, static_cast<Field_new_decimal*>(f),n_ptr, flags);
 				return;
 			}
 			if(flags & f_use_var_header){
@@ -266,7 +266,7 @@ namespace tree_stored{
 		}
 
 		/// direct getters into the composite type for indexes
-
+        typedef stored::DynamicKey CompositeStored;
 		inline void fadd(CompositeStored& to, stored::FloatStored &fs, Field * f, const uchar*, uint flags){
 			to.addf4((float)f->val_real());
 

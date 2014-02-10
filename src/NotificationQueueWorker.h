@@ -144,8 +144,12 @@ namespace asynchronous{
 
 		}
 	public:
-		QueueManager(int workers = 2) : threads(workers,workers*2), last(0){
-			(*this).workers.resize(workers);
+		explicit QueueManager(int w ) : threads(w,w*2), last(0){
+			(*this).workers.resize(w);
+			createWorkers();
+		}
+		QueueManager() : threads(2,2*2), last(0){
+			(*this).workers.resize(2);
 			createWorkers();
 		}
 
@@ -157,7 +161,7 @@ namespace asynchronous{
 			queue.enqueueNotification(note);
 
 		}
-		
+
 	};
 	class AbstractWorker : public Poco::Notification{
 	public:

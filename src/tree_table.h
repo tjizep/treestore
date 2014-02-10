@@ -66,9 +66,9 @@ namespace tree_stored{
 		virtual void compose(CompositeStored & to, Field* f,const uchar * n_ptr, uint flags)=0;
 		virtual bool equal(stored::_Rid row, Field* f)=0;
 		virtual void reduce_cache_use() = 0;
-		virtual void reduce_col_use() = 0;		
+		virtual void reduce_col_use() = 0;
 		virtual void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data ) = 0;
-		
+
 		virtual nst::u32 get_rows_per_key() = 0;
 		virtual void flush() = 0;
 		virtual void begin(bool read) = 0;
@@ -77,36 +77,28 @@ namespace tree_stored{
 		virtual void commit2() = 0;
 		virtual void rollback() = 0;
 	};
-	
-	
-	
-	
+
+
+
+
 
 	template <typename _Fieldt>
 	class my_collumn : public abstract_my_collumn{
 	protected:
 		typedef typename collums::collumn<_Fieldt> _Colt;
 		typedef std::vector<std::pair<stored::_Rid,_Fieldt> > _RowBuffer;
-		_Colt col;
-		_Fieldt temp;
-		conversions convertor;
-		
-		Poco::AtomicCounter workers_away;
-		nst::u32 number;
-		nst::u32 rowsize;
-		collums::_LockedRowData * row_datas;
-
 		static const int MAX_BUFFERED_ROWS = 10000;
 		class ColAdder : public asynchronous::AbstractWorker{
 		protected:
-			
+
 			_Colt &col;
+
 			Poco::AtomicCounter &workers_away;
 			_RowBuffer buffer;
 		protected:
 			void flush_data(){
 				if(!buffer.empty()){
-					for(_RowBuffer::iterator r = buffer.begin(); r != buffer.end(); ++r){	
+					for(typename _RowBuffer::iterator r = buffer.begin(); r != buffer.end(); ++r){
 						col.add((*r).first, (*r).second);
 					}
 					col.flush2();
@@ -129,42 +121,53 @@ namespace tree_stored{
 			virtual void work(){
 				flush_data();
 				--workers_away;
-				
+
 			}
 			virtual ~ColAdder(){
 				flush_data();
 			}
 		};
 
-		unsigned int wid;/// worker id for table loading.
+		_Colt col;
 		ColAdder * worker;
+        unsigned int wid;/// worker id for table loading.
+		_Fieldt temp;
+		conversions convertor;
+
+		Poco::AtomicCounter workers_away;
+		nst::u32 number;
+		nst::u32 rowsize;
+		collums::_LockedRowData * row_datas;
+
+
 
 		void wait_for_workers(){
 			destroy_worker();
-			
+
 			while (workers_away>0) os::zzzz(20);
-			
+
 		}
 		void destroy_worker(){
-			if(worker!=nullptr){	
-				worker->clear();
-				delete worker;
+			if((*this).worker!=nullptr){
+				(*this).worker->clear();
+				delete (*this).worker;
+				(*this).worker = nullptr;
 			}
 		}
 		void add_worker(){
-			if(worker!=nullptr){	
-				if(workers_away == 0 && worker->size() < MAX_BUFFERED_ROWS){				
-					delete worker;
+			if((*this).worker!=nullptr){
+				if((*this).workers_away == 0 && (*this).worker->size() < MAX_BUFFERED_ROWS){
+					delete (*this).worker;
 				}else{
-					storage_workers::get_threads(wid).add(worker);
-					++workers_away;
+					storage_workers::get_threads((*this).wid).add((*this).worker);
+					++((*this).workers_away);
 				}
-				worker = nullptr;
+				(*this).worker = nullptr;
 			}
 		}
 	public:
 
-		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,collums::_LockedRowData *row_datas, bool do_load) 
+		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,collums::_LockedRowData *row_datas, bool do_load)
 		:	col(name, do_load)
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
@@ -172,15 +175,15 @@ namespace tree_stored{
 		,	rowsize(rowsize)
 		,	row_datas(row_datas)
 		{
-		
+
 		}
 
 		virtual ~my_collumn(){
-			
+
 			wait_for_workers();
-			
+
 		}
-		
+
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
 			//col.add(row, temp);
@@ -191,7 +194,7 @@ namespace tree_stored{
 			if(worker->size() >= MAX_BUFFERED_ROWS){
 				add_worker();
 			}
-			
+
 		}
 
 		virtual void erase_row(collums::_Rid row){
@@ -229,7 +232,7 @@ namespace tree_stored{
 			return (t==temp);
 		}
 
-		
+
 
 		template<typename _PredictedFieldType>
 		struct _PredictorContext{
@@ -243,7 +246,7 @@ namespace tree_stored{
 		/// Predictive hash for experimental use, will probably be replaced
 		/// by row oriented cache since that would usually have better
 		/// memory page read access behaviour
-		
+
 		template<typename _StoredType>
 		struct _SimplePredictorContextImplmentor{
 			enum {
@@ -261,9 +264,9 @@ namespace tree_stored{
 			typedef std::pair<_MappingPrimitive,_StoredType> _StorePair;
 			typedef std::vector<_StorePair> _StoredData;
 			typedef std::vector<stored::_Rid> _DataMap;
-			
+
 			_StoredData stored;
-			
+
 			_DataMap mapping;
 
 			_MappingPrimitive store_pos;
@@ -282,9 +285,9 @@ namespace tree_stored{
 			}
 
 			~_SimplePredictorContextImplmentor(){
-			
+
 			}
-			
+
 			const _StoredType* find(stored::_Rid row) const {
 				//++finds;
 				//if(finds % 1000000 == 0){
@@ -292,13 +295,13 @@ namespace tree_stored{
 				//}
 				/**/
 				if(last_found < stored.size()-4){
-						
+
 					for(int i=0;i<4;++i){
-						if(stored[++last_found].first == row){						
+						if(stored[++last_found].first == row){
 							//++predicted;
 							return &(stored[last_found].second);
 						}
-					
+
 					}
 				}
 				//last_found = 0;
@@ -318,7 +321,7 @@ namespace tree_stored{
 				++nothing;
 				return nullptr;
 			}
-			
+
 			void store(stored::_Rid row, const _StoredType& data){
 				if(store_pos < MaxStored){
 					_MappingPrimitive m = store_pos++;
@@ -330,19 +333,19 @@ namespace tree_stored{
 			}
 		};
 
-		
+
 #define _EXPERIMENT_PCACHEd
 #ifdef _EXPERIMENT_PCACHE
-		
+
 		template<>
 		struct _PredictorContext<IntStored>{
 			//_PredictorContextImplmentor<IntStored> implementation;
 			_SimplePredictorContextImplmentor<IntStored> implementation;
-			
+
 			void store(_Rid row, const IntStored& t ){
 				implementation.store(row, t);
 			}
-			
+
 			const _Fieldt* find(_Rid row){
 				return implementation.find(row);
 			}
@@ -352,11 +355,11 @@ namespace tree_stored{
 		struct _PredictorContext<UIntStored>{
 			//_PredictorContextImplmentor<IntStored> implementation;
 			_SimplePredictorContextImplmentor<UIntStored> implementation;
-			
+
 			void store(_Rid row, const UIntStored& t ){
 				implementation.store(row, t);
 			}
-			
+
 			const _Fieldt* find(_Rid row){
 				return implementation.find(row);
 			}
@@ -371,9 +374,9 @@ namespace tree_stored{
 			inline nst::u16 * u16from_rd(std::vector<nst::u8>& row_data){
 				return ((nst::u16*)&row_data[0]);
 			}
-			
+
 			void seek_retrieve_from_shared_row_data(Field* f, stored::_Rid row, collums::_RowData& row_data) {
-				
+
 				nst::u16 dpos = u16from_rd(row_data)[number];
 				if(dpos == 0){
 					const _Fieldt& t = col.seek_by_cache(row);
@@ -381,12 +384,12 @@ namespace tree_stored{
 						f->set_null();
 					}else{
 						f->set_notnull();
-				
+
 						nst::synchronized sr(row_datas->lock);
 						nst::u16 dpos = (nst::u16)row_data.size();
 						row_data.resize(dpos+sizeof(_Fieldt));
 						new (&row_data[dpos])  _Fieldt(t);
-					
+
 						u16from_rd(row_data)[number] = dpos;
 						convertor.fset(row, f, t);
 					}
@@ -394,12 +397,12 @@ namespace tree_stored{
 					f->set_notnull();
 					convertor.fset(row, f, ft_from_rowdata(row_data,dpos));
 				}
-		
+
 			}
 		public:
-		
+
 		virtual void seek_retrieve(stored::_Rid row, Field* f) {
-		
+
 			const _Fieldt * predicted = predictor.find(row);
 			if(predicted!=nullptr){
 				f->set_notnull();
@@ -412,9 +415,9 @@ namespace tree_stored{
 				f->set_null();
 			}else{
 				f->set_notnull();
-				
+
 				predictor.store(row, t);
-				
+
 				convertor.fset(row, f, t);
 			}
 		}
@@ -437,7 +440,7 @@ namespace tree_stored{
 			add_worker();
 		}
 		virtual void commit1() {
-			
+
 			wait_for_workers();
 			col.reduce_tree_use();
 			col.commit1();
@@ -452,7 +455,7 @@ namespace tree_stored{
 			col.tx_begin(read);
 		}
 		virtual void rollback() {
-			
+
 			wait_for_workers();
 			col.rollback();
 		}
@@ -500,10 +503,10 @@ namespace tree_stored{
 				field->ptr = saved_ptr;
 
 		}
-		uchar * saved_ptr;
+
 		abstract_my_collumn * col;
 		Field * field;
-
+        uchar * saved_ptr;
 	};
 
 	typedef std::vector<selection_tuple> _Selection;
@@ -512,10 +515,10 @@ namespace tree_stored{
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
-		struct shared_data{			
+		struct shared_data{
 			shared_data(){
-			}	
-			nst::u64 last_write_lock_time;			
+			}
+			nst::u64 last_write_lock_time;
 		};
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
@@ -607,7 +610,7 @@ namespace tree_stored{
 						//TODO: ERROR ??
 						/// default to var bin
 						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
-						
+
 						break; //do nothing pass
 				}//switch
 
@@ -706,10 +709,10 @@ namespace tree_stored{
 		_FileNames file_names;
 		stored::_Rid _row_count;
 		int locks;
-		nst::u64 last_lock_time;	
-		nst::u64 last_unlock_time;	
+		nst::u64 last_lock_time;
+		nst::u64 last_unlock_time;
 		collums::_LockedRowData* row_datas;
-		
+
 	public:
 		nst::u32 get_col_count() const {
 			return cols.size();
@@ -765,7 +768,7 @@ namespace tree_stored{
 		}
 
 		void begin_table(){
-			stored::abstracted_tx_begin(!changed, storage, get_table());			
+			stored::abstracted_tx_begin(!changed, storage, get_table());
 			init_rowcount();
 
 		}
@@ -777,7 +780,7 @@ namespace tree_stored{
 		}
 
 		void commit_table1(){
-			if(changed){				
+			if(changed){
 				get_table().reduce_use();
 			}
 		}
@@ -841,7 +844,7 @@ namespace tree_stored{
 		}
 
 		void clear(){
-			
+
 			rollback();
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
@@ -874,7 +877,7 @@ namespace tree_stored{
 			if(cols.empty()){
 				load(table_arg);
 			}
-			
+
 		}
 
 		void load(TABLE *table_arg){
@@ -930,7 +933,7 @@ namespace tree_stored{
 		}
 
 		void reduce_use_collum_trees(){
-			
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
@@ -939,11 +942,11 @@ namespace tree_stored{
 
 		void reduce_use_collum_caches(){
 			/// reduce on table granularity
-			
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_cache_use();
 			}
-			
+
 		}
 
 		void check_use(){
@@ -1291,13 +1294,13 @@ namespace tree_stored{
 			begin(!changed);
 
 		}
-		
+
 		static const nst::u64 READER_ROLLBACK_THRESHHOLD = 10000ll;/// in millis
 
 		private:
-			
-			
-			
+
+
+
 		public:
 		/// release locks and resources
 		void unlock(Poco::Mutex* p2_lock)
@@ -1308,7 +1311,7 @@ namespace tree_stored{
 				/// locks so that all the storages can commit atomically allowing
 				/// other transactions to start on the same version
 				synchronized _s(*p2_lock);
-				
+
 				commit2();
 				if(calc_total_use() > treestore_max_mem_use){
 					stored::reduce_all();
@@ -1322,7 +1325,7 @@ namespace tree_stored{
 					||	calc_total_use() > treestore_max_mem_use*0.7f
 					||  rolling
 				)
-					rollback();/// relieves the version load when new data is added to the collums				
+					rollback();/// relieves the version load when new data is added to the collums
 			}
 			last_unlock_time = os::micros();
 		}
@@ -1378,7 +1381,7 @@ namespace tree_stored{
 			}
 
 		}
-		
+
 		void write(stored::_Rid rid, TABLE* table){
 			/// erase_row_index must be called before this function
 			check_load(table);
@@ -1407,7 +1410,7 @@ namespace tree_stored{
 			}
 
 		}
-		
+
 		void erase_row_index(stored::_Rid rid){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
@@ -1419,7 +1422,7 @@ namespace tree_stored{
 				(*x)->index.remove(temp);
 			}
 		}
-		
+
 		stored::_Rid row_count() const {
 			return get_table().size();
 		}

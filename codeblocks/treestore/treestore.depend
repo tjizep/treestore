@@ -119,16 +119,15 @@
 	<Poco/BinaryReader.h>
 	<Poco/File.h>
 
-1384065197 /home/liz/Desktop/treestore/src/abstracted_storage.h
+1392043816 /home/liz/Desktop/treestore/src/abstracted_storage.h
 	"stx/storage/basic_storage.h"
 	"fields.h"
-	"abstracted_storage.h"
 	"MurmurHash3.h"
 	<map>
 	<vector>
 	<conio.h>
 
-1383985579 /home/liz/Desktop/treestore/src/stx/storage/basic_storage.h
+1392053939 /home/liz/Desktop/treestore/src/stx/storage/basic_storage.h
 	<stx/storage/types.h>
 	<stx/storage/leb128.h>
 	<Poco/Mutex.h>
@@ -145,8 +144,9 @@
 1383986090 /home/liz/Desktop/treestore/src/stx/storage/leb128.h
 	<stx/storage/types.h>
 
-1384002825 /home/liz/Desktop/treestore/src/fields.h
+1392057827 /home/liz/Desktop/treestore/src/fields.h
 	<stx/storage/basic_storage.h>
+	<bit_symbols.h>
 	<stx/btree.h>
 	<stx/btree_map>
 	<stx/btree_map.h>
@@ -160,7 +160,7 @@
 	<conio.h>
 	"abstracted_storage.h"
 
-1384099064 /home/liz/Desktop/treestore/src/stx/btree.h
+1392057679 /home/liz/Desktop/treestore/src/stx/btree.h
 	<algorithm>
 	<functional>
 	<istream>
@@ -183,7 +183,7 @@
 	"NotificationQueueWorker.h"
 	<iostream>
 
-1383985790 /home/liz/Desktop/treestore/src/NotificationQueueWorker.h
+1392056183 /home/liz/Desktop/treestore/src/NotificationQueueWorker.h
 	<vector>
 	"Poco/Notification.h"
 	"Poco/NotificationQueue.h"
@@ -197,7 +197,7 @@
 1383637559 /home/liz/Desktop/treestore/src/stx/btree_map
 	<stx/btree_map.h>
 
-1383986077 /home/liz/Desktop/treestore/src/stx/btree_map.h
+1392043816 /home/liz/Desktop/treestore/src/stx/btree_map.h
 	<stx/btree.h>
 
 1383637559 /home/liz/Desktop/treestore/src/stx/btree_multimap
@@ -212,7 +212,7 @@
 1383637559 /home/liz/Desktop/treestore/src/stx/btree_set.h
 	<stx/btree.h>
 
-1384099301 /home/liz/Desktop/treestore/src/transactional_storage.h
+1392043816 /home/liz/Desktop/treestore/src/transactional_storage.h
 	<stdlib.h>
 	<memory>
 	<string>
@@ -237,7 +237,10 @@
 	"Poco/LogFile.h"
 	"Poco/StringTokenizer.h"
 	"Poco/Timestamp.h"
-	<lz4.h>
+	"Poco/DirectoryIterator.h"
+	"Poco/BinaryWriter.h"
+	"Poco/BinaryReader.h"
+	"Poco/File.h"
 
 1383637559 /home/liz/Desktop/treestore/src/MurmurHash3.h
 	<stdint.h>
@@ -253,14 +256,19 @@
 	"MurmurHash3.h"
 	<stdlib.h>
 
-1383985383 /home/liz/Desktop/treestore/src/system_timers.h
+1392043816 /home/liz/Desktop/treestore/src/system_timers.h
+	<fstream>
 	<Poco/Timestamp.h>
+	<Poco/Thread.h>
+	<Poco/BinaryWriter.h>
+	<Poco/BinaryReader.h>
+	<Poco/File.h>
 
 1384000550 source:/home/liz/Desktop/treestore/src/transactional_storage.cpp
 	"Poco/Mutex.h"
 	"system_timers.h"
 
-1384098804 source:/home/liz/Desktop/treestore/src/myi.cpp
+1392056517 source:/home/liz/Desktop/treestore/src/myi.cpp
 	"myi.h"
 	<cmath>
 	"sql_priv.h"
@@ -922,7 +930,7 @@
 	"my_compare.h"
 	<mysql/plugin.h>
 
-1384098872 /home/liz/Desktop/treestore/src/collumn.h
+1392057561 /home/liz/Desktop/treestore/src/collumn.h
 	"fields.h"
 	"Poco/Mutex.h"
 	"Poco/Thread.h"
@@ -930,15 +938,17 @@
 	"Poco/TaskManager.h"
 	"Poco/Task.h"
 	"NotificationQueueWorker.h"
+	"conversions.h"
 
-1383637559 /home/liz/Desktop/treestore/src/tree_stored.h
+1392043816 /home/liz/Desktop/treestore/src/tree_stored.h
 	"collumn.h"
 
-1384070240 /home/liz/Desktop/treestore/src/conversions.h
+1392055236 /home/liz/Desktop/treestore/src/conversions.h
 	<cmath>
 	"sql_class.h"
 	<mysql.h>
 	<mysql/plugin.h>
+	"fields.h"
 
 1378798705 /usr/local/src/mysql/mysql-5.6.14/include/mysql.h
 	<standards.h>
@@ -951,17 +961,21 @@
 	"typelib.h"
 	"my_alloc.h"
 
-1383637559 /home/liz/Desktop/treestore/src/tree_index.h
+1392043816 /home/liz/Desktop/treestore/src/tree_index.h
 	"collumn.h"
 	"PredictiveCache.h"
 
-1384067107 /home/liz/Desktop/treestore/src/PredictiveCache.h
+1392043816 /home/liz/Desktop/treestore/src/PredictiveCache.h
 	"tree_stored.h"
 
-1384098953 /home/liz/Desktop/treestore/src/tree_table.h
+1392057388 /home/liz/Desktop/treestore/src/tree_table.h
 	"tree_stored.h"
 	"conversions.h"
 	"tree_index.h"
+	"system_timers.h"
 
 1383641422 source:/home/liz/Desktop/treestore/codeblocks/treestore/main.cpp
+
+1392054095 /home/liz/Desktop/treestore/src/bit_symbols.h
+	<stx/storage/basic_storage.h>
 

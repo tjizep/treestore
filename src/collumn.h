@@ -41,13 +41,14 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/TaskManager.h"
 #include "Poco/Task.h"
 #include "NotificationQueueWorker.h"
+#include "conversions.h"
 namespace nst = NS_STORAGE;
 namespace collums{
 		typedef stored::_Rid _Rid;
-	
 
 
-	
+
+
 	class AbstractedIterator{
 	public:
 		AbstractedIterator(){
@@ -217,16 +218,16 @@ namespace collums{
 	};
 
 	typedef std::vector<nst::u8> _RowData;
-	
+
 	struct _LockedRowData{
-		std::vector<_RowData> rows;	
+		std::vector<_RowData> rows;
 		Poco::Mutex lock;
 	};
 
 	struct _RowDataCache{
 		typedef std::shared_ptr<_LockedRowData> _SharedRowData;
 		typedef std::unordered_map<std::string,_SharedRowData> _NamedRowData;
-		
+
 		_NamedRowData cache;
 		Poco::Mutex lock;
 
@@ -249,9 +250,9 @@ namespace collums{
 			rows->rows.clear();
 		}
 	};
-	
+
 	extern _LockedRowData* get_locked_rows(const std::string& name);
-	
+
 	extern void set_loading_data(const std::string& name, int loading);
 	extern int get_loading_data(const std::string& name);
 
@@ -261,16 +262,16 @@ namespace collums{
 		typedef typename stored::IntTypeStored<_Rid> _StoredRowId;
 		stored::abstracted_storage storage;
 
-		
+
 		struct int_terpolator{
-			
+
 
 			/// function assumes a list of increasing integer values
 			inline bool encoded(bool multi) const
 			{
 				return !multi; // only encodes uniques;
 			}
-			typedef nst::u16 count_t; 
+			typedef nst::u16 count_t;
 			/// decode mixed run length and delta for simple sequences
 			void decode(nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
 				count_t k = 0, m = occupants - 1;
@@ -291,7 +292,7 @@ namespace collums{
 						++k;
 
 					}
-				}				
+				}
 			}
 
 			/// encoding mixes run length and delta encoding for simple sequences
@@ -299,7 +300,7 @@ namespace collums{
 				count_t k = 0, m = occupants - 1;
 				nst::i32 rl = 0;
 				int size = keys[k++].stored();
-				
+
 				for(; k < occupants; ++k){
 					// works with keys[k] < 0 too
 					if(keys[k].value - keys[k-1].value == 1 &&  k < m){
@@ -309,7 +310,7 @@ namespace collums{
 						++rl;
 						size += nst::leb128::signed_size((nst::i64)0);
 						size += nst::leb128::signed_size((nst::i64)rl);
-						rl = 0;						
+						rl = 0;
 					}else{
 						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
 							size += nst::leb128::signed_size((nst::i64)keys[j].value - keys[j-1].value);
@@ -318,7 +319,7 @@ namespace collums{
 				}
 				return size;
 			}
-			
+
 			void encode(nst::buffer_type::iterator& writer,const _StoredRowId* keys, count_t occupants) const {
 				count_t k = 0, m = occupants - 1;
 				nst::i32 rl = 0;
@@ -333,7 +334,7 @@ namespace collums{
 						++rl;
 						writer = nst::leb128::write_signed(writer, (nst::i64)0);
 						writer = nst::leb128::write_signed(writer, (nst::i64)rl);
-						rl = 0;						
+						rl = 0;
 					}else{
 						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
 							writer = nst::leb128::write_signed(writer, keys[j].value - keys[j-1].value);
@@ -388,9 +389,9 @@ namespace collums{
 		static const nst::u16 F_NOT_NULL = 1;
 		static const nst::u16 F_CHANGED = 2;
 		static const nst::u16 F_INVALID = 4;
-		
 
-	
+
+
 		struct _StoredEntry{
 
 			_StoredEntry(const _Stored& key):key(key){};//,flags(F_INVALID)
@@ -398,7 +399,7 @@ namespace collums{
 			_StoredEntry(){};//:flags(0)
 
 			_StoredEntry &operator=(const _Stored& key){
-				(*this).key = key;				
+				(*this).key = key;
 				return *this;
 			}
 
@@ -411,27 +412,27 @@ namespace collums{
 			}
 
 			void nullify(nst::u8& flags){
-				
+
 				flags &= (~F_NOT_NULL);
 			}
 
 			bool null(const nst::u8& flags) const {
-				
+
 				return ( ( flags & F_NOT_NULL ) == 0);
 			}
 
 			bool invalid(const nst::u8& flags) const {
-				
+
 				return ( ( flags & F_INVALID ) != 0);
 			}
 
 			bool valid(const nst::u8& flags) const {
-				
+
 				return ( ( flags & F_INVALID ) == 0);
 			}
 
 			void invalidate(nst::u8& flags){
-				
+
 				flags |= F_INVALID;
 			}
 
@@ -444,7 +445,7 @@ namespace collums{
 
 		};
 		typedef std::vector<_StoredEntry> _Cache;
-		
+
 		typedef std::vector<nst::u8> _Flags;
 
 		struct _CacheEntry{
@@ -480,21 +481,23 @@ namespace collums{
 				_temp.nullify(flags);
 			}
 			void clear(){
-				data.swap(_Cache());
-				flags.swap(_Flags());
+                _Flags f;
+                _Cache c;
+				data.swap(c);
+				flags.swap(f);
 				encoded.clear();
 			}
 			void encode(_Rid row){
 				encoded.set(row, data[row]);
 			}
-			
+
 			_Rid size() const {
 				return rows_cached;
 			}
-			
+
 			const _Stored& get(_Rid row) const {
 				if(encoded.good()){
-					
+
 					return encoded.get(row);;
 				}else
 					return _data[row].key;
@@ -513,7 +516,7 @@ namespace collums{
 			bool empty() const {
 				return (encoded.empty() && data.empty());
 			}
-			
+
 			_Rid get_v_row_count(_ColMap&col){
 				_Rid r = 0;
 				typename _ColMap::iterator e = col.end();
@@ -521,7 +524,7 @@ namespace collums{
 				if(!col.empty()){
 					--c;
 					r = c.key().get_value() + 1;
-					
+
 				}
 				return r;
 			}
@@ -534,10 +537,10 @@ namespace collums{
 				_Rid prev = 0;
 				nst::u8 * flags = &(*this).flags[0];
 				nst::u64 nulls = 0;
-				
+
 				for(c = col.begin(); c != e; ++c){
 					kv = c.key().get_value();
-						
+
 					/// nullify the gaps
 					_Rid cs = (*this).size();
 					if((*this).size() > kv){
@@ -547,16 +550,16 @@ namespace collums{
 								++nulls;
 							}
 						}
-							
+
 						(*this).set_data(kv, c.data());
 						prev = kv;
 					}
 					ctr++;
-				
+
 					if(ctr % CKECK ==0){
-						col.reduce_use();														
+						col.reduce_use();
 					}
-					
+
 				}
 				if(kv > 0){
 					for(_Rid n = prev; n < kv-1; ++n){
@@ -565,8 +568,9 @@ namespace collums{
 					}
 				}
 				if(nulls == 0){
+                    _Flags f;
 					nst::remove_col_use(calc_use());
-					(*this).flags.swap(_Flags());
+					(*this).flags.swap(f);
 					nst::add_col_use(calc_use());
 				}
 			}
@@ -574,8 +578,8 @@ namespace collums{
 				const _Rid CKECK = 1000000;
 				NS_STORAGE::remove_col_use(calc_use());
 				rows_cached = get_v_row_count(col);
-				nst::i64 use_before = rows_cached * sizeof(typename _StoredEntry);
-	
+				nst::i64 use_before = rows_cached * sizeof(_StoredEntry);
+
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
@@ -584,23 +588,23 @@ namespace collums{
 					encoded.sample(c.data());
 					++ctr;
 					if(r % CKECK ==0){
-						col.reduce_use();								
-						
+						col.reduce_use();
+
 					}
 				}
-				col.reduce_use();		
+				col.reduce_use();
 				encoded.finish(rows_cached);
 				if(encoded.good()){
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());
-						
+
 						if(r % CKECK ==0){
-							col.reduce_use();										
+							col.reduce_use();
 						}
-						
-					}								
-					if(calc_use() < use_before ){						
+
+					}
+					if(calc_use() < use_before ){
 						encoded.optimize();
 						printf("reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
 					}else{
@@ -609,16 +613,16 @@ namespace collums{
 						resize(rows_cached);
 						load_data(col);
 					}
-					
+
 				}else{
 					encoded.clear();
 					resize(rows_cached);
 					load_data(col);
-					
+
 					printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 				}
 				NS_STORAGE::add_col_use(calc_use());
-				
+
 			}
 
 			nst::i64 calc_use(){
@@ -644,10 +648,11 @@ namespace collums{
 				NS_STORAGE::remove_col_use(calc_use());
 				loaded = false;
 				available = false;
-				
-				data.swap(_Cache());
-				flags.swap(_Flags());
-				
+                _Cache c;
+                _Flags f;
+				data.swap(c);
+				flags.swap(f);
+
 			}
 		};
 
@@ -692,9 +697,9 @@ namespace collums{
 				//printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
 			}
 		protected:
-			
+
 			bool load_into_cache(size_t col_size){
-				
+
 				stored::abstracted_storage storage(name);
 				storage.begin();
 				storage.set_reader();
@@ -704,7 +709,7 @@ namespace collums{
 				//col.share(storage.get_name());
 				//col.reload();
 				_Rid ctr = 0;
-				
+
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				nst::u64 cached = 0;
@@ -724,11 +729,11 @@ namespace collums{
 
 				}
 				//printf("load %s start system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
-			
+
 				(*cache).finish(col,storage.get_name());
 				calc_density();
 				storage.rollback();
-				
+
 				col.reduce_use();
 				storage.reduce();
 				cache->available = true;
@@ -750,25 +755,25 @@ namespace collums{
 			}
 
 			virtual void work(){
-					
+
 				try{
 					(*this).load_into_cache(col_size);
 				}catch(std::exception&){
 					printf("Error during col cache loading/decoding\n");
 				}
 				set_loading_data(name, 0);
-				
-				
+
+
 			}
 			virtual ~ColLoader(){
 
 			}
-		
+
 		};
 		typedef std::vector<char>    _Nulls;
 
 		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
-		
+
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
 			return m;
@@ -778,7 +783,7 @@ namespace collums{
 			static _Caches _g_cache;
 			return _g_cache;
 		}
-		
+
 		void unload_cache(std::string name){
 			_CacheEntry * entry= 0;
 
@@ -823,15 +828,15 @@ namespace collums{
 
 			NS_STORAGE::synchronized slock(result->lock);
 			if(!result->loaded){
-				
+
 				result->loaded = true;
 				//ColLoader l(name, result, lazy, col.size());
 				//l.doTask();
-				
+
 				using namespace storage_workers;
-				
+
 				get_threads( get_next_counter() ).add(new ColLoader(name, result, lazy, col.size()));
-				
+
 			}
 
 			return result;
@@ -843,7 +848,7 @@ namespace collums{
 		typename _ColMap::iterator ival;
 		_CacheEntry * _cache;
 		_Nulls * _nulls;
-		
+
 		nst::u8 * cache_f;
 		_StoredEntry user;
 		_Stored empty;
@@ -852,19 +857,19 @@ namespace collums{
 		nst::u32 rows_per_key;
 		bool modified;
 		bool lazy;
-		
+
 		inline bool has_cache() const {
 			return _cache != nullptr && _cache->available;
 		}
 
 		void load_cache(){
 			if(treestore_collumn_cache==FALSE) return;
-			
+
 			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){
 				using namespace stored;
 				if((calc_total_use()+col.size()*sizeof(_StoredEntry)) < treestore_max_mem_use){
-					
+
 					_cache = load_cache(storage.get_name(),lazy,col.size());
 				}
 			}
@@ -879,7 +884,7 @@ namespace collums{
 			return *_cache;
 		}
 		void reset_cache_locals(){
-			cache_size = 0;			
+			cache_size = 0;
 			cache_f = nullptr;
 			_cache = nullptr;
 			ival = col.end();
@@ -908,7 +913,7 @@ namespace collums{
 					_cache->users--;
 				}
 			}
-			
+
 		}
 		void unload_cache(){
 			if(_cache != nullptr)
@@ -930,7 +935,7 @@ namespace collums{
 				NS_STORAGE::synchronized slock(_cache->lock);
 				if(_cache->available)
 				{
-					
+
 					cache_size = (_Rid)get_cache().size();
 
 					if(cache_size){
@@ -942,7 +947,7 @@ namespace collums{
 					}
 					if(cache_size != col.size())
 					{
-						
+
 						//_cache->unload();
 						//get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
 						//reset_cache_locals();
@@ -963,7 +968,7 @@ namespace collums{
 		collumn(std::string name, bool load = false)
 		:	storage(name)
 		,	col(storage)
-		
+
 		,	_cache(nullptr)
 		,	_nulls(nullptr)
 		,	rows_per_key(0)
@@ -971,19 +976,19 @@ namespace collums{
 		,	lazy(load)
 		{
 			rows = (_Rid)col.size();
-			
+
 #ifdef _DEBUG
-			
+
 			int_terpolator t;
 			t.test_encode();
-#endif		
+#endif
 		}
 
 		~collumn(){
 		}
-		
+
 		void initialize(bool by_tree){
-			
+
 			cend = col.end();
 			ival = cend;
 			if(!modified){
@@ -991,7 +996,7 @@ namespace collums{
 				check_cache();
 				engage_cache();
 			}
-			
+
 			//check_cache();
 
 
@@ -1018,28 +1023,28 @@ namespace collums{
 			}
 			return rows_per_key;
 		}
-		
+
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
-		
+
 		const _Stored& seek_by_tree(_Rid row) {
 
 			return seek_by_cache(row);
 		}
-		
+
 		const _Stored& seek_by_cache(_Rid row)  {
 
 
 			if( has_cache() && cache_size > row )
 			{
 				const _Stored & se = _cache->get(row);
-				
+
 				if(nullptr != cache_f ){
 					nst::u8 flags = cache_f[row];
 					if(user.valid(flags))
 						return se;
-				
+
 					if(user.null(flags))
 						return empty;
 				}else{
@@ -1047,18 +1052,18 @@ namespace collums{
 				}
 
 			}
-		
+
 			ival = col.find(row);
-				
-					
+
+
 			if(ival == cend || ival.key().get_value() != row)
 			{
-				return empty;	
+				return empty;
 			}
 			return ival.data();
-			
+
 		}
-		
+
 		void flush(){
 			if(modified)
 			{
@@ -1069,18 +1074,18 @@ namespace collums{
 			}
 			modified = false;
 		}
-		
+
 		void flush2(){
 			if(modified){
 				col.flush_buffers();
-				
+
 			}
 		}
-		
+
 		void commit1(){
 			if(modified){
 				col.reduce_use();
-				
+
 			}
 			release_cache();
 			reset_cache_locals();
@@ -1095,8 +1100,8 @@ namespace collums{
 		}
 
 		void tx_begin(bool read){
-			stored::abstracted_tx_begin(read, storage, col);	
-			
+			stored::abstracted_tx_begin(read, storage, col);
+
 		}
 
 		void rollback(){
@@ -1111,7 +1116,7 @@ namespace collums{
 			reset_cache_locals();
 		}
 
-		void reduce_cache_use(){				
+		void reduce_cache_use(){
 			release_cache();
 			unload_cache();
 			reset_cache_locals();
@@ -1120,7 +1125,7 @@ namespace collums{
 		void reduce_tree_use(){
 			col.reduce_use();
 		}
-		
+
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));
 		}
@@ -1128,487 +1133,41 @@ namespace collums{
 		ImplIterator<_ColMap> begin(){
 			return ImplIterator<_ColMap> (col, col.begin());
 		}
-		
+
 		void erase(_Rid row){
 			col.erase(row);
 			if((*this).rows > 0) --(*this).rows;
-	
+
 			if(has_cache()){
-				
+
 				NS_STORAGE::synchronized synch(get_cache().lock);
 				if(has_cache() && get_cache().size() > row){
 					get_cache().make_flags();
-					
+
 					get_cache().invalidate(row);
-				}				
+				}
 			}
 		}
 
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
 			if(has_cache()){
-			
+
 				NS_STORAGE::synchronized synch(get_cache().lock);
 				if(has_cache() && get_cache().size() > row){
 					get_cache().make_flags();
 					get_cache().invalidate(row);
-				}	
+				}
 			}
 			col[row] = s;
 			modified = true;
 		}
 	};
-	
 
-	class DynamicKey{
-	public:
 
-		enum StoredType{
-			I1 = 1,
-			I2 ,
-			I4 ,
-			I8 ,
-			R4 ,
-			R8 ,
-			S 
 
-		};
-
-		typedef unsigned char	uchar;	/* Short for unsigned char */
-		typedef signed char int8;       /* Signed integer >= 8  bits */
-		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
-		typedef short int16;
-		typedef unsigned short uint16;
-		typedef int int32;
-		typedef unsigned int uint32;
-		typedef unsigned long	ulong;		  /* Short for unsigned long */
-		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
-		typedef long long longlong;
-		typedef longlong int64;
-		typedef ulonglong uint64;
-		typedef std::vector<nst::u8> _Data;
-
-		static const size_t MAX_BYTES = 2048;
-	
-		typedef _Rid row_type ;
-
-		typedef NS_STORAGE::u8 _size_type;
-		typedef NS_STORAGE::u8 _BufferSize;
-
-	protected:
-
-		nst::u8 buf[sizeof(_Data)];
-		_BufferSize bs;// bytes used
-
-		inline _Data& get_Data(){
-			return *(_Data*)&buf[0];
-		}
-		inline const _Data& get_Data() const {
-			return *(const _Data*)&buf[0];
-		}
-		inline nst::u8* data(){
-			if(bs==sizeof(_Data))
-				return &(get_Data())[0];
-			return &buf[0];
-		}
-		inline const nst::u8* data() const{
-			if(bs==sizeof(_Data))
-				return &(get_Data())[0];
-			return &buf[0];
-		}
-		inline nst::u8* _resize_buffer(size_t nbytes){
-
-			using namespace NS_STORAGE;
-
-			if(nbytes >= sizeof(_Data) && bs < nbytes){
-				bs = sizeof(_Data);
-				new (&get_Data()) _Data();
-			}else
-				bs = (_BufferSize)nbytes;
-			if(bs==sizeof(_Data)){
-				if(get_Data().capacity() < nbytes){				
-					nst::i64 d = get_Data().capacity();
-					get_Data().resize(nbytes);
-					add_btree_totl_used (get_Data().capacity()-d);
-				}else
-					get_Data().resize(nbytes);			
-			}
-	
-			return data();
-		}
-		NS_STORAGE::u8* _append( size_t count ){
-			size_t os = size();
-			NS_STORAGE::u8* r = _resize_buffer( os + count ) + os;
-			
-			return r;
-		}
-
-		/// 1st level
-		void addDynInt(nst::i64 v){
-			*_append(1) = DynamicKey::I8;
-			*(nst::i64*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::u64 v){
-			*_append(1) = DynamicKey::I8;
-			*(nst::u64*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::i32 v){
-			*_append(1) = DynamicKey::I4;
-			*(nst::i32*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::u32 v){
-			*_append(1) = DynamicKey::I4;
-			*(nst::u32*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::i16 v){
-			*_append(1) = DynamicKey::I2;
-			*(nst::i16*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::u16 v){
-			*_append(1) = DynamicKey::I2;
-			*(nst::u16*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::i8 v){
-			*_append(1) = DynamicKey::I1;
-			*(nst::i8*)_append(sizeof(v)) =  v;
-		}
-		void addDynInt(nst::u8 v){
-			*_append(1) = DynamicKey::I1;
-			*(nst::u8*)_append(sizeof(v)) =  v;
-		}
-		void addDynReal(double v){
-			*_append(1) = DynamicKey::R8;
-			*(double*)_append(sizeof(v)) = v;
-		}
-		void addDynReal(float v){
-			*_append(1) = DynamicKey::R4;
-			*(float*)_append(sizeof(v)) = v;
-		}
-	public:	
-		void add(const char* k, size_t s){
-			size_t sad = s;
-			*_append(1) = DynamicKey::S;
-			( *(nst::u16*)_append(2)) = (nst::u16)sad; 
-			if(sad > 0){
-				memcpy(_append(sad), k, sad);
-			}
-		}
-	public:	
-		row_type row;
-	public:
-		size_t size() const {
-			if(bs==sizeof(_Data))
-				return get_Data().size();
-			return bs;
-		}
-		/// 2nd level
-		void addf8(double v){
-
-			addDynReal(v);
-		}
-
-		void add1(char c){
-			addDynInt(c);
-			
-		}
-
-		void addu1(unsigned char c){
-
-			addDynInt(c);
-			
-		}
-
-		void addf4(float v){
-
-			addDynReal(v);
-		}
-
-		void add8(long long v){
-			addDynInt(v);
-			
-		}
-
-		void addu8(unsigned long long v){
-
-			addDynInt(v);
-			
-		}
-
-		void add4(long v){
-
-			addDynInt(v);
-			
-		}
-
-		void addu4(unsigned int v){
-
-			addDynInt(v);
-			
-		}
-
-		void add2(short v){
-
-			addDynInt(v);
-		}
-
-		void addu2(unsigned short v){
-
-			addDynInt(v);
-		}
-		/// 3rd level
-		void add(const stored::FloatStored & v){
-
-			addf4(v.get_value());
-		}
-
-		void add(const stored::DoubleStored & v){
-
-			addf8(v.get_value());
-		}
-		void add(const stored::ShortStored& v){
-
-			add2(v.get_value());
-		}
-
-		void add(const stored::UShortStored& v){
-
-			addu2(v.get_value());
-		}
-
-		void add(const stored::CharStored& v){
-
-			add1(v.get_value());
-		}
-
-		void add(const stored::UCharStored& v){
-
-			addu1(v.get_value());
-		}
-
-		void add(const stored::IntStored& v){
-
-			add4(v.get_value());
-		}
-
-		void add(const stored::UIntStored& v){
-
-			addu4(v.get_value());
-		}
-
-		void add(const stored::LongIntStored& v){
-
-			add8(v.get_value());
-		}
-
-		void add(const stored::ULongIntStored& v){
-
-			addu8(v.get_value());
-		}
-
-		void add(const stored::BlobStored& v){
-
-			add(v.get_value(),v.get_size());
-		}
-
-		void add(const stored::VarCharStored& v){
-
-			add(v.get_value(),v.get_size()-1);
-		}
-
-		void addTerm(const char* k, size_t s){
-			add(k, s);
-		}
-
-		void clear(){
-
-			row = 0;
-			if(bs==sizeof(_Data)){			
-				get_Data().clear();
-			}else
-				bs = 0;
-		}
-
-		~DynamicKey(){
-			if(bs==sizeof(_Data)){
-				remove_btree_totl_used (get_Data().capacity());
-				get_Data().~_Data();
-				bs = 0;
-			}
-		}
-
-		DynamicKey():
-			bs(0),
-			row(0)
-		{
-			
-		}
-
-		DynamicKey(const DynamicKey& right):
-			bs(0),
-			row(0)
-		{
-			*this = right;
-		}
-
-		inline bool left_equal_key(const DynamicKey& right) const {
-			//if( size != right.size ) return false;
-			if( size() == 0 ) return false;
-
-			int r = memcmp(data(), right.data(), std::min<size_t>(size(),right.size()) );
-			return r == 0;
-		}
-		
-		inline bool equal_key(const DynamicKey& right) const {
-			if( size() != right.size() ) return false;
-			int r = memcmp(data(), right.data(), size() );
-			return r == 0;
-
-		}
-
-		DynamicKey& operator=(const DynamicKey& right){
-			_resize_buffer(right.size());
-			memcpy(data(), right.data(), right.size());
-			row = right.row;
-			return *this;
-		}
-		inline operator size_t() const {
-			size_t r = 0;
-			MurmurHash3_x86_32(data(), size(), 0, &r);
-			return r;
-		}
-		bool operator<(const DynamicKey& right) const {
-
-			/// partitions the order in a hierarchy
-			const nst::u8 *ld = data();
-			const nst::u8 *rd = right.data();
-			nst::u8 lt = *ld;
-			nst::u8 rt = *rd;
-			int r = 0,l=0,ll=0;	
-			while(lt == rt){
-				switch(lt){
-				case DynamicKey::I1 :
-					l=sizeof(nst::i8);
-					if(*(nst::i8*)ld < *(nst::i8*)rd)
-						return true;
-					else if(*(nst::i8*)ld > *(nst::i8*)rd)
-						return false;
-					else r = 0;
-					break;
-				case DynamicKey::I2:
-					l = sizeof(nst::i16);
-					if(*(nst::i16*)ld < *(nst::i16*)rd)
-						return true;
-					else if(*(nst::i16*)ld > *(nst::i16*)rd)
-						return false;
-					else r = 0;
-					break;
-				case DynamicKey::I4:
-					l = sizeof(nst::i32);
-					if(*(nst::i32*)ld < *(nst::i32*)rd)
-						return true;
-					else if(*(nst::i32*)ld > *(nst::i32*)rd)
-						return false;
-					else r = 0;
-					break;
-				case DynamicKey::I8 :
-					l = 8;
-					if(*(nst::i64*)ld < *(nst::i64*)rd)
-						return true;
-					else if(*(nst::i64*)ld > *(nst::i64*)rd)
-						return false;
-					else r = 0;
-					break;
-				case DynamicKey::R4 :
-					l = sizeof(float);					
-					if(*(float*)ld < *(float*)rd)
-						return true;
-					else if(*(float*)ld > *(float*)rd)
-						return false;
-					else r = 0;
-
-					break;
-				case DynamicKey::R8 :
-					l = sizeof(double);					
-					if(*(double*)ld < *(double*)rd)
-						return true;
-					else if(*(double*)ld > *(double*)rd)
-						return false;
-					else r = 0; 
-					break;
-				case DynamicKey::S:
-
-					r = memcmp(ld+2, rd+2, std::min<nst::i16>(*(const nst::i16*)rd, *(const nst::i16*)ld));
-					if(r !=0) return r<0;
-					if(*(const nst::i16*)rd != *(const nst::i16*)ld)
-						return (*(const nst::i16*)rd < *(const nst::i16*)ld);
-					break;
-				};
-				if( r != 0 ) break;
-				++l;
-				ld += l;
-				rd += l;
-				ll += l;
-				if(ll >= size()) break;
-				if(ll >= right.size()) break;
-				lt = *ld;
-				rt = *rd;
-			}
-			if(rt != lt) 
-				return lt < rt; //total order on types first
-			if(r != 0) 
-				return r < 0;
-			if(size() != right.size())
-				return size() < right.size();
-			return (row < right.row);
-		}
-
-		inline bool operator!=(const DynamicKey& right) const {
-			if(size() != right.size()) return true;
-			int r = memcmp(data(), right.data(), size());
-			if(r != 0) return true;
-			return (row != right.row);
-		}
-
-		inline bool operator==(const DynamicKey& right) const {
-			return !(*this != right);
-		}
-
-		NS_STORAGE::u32 stored() const {
-			return (NS_STORAGE::u32)(NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row));
-		};
-
-		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
-			using namespace NS_STORAGE;
-			buffer_type::iterator writer = w;
-			writer = leb128::write_signed(writer, row);
-			writer = leb128::write_signed(writer, size());
-
-			const u8 * end = data()+size();
-			for(const u8 * d = data(); d < end; ++d,++writer){
-				*writer = *d;
-			}
-			return writer;
-		};
-
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
-			using namespace NS_STORAGE;
-			buffer_type::const_iterator reader = r;
-			row = leb128::read_signed(reader);
-			size_t s = leb128::read_signed(reader);
-			if(s > MAX_BYTES){
-				s = MAX_BYTES;
-			}
-			u8 * end = _resize_buffer(s)+s;
-			for(u8 * d = data(); d < end; ++d,++reader){
-				*d = *reader;
-			}
-			
-			
-			return reader;
-		};
-	};
 	void test_ints(){
-		typedef collums::DynamicKey _Sk;
+		typedef stored::DynamicKey _Sk;
 		typedef std::map<_Sk, int> _TestMap;
 		int mv = 1000000;
 		_TestMap tm;
@@ -1651,17 +1210,17 @@ namespace collums{
 	class col_index{
 	public:
 		typedef stored::IntTypeStored<char> index_value;
-		typedef DynamicKey index_key;//StaticKey
+		typedef stored::DynamicKey index_key;//StaticKey
 		stored::abstracted_storage storage;
 		typedef stx::btree_map<index_key, index_value, stored::abstracted_storage> _IndexMap;
 		typedef _IndexMap::iterator iterator_type;
 		typedef ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key> _KeyBuffer;
-		
+
 		class IndexScanner : public asynchronous::AbstractWorker
 		{
 		protected:
-			std::string name;	
+			std::string name;
 		protected:
 			bool scan_index()
 			{
@@ -1701,7 +1260,7 @@ namespace collums{
 			virtual ~IndexScanner()
 			{
 			}
-	
+
 		};
 
 		class IndexLoader : public asynchronous::AbstractWorker
@@ -1715,7 +1274,7 @@ namespace collums{
 			void flush_key_buffer(){
 				if(!buffer.empty()){
 					std::sort(buffer.begin(), buffer.end());
-				
+
 					for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
 						index.insert((*b),'0');
 					}
@@ -1725,11 +1284,11 @@ namespace collums{
 					buffer.clear();
 				}
 			}
-			
+
 		public:
 			static const int MAX_KEY_BUFFER = 3000000;/// size of the write key buffer
 			static const int MIN_KEY_BUFFER = 10000;
-			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away) 
+			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away)
 			:	loaders_away(loaders_away)
 			,	index(index)
 			,	flush_keys(true)
@@ -1744,19 +1303,19 @@ namespace collums{
 			bool is_minimal() const {
 				return ((*this).size() < MIN_KEY_BUFFER);
 			}
-			
+
 			void set_flush()
 			{
-				(*this).flush_keys = true; 
+				(*this).flush_keys = true;
 			}
 
 			bool add(const index_key& k, const index_value& v)
 			{
-				if(buffer.empty()) 
+				if(buffer.empty())
 					buffer.reserve(MAX_KEY_BUFFER);
-				
-				buffer.push_back(k);			
-				
+
+				buffer.push_back(k);
+
 				return buffer.size() < MAX_KEY_BUFFER;
 			}
 
@@ -1771,7 +1330,7 @@ namespace collums{
 			}
 		};
 	private:
-		_IndexMap index;		
+		_IndexMap index;
 		_IndexMap::iterator the_end;
 		bool modified;
 		IndexLoader * loader;
@@ -1787,13 +1346,13 @@ namespace collums{
 		void wait_for_loaders(){
 			destroy_loader();
 			while(loaders_away > 0) os::zzzz(20);
-			
+
 		}
 	public:
 
 		col_index(std::string name)
 		:	storage(name)
-		,	index(storage)	
+		,	index(storage)
 		,	modified(false)
 		,	loader(nullptr)
 		,	wid(storage_workers::get_next_counter())
@@ -1828,7 +1387,7 @@ namespace collums{
 		std::string get_name() const {
 			return storage.get_name();
 		}
-		
+
 		IndexIterator first(){
 			return IndexIterator (index, index.begin());
 		}
@@ -1856,7 +1415,7 @@ namespace collums{
 		IndexIterator find(const index_key& k){
 			return IndexIterator (index, index.find(k));
 		}
-		
+
 		void add(const index_key& k, const index_value& v){
 			modified = true;
 			//index.insert(k,'0');
@@ -1866,7 +1425,7 @@ namespace collums{
 			if(!loader->add(k,v)){
 				storage_workers::get_threads(wid).add(loader);
 				++loaders_away;
-			
+
 				loader = nullptr;
 			}
 		}
@@ -1891,7 +1450,7 @@ namespace collums{
 			if(modified){
 				wait_for_loaders();
 				index.reduce_use();
-				
+
 			}
 			storage.rollback();
 			modified = false;
@@ -1901,7 +1460,7 @@ namespace collums{
 		}
 		void commit1_asynch(){
 			if(loader){
-				if(loaders_away==0 && loader->is_minimal()){				
+				if(loaders_away==0 && loader->is_minimal()){
 					delete loader;
 				}else{
 					storage_workers::get_threads(wid).add(loader);
@@ -1912,11 +1471,11 @@ namespace collums{
 		}
 		void commit1(){
 			if(modified){
-				
+
 				wait_for_loaders();
-				
+
 				//index.flush_buffers();
-				
+
 			}
 			storage.reduce();
 		}

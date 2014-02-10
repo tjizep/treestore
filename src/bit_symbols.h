@@ -59,11 +59,12 @@ public:
 
 	/// remove data completely - requires resize to enable again
 	void clear(){
-		data.swap(_Data());
+        _Data d;
+		data.swap(d);
 	}
-	
+
 	/// write code_size bits at bit-index index
-	void set(_IndexType index, typename const _IntSymBolType &val){
+	void set(_IndexType index, const _IntSymBolType &val){
 		_BucketType bucket_start;
 		_IntSymBolType code = val;
 		_IndexType bits_done = index * code_size;
@@ -73,41 +74,41 @@ public:
 			bucket_start = bits_done & (BUCKET_BITS-1);/// where to begin in the bucket
 			_BucketType todo = std::min<_BucketType>(code_left, BUCKET_BITS-bucket_start);
 			*current &= ~(((1 << todo) - 1) << bucket_start); /// clean the destination like 11100001
-			*current |=  ( (_BucketType)( code & ( (1 << todo)-1 ) ) ) << bucket_start ;						
+			*current |=  ( (_BucketType)( code & ( (1 << todo)-1 ) ) ) << bucket_start ;
 			code = (code >> todo);/// drop the bits written ready for next bucket/iteration
 			bits_done += todo;
 			code_left -= todo;
 			if( ( bits_done & (BUCKET_BITS-1) ) == 0){
 				++current; /// increment the bucket
 			}
-		}while(code_left > 0 );		
+		}while(code_left > 0 );
 	}
-		
+
 	/// read code_size bits at bit-index index
-	typename _IntSymBolType get(_IndexType index) const {
+	_IntSymBolType get(_IndexType index) const {
 		_IntSymBolType code = 0;
 		_BucketType bucket_start, bucket;
-		_IndexType bit_start = index * code_size;				
-		const _BucketType* current = &data[bit_start / BUCKET_BITS];			
+		_IndexType bit_start = index * code_size;
+		const _BucketType* current = &data[bit_start / BUCKET_BITS];
 		_IndexType code_left = code_size;
 		_IndexType code_complete = 0;
 		for(;;){	/// read from BUCKET_BITS-bit buckets
 			bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 			_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);
 			bucket = (*current >> bucket_start) & ( ( 1 << todo ) - 1); /// this is a hot line
-												
-			code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens				
-						
-			bit_start += todo;						
+
+			code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
+
+			bit_start += todo;
 			code_complete += todo;
-			
+
 			if(code_complete == code_size )
 				break;
 
 			if( ( bit_start & (BUCKET_BITS-1) ) == 0){
 				++current; /// increment the bucket
 			}
-		}				
+		}
 		return code;
 	}
 

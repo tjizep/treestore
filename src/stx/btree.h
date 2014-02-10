@@ -147,9 +147,9 @@ namespace stx
 		}
 
 		inline void encode(nst::buffer_type::iterator&, const _KeyType*, nst::u16) const {
-			
+
 		}
-		inline void decode(nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {	
+		inline void decode(nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {
 		}
 
 		int encoded_size(const _KeyType*, nst::u16){
@@ -172,7 +172,7 @@ namespace stx
 	{
 		enum
 		{
-			bytes_per_page = 4096, /// this isnt currently used but could be 
+			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
 			keys_per_page = 512
@@ -182,7 +182,7 @@ namespace stx
 	template <typename _Key, typename _PersistTraits >
 	struct btree_default_set_traits
 	{
-		
+
 
 		/// If true, the tree will self verify it's invariants after each insert()
 		/// or erase(). The header must have been compiled with BTREE_DEBUG defined.
@@ -193,7 +193,7 @@ namespace stx
 		/// compiled with BTREE_DEBUG defined and key_type must be std::ostream
 		/// printable.
 		static const bool   debug = false;
-		
+
 		/// persistence related addressing
 		typedef def_p_traits persist_traits;
 
@@ -405,11 +405,11 @@ namespace stx
 		protected:
 
 			btree * context;
-		public:			
+		public:
 			node_ref * ptr;
 
 			stream_address w;
-			
+
 			void make_mini(mini_pointer& m) const {
 				/*if(ptr != NULL_REF && ptr->shared){
 					m.ptr = (*this).ptr;
@@ -708,7 +708,7 @@ namespace stx
 
 			/// if the state is set to loaded and a valid wHere is set the proxy will change state to unloaded
 			void unload_only(){
-			
+
 				if((*this).get_state()==loaded && super::w){
 					unref();
 					get_context()->free_node(static_cast<_Loaded*>((*this).ptr),(*this).get_where());
@@ -1197,7 +1197,7 @@ namespace stx
 
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
-			
+
 			/// shared counter used when page is shared, only surfaces can be shared
 			Poco::AtomicCounter a_refs;
 
@@ -1330,7 +1330,7 @@ namespace stx
 							unsorted[i].value = values[i];
 						}
 
-						
+
 
 						if(btree::allow_duplicates)
 						{
@@ -1405,7 +1405,7 @@ namespace stx
 				next.set_where(sa);
 				if(interp.encoded(btree::allow_duplicates)){
 					interp.decode(reader, keys, (*this).get_occupants());
-					
+
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage.retrieve(reader, keys[k]);
@@ -1517,7 +1517,7 @@ namespace stx
 			}
 			_AddressedVersionNodes* nodes;
 		};
-		
+
 		/// used to consistently report nodes loaded memory use;
 		nst::u64 _nodes_loaded_mem_reported;
 		void report_nodes_loaded_mem(){
@@ -1529,7 +1529,7 @@ namespace stx
 		/// used to prevent reinstantiation of existing nodes
 		/// therefore providing consistency to updates to any
 		/// node
-		
+
 		_AddressedNodes nodes_loaded;
 		_Shared shared;
 		///	returns NULL if a node with given storage address is not currently
@@ -1678,17 +1678,17 @@ namespace stx
 					typename node::ptr ns = nt;
 					ns.set_where(w);
 					ns.set_context(this);
-					if(nt->level==0){ // its a surface		
+					if(nt->level==0){ // its a surface
 						typename surface_node::ptr s ;
 						nodes_loaded[w] = s.rget();
 					}else{
 						/// should be an error
-						BTREE_ASSERT(nt->level == 0 && nt->get_shared());						
+						BTREE_ASSERT(nt->level == 0 && nt->get_shared());
 					}
 					return ns;
 				}
 			}
-			
+
 			buffer_type buffer = dangling_buffer ;
 			get_storage()->complete();
 			if(lz4){
@@ -1863,7 +1863,7 @@ namespace stx
 
 			/// The next to operators have been comented out since they will cause
 			/// problems in shared mode because they cannot 'render' logical
-			/// keys, (keys pointed to but  not  loaded) may be fixed with 
+			/// keys, (keys pointed to but  not  loaded) may be fixed with
 			/// hackery but not likely
 
 			/// Dereference the iterator, this is not a value_type& because key and
@@ -3037,7 +3037,7 @@ namespace stx
 		private:
 			typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
 			typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
-		
+
 		void release_shared(bool do_write){
 			if(shared.nodes != NULL){
 				nst::synchronized synched(shared.get_named_mutex());
@@ -3090,12 +3090,10 @@ namespace stx
 
 			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;
-		
-			nst::u64 flushed = 0;
 
 			this->headsurface.unload_only();
 			this->last_surface.unload_only();
-					
+
 			_ToDelete td;
 
 			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
@@ -3107,10 +3105,10 @@ namespace stx
 				np.discard(*this);
 			}
 			release_shared(false);
-			
+
 			if(save_tot > btree_totl_used)
-				BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());	
-			
+				BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());
+
 		}
 		public:
 		/// writes all modified pages to storage and frees all surface nodes
@@ -3129,7 +3127,7 @@ namespace stx
 			this->last_surface.unload();
 
 			flush_recursive(flushed,root);
-			
+
 			_ToDelete td;
 
 			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
@@ -3143,7 +3141,7 @@ namespace stx
 			if(reduce){
 				release_shared(true);
 				if(save_tot > btree_totl_used)
-					BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());	
+					BTREE_PRINT("total tree use %.8g MiB after flush , nodes removed %lld remaining %lld\n",(double)btree_totl_used/(1024.0*1024.0), (long long)nodes_before - (long long)nodes_loaded.size() , (long long)nodes_loaded.size());
 			}
 		}
 	private:
@@ -3225,7 +3223,7 @@ namespace stx
 				surface_node *ln = n;
 				typename surface_node::alloc_type a(surface_node_allocator());
 				/// TODO: adding multithreaded freeing of pages can improve transactional
-				/// performance where small ammounts of random page access is prevalent 
+				/// performance where small ammounts of random page access is prevalent
 
 				//static mt_free liberator(surface_node_allocator());
 				surface_node * removed = ln;
