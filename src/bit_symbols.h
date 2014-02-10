@@ -23,7 +23,7 @@ namespace nst = stx::storage;
 template<typename _IntSymBolType>
 class symbol_vector{
 public:
-	typedef nst::u32 _BucketType;/// use a configurable bucket type for larger code size performance
+	typedef nst::u16 _BucketType;/// use a configurable bucket type for larger code size performance
 	typedef nst::u32 _IndexType; /// type to index bits
 	static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
 	typedef std::vector<_BucketType> _Data;
@@ -93,8 +93,8 @@ public:
 		_IndexType code_complete = 0;
 		for(;;){	/// read from BUCKET_BITS-bit buckets
 			bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
-			_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);/// this is a hot line
-			bucket = (*current >> bucket_start)& ( ( 1 << todo ) - 1);
+			_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);
+			bucket = (*current >> bucket_start) & ( ( 1 << todo ) - 1); /// this is a hot line
 												
 			code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens				
 						

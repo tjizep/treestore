@@ -405,10 +405,11 @@ namespace stx
 		protected:
 
 			btree * context;
-		public:
+		public:			
 			node_ref * ptr;
-			stream_address w;
 
+			stream_address w;
+			
 			void make_mini(mini_pointer& m) const {
 				/*if(ptr != NULL_REF && ptr->shared){
 					m.ptr = (*this).ptr;
@@ -1196,6 +1197,9 @@ namespace stx
 
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
+			
+			/// shared counter used when page is shared, only surfaces can be shared
+			Poco::AtomicCounter a_refs;
 
 			/// Keys of children or data pointers
 			key_type        keys[surfaceslotmax];
@@ -1206,8 +1210,6 @@ namespace stx
 			/// Is the node sorted or not
 			int sorted;
 
-			/// shared counter used when page is shared, only surfaces can be shared
-			Poco::AtomicCounter a_refs;
 
 			/// Set variables to initial values
 			inline void initialize()
@@ -1328,10 +1330,12 @@ namespace stx
 							unsorted[i].value = values[i];
 						}
 
-						std::sort(unsorted, unsorted + node::get_occupants() );
+						
 
 						if(btree::allow_duplicates)
 						{
+							std::sort(unsorted, unsorted + node::get_occupants() );
+
 							for(int i = 0; i < node::get_occupants(); ++i)
 							{
 
@@ -1341,6 +1345,8 @@ namespace stx
 							}
 						}else
 						{
+							std::stable_sort(unsorted, unsorted + node::get_occupants() );
+
 							int i = 0, s = 0, p = 0;
 							keys[i] = unsorted[i].key;
 

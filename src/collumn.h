@@ -1476,7 +1476,7 @@ namespace collums{
 			MurmurHash3_x86_32(data(), size(), 0, &r);
 			return r;
 		}
-		inline bool operator<(const DynamicKey& right) const {
+		bool operator<(const DynamicKey& right) const {
 
 			/// partitions the order in a hierarchy
 			const nst::u8 *ld = data();
