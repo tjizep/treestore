@@ -4,7 +4,7 @@ treestore
 TuReestore MySQL Storage Engine version 0.28 (beta)
 --------------------------------------------------
 
-TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.13+
+TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.16+
 
 Features
 --------
