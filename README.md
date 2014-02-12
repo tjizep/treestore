@@ -17,6 +17,43 @@ Features
 + High read performance - average increase of 200% performance on tpc-h (HammerDB) and more when running from cold cache
 + In memory compression without performance loss
 
+Benchmarks
+----------
+
+Machine
++ Core i7 3770s 
++ 16 GB RAM
++ Western Digital Green 1.5 TB hardrive
++ Windows 8.1 x64
+
+Software
++ Mysql 5.6.13
++ HammerDB 2.1.4
++ Treestore 0.27 beta
+
+Load
++ TPC-H Scale 1 all queries
+
+Results (hot start 0.5 % variance)
++ InnoDB 76 secs 
++ Treestore 27 secs
+
+Results (cold start 30 % variance)
++ InnoDB 660 secs
++ TuReestore 105 secs
+
+Microsoft Windows Installation
+------------------------------
+
++ Download and install MySQL 5.6.16 x64 from [MySQL downloads](http://dev.mysql.com/downloads/mysql/)
++ Locate 'plugin' folder in MySQL installation directory
++ Copy treestore.dll from x64/Release to the previously located plugin folder
++ Install MSVC 11 x64 runtime dependencies from [MSVC Redistributable download](http://www.microsoft.com/en-za/download/details.aspx?id=30679)
++ Start MySQL
++ Using the client run the statement INSTALL PLUGIN TREESTORE SONAME 'treestore.dll'
++ use create table syntax with a suffix like engine='treestore'
+
+
 Technical
 ---------
 
@@ -30,17 +67,6 @@ Technical
 + Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 + Simple entropy coding is used for in memory compression 
-
-Microsoft Windows Installation
-------------------------------
-
-+ Download and install MySQL 5.6.13 x64 from [MySQL downloads](http://dev.mysql.com/downloads/mysql/)
-+ Locate 'plugin' folder in MySQL installation directory
-+ Copy treestore.dll from x64/Release to the previously located plugin folder
-+ Install MSVC 11 x64 runtime dependencies from [MSVC Redistributable download](http://www.microsoft.com/en-za/download/details.aspx?id=30679)
-+ Start MySQL
-+ Using the client run the statement INSTALL PLUGIN TREESTORE SONAME 'treestore.dll'
-+ use create table syntax with a suffix like engine='treestore'
 
 
 Configuration
@@ -100,30 +126,6 @@ Building
 
 GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
 
-Benchmarks
-----------
-
-Machine
-+ Core i7 3770s 
-+ 16 GB RAM
-+ Western Digital Green 1.5 TB hardrive
-+ Windows 8.1 x64
-
-Software
-+ Mysql 5.6.13
-+ HammerDB 2.1.4
-+ Treestore 0.27 beta
-
-Load
-+ TPC-H Scale 1 all queries
-
-Results (hot start 0.5 % variance)
-+ InnoDB 76 secs 
-+ Treestore 27 secs
-
-Results (cold start 30 % variance)
-+ InnoDB 660 secs
-+ TuReestore 105 secs
 
 TODO FOR GA 0.3
 ---------------
