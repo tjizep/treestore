@@ -497,13 +497,16 @@ void print_read_lookups(){
 		stx::storage::syncronized ul(plock);
 		if(os::millis()-ltime > 1000){
 			if(ltime){
+				double use = calc_total_use();
+				double twitch = 500.0 * units::MB;
 				printf
-				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g MB in %lld trees)\n"
+				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g %s in %lld trees)\n"
 				,   (nst::lld)read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups)
 				,   (nst::lld)hash_hits
 				,   (nst::lld)hash_predictions
 				,   (nst::lld)read_lookups
-				,   (double)calc_total_use()/(1024.0*1024.0)
+				,   (double)use/(use < twitch ? units::MB : units::GB)
+				,	use < twitch ? "MB" : "GB"
 				,   (nst::lld)btree_totl_instances
 				);
 			}
@@ -686,7 +689,9 @@ public:
 	const char *table_type(void) const{
 		return "TREESTORE";
 	}
-
+	const char *index_type(uint /*keynr*/) const{
+		return("BTREE");
+	}
 	const char **bas_ext(void) const{
 		static const char * exts[] = {TREESTORE_FILE_EXTENSION, NullS};
 		return exts;
