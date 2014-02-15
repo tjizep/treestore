@@ -122,7 +122,6 @@ namespace tree_stored{
 		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * fl, const stored::IntStored& i){
 			Field_long * f = (Field_long*)fl;
-			long t = i.value;
 			longstore(f->ptr, i.value);
 		}
 

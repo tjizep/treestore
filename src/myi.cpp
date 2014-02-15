@@ -246,7 +246,7 @@ namespace tree_stored{
 		}
 
 		void check_journal(){
-			if(get_treestore_journal_size() > treestore_journal_upper_max){
+			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 				synchronized _s(p2_lock);
 				if(!locks){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
@@ -962,7 +962,7 @@ public:
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
 			while
-			(	get_treestore_journal_size() > treestore_journal_upper_max
+			(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
 			)
 			{
 				st.check_journal();
@@ -971,7 +971,7 @@ public:
 			}
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
-			if(get_treestore_journal_size() > treestore_journal_upper_max){
+			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 
 				return HA_ERR_LOCK_TABLE_FULL;
 			}
@@ -1030,16 +1030,16 @@ public:
 		Item::Type t = acon->type();
 		if(t == Item::FUNC_ITEM){
 			const Item_func* f = (const Item_func*)acon;
-			Item_func::Functype ft = f->functype();
+			//Item_func::Functype ft = f->functype();
 
 			for(uint ac =0; ac < f->argument_count(); ++ac){
-				const Item * ia = f->arguments()[ac];
-				Item::Type it = ia->type();
+				//const Item * ia = f->arguments()[ac];
+				//Item::Type it = ia->type();
 				printf("argument type\n");
 			}
 			printf("function type");
 		}
-		const char * n = acon->full_name();
+		//const char * n = acon->full_name();
 		return acon;
 
 	};

@@ -11,7 +11,7 @@
 #include <stdio.h>
 /// memuse variables
 extern long long treestore_max_mem_use ;
-extern ptrdiff_t  _reported_memory_size();
+extern long long  _reported_memory_size();
 extern long long calc_total_use();
 
 extern "C"{

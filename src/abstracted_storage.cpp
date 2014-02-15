@@ -33,7 +33,7 @@ namespace stored{
 		return r;
 	}
 	void reduce_all(){
-		
+
 		nst::synchronized ll(m);
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
 			(*a).second->reduce();
@@ -50,9 +50,9 @@ namespace stored{
 
 extern void set_treestore_journal_size(nst::u64 ns);
 
-extern nst::u64 get_treestore_journal_size();
+extern nst::i64 get_treestore_journal_size();
 
-extern nst::u64 get_treestore_journal_lower_max();
+extern nst::i64 get_treestore_journal_lower_max();
 
 static Poco::Mutex llock;
 std::ofstream creation("allocations.txt", std::ios::app);
@@ -170,7 +170,7 @@ public:
 				reader.readRaw( (char*)&buffer[0], buffer.size() );
 		}
 	};
-	
+
 	bool is_valid_storage_directory(const std::string& storage_name) const {
 		try{
 			Poco::Path pdir = Poco::Path::current();
@@ -179,7 +179,7 @@ public:
 			pdir.parseDirectory(dtest);
 			pdir.popDirectory();
 			dtest =  pdir.toString();
-			Poco::File tmpDir(dtest);							
+			Poco::File tmpDir(dtest);
 			return tmpDir.isDirectory();
 		}catch(...){
 		}
@@ -220,12 +220,12 @@ public:
 						_Command &entry =  (*c);
 						nst::stream_address add = entry.address;
 						std::string storage_name = entry.name;
-						
+
 						stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
 						if(transaction == nullptr){
-											
+
 							if(is_valid_storage_directory(storage_name)){
 								transaction = storage->begin();
 								pending[storage_name] = transaction;
@@ -283,7 +283,8 @@ public:
 		Poco::File jf(journal_name);
 		if(jf.exists()){
 			set_treestore_journal_size( jf.getSize() );
-			if(force || jf.getSize() > get_treestore_journal_lower_max() ){
+			if(force || jf.getSize() > (nst::u64)get_treestore_journal_lower_max() ){
+
 				nst::u64 singles = 0;
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 					singles += (*p).second->make_singular() ? 1 : 0;

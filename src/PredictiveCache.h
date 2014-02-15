@@ -70,7 +70,7 @@ namespace tree_stored{
 		}
 
 		bool load(){
-			
+
 			if(!loaded){
 				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(stored::_Rid)*HASH_SIZE > (nst::u64)treestore_max_mem_use){
 					return false;
@@ -87,14 +87,14 @@ namespace tree_stored{
 			}
 			return loaded;
 		}
-		/// TODO: NB: the return value should be const 
+		/// TODO: NB: the return value should be const
 		const CompositeStored* _int_predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
 			using namespace NS_STORAGE;
 			if(predictor){
 				predictor++;
 				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
-				
+
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
 					if(sec_cache[predictor].k.left_equal_key(input) ){
@@ -156,7 +156,7 @@ namespace tree_stored{
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
-			if(calc_total_use() > (nst::u64)treestore_max_mem_use){
+			if((nst::u64)calc_total_use() > (nst::u64)treestore_max_mem_use){
 				clear();
 				return;
 			}
@@ -167,7 +167,7 @@ namespace tree_stored{
 			store_pos = sec_cache.size();
 			if(store_pos >= CIRC_SIZE) return;
 			size_t h = ((size_t)iter.key()) % HASH_SIZE;
-			
+
 			size_t s = cache_index[h];
 			if(s == 0){
 				cache_index[h] = sec_cache.size(); //store_pos+1;

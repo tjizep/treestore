@@ -90,10 +90,10 @@ namespace tree_stored{
 		static const int MAX_BUFFERED_ROWS = 10000;
 		class ColAdder : public asynchronous::AbstractWorker{
 		protected:
-
+            Poco::AtomicCounter &workers_away;
 			_Colt &col;
 
-			Poco::AtomicCounter &workers_away;
+
 			_RowBuffer buffer;
 		protected:
 			void flush_data(){
@@ -723,11 +723,12 @@ namespace tree_stored{
 		tree_table(TABLE *table_arg)
 		:	changed(false)
 		,	_row_count(0)
-		,	storage(table_arg->s->path.str)
-		,	table(nullptr)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
 		,	row_datas(nullptr)
+		,	storage(table_arg->s->path.str)
+		,	table(nullptr)
+
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -752,6 +753,7 @@ namespace tree_stored{
 		stored::abstracted_storage storage;
 		_TableMap * table;
 		shared_data * share;
+
 		_TableMap& get_table(){
 
 			if(nullptr==table)

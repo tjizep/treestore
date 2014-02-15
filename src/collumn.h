@@ -450,7 +450,7 @@ namespace collums{
 
 		struct _CacheEntry{
 			typedef stored::standard_entropy_coder<_Stored> _Encoded;
-			_CacheEntry() : available(false), loaded(false),density(1),users(0),_data(nullptr),rows_cached(0){};//
+			_CacheEntry() : available(false), loaded(false),_data(nullptr),rows_cached(0),density(1),users(0){};//
 			~_CacheEntry(){
 				NS_STORAGE::remove_col_use(calc_use());
 				rows_cached = 0;
@@ -466,6 +466,10 @@ namespace collums{
 			_StoredEntry _temp;
 			_Rid rows_cached;
 		public:
+            Poco::Mutex lock;
+			_Rid density;
+			nst::i64 users;
+
 			void resize(nst::i64 size){
 				data.resize(size);
 				flags.resize(size);
@@ -535,14 +539,14 @@ namespace collums{
 				_Rid kv = 0;
 				_Rid ctr = 0;
 				_Rid prev = 0;
-				nst::u8 * flags = &(*this).flags[0];
+
 				nst::u64 nulls = 0;
 
 				for(c = col.begin(); c != e; ++c){
 					kv = c.key().get_value();
 
 					/// nullify the gaps
-					_Rid cs = (*this).size();
+
 					if((*this).size() > kv){
 						if(kv > 0){
 							for(_Rid n = prev; n < kv-1; ++n){
@@ -632,9 +636,7 @@ namespace collums{
 					return data.capacity()* sizeof(_StoredEntry) + flags.capacity();
 				}
 			}
-			Poco::Mutex lock;
-			_Rid density;
-			nst::i64 users;
+
 			void make_flags(){
 				if(flags.size() != rows_cached){
 					NS_STORAGE::remove_col_use(flags.capacity());
@@ -708,15 +710,14 @@ namespace collums{
 
 				//col.share(storage.get_name());
 				//col.reload();
-				_Rid ctr = 0;
+
 
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				nst::u64 cached = 0;
-				_Rid actual_rows = 0;
 				if(!col.empty()){
 					--c;
-					actual_rows = c.key().get_value() + 1;
+
 					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
 					nst::u64 bytes_used = cached * (sizeof(_StoredEntry) + 1);
 					nst::remove_col_use((*cache).calc_use());

@@ -238,10 +238,10 @@ namespace stored{
 		NS_STORAGE::u8 buf[_ConstSize];
 
 		inline NS_STORAGE::u8 *extract_ptr(){
-			return (NS_STORAGE::u8*)(*(size_t*)(buf));
+			return (NS_STORAGE::u8*)(*reinterpret_cast<size_t*>(buf));
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
+			return (const NS_STORAGE::u8*)(*reinterpret_cast<const size_t*>(buf));
 		}
 		NS_STORAGE::u8* data(){
 			if(bytes <= _ConstSize){
@@ -552,10 +552,10 @@ namespace stored{
 		_BufferSize bs;// bytes used
 
 		inline _Data& get_Data(){
-			return *(_Data*)&buf[0];
+			return *reinterpret_cast<_Data*>(&buf[0]);
 		}
 		inline const _Data& get_Data() const {
-			return *(const _Data*)&buf[0];
+			return *reinterpret_cast<const _Data*>(&buf[0]);
 		}
 		inline nst::u8* data(){
 			if(bs==sizeof(_Data))
