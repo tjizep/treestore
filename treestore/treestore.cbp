@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="treestore" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug x64">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-D_DEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
+					<Add option="-D_CRT_SECURE_NO_WARNINGS" />
+					<Add option="-DPOCO_STATIC" />
+					<Add option="-DTREESTORE_EXPORTS" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Foundation/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Util/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/SQLite/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/sql" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/sql" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/regex" />
+					<Add directory="$(CPP_REPO)/lz4-r101" />
+					<Add directory="$(CPP_REPO)/zlib-1.2.8" />
+					<Add directory="/home/liz/Desktop/treestore/treestore/../src" />
+				</Compiler>
+				<Linker>
+					<Add library="kernel32.lib" />
+					<Add library="user32.lib" />
+					<Add library="gdi32.lib" />
+					<Add library="winspool.lib" />
+					<Add library="comdlg32.lib" />
+					<Add library="advapi32.lib" />
+					<Add library="shell32.lib" />
+					<Add library="ole32.lib" />
+					<Add library="oleaut32.lib" />
+					<Add library="uuid.lib" />
+					<Add library="odbc32.lib" />
+					<Add library="odbccp32.lib" />
+					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\sql\Release\mysqld.lib" />
+					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\libservices\Release\mysqlservices.lib" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/lib64" />
+				</Linker>
+			</Target>
+			<Target title="Release x64">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-DNDEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
+					<Add option="-D_CRT_SECURE_NO_WARNINGS" />
+					<Add option="-DPOCO_STATIC" />
+					<Add option="-DTREESTORE_EXPORTS" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Foundation/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Util/include" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/SQLite/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/sql" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/sql" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/include" />
+					<Add directory="$(CPP_REPO)/mysql-5.6.13/regex" />
+					<Add directory="$(CPP_REPO)/lz4-r101" />
+					<Add directory="$(CPP_REPO)/zlib-1.2.8" />
+					<Add directory="/home/liz/Desktop/treestore/treestore/../src" />
+				</Compiler>
+				<Linker>
+					<Add library="kernel32.lib" />
+					<Add library="user32.lib" />
+					<Add library="gdi32.lib" />
+					<Add library="winspool.lib" />
+					<Add library="comdlg32.lib" />
+					<Add library="advapi32.lib" />
+					<Add library="shell32.lib" />
+					<Add library="ole32.lib" />
+					<Add library="oleaut32.lib" />
+					<Add library="uuid.lib" />
+					<Add library="odbc32.lib" />
+					<Add library="odbccp32.lib" />
+					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\sql\Release\mysqld.lib" />
+					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\libservices\Release\mysqlservices.lib" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/lib64" />
+				</Linker>
+			</Target>
+		</Build>
+		<Unit filename="../../repo/lz4-r101/lz4.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/adler32.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/compress.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/crc32.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/deflate.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/infback.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/inffast.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/inflate.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/inftrees.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/trees.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/uncompr.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../../repo/zlib-1.2.8/zutil.c">
+			<Option compilerVar="CC" />
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/MurmurHash3.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/MurmurHash3.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/NotificationQueueWorker.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/PredictiveCache.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/abstracted_storage.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/abstracted_storage.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/collumn.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/collumn.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/conversions.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/fields.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/fields.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/myi.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/myi.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_map">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_map.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_multimap">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_multimap.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_multiset">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_multiset.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_set">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/stx/btree_set.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/transactional_storage.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/transactional_storage.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/tree_index.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/tree_stored.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="../src/tree_table.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="dllmain.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="targetver.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="treestore.cpp">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Unit filename="treestore.h">
+			<Option target="Debug x64" />
+			<Option target="Debug Win32" />
+			<Option target="Release Win32" />
+			<Option target="Release x64" />
+		</Unit>
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
