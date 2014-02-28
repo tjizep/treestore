@@ -52,7 +52,7 @@ extern void set_treestore_journal_size(nst::u64 ns);
 
 extern nst::i64 get_treestore_journal_size();
 
-extern nst::i64 get_treestore_journal_lower_max();
+extern nst::u64 get_treestore_journal_lower_max();
 
 static Poco::Mutex llock;
 std::ofstream creation("allocations.txt", std::ios::app);

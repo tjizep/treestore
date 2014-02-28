@@ -127,6 +127,9 @@ namespace stored{
 			value = NS_STORAGE::leb128::read_signed(reader);
 			return reader;
 		};
+		size_t get_hash() const{
+			return (size_t)value;
+		}
 	};
 
 	template<typename _FType>
@@ -174,6 +177,9 @@ namespace stored{
 			reader+=sizeof(value);
 			return reader;
 		};
+		size_t get_hash() const{
+			return (size_t)value;
+		}
 	};
 
 	template<typename _FType>
@@ -224,6 +230,9 @@ namespace stored{
 			reader += value.size();
 			return reader;
 		};
+		size_t get_hash() const{
+			return (size_t)value;
+		}
 	};
 	template<bool CHAR_LIKE, int _ConstSize = 16>
 	class Blobule {
@@ -238,10 +247,10 @@ namespace stored{
 		NS_STORAGE::u8 buf[_ConstSize];
 
 		inline NS_STORAGE::u8 *extract_ptr(){
-			return (NS_STORAGE::u8*)(*reinterpret_cast<size_t*>(buf));
+			return (NS_STORAGE::u8*)(*(size_t*)(buf));
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
-			return (const NS_STORAGE::u8*)(*reinterpret_cast<const size_t*>(buf));
+			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
 		NS_STORAGE::u8* data(){
 			if(bytes <= _ConstSize){
@@ -307,6 +316,7 @@ namespace stored{
 
 		}
 	public:
+
 		char * get_value(){
 			return chars();
 		}
@@ -463,7 +473,11 @@ namespace stored{
 		NS_STORAGE::u32 stored() const {
 			return NS_STORAGE::leb128::signed_size((*this).size)+(*this).size;
 		};
-
+		size_t get_hash() const{
+			nst::u32 h = 0;
+			MurmurHash3_x86_32(data(), get_size(), 0, &h);
+			return h;
+		}
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
 			buffer_type::iterator writer = w;
@@ -552,10 +566,10 @@ namespace stored{
 		_BufferSize bs;// bytes used
 
 		inline _Data& get_Data(){
-			return *reinterpret_cast<_Data*>(&buf[0]);
+			return *(_Data*)&buf[0];
 		}
 		inline const _Data& get_Data() const {
-			return *reinterpret_cast<const _Data*>(&buf[0]);
+			return *(const _Data*)&buf[0];
 		}
 		inline nst::u8* data(){
 			if(bs==sizeof(_Data))
@@ -649,7 +663,7 @@ namespace stored{
 	public:
 		int size() const {
 			if(bs==sizeof(_Data))
-				return get_Data().size();
+				return (int)get_Data().size();
 			return bs;
 		}
 		/// 2nd level
@@ -1050,8 +1064,12 @@ namespace stored{
 			typedef symbol_vector<_CodeType> _Symbols;
 
 			typedef int_entropy_t<_IntType> _Entropy;
-
-            typedef std::map<_IntType, _CodeType> _CodeMap;
+			struct hash_fixed{
+				size_t operator()(const _IntType& i) const {
+					return i.get_hash();
+				}
+			};
+            typedef std::unordered_map<_IntType, _CodeType, hash_fixed> _CodeMap;
 			typedef std::vector<_IntType> _DeCodeMap;
 
 			_Entropy stats;
