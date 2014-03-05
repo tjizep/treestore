@@ -138,6 +138,14 @@ public:
 namespace nst = stx::storage;
 namespace stx
 {
+	/// mini pointer for portable iterator references
+	struct mini_pointer{
+		
+		storage::stream_address w;
+	};
+	
+	/// an iterator intializer pair
+	typedef std::pair<mini_pointer, unsigned short> initializer_pair;
 
 	template<typename _KeyType>
 	struct interpolator{
@@ -273,6 +281,8 @@ namespace stx
 		{
 		}
 	};
+	
+
 	/// as a test the null ref was actually defined as a real address
 	/// static node_ref null_ref;
 	/// static node_ref * NULL_REF = &null_ref;
@@ -395,11 +405,7 @@ namespace stx
 		/// proxy and interceptor class for reference counted pointers
 		/// and automatic loading
 
-		struct mini_pointer{
-			//node_ref * ptr;
-			stream_address w;
-
-		};
+		
 		class base_proxy
 		{
 		protected:
@@ -1811,7 +1817,8 @@ namespace stx
 			typedef iterator                self;
 
 			/// an iterator intializer pair
-			typedef std::pair<mini_pointer, unsigned short> initializer_pair;
+			typedef stx::initializer_pair initializer_pair;
+			
 		private:
 			// *** Members
 

@@ -836,11 +836,82 @@ namespace stored{
 			row = right.row;
 			return *this;
 		}
+		DynamicKey& return_or_copy(DynamicKey& ){
+			return *this;
+		}
 		inline operator size_t() const {
 			size_t r = 0;
 			MurmurHash3_x86_32(data(), size(), 0, &r);
 			return r;
 		}
+		template<typename _IntType>
+		bool p_decode(_IntType& out, int n = 1){
+			const nst::u8 *ld = data();
+			
+			nst::u8 lt = *ld;
+			
+			int r = 0,l=0,ll=0;
+			while(n > 0){
+				--n;
+				++ld;
+				switch(lt){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					if(!n){
+						out = (*(nst::i8*)ld )					
+						
+					}
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					if(!n){
+						out = (*(nst::i16*)ld );
+									
+					}
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					if(!n){
+						out = (*(nst::i32*)ld);
+						
+					}
+					break;
+				case DynamicKey::I8 :
+					l = 8;
+					if(!n){
+						out = (*(nst::i64*)ld)
+						
+					}
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					if(!n){
+						out = (*(float*)ld );
+						return true;
+					}
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					if(!n){
+						out = (*(double*)ld);
+						return true;
+					}
+					break;
+
+				case DynamicKey::S:
+					l = *(const nst::i16*)ld;
+					if(!n){
+						out = 0;
+						return false;
+					}
+					break;
+				};
+				ld += l;
+				lt = *ld;
+			};
+			return true;
+		}
+
 		bool operator<(const DynamicKey& right) const {
 
 			/// partitions the order in a hierarchy
@@ -850,6 +921,8 @@ namespace stored{
 			nst::u8 rt = *rd;
 			int r = 0,l=0,ll=0;
 			while(lt == rt){
+				++ld;
+				++rd;
 				switch(lt){
 				case DynamicKey::I1 :
 					l=sizeof(nst::i8);
@@ -909,14 +982,16 @@ namespace stored{
 					break;
 				};
 				if( r != 0 ) break;
-				++l;
+				
 				ld += l;
 				rd += l;
-				ll += l;
-				if(ll >= size()) break;
-				if(ll >= right.size()) break;
 				lt = *ld;
 				rt = *rd;
+
+				ll += (l+1);
+				if(ll >= size()) break;
+				if(ll >= right.size()) break;
+				
 			}
 			if(rt != lt)
 				return lt < rt; //total order on types first
@@ -969,6 +1044,285 @@ namespace stored{
 			}
 
 
+			return reader;
+		};
+	};
+	template<typename _DataType,typename _FieldType>
+	class PrimitiveDynamicKey{
+	public:
+
+		
+
+		typedef unsigned char	uchar;	/* Short for unsigned char */
+		typedef signed char int8;       /* Signed integer >= 8  bits */
+		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
+		typedef short int16;
+		typedef unsigned short uint16;
+		typedef int int32;
+		typedef unsigned int uint32;
+		typedef unsigned long	ulong;		  /* Short for unsigned long */
+		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
+		typedef long long longlong;
+		typedef longlong int64;
+		typedef ulonglong uint64;
+		typedef std::vector<nst::u8> _Data;
+
+		static const size_t MAX_BYTES = 2048;
+
+		typedef _Rid row_type ;
+
+		typedef NS_STORAGE::u8 _size_type;
+		typedef NS_STORAGE::u8 _BufferSize;
+
+	protected:
+
+		_DataType data;
+		
+		/// 1st level
+		void addDynInt(nst::i64 v){
+			data = v;
+		}
+		void addDynInt(nst::u64 v){
+			data = v;
+		}
+		void addDynInt(nst::i32 v){
+			data = v;
+		}
+		void addDynInt(nst::u32 v){
+			data = v;
+		}
+		void addDynInt(nst::i16 v){
+			data = v;
+		}
+		void addDynInt(nst::u16 v){
+			data = v;
+		}
+		void addDynInt(nst::i8 v){
+			data = v;
+		}
+		void addDynInt(nst::u8 v){
+			data = v;
+		}
+		void addDynReal(double v){
+			data = v;
+		}
+		void addDynReal(float v){
+			data = v;
+		}
+	public:
+		void add(const char* k, size_t s){
+			
+		}
+	public:
+		row_type row;
+	public:
+		int size() const {
+			return sizeof(data);
+		}
+		/// 2nd level
+		void addf8(double v){
+
+			addDynReal(v);
+		}
+
+		void add1(char c){
+			addDynInt(c);
+
+		}
+
+		void addu1(unsigned char c){
+
+			addDynInt(c);
+
+		}
+
+		void addf4(float v){
+
+			addDynReal(v);
+		}
+
+		void add8(long long v){
+			addDynInt((nst::i64)v);
+
+		}
+
+		void addu8(unsigned long long v){
+
+			addDynInt((nst::u64)v);
+
+		}
+
+		void add4(long v){
+
+			addDynInt(v);
+
+		}
+
+		void addu4(unsigned int v){
+
+			addDynInt(v);
+
+		}
+
+		void add2(short v){
+
+			addDynInt(v);
+		}
+
+		void addu2(unsigned short v){
+
+			addDynInt(v);
+		}
+		/// 3rd level
+		void add(const stored::FloatStored & v){
+
+			addf4(v.get_value());
+		}
+
+		void add(const stored::DoubleStored & v){
+
+			addf8(v.get_value());
+		}
+		void add(const stored::ShortStored& v){
+
+			add2(v.get_value());
+		}
+
+		void add(const stored::UShortStored& v){
+
+			addu2(v.get_value());
+		}
+
+		void add(const stored::CharStored& v){
+
+			add1(v.get_value());
+		}
+
+		void add(const stored::UCharStored& v){
+
+			addu1(v.get_value());
+		}
+
+		void add(const stored::IntStored& v){
+
+			add4(v.get_value());
+		}
+
+		void add(const stored::UIntStored& v){
+
+			addu4(v.get_value());
+		}
+
+		void add(const stored::LongIntStored& v){
+
+			add8(v.get_value());
+		}
+
+		void add(const stored::ULongIntStored& v){
+
+			addu8(v.get_value());
+		}
+
+		void add(const stored::BlobStored& v){
+
+			add(v.get_value(),v.get_size());
+		}
+
+		void add(const stored::VarCharStored& v){
+
+			add(v.get_value(),v.get_size()-1);
+		}
+
+		void addTerm(const char* k, size_t s){
+			add(k, s);
+		}
+
+		void clear(){
+
+			data = 0;
+		}
+
+		~PrimitiveDynamicKey(){
+			
+		}
+
+		PrimitiveDynamicKey():
+			data(0),row(0)
+		{
+
+		}
+
+		PrimitiveDynamicKey(const PrimitiveDynamicKey& right):
+			data(0),row(0)
+		{
+			*this = right;
+		}
+
+		inline bool left_equal_key(const DynamicKey& right) const {
+			
+			return data == right.data;
+		}
+
+		inline bool equal_key(const DynamicKey& right) const {
+			if( data == right.data)
+				return row == right.row;
+			return false;
+
+		}
+
+		PrimitiveDynamicKey& operator=(const PrimitiveDynamicKey& right){
+			data = right.data;
+			row = right.row;			
+			return *this;
+		}
+
+		DynamicKey& return_or_copy(DynamicKey& x){
+
+			return x;
+		}
+		inline operator size_t() const {
+			
+			return data;
+		}
+		
+
+		bool operator<(const PrimitiveDynamicKey& right) const {
+			if( data == right.data)
+				return row < right.row;
+			
+			return (data < right.data);
+		}
+
+		inline bool operator!=(const PrimitiveDynamicKey& right) const {
+			if( data == right.data)
+				return row != right.row;
+			
+			return data != right.data;
+		}
+
+		inline bool operator==(const PrimitiveDynamicKey& right) const {
+			return !(*this != right);
+		}
+
+		NS_STORAGE::u32 stored() const {
+			return (NS_STORAGE::u32)(NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row));
+		};
+
+		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
+			using namespace NS_STORAGE;
+			buffer_type::iterator writer = w;
+			DynamicKey s;
+			s.add(data);
+			writer = s.store(writer);
+			return writer;
+		};
+
+		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+			using namespace NS_STORAGE;
+			buffer_type::const_iterator reader = r;
+			DynamicKey s;			
+			reader = s.read(reader);
+			d.p_decode(data);
 			return reader;
 		};
 	};
@@ -1493,5 +1847,75 @@ namespace stored{
 		};
 		/**/
 #endif
+	class index_iterator_interface{
+	public:
+		///for quick type check
+		int type_id; 
+		
+		index_iterator_interface() : type_id(0){
+		}
+		virtual ~index_iterator_interface(){
+		}
+
+		virtual bool valid() const = 0;
+		virtual bool invalid() const = 0;
+		virtual void next() = 0;
+		virtual void previous() = 0;
+		virtual nst::u64 count(const index_iterator_interface& in) = 0;
+		virtual DynamicKey& get_key() = 0;
+		virtual void set_end(index_iterator_interface& in) = 0;
+	};
+
+	class index_interface{
+	public:
+		int ix;
+		int fields_indexed;
+		stored::_Parts parts;
+		stored::_Parts density;
+
+		virtual const DynamicKey *predict(index_iterator_interface& io, DynamicKey& q)=0;
+		virtual void cache_it(index_iterator_interface& io)=0;
+		virtual bool is_unique() const = 0;
+		virtual void set_col_index(int ix)= 0;
+		virtual void set_fields_indexed(int indexed)=0;
+		virtual void push_part(_Rid part)=0;
+		virtual void push_density(_Rid dens) = 0;
+		virtual size_t densities() const = 0;		
+		virtual int& density_at(size_t at) = 0;
+		virtual const int& density_at(size_t at) const = 0;
+		virtual void end(index_iterator_interface& out)=0;
+		virtual index_iterator_interface * get_index_iterator() = 0;
+		virtual index_iterator_interface * get_first1() = 0;
+		virtual index_iterator_interface * get_last1() = 0;
+
+		virtual void first(index_iterator_interface& out)=0;
+		virtual void lower_(index_iterator_interface& out,const DynamicKey& key)=0;
+		virtual void lower(index_iterator_interface& out,const DynamicKey& key)=0;
+		virtual void upper(index_iterator_interface& out, const DynamicKey& key)=0;
+		virtual void add(const DynamicKey& k)=0;
+		virtual void remove(const DynamicKey& k) = 0;
+		virtual void find(index_iterator_interface& out, const DynamicKey& key) = 0;
+		virtual void from_initializer(index_iterator_interface& out, const stx::initializer_pair& ip) = 0;
+		virtual void reduce_use() = 0;
+
+		virtual void begin(bool read) = 0;
+
+		virtual void commit1_asynch() = 0;
+
+		virtual void commit1()= 0;
+		
+		virtual void commit2() = 0;
+		
+		virtual void rollback() = 0;
+		
+		virtual void share() = 0;
+		virtual void unshare() = 0;
+		
+		virtual void clear_cache() = 0;
+		virtual void reduce_cache() = 0;
+
+		typedef index_interface * ptr;
+	};
+	
 };
 #endif

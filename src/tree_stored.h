@@ -34,27 +34,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _TREE_STORED_H_CEP2013_
 #define _TREE_STORED_H_CEP2013_
-#include "collumn.h"
+//#include "collumn.h"
 namespace tree_stored{
-	
-	typedef collums::col_index ColIndex;
+	typedef stored::DynamicKey CompositeStored;
+	/*typedef collums::col_index ColIndex;
 	typedef ColIndex::IndexIterator IndexIterator ;
-	typedef ColIndex::index_key CompositeStored;
-	typedef ColIndex::iterator_type BasicIterator;
-
 	
+	typedef ColIndex::iterator_type BasicIterator;*/
 
-	/*typedef collums::FloatStored FloatStored ;
-	typedef collums::DoubleStored DoubleStored ;
-	typedef collums::ShortStored ShortStored;
-	typedef collums::UShortStored UShortStored;
-	typedef collums::CharStored CharStored;
-	typedef collums::UCharStored UCharStored;
-	typedef collums::IntStored IntStored;
-	typedef collums::UIntStored UIntStored;
-	typedef collums::LongIntStored LongIntStored;
-	typedef collums::ULongIntStored ULongIntStored;
-	typedef collums::BlobStored BlobStored;
-	typedef collums::VarCharStored VarCharStored;*/
 };
 #endif

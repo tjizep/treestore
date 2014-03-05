@@ -571,7 +571,12 @@ public:
 	stored::_Rid last_resolved;
 	typedef tree_stored::_Selection  _Selection;
 	tree_stored::_Selection selected;// direct selection filter
-	tree_stored::IndexIterator index_iterator;
+	
+	stored::index_interface * current_index;
+
+	stored::index_iterator_interface& get_index_iterator(){
+		return *current_index->get_index_iterator();
+	}
 	tree_stored::tree_thread* get_thread(THD* thd){
 		return new_thread_from_thd(thd);
 	}
@@ -1146,9 +1151,9 @@ public:
 		DBUG_ENTER("records_in_range");
 		//read_lookups+=2;
 
-		tree_stored::IndexIterator first = get_index_iterator_lower(inx, start_key) ;
-		tree_stored::IndexIterator last = get_index_iterator_upper(inx, end_key);
-		rows = first.count(last);
+		get_index_iterator_lower(*current_index->get_first1(),inx, start_key) ;
+		get_index_iterator_upper(*current_index->get_last1(), inx, end_key);
+		rows = current_index->get_first1()->count(*current_index->get_last1());
 		if (rows == 0) {
 			rows = 1;
 		}
@@ -1163,6 +1168,7 @@ public:
 		handler::active_index = keynr;
 		tt = NULL;
 		clear_selection(selected);
+		current_index = get_tree_table()->get_index_interface(handler::active_index);
 		selected = get_tree_table()->create_output_selection(table);
 		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
 
@@ -1210,7 +1216,7 @@ public:
 
 	void resolve_selection_from_index(uint ax){
 
-		tree_stored::CompositeStored& iinfo = index_iterator.get_key();
+		tree_stored::CompositeStored& iinfo = get_index_iterator().get_key();
 		resolve_selection_from_index(ax, iinfo);
 
 	}
@@ -1231,31 +1237,31 @@ public:
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 
 		read_lookups++;
-		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map, index_iterator);
+		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map, get_index_iterator());
 		if(pred==NULL){
-			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,index_iterator);
+			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,get_index_iterator());
 		}
 		print_read_lookups();
-		if(index_iterator.valid()){
+		if(get_index_iterator().valid()){
 
 			switch(find_flag){
 			case HA_READ_AFTER_KEY:
-				index_iterator.next();
-				if(index_iterator.invalid()){
+				get_index_iterator().next();
+				if(get_index_iterator().invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
 
 				break;
 			case HA_READ_BEFORE_KEY:
-				index_iterator.previous();
-				if(index_iterator.invalid()){
+				get_index_iterator().previous();
+				if(get_index_iterator().invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
 
 				break;
 			case HA_READ_KEY_EXACT:
 				{
-					const tree_stored::CompositeStored& current = pred == NULL ?index_iterator.get_key(): *pred;
+					const tree_stored::CompositeStored& current = pred == NULL ?get_index_iterator().get_key(): *pred;
 					if(!tt->check_key_match2(current,table,keynr,keypart_map)){
 						DBUG_RETURN(HA_ERR_END_OF_FILE);
 					}
@@ -1324,10 +1330,9 @@ public:
 	}
 	int index_next(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
-		index_iterator.next();
+		get_index_iterator().next();
 		table->status = STATUS_NOT_FOUND;
-		if(index_iterator.valid()){
-
+		if(get_index_iterator().valid()){
 			resolve_selection_from_index();
 			r = 0;
 			table->status = 0;
@@ -1338,10 +1343,10 @@ public:
 	}
 
 	int index_prev(byte * buf) {
-		index_iterator.previous();
+		get_index_iterator().previous();
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
-		if(index_iterator.valid()){
+		if(get_index_iterator().valid()){
 			r = 0;
 			resolve_selection_from_index();
 			table->status = 0;
@@ -1373,31 +1378,32 @@ public:
 	,	uint key_map
 	,	enum ha_rkey_function find_flag
 	){
-		index_iterator = get_tree_table()->compose_query_lower_r(table, ax, key, key_l, key_map);
-		return index_iterator.valid() ? 0 : HA_ERR_END_OF_FILE;
+		get_tree_table()->compose_query_lower_r(get_index_iterator(),table, ax, key, key_l, key_map);
+		return get_index_iterator().valid() ? 0 : HA_ERR_END_OF_FILE;
 	}
 
-	tree_stored::IndexIterator get_index_iterator_lower
-	(	uint ax
+	void get_index_iterator_lower
+	(	stored::index_iterator_interface& out
+	,	uint ax
 	,	const uchar *key
 	,	uint key_l
 	,	uint key_map
 	,	enum ha_rkey_function find_flag
 	){
-		return get_tree_table()->compose_query_lower_r(table, ax, key, key_l, key_map);
+		return get_tree_table()->compose_query_lower_r(out, table, ax, key, key_l, key_map);
 	}
 
-	tree_stored::IndexIterator get_index_iterator_upper(uint ax, const key_range *start_key){
+	void get_index_iterator_upper(stored::index_iterator_interface& out, uint ax, const key_range *start_key){
 		if(start_key != NULL){
-			return get_tree_table()->compose_query_upper(table, ax, start_key->key, start_key->length, start_key->keypart_map);
+			get_tree_table()->compose_query_upper(out, table, ax, start_key->key, start_key->length, start_key->keypart_map);
 		}else{
-			return get_tree_table()->compose_query_upper(NULL, ax, NULL, 0ul, 0ul);
+			get_tree_table()->compose_query_upper(out, NULL, ax, NULL, 0ul, 0ul);
 		}
 
 	}
 
-	tree_stored::IndexIterator get_index_iterator_upper(const key_range *start_key){
-		return get_index_iterator_upper(active_index, start_key);
+	void get_index_iterator_upper(stored::index_iterator_interface& out,const key_range *start_key){
+		get_index_iterator_upper(out, active_index, start_key);
 	}
 
 	int set_index_iterator_lower(const key_range *start_key){
@@ -1407,11 +1413,11 @@ public:
 			return set_index_iterator_lower(active_index, NULL, 0, 0, HA_READ_KEY_OR_NEXT);
 	}
 
-	tree_stored::IndexIterator get_index_iterator_lower(uint ax, const key_range *bound){
+	void get_index_iterator_lower(stored::index_iterator_interface& out, uint ax, const key_range *bound){
 		if(bound != NULL){
-			return get_index_iterator_lower(ax, bound->key, bound->length, bound->keypart_map,bound->flag);
+			get_index_iterator_lower(out, ax, bound->key, bound->length, bound->keypart_map,bound->flag);
 		}else{
-			return get_index_iterator_lower(ax, NULL, 0ul, 0xFFFFFFFF, HA_READ_AFTER_KEY);
+			get_index_iterator_lower(out, ax, NULL, 0ul, 0xFFFFFFFF, HA_READ_AFTER_KEY);
 		}
 	}
 
@@ -1435,9 +1441,10 @@ public:
 			table->status = 0;
 			resolve_selection_from_index();
 			read_lookups++;
-			index_iterator.set_end(get_index_iterator_upper(end_key));
-			if(index_iterator.valid()){
-				index_iterator.next();
+			get_index_iterator_upper(*current_index->get_first1(), end_key);
+			get_index_iterator().set_end(*current_index->get_first1());
+			if(get_index_iterator().valid()){
+				get_index_iterator().next();
 			}else
 				r = HA_ERR_END_OF_FILE;
 		}
@@ -1449,11 +1456,11 @@ public:
 		int r = HA_ERR_END_OF_FILE;
 
 
-		if(index_iterator.valid()){
+		if(get_index_iterator().valid()){
 			r = 0;
 			table->status = 0;
 			resolve_selection_from_index();
-			index_iterator.next();
+			get_index_iterator().next();
 		}
 
 		++range_iterator;

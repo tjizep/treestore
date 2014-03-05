@@ -84,6 +84,9 @@
     <ClInclude Include="..\src\bit_symbols.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\iterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="treestore.cpp">

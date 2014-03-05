@@ -467,7 +467,7 @@ namespace tree_stored{
 		}
 	};
 
-	typedef std::vector<tree_index::ptr> _Indexes;
+	typedef std::vector<stored::index_interface::ptr> _Indexes;
 	typedef std::vector<abstract_my_collumn*> _Collumns;
 	struct selection_tuple{
 		selection_tuple()
@@ -653,13 +653,13 @@ namespace tree_stored{
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
 
-				tree_index::ptr index = (*this).indexes[i];
+				stored::index_interface::ptr index = (*this).indexes[i];
 
 				for (j= 0; j < pos->usable_key_parts; j++){
 					Field *field = pos->key_part[j].field;// the jth field in the key
 					nst::u32 fi=field->field_index;
 					if(j == 0){
-						index->density.push_back((*this).cols[fi]->get_rows_per_key());
+						index->push_density((*this).cols[fi]->get_rows_per_key());
 					}else{
 						/*const _Rid sample = std::min<_Rid>(_row_count, 10000);
 						typedef std::set<CompositeStored> _Uniques;
@@ -675,7 +675,7 @@ namespace tree_stored{
 						_Rid d = sample / uniques.size();
 						if(d > 1) d /= 2;*/
 						stored::_Rid d = 1;
-						index->density.push_back(d);
+						index->push_density(d);
 					}
 				}
 			}
@@ -689,13 +689,13 @@ namespace tree_stored{
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
 
-				tree_index::ptr index = new tree_index(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+				stored::index_interface::ptr index = new tree_index<stored::DynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 
-				index->ix = i;
-				index->fields_indexed = pos->usable_key_parts;
+				index->set_col_index(i);
+				index->set_fields_indexed (pos->usable_key_parts);
 				for (j= 0; j < pos->usable_key_parts; j++){
 					Field *field = pos->key_part[j].field;// the jth field in the key
-					index->parts.push_back(field->field_index);
+					index->push_part(field->field_index);
 
 				}
 
@@ -896,7 +896,7 @@ namespace tree_stored{
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 
-				(*x)->index.reduce_use();
+				(*x)->reduce_use();
 
 			}
 
@@ -969,8 +969,8 @@ namespace tree_stored{
 		/// returns the rows per key for a given collumn
 
 		nst::u32 get_rows_per_key(nst::u32 i, nst::u32 part) const {
-			if(indexes.size() > i && indexes[i]->density.size() > part){
-				return indexes[i]->density[part];
+			if(indexes.size() > i && indexes[i]->densities() > part){
+				return indexes[i]->density_at(part);
 			}
 			return 1;
 		}
@@ -1112,18 +1112,18 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		,	IndexIterator & out
+		,	stored::index_iterator_interface & out
 
 		){
 			check_load(table);
-			tree_index::ptr ix =  indexes[ax];
+			stored::index_interface::ptr ix =  indexes[ax];
 			if(!key_map || key==NULL){
-				out = ix->index.first();
+				ix->first(out);
 				return NULL;
 			}
 			_compose_query_nb(table, 0ull, ax, key, key_l, key_map);
 
-			if( ix->unique && treestore_predictive_hash == TRUE ){
+			if( ix->is_unique() && treestore_predictive_hash == TRUE ){
 
 				return ix->predict(out, temp);
 
@@ -1132,57 +1132,68 @@ namespace tree_stored{
 		}
 
 		void from_initializer
-		(	IndexIterator & out
+		(	stored::index_iterator_interface & out
 		,	uint ax
-		,	const IndexIterator::initializer_pair& ip)
+		,	const stx::initializer_pair& ip)
 		{
-			indexes[ax]->index.from_initializer(out,ip);
+			indexes[ax]->from_initializer(out,ip);
 		}
 
 
-		IndexIterator compose_query_find
-		(	TABLE* table
+		void compose_query_find
+		(	stored::index_iterator_interface& out
+		,	TABLE* table
 		,	uint ax
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-
+		
 		){
 			check_load(table);
 			_compose_query(table, 0ull, ax, key, key_l, key_map);
-			return indexes[ax]->index.find(temp);
+			
+			indexes[ax]->find(out, temp);
+			
 		}
 
 
-		IndexIterator compose_query_upper
-		(	TABLE* table
+		void compose_query_upper
+		(	stored::index_iterator_interface& r
+		,	TABLE* table
 		,	uint ax
 		,	const uchar *key
 		,	uint key_l
 
 		,	uint key_map
 		){
+			
 			check_load(table);
 			if(!key_map || key==NULL){
-				return indexes[ax]->index.end();
+				indexes[ax]->end(r);
+				return ;
 			}
 			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
-			return indexes[ax]->index.upper(temp);
+			indexes[ax]->upper(r, temp);
+			
 		}
 
-		IndexIterator compose_query_upper_r
-		(	TABLE* table
+		void compose_query_upper_r
+		(	stored::index_iterator_interface& r
+		,	TABLE* table
 		,	uint ax
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
 		){
 			check_load(table);
+			
 			if(!key_map || key==NULL){
-				return indexes[ax]->index.end();
+				indexes[ax]->end(r);
+				return ;
 			}
 			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
-			return indexes[ax]->index.upper(temp);
+			indexes[ax]->upper(r,temp);
+			
 		}
 
 		void compose_query_lower
@@ -1191,17 +1202,17 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		,	IndexIterator & out
+		,	stored::index_iterator_interface& out
 		){
 			check_load(table);
 			if(!key_map || key==NULL){
-				out = indexes[ax]->index.first();
+				indexes[ax]->first(out);
 				return ;
 			}
 
 			_compose_query(table, 0ull, ax, key, key_l, key_map);
 
-			indexes[ax]->index.lower_(out, temp);
+			indexes[ax]->lower_(out, temp);
 		}
 
 		void temp_lower
@@ -1210,37 +1221,42 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		,	IndexIterator & out
+		,	stored::index_iterator_interface& out
 		){
 			check_load(table);
-			tree_index::ptr ix =  indexes[ax];
+			stored::index_interface::ptr ix =  indexes[ax];
 			if(!key_map || key==NULL){
-				out = ix->index.first();
+				ix->first(out);
 				return ;
 			}
 
-			ix->index.lower_(out, temp);
+			ix->lower_(out, temp);
 			if(!changed){
-				if(ix->unique && out.valid()){
+				if(ix->is_unique() && out.valid()){
 					ix->cache_it(out);
 				}
 			}
 
 		}
-		IndexIterator compose_query_lower_r
-		(	TABLE* table
+
+		void compose_query_lower_r
+		(	stored::index_iterator_interface& r
+		,	TABLE* table
 		,	uint ax
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
 		){
 			check_load(table);
+			
 			if(!key_map || key==NULL){
-				return indexes[ax]->index.first();
+				indexes[ax]->first(r);
+				
+			}else{
+				_compose_query(table, 0ull, ax, key, key_l, key_map);
+				indexes[ax]->lower(r, temp);
 			}
-
-			_compose_query(table, 0ull, ax, key, key_l, key_map);
-			return indexes[ax]->index.lower(temp);
+			
 		}
 
 		void compose_query_find
@@ -1249,16 +1265,16 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		,	IndexIterator & out
+		,	stored::index_iterator_interface& out
 		){
 			check_load(table);
 			if(!key_map){
-				out = indexes[ax]->index.end();
+				indexes[ax]->end(out);
 				return ;
 			}
 
 			_compose_query(table, 0ull, ax, key, key_l, key_map);
-			out = indexes[ax]->index.find(temp);
+			indexes[ax]->find(out, temp);
 		}
 
 		nst::u64 get_last_lock_time() const {
@@ -1354,7 +1370,7 @@ namespace tree_stored{
 					cols[(*p)]->compose(temp);
 				}
 				temp.row = _row_count;
-				(*x)->index.add(temp, 0);
+				(*x)->add(temp);
 			}
 
 			(*this).get_table().insert(_row_count, '0');
@@ -1408,7 +1424,7 @@ namespace tree_stored{
 				}
 				//temp.add(rid);
 				temp.row = rid;
-				(*x)->index.add(temp, 0);
+				(*x)->add(temp);
 			}
 
 		}
@@ -1421,7 +1437,7 @@ namespace tree_stored{
 				}
 				//temp.add(rid);
 				temp.row = rid;
-				(*x)->index.remove(temp);
+				(*x)->remove(temp);
 			}
 		}
 
@@ -1436,7 +1452,12 @@ namespace tree_stored{
 			}
 			return row_count()*r;
 		}
-
+		stored::index_interface* get_index_interface(int at){
+			return indexes[at];
+		}
+		const stored::index_interface* get_index_interface(int at) const {
+			return indexes[at];
+		}
 		_Selection create_output_selection(TABLE* table){
 			check_load(table);
 			_Selection r;

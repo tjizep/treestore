@@ -44,18 +44,19 @@ namespace tree_stored{
 
 		CompositeStored k;
 
-		BasicIterator::initializer_pair i;
+		stx::initializer_pair i;
 
 	};
 	/// The predictive cache acts like an adaptive 'derandomizer'
-	struct _PredictiveCache{
+	template<typename BasicIterator>
+	struct predictive_cache{
 		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
 		static const NS_STORAGE::u64 HASH_SIZE = 15485863; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
-		_PredictiveCache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
+		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
 
 		}
-		~_PredictiveCache(){
+		~predictive_cache(){
 		}
 		inline bool hashed() const {
 			return !cache_index.empty();
@@ -220,17 +221,6 @@ namespace tree_stored{
 
 	};
 
-	typedef std::unordered_map<std::string, _PredictiveCache*> _PCaches;
-	_PredictiveCache* get_pcache(std::string name){
-		stx::storage::syncronized ul(plock);
-		static _PCaches pc;
-		_PredictiveCache * r = pc[name];
-		if(r == nullptr){
-			printf("creating p-cache for %s\n",name.c_str());
-			r = new _PredictiveCache();
-			pc[name] = r;
-		}
-		return r;
-	}
+	
 };
 #endif

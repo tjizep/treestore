@@ -171,6 +171,7 @@
     <ClInclude Include="..\src\collumn.h" />
     <ClInclude Include="..\src\conversions.h" />
     <ClInclude Include="..\src\fields.h" />
+    <ClInclude Include="..\src\iterator.h" />
     <ClInclude Include="..\src\MurmurHash3.h" />
     <ClInclude Include="..\src\myi.h" />
     <ClInclude Include="..\src\NotificationQueueWorker.h" />
