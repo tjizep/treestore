@@ -688,8 +688,78 @@ namespace tree_stored{
 			std::string path = share->path.str;
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
+				stored::index_interface::ptr index = nullptr;
+				bool field_primitive =false;
+				if(pos->usable_key_parts==1){
+					field_primitive = true;
+					Field **field = &(pos->key_part[0].field);// the jth field in the key
+					ha_base_keytype bt = (*field)->key_type();
+					nst::u32 fi = (*field)->field_index;
+					switch(bt){
+						case HA_KEYTYPE_END:
+							// ERROR ??
+							break;
+						case HA_KEYTYPE_FLOAT:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::FloatStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_DOUBLE:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::DoubleStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_SHORT_INT:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::ShortStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_LONG_INT:							
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::IntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_USHORT_INT:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::UShortStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_ULONG_INT:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::ULongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_LONGLONG:							
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::LongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 
-				stored::index_interface::ptr index = new tree_index<stored::DynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							break;
+						case HA_KEYTYPE_ULONGLONG:							
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::ULongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+
+							break;
+						case HA_KEYTYPE_INT24:							
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::IntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							break;
+						case HA_KEYTYPE_UINT24:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::UIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_INT8:
+							index = new tree_index<stored::PrimitiveDynamicKey<stored::CharStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+							
+							break;
+						case HA_KEYTYPE_BIT:
+						case HA_KEYTYPE_NUM:			
+						case HA_KEYTYPE_TEXT:			
+						case HA_KEYTYPE_BINARY:			
+						case HA_KEYTYPE_VARTEXT1:       						
+						case HA_KEYTYPE_VARTEXT2:									
+						case HA_KEYTYPE_VARBINARY1:     							
+						case HA_KEYTYPE_VARBINARY2:									
+						default:
+							field_primitive = false;						
+							break; //do nothing pass
+					}//switch
+					
+
+				}
+				if(!field_primitive){
+					index = new tree_index<stored::DynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+				}
 
 				index->set_col_index(i);
 				index->set_fields_indexed (pos->usable_key_parts);

@@ -361,7 +361,7 @@ namespace tree_stored{
 		typedef col_index<index_key_type> ColIndex;
 		typedef typename ColIndex::IndexIterator IndexIterator;
 	private:		
-		CachedRow empty;
+		//CachedRow empty;
 	private:
 		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
 		typedef std::unordered_map<std::string, _PredictiveCache*> _PCaches;

@@ -134,6 +134,8 @@ namespace stored{
 
 	template<typename _FType>
 	class FTypeStored {
+	public:
+		typedef _FType value_type;
 	protected:
 		_FType value;
 	public:
@@ -184,6 +186,8 @@ namespace stored{
 
 	template<typename _FType>
 	class VectorTypeStored {
+	public:
+		typedef _FType value_type;
 	protected:
 		_FType value;
 	public:
@@ -845,7 +849,7 @@ namespace stored{
 			return r;
 		}
 		template<typename _IntType>
-		bool p_decode(_IntType& out, int n = 1){
+		bool p_decode(_IntType& out, int n = 1) const {
 			const nst::u8 *ld = data();
 			
 			nst::u8 lt = *ld;
@@ -858,42 +862,42 @@ namespace stored{
 				case DynamicKey::I1 :
 					l=sizeof(nst::i8);
 					if(!n){
-						out = (*(nst::i8*)ld )					
+						out = (_IntType)(*(nst::i8*)ld )	;				
 						
 					}
 					break;
 				case DynamicKey::I2:
 					l = sizeof(nst::i16);
 					if(!n){
-						out = (*(nst::i16*)ld );
+						out = (_IntType)(*(nst::i16*)ld );
 									
 					}
 					break;
 				case DynamicKey::I4:
 					l = sizeof(nst::i32);
 					if(!n){
-						out = (*(nst::i32*)ld);
+						out = (_IntType)(*(nst::i32*)ld);
 						
 					}
 					break;
 				case DynamicKey::I8 :
 					l = 8;
 					if(!n){
-						out = (*(nst::i64*)ld)
+						out = (_IntType)(*(nst::i64*)ld);
 						
 					}
 					break;
 				case DynamicKey::R4 :
 					l = sizeof(float);
 					if(!n){
-						out = (*(float*)ld );
+						out = (_IntType)(*(float*)ld );
 						return true;
 					}
 					break;
 				case DynamicKey::R8 :
 					l = sizeof(double);
 					if(!n){
-						out = (*(double*)ld);
+						out = (_IntType)(*(double*)ld);
 						return true;
 					}
 					break;
@@ -919,10 +923,12 @@ namespace stored{
 			const nst::u8 *rd = right.data();
 			nst::u8 lt = *ld;
 			nst::u8 rt = *rd;
+
 			int r = 0,l=0,ll=0;
 			while(lt == rt){
 				++ld;
 				++rd;
+				++ll;
 				switch(lt){
 				case DynamicKey::I1 :
 					l=sizeof(nst::i8);
@@ -985,13 +991,11 @@ namespace stored{
 				
 				ld += l;
 				rd += l;
-				lt = *ld;
-				rt = *rd;
-
-				ll += (l+1);
+				ll += l;
 				if(ll >= size()) break;
 				if(ll >= right.size()) break;
-				
+				lt = *ld;
+				rt = *rd;
 			}
 			if(rt != lt)
 				return lt < rt; //total order on types first
@@ -1047,12 +1051,11 @@ namespace stored{
 			return reader;
 		};
 	};
-	template<typename _DataType,typename _FieldType>
+	template<typename _FieldType>
 	class PrimitiveDynamicKey{
 	public:
-
+		typedef typename _FieldType::value_type _DataType ;
 		
-
 		typedef unsigned char	uchar;	/* Short for unsigned char */
 		typedef signed char int8;       /* Signed integer >= 8  bits */
 		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
@@ -1238,7 +1241,7 @@ namespace stored{
 		}
 
 		void clear(){
-
+			row = 0;
 			data = 0;
 		}
 
@@ -1257,13 +1260,24 @@ namespace stored{
 		{
 			*this = right;
 		}
-
+		PrimitiveDynamicKey(const DynamicKey& right)
+		
+		{
+			row =right.row;
+			right.p_decode(data);
+		}
 		inline bool left_equal_key(const DynamicKey& right) const {
+			_DataType rdata;
+			right.p_decode(rdata);
+			return data == rdata;
+		}
+
+		inline bool left_equal_key(const PrimitiveDynamicKey& right) const {
 			
 			return data == right.data;
 		}
 
-		inline bool equal_key(const DynamicKey& right) const {
+		inline bool equal_key(const PrimitiveDynamicKey& right) const {
 			if( data == right.data)
 				return row == right.row;
 			return false;
@@ -1275,14 +1289,26 @@ namespace stored{
 			row = right.row;			
 			return *this;
 		}
-
+	
+		PrimitiveDynamicKey& operator=(const DynamicKey& right){
+			row =right.row;
+			right.p_decode(data);
+			return *this;
+		}
+		
 		DynamicKey& return_or_copy(DynamicKey& x){
-
+			x.clear();
+			_FieldType f;
+			f.set_value(data);
+			x.add(f);
+			x.row = (*this).row;
 			return x;
 		}
 		inline operator size_t() const {
-			
-			return data;
+			//size_t r = 0;
+			//MurmurHash3_x86_32(&data, sizeof(data), 0, &r);
+			//return r;			
+			return (size_t)data;
 		}
 		
 
@@ -1305,16 +1331,23 @@ namespace stored{
 		}
 
 		NS_STORAGE::u32 stored() const {
-			return (NS_STORAGE::u32)(NS_STORAGE::leb128::signed_size((*this).size())+(*this).size()+NS_STORAGE::leb128::signed_size((*this).row));
+			_FieldType f;
+			f.set_value(data);
+
+			DynamicKey s;
+			s.add(f);
+			s.row = (*this).row;
+			return s.stored();
 		};
 
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
-			using namespace NS_STORAGE;
-			buffer_type::iterator writer = w;
+			using namespace NS_STORAGE;			
+			_FieldType f;
 			DynamicKey s;
-			s.add(data);
-			writer = s.store(writer);
-			return writer;
+			f.set_value((*this).data);			
+			s.add(f);			
+			s.row = (*this).row;
+			return s.store(w);
 		};
 
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
@@ -1322,7 +1355,8 @@ namespace stored{
 			buffer_type::const_iterator reader = r;
 			DynamicKey s;			
 			reader = s.read(reader);
-			d.p_decode(data);
+			s.p_decode(data);
+			row = s.row;
 			return reader;
 		};
 	};

@@ -37,10 +37,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 //#include "collumn.h"
 namespace tree_stored{
 	typedef stored::DynamicKey CompositeStored;
-	/*typedef collums::col_index ColIndex;
-	typedef ColIndex::IndexIterator IndexIterator ;
 	
-	typedef ColIndex::iterator_type BasicIterator;*/
-
 };
 #endif

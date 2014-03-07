@@ -38,11 +38,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 extern NS_STORAGE::u64 hash_hits;
 extern NS_STORAGE::u64 hash_predictions;
 namespace tree_stored{
-	struct CachedRow{
-		CachedRow(){
+	template<typename _Keytype>
+	struct cached_row{
+		cached_row(){
 		}
 
-		CompositeStored k;
+		_Keytype k;
 
 		stx::initializer_pair i;
 
@@ -53,6 +54,8 @@ namespace tree_stored{
 		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
 		static const NS_STORAGE::u64 HASH_SIZE = 15485863; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
+		typedef cached_row<typename BasicIterator::key_type> CachedRow;
+		stored::DynamicKey rval;
 		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
 
 		}
@@ -103,7 +106,7 @@ namespace tree_stored{
 						//if(out.valid()){
 						++hash_hits;
 						++hash_predictions;
-						return  &sec_cache[predictor].k;
+						return  &sec_cache[predictor].k.return_or_copy(rval);
 						//}
 					}
 					predictor++;
@@ -116,16 +119,18 @@ namespace tree_stored{
 				predictor = 0;
 				return NULL;
 			}
-			unsigned int h = ((size_t)input) % HASH_SIZE;
+			BasicIterator::key_type kin = input;
+			unsigned int h = ((size_t)kin) % HASH_SIZE;
 			predictor = cache_index[h];
 
-			if(predictor && sec_cache[predictor].k.left_equal_key(input) ){
+			if(predictor && sec_cache[predictor].k.left_equal_key(kin) ){
 
 				out = sec_cache[predictor].i;
 
 				if(out.valid()){
 					++hash_hits; // neither hit nor miss
-					return &sec_cache[predictor].k;
+
+					return &sec_cache[predictor].k.return_or_copy(rval);
 				}
 			}
 			predictor = 0;
