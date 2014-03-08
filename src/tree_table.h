@@ -1003,7 +1003,13 @@ namespace tree_stored{
 				(*x)->clear_cache();
 			}
 		}
+		void reduce_use_collum_trees_only(){
 
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->reduce_col_use();
+			}
+			
+		}
 		void reduce_use_collum_trees(){
 
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){

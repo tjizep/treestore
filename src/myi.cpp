@@ -324,6 +324,19 @@ namespace tree_stored{
 			}
 
 		}
+		void reduce_col_trees_only(){
+			synchronized _s(p2_lock);
+			if(!locks){
+				DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+					if((*t).second)
+						(*t).second->reduce_use_collum_trees_only();
+					else
+						printf("table entry %s is NULL\n", (*t).first.c_str());
+				}
+			}
+
+		}
 		void remove_table(const std::string name){
 			synchronized _s(p2_lock);
 			if(tables.count(name)){
@@ -1010,7 +1023,7 @@ public:
 			if(thread->get_locks()==0){
 
 				if(treestore_reduce_tree_use_on_unlock==TRUE){
-					thread->reduce_col_trees();
+					thread->reduce_col_trees_only();
 					if(treestore_reduce_index_tree_use_on_unlock==TRUE)
 						thread->reduce_index_trees();
 				}
