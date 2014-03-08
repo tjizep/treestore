@@ -418,18 +418,20 @@ namespace collums{
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
-				for(c = col.begin(); c != e; ++c){
-					_Rid r = c.key().get_value();
-					encoded.sample(c.data());
-					++ctr;
-					if(r % CKECK ==0){
-						col.reduce_use();
+				if(treestore_column_encoded){
+					for(c = col.begin(); c != e; ++c){
+						_Rid r = c.key().get_value();
+						encoded.sample(c.data());
+						++ctr;
+						if(r % CKECK ==0){
+							col.reduce_use();
 
+						}
 					}
+					col.reduce_use();
+					encoded.finish(rows_cached);
 				}
-				col.reduce_use();
-				encoded.finish(rows_cached);
-				if(encoded.good()){
+				if(treestore_column_encoded && encoded.good()){
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());
@@ -453,8 +455,10 @@ namespace collums{
 					encoded.clear();
 					resize(rows_cached);
 					load_data(col);
-
-					printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					if(treestore_column_encoded)
+						printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					else
+						printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 				}
 				NS_STORAGE::add_col_use(calc_use());
 
@@ -695,7 +699,7 @@ namespace collums{
 		}
 
 		void load_cache(){
-			if(treestore_collumn_cache==FALSE) return;
+			if(treestore_column_cache==FALSE) return;
 
 			if(lazy) return;
 			if(_cache==nullptr || !_cache->loaded){

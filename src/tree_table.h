@@ -41,7 +41,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 typedef std::vector<std::string> _FileNames;
 extern my_bool treestore_efficient_text;
-
+extern char treestore_use_primitive_indexes;
 namespace tree_stored{
 	class InvalidTablePointer : public std::exception{
 	public:
@@ -690,7 +690,7 @@ namespace tree_stored{
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				stored::index_interface::ptr index = nullptr;
 				bool field_primitive =false;
-				if(pos->usable_key_parts==1){
+				if(treestore_use_primitive_indexes && pos->usable_key_parts==1){
 					field_primitive = true;
 					Field **field = &(pos->key_part[0].field);// the jth field in the key
 					ha_base_keytype bt = (*field)->key_type();

@@ -55,7 +55,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 #include "abstracted_storage.h"
 
-extern	char treestore_collumn_cache ;
+extern	char treestore_column_cache ;
+extern  char treestore_column_encoded ;
 extern  char treestore_predictive_hash ;
 extern  char treestore_reduce_tree_use_on_unlock;
 namespace storage_workers{

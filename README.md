@@ -59,12 +59,12 @@ Technical
 
 + B+ TREE indexes AND tables
 + variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
-+ portable collumns
++ portable columns
 + 2 Level CPU Cache Aware Predictive Hash Table for unique index optimization
 + Simple and easy to change code base
-+ STL like internal data structures for index and collumn storage
++ STL like internal data structures for index and column storage
 + No NULL storage format i.e no extra bit for NULL values
-+ Very Efficient sparse collumn storage due to no null format and runlength + differencial encoding
++ Very Efficient sparse column storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 + Simple entropy coding is used for in memory compression 
 
@@ -83,8 +83,8 @@ Defaults to false. If set to TRUE treestore will use much less memory (usually h
 Experiment - your milage may vary
 + **treestore_predictive_hash**
 Defaults to true. enables/disables the predictive hash can improve performance on some queries
-+ **treestore_collumn_cache**
-Defaults to true. enables/disables the collumn cache, should be left enabled unless ultra low memory use is required
++ **treestore_column_cache**
+Defaults to true. enables/disables the column cache, should be left enabled unless ultra low memory use is required
 + **treestore_reduce_tree_use_on_unlock**
 Defaults to false. releases shared tree cached pages on every unlock also releases readlocks every time. Its a good option for memory constrained environments 
 + **treestore_current_mem_use** can be queried to retrieve the current treestore memory use
@@ -94,7 +94,7 @@ Time Performance versus Space performance
 
 This table supplies configuration options for sacrificing performance for less memory use. try different options for your workload. 
 
-| Performance+memuse   | treestore_predictive_hash           | treestore_collumn_cache  | treestore_reduce_tree_use_on_unlock  | treestore_reduce_index_tree_use_on_unlock |
+| Performance+memuse   | treestore_predictive_hash           | treestore_column_cache  | treestore_reduce_tree_use_on_unlock  | treestore_reduce_index_tree_use_on_unlock |
 | -------------------- | -----------------------------------:| ------------------------:|-------------------------------------:| -----------------------------------------:|
 | Lowest               | false                               | false                    | true                                 | true                                      |
 | Low                  | false                               | false                    | true                                 | false                                     |
@@ -111,8 +111,8 @@ Changes
 
 0.28 beta
 
-1. Added in memory collumn compression improving memory use by a lot
-2. do not load collumns which are not specified in a query
+1. Added in memory column compression improving memory use by a lot
+2. do not load columns which are not specified in a query
 3. compression improvement 
 
 0.27 beta

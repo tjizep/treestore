@@ -62,11 +62,13 @@ long long treestore_journal_lower_max = 0;
 long long treestore_journal_upper_max = 0;
 long long treestore_journal_size = 0;
 my_bool treestore_efficient_text = FALSE;
-char treestore_collumn_cache = TRUE;
+char treestore_column_cache = TRUE;
+char treestore_column_encoded = TRUE;
 char treestore_predictive_hash = TRUE;
 char treestore_reduce_tree_use_on_unlock = FALSE;
 char treestore_reduce_index_tree_use_on_unlock = FALSE;
 char treestore_reduce_storage_use_on_unlock = TRUE;
+char treestore_use_primitive_indexes = TRUE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -100,7 +102,7 @@ static MYSQL_SYSVAR_BOOL(efficient_text, treestore_efficient_text,
   "Default is false",
   NULL, NULL, FALSE);
 
-static MYSQL_SYSVAR_BOOL(collumn_cache, treestore_collumn_cache,
+static MYSQL_SYSVAR_BOOL(column_cache, treestore_column_cache,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "enables or disables collumn cache"
   "Default is true (enabled)",
@@ -109,6 +111,12 @@ static MYSQL_SYSVAR_BOOL(collumn_cache, treestore_collumn_cache,
 static MYSQL_SYSVAR_BOOL(predictive_hash, treestore_predictive_hash,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "enables or disables predictive hash cache"
+  "Default is true (enabled)",
+  NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(column_encoded, treestore_column_encoded,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables column compression"
   "Default is true (enabled)",
   NULL, NULL, TRUE);
 
@@ -129,6 +137,13 @@ static MYSQL_SYSVAR_BOOL(reduce_index_tree_use_on_unlock, treestore_reduce_index
   "enables or disables reducing index tree use on unlock -inneffective without treestore_reduce_tree_use_on_unlock "
   "Default is false (no reducing)",
   NULL, NULL, FALSE);
+
+static MYSQL_SYSVAR_BOOL(use_primitive_indexes, treestore_use_primitive_indexes,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "enables or disables primitive index trees - primitive index trees use less memory"
+  "Default is true",
+  NULL, NULL, TRUE);
+
 
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
@@ -595,6 +610,7 @@ public:
 			(*s).restore_ptr();
 		}
 		selected.clear();
+		current_index = NULL;
 	}
 
 	ha_treestore
@@ -605,6 +621,7 @@ public:
 	,	tt(NULL)
 	,	row(0)
 	,	last_resolved(0)
+	,	current_index(NULL)
 	{
 
 	}
@@ -931,6 +948,7 @@ public:
 		if(tt!= NULL)
 			tt->clear();
 		tt = NULL;
+		current_index = NULL;
 		return 0;
 	}
 
@@ -1150,7 +1168,9 @@ public:
 		ha_rows rows = 0;
 		DBUG_ENTER("records_in_range");
 		//read_lookups+=2;
-
+		
+		stored::index_interface*current_index = get_tree_table()->get_index_interface(inx);
+		
 		get_index_iterator_lower(*current_index->get_first1(),inx, start_key) ;
 		get_index_iterator_upper(*current_index->get_last1(), inx, end_key);
 		rows = current_index->get_first1()->count(*current_index->get_last1());
@@ -1507,7 +1527,7 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 3;
+	const int MAX_WORKER_MANAGERS = 4;
 	extern _WorkerManager & get_threads(unsigned int which){
 		static _storage_worker _adders[MAX_WORKER_MANAGERS];
 		return _adders[which % MAX_WORKER_MANAGERS].w;
@@ -1579,11 +1599,13 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(journal_lower_max),
   MYSQL_SYSVAR(journal_upper_max),
   MYSQL_SYSVAR(efficient_text),
-  MYSQL_SYSVAR(collumn_cache),
+  MYSQL_SYSVAR(column_cache),
+  MYSQL_SYSVAR(column_encoded),
   MYSQL_SYSVAR(predictive_hash),
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_storage_use_on_unlock),
+  MYSQL_SYSVAR(use_primitive_indexes),
   NULL
 };
 

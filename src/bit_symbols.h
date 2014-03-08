@@ -23,7 +23,7 @@ namespace nst = stx::storage;
 template<typename _IntSymBolType>
 class symbol_vector{
 public:
-	typedef nst::u16 _BucketType;/// use a configurable bucket type for larger code size performance
+	typedef nst::u32 _BucketType;/// use a configurable bucket type for larger code size performance
 	typedef nst::u32 _IndexType; /// type to index bits
 	static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
 	typedef std::vector<_BucketType> _Data;
