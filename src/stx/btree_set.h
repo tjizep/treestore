@@ -38,7 +38,7 @@ namespace stx {
 template <	typename _Key,
 			typename _Storage,
 			typename _Compare = std::less<_Key>,
-			typename _Iterpolator = stx::interpolator<_Key> ,
+			typename _Interpolator = stx::interpolator<_Key> ,
 			typename _Traits = btree_default_set_traits<_Key, def_p_traits>,
 			typename _Alloc = std::allocator<_Key> >
 class btree_set
@@ -54,7 +54,7 @@ public:
     typedef _Compare                    key_compare;
 
 	/// Third template parameter: interpolator if applicable
-	typedef _Iterpolator				key_interpolator;
+	typedef _Interpolator				key_interpolator;
 
     /// Fourth template parameter: Traits object used to define more parameters
     /// of the B+ tree
@@ -69,6 +69,11 @@ private:
     /// \internal The empty struct used as a placeholder for the data_type
     struct empty_struct
     {
+		template<typename _T>
+		_T read(_T t){return t;};
+		template<typename _T>
+		_T store(_T t) const {return t;};
+		nst::u32 stored() const {return 0;};
     };
 
 public:
@@ -79,17 +84,18 @@ public:
 
     /// Construct the set value_type: the key_type.
     typedef key_type                    value_type;
+	
+	/// Storage
+    typedef _Storage storage_type;
 
     /// Typedef of our own type
-    typedef btree_set<key_type, key_compare, key_interpolator, traits, allocator_type> self;
+    typedef btree_set<key_type, storage_type, key_compare, key_interpolator, traits, allocator_type> self;
 
-	/// Storage
 
-    typedef _Storage storage_type;
 
     /// Implementation type of the btree_base
     typedef stx::btree<key_type, data_type, storage_type, value_type, key_compare, key_interpolator, traits, false, allocator_type> btree_impl;
-
+	
     /// Function class comparing two value_type keys.
     typedef typename btree_impl::value_compare  value_compare;
 
@@ -112,7 +118,7 @@ public:
     /// Computed B+ tree parameter: The minimum number of key slots used in a
     /// leaf. If fewer slots are used, the leaf will be merged or slots shifted
     /// from it's siblings.
-    static const unsigned short			minsurfaceslots = btree_impl::minsurfaceslots;
+    static const unsigned short			minsurfaceslots = btree_impl::minsurfaces;
 
     /// Computed B+ tree parameter: The minimum number of key slots used
     /// in an inner node. If fewer slots are used, the inner node will be
@@ -159,24 +165,30 @@ public:
 
     /// Default constructor initializing an empty B+ tree with the standard key
     /// comparison function
-    explicit inline btree_set(const allocator_type &alloc = allocator_type())
-        : tree(alloc)
+    explicit inline btree_set
+	(	storage_type& storage
+	,	const allocator_type &alloc = allocator_type())
+    :	tree(storage, alloc)
     {
     }
 
     /// Constructor initializing an empty B+ tree with a special key
     /// comparison object
-    explicit inline btree_set(const key_compare &kcf,
-                              const allocator_type &alloc = allocator_type())
-        : tree(kcf, alloc)
+    explicit inline btree_set
+	(	storage_type& storage
+	,	const key_compare &kcf
+	,   const allocator_type &alloc = allocator_type())
+    :	tree(storage, kcf, alloc)
     {
     }
 
     /// Constructor initializing a B+ tree with the range [first,last)
     template <class InputIterator>
-    inline btree_set(InputIterator first, InputIterator last,
-                     const allocator_type &alloc = allocator_type())
-        : tree(alloc)
+    inline btree_set
+	(	storage_type& storage
+	,	InputIterator first, InputIterator last
+	,	const allocator_type &alloc = allocator_type())
+    :	tree(storage, alloc)
     {
         insert(first, last);
     }
@@ -184,9 +196,11 @@ public:
     /// Constructor initializing a B+ tree with the range [first,last) and a
     /// special key comparison object
     template <class InputIterator>
-    inline btree_set(InputIterator first, InputIterator last, const key_compare &kcf,
-                     const allocator_type &alloc = allocator_type())
-        : tree(kcf, alloc)
+    inline btree_set
+	(	storage_type& storage
+	,	InputIterator first, InputIterator last, const key_compare &kcf
+	,	const allocator_type &alloc = allocator_type())
+    :	tree(storage,kcf, alloc)
     {
         insert(first, last);
     }
@@ -489,6 +503,61 @@ public:
     }
 
 public:
+	// *** public persistence functions
+
+	/// reduce the tree memory use by storing pages to alternate storage
+
+    void reduce_use(){
+		tree.flush_buffers(true);
+	}
+	
+	/// store written pages
+	
+	void flush_buffers(){
+		tree.flush_buffers(false);
+	}
+	/// shared pages
+
+	void share(std::string name){
+		tree.share(name);
+	}
+
+	/// unshare all surfaces
+
+	void unshare(){
+		tree.unshare();
+	}
+	stx::storage::stream_address get_root_address() const {
+		return tree.get_root_address();
+	}
+    /// encodes and writes all active nodes which are still modified
+
+    void flush()    {
+        tree.flush();
+
+    }
+
+	/// loads the tree from the specified root address - all previous changes are lost
+
+	void restore(stx::storage::stream_address r){
+
+		tree.restore(r);
+
+	}
+
+	/// when a tree becomes stale
+
+	void reload()
+	{
+		tree.reload();
+
+	}
+
+	/// restore an iterator from an initializer pair
+	void restore_iterator(iterator& out, const typename iterator::initializer_pair& init){
+		out.from_initializer(tree, init);
+	}
+public:
     // *** Public Erase Functions
 
     /// Erases the key from the set. As this is a unique set, there is no
@@ -549,37 +618,7 @@ public:
         tree.verify();
     }
 
-public:
-	/// shared pages
 
-	void share(std::string name){
-		tree.share(name);
-		printf("shared pages in %s\n",name.c_str());
-	}
-
-	/// unshare all surfaces
-
-	void unshare(){
-		tree.unshare();
-	}
-
-	stx::storage::stream_address get_root_address() const {
-		return tree.get_root_address();
-	}
-
-	// encodes and writes all nodes active nodes thats still modified
-
-    void flush()
-    {
-        tree.flush();
-    }
-
-    /// loads the tree from the specified root address - all previous changes are lost
-
-	void restore(stx::storage::stream_address r)
-    {
-        tree.restore(r);
-    }
 };
 
 } // namespace stx

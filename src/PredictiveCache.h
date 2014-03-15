@@ -52,7 +52,7 @@ namespace tree_stored{
 	template<typename BasicIterator>
 	struct predictive_cache{
 		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
-		static const NS_STORAGE::u64 HASH_SIZE = 15485863; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
+		static const NS_STORAGE::u64 HASH_SIZE = 32452843; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
 		typedef cached_row<typename BasicIterator::key_type> CachedRow;
 		stored::DynamicKey rval;
@@ -83,7 +83,7 @@ namespace tree_stored{
 				using namespace NS_STORAGE;
 				if(cache_index.empty()){
 					cache_index.resize(HASH_SIZE);
-					sec_cache.reserve(CIRC_SIZE/32);
+					sec_cache.reserve(CIRC_SIZE/8);
 					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*HASH_SIZE);
 					printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
 				}
@@ -176,7 +176,7 @@ namespace tree_stored{
 
 			size_t s = cache_index[h];
 			if(s == 0){
-				cache_index[h] = sec_cache.size(); //store_pos+1;
+				cache_index[h] = (_Rid)sec_cache.size(); //store_pos+1;
 			}
 			CachedRow cr;
 			cr.i = iter.construction();

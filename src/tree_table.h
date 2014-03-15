@@ -757,6 +757,7 @@ namespace tree_stored{
 					
 
 				}
+
 				if(!field_primitive){
 					index = new tree_index<stored::DynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 				}

@@ -92,22 +92,35 @@ public:
 		const _BucketType* current = &data[bit_start / BUCKET_BITS];
 		_IndexType code_left = code_size;
 		_IndexType code_complete = 0;
-		for(;;){	/// read from BUCKET_BITS-bit buckets
-			bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
-			_BucketType todo = std::min<_BucketType>(code_size-code_complete, BUCKET_BITS-bucket_start);
-			bucket = (*current >> bucket_start) & ( ( 1 << todo ) - 1); /// this is a hot line
+		bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
+		if(bucket_start + code_size < BUCKET_BITS){
+
+			bucket = (*current >> bucket_start) & ( ( 1 << code_size ) - 1); /// this is a hot line
 
 			code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
+			return code;
+		}
+		for(;;){	/// read from BUCKET_BITS-bit buckets
+			
+			
+			
+				_BucketType todo = std::min<_BucketType>(code_size - code_complete, BUCKET_BITS - bucket_start);
+			
+				bucket = (*current >> bucket_start) & ( ( 1 << todo ) - 1); /// this is a hot line
 
-			bit_start += todo;
-			code_complete += todo;
+				code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
 
+				bit_start += todo;
+			
+				code_complete += todo;
+			
 			if(code_complete == code_size )
 				break;
 
 			if( ( bit_start & (BUCKET_BITS-1) ) == 0){
 				++current; /// increment the bucket
 			}
+			bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 		}
 		return code;
 	}

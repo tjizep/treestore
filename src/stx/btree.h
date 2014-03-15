@@ -205,7 +205,7 @@ namespace stx
 		/// persistence related addressing
 		typedef def_p_traits persist_traits;
 
-		typedef _Key key_proxy;
+		typedef _Key		key_type;
 
 		/// Number of slots in each surface of the tree. Estimated so that each node
 		/// has a size of about btree_traits::bytes_per_page bytes.
@@ -241,12 +241,9 @@ namespace stx
 
 		typedef _PersistTraits persist_traits;
 
-		/// the persist proxy's and context if required
-		/// usually these are synonymous with the _Key and _Data types
+		typedef _Key key_type;
 
-		typedef _Key key_proxy;
-
-		typedef _Data data_proxy;
+		typedef _Data data_type;
 
 
 		/// Number of slots in each surface of the tree. A page has a size of about btree_traits::bytes_per_page bytes.
@@ -319,7 +316,7 @@ namespace stx
 
 		/// First template parameter: The key type of the B+ tree. This is stored
 		/// in interior nodes and leaves
-		typedef typename traits::key_proxy  key_type;
+		typedef typename traits::key_type  key_type;
 
 		/// Second template parameter: The data type associated with each
 		/// key. Stored in the B+ tree's leaves

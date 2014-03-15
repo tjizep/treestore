@@ -505,7 +505,7 @@ namespace collums{
 				/// get a 5% sample
 				typedef std::set<_Stored> _Uniques;
 				_Uniques uniques;
-				_Rid SAMPLE = (_Rid)data.size()/20;
+				_Rid SAMPLE = (_Rid)data.size()/10;
 				//printf("calc %ld density sample\n",(long)SAMPLE);
 				for(_Rid r = 0;r<SAMPLE ; ++r){
 					_Rid sample = (std::rand()*std::rand()) % data.size();

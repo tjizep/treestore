@@ -48,6 +48,7 @@ myi.cpp - MySQL Storage Engine Interfaces
 typedef uchar byte;
 ptrdiff_t MAX_PC_MEM = 1024ll*1024ll*1024ll*4ll;
 namespace nst = NS_STORAGE;
+nst::u64 pk_lookups = 0;
 static NS_STORAGE::u64 read_lookups =0;
 NS_STORAGE::u64 hash_hits =0;
 NS_STORAGE::u64 hash_predictions =0;
@@ -1207,7 +1208,7 @@ public:
 
 		return 0;
 	}
-
+	
 	inline stored::_Rid key_to_rid
 	(	uint ax
 	,	const tree_stored::CompositeStored& input
@@ -1217,6 +1218,7 @@ public:
 	}
 	void resolve_selection(stored::_Rid row){
 		last_resolved = row;
+#ifdef _ROW_CACHE_
 		collums::_LockedRowData * lrd = get_tree_table()->get_row_datas();
 		if(lrd && row < lrd->rows.size() ){
 			collums::_RowData& rd = lrd->rows[row];
@@ -1230,12 +1232,19 @@ public:
 				sel.col->seek_retrieve(sel.field, row, rd);
 			}
 
-		}else{
-			for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
+		}else
+#endif
+		{		
+			_Selection::iterator s = selected.begin();
+		
+			for(; s != selected.end(); ++s){
 				tree_stored::selection_tuple & sel = (*s);
 				sel.col->seek_retrieve(row,sel.field);
 			}
+			
+
 		}
+		
 	}
 	void resolve_selection_from_index(uint ax,  const tree_stored::CompositeStored& iinfo){
 
@@ -1272,9 +1281,11 @@ public:
 		read_lookups++;
 		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map, get_index_iterator());
 		if(pred==NULL){
+			print_read_lookups();
 			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,get_index_iterator());
 		}
-		print_read_lookups();
+		
+		
 		if(get_index_iterator().valid()){
 
 			switch(find_flag){
@@ -1540,7 +1551,7 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 4;
+	const int MAX_WORKER_MANAGERS = 3;
 	extern _WorkerManager & get_threads(unsigned int which){
 		static _storage_worker _adders[MAX_WORKER_MANAGERS];
 		return _adders[which % MAX_WORKER_MANAGERS].w;

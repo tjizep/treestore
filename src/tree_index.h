@@ -47,7 +47,7 @@ namespace tree_stored{
 		typedef stored::IntTypeStored<char> index_value;
 		typedef typename index_key_type index_key;//StaticKey
 		stored::abstracted_storage storage;
-		typedef stx::btree_map< index_key, index_value, stored::abstracted_storage> _IndexMap;
+		typedef stx::btree_set< index_key, stored::abstracted_storage> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
 		typedef iterator::ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key> _KeyBuffer;
@@ -143,7 +143,7 @@ namespace tree_stored{
 					std::sort(buffer.begin(), buffer.end());
 
 					for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
-						index.insert((*b),'0');
+						index.insert((*b));
 					}
 					if(flush_keys){
 						index.flush_buffers();

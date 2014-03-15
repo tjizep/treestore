@@ -1458,7 +1458,7 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::unordered_map<_IntType, _CodeType, hash_fixed> _CodeMap;
+            typedef std::map<_IntType, _CodeType> _CodeMap;
 			typedef std::vector<_IntType> _DeCodeMap;
 
 			_Entropy stats;
