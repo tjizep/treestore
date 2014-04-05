@@ -66,9 +66,11 @@ namespace tree_stored{
 			f_use_var_header = 1
 		};
 	private:
-
+		/// conversion buffers
 		String  attribute;
 		String *r;
+		
+		my_decimal md_buffer;
 
 	private:
 
@@ -341,6 +343,125 @@ namespace tree_stored{
 			to.addTerm(r->ptr(),r->length());
 			return;
 		}
+		/// item conversions
+		template<typename _IntType>
+		inline void make_int_item_val(_IntType& i,const Item* val){
+			switch(val->type()){
+				case Item::INT_ITEM:
+					i.set_value((typename _IntType::value_type)((const Item_int*)val)->value);
+					break;
+				case Item::REAL_ITEM:
+					i.set_value((typename _IntType::value_type)((const Item_float*)val)->value);
+					break;
+				case Item::DECIMAL_ITEM:
+					i.set_value((typename _IntType::value_type)((Item_decimal*)val)->val_int());
+					break;
+				case Item::STRING_ITEM:
+					
+					i.set_value((typename _IntType::value_type)((Item_string*)val)->val_int());
+					break;
+				default:
+					break;
+			};
+		}
+		
+		template<typename _FloatType>
+		inline void make_float_item_val(_FloatType& i,const Item* val){
+			switch(val->type()){
+				case Item::INT_ITEM:
+					i.set_value((_FloatType::value_type)((const Item_int*)val)->value);
+					break;
+				case Item::REAL_ITEM:
+					i.set_value((_FloatType::value_type)((const Item_float*)val)->value);
+					break;
+				case Item::DECIMAL_ITEM:
+					i.set_value((_FloatType::value_type)((Item_decimal*)val)->val_real());
+					break;
+				case Item::STRING_ITEM:
+					
+					i.set_value((_FloatType::value_type)((Item_string*)val)->val_real());
+					break;
+				default:
+					break;
+			};
+		}
+		
+		template<typename _BinaryType>
+		inline void make_binary_item_val(_BinaryType& b, Field* conversion, const Item* val){
+			String *sv;
+			switch(val->type()){
+				case Item::INT_ITEM:
+					b.add(((const Item_int*)val)->value);
+					break;
+				case Item::REAL_ITEM:
+					b.add(((const Item_float*)val)->value);
+					break;
+				case Item::DECIMAL_ITEM:
+					conversion->store_decimal(((Item_decimal*)val)->val_decimal(&md_buffer));
+					fget(b,conversion,NULL,0);
+					
+					break;
+				case Item::STRING_ITEM:
+					sv = ((Item_string*)val)->val_str(&attribute);
+					/// truncate query strings which may be longer than the field - if another kind of error happens the item will copy an empty string							
+					conversion->store(sv->ptr(), std::min<uint>(conversion->data_length(), sv->length()),sv->charset());
+					fget(b,conversion,NULL,0);
+					break;
+				default:
+					break;
+			};
+		}
+		
+		inline void make_item_val(stored::FloatStored &fs, Field* , const Item* val){
+			make_float_item_val(fs, val);
+		}
+		
+		inline void make_item_val(stored::DoubleStored &ds, Field* , const Item* val){
+			make_float_item_val(ds, val);
+		}
+		
+		inline void make_item_val(stored::ShortStored& s, Field* , const Item* val){
+			make_int_item_val(s, val);
+		}
+		
+		inline void make_item_val(stored::UShortStored& us, Field* , const Item* val){
+			make_int_item_val(us, val);
+		}
+		
+		inline void make_item_val(stored::CharStored& c, Field* , const Item* val){
+			make_int_item_val(c, val);
+		}
+		
+		inline void make_item_val(stored::UCharStored& uc, Field*  , const Item* val){
+			make_int_item_val(uc, val);
+		}
+		
+		inline void make_item_val(stored::IntStored& i, Field* , const Item* val){
+			make_int_item_val(i, val);
+			
+		}
+
+		inline void make_item_val(stored::UIntStored& ui, Field* , const Item* val){
+			make_int_item_val(ui, val);
+		}
+
+		inline void make_item_val(stored::LongIntStored& li, Field*, const Item* val){
+			make_int_item_val(li, val);
+		}
+
+		inline void make_item_val(stored::ULongIntStored& uli, Field*, const Item* val){
+			make_int_item_val(uli, val);
+		}
+		
+		inline void make_item_val(stored::BlobStored& b, Field* conversion, const Item* val){
+			make_binary_item_val(b, conversion, val);
+		}
+
+		
+		inline void make_item_val(stored::VarCharStored& b, Field* conversion, const Item* val){
+			make_binary_item_val(b, conversion, val);
+		}
+		
 	};
 };
 #endif

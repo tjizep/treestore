@@ -76,6 +76,9 @@ namespace tree_stored{
 		virtual void commit1() = 0;
 		virtual void commit2() = 0;
 		virtual void rollback() = 0;
+		/// push down condition
+		virtual void push_condition(const Item_func* f, const Item* val, Field* target) = 0;
+		virtual void pop_conditions() = 0;
 	};
 
 
@@ -165,6 +168,24 @@ namespace tree_stored{
 				(*this).worker = nullptr;
 			}
 		}
+		void make_item_val(_Fieldt& v, const Item* val){
+			
+			switch(val->type()){
+				case Item::INT_ITEM:
+					v.set_value(((const Item_int*)val)->value);
+					break;
+				case Item::REAL_ITEM:
+					v.set_value(((const Item_real*)val)->value);
+					break;
+				case Item::DECIMAL_ITEM:
+					v.set_value(((const Item_decimal*)val)->value);
+					break;
+				case Item::STRING_ITEM:
+					break;
+				default:
+					break;
+			};
+		}
 	public:
 
 		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,collums::_LockedRowData *row_datas, bool do_load)
@@ -196,7 +217,105 @@ namespace tree_stored{
 			}
 
 		}
+	protected:
+		class conditional_iterator{
+		public:
+			virtual _Rid iterate(_Rid start) = 0;
 
+		};
+
+		template<typename _Condition>
+		class entropic_conditional_iterator{
+		protected:
+			_Condition contition;
+			_Fieldt value;
+		public:
+			entropic_conditional_iterator(_Fieldt value){
+				(*this).value = value;
+			}
+			virtual _Rid iterate(_Rid start) {
+				return 0;
+			}
+		};
+
+		template<typename _Condition>
+		class standard_conditional_iterator{
+		protected:
+			_Condition condition;
+			_Fieldt value;
+		public:
+			standard_conditional_iterator(_Fieldt value){
+				(*this).value = value;
+			}
+			virtual _Rid iterate(_Rid start) {
+				return 0;
+			}
+		};
+		/// push doen condition evaluations
+		
+		void push_gt_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+		}
+
+		void push_ge_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+		}
+
+		void push_e_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+		}
+
+		void push_lt_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+		}
+
+		void push_le_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+		}
+
+	public:
+		virtual void push_condition(const Item_func* f, const Item* val, Field* target){
+			Item_func::Functype ft = f->functype();
+			switch(ft){
+			case Item_func::GT_FUNC: // greater than
+				push_gt_condition(target,val);
+				break;
+			case Item_func::GE_FUNC: // greater than
+				push_ge_condition(target,val);
+				break;
+			case Item_func::EQ_FUNC: // equal
+				push_e_condition(target,val);
+				break;
+			case Item_func::LE_FUNC: // less or equal
+				push_le_condition(target,val);
+				break;
+			case Item_func::LT_FUNC: // less than
+				push_lt_condition(target,val);
+				break;
+			default: // unimplemented type of conditional binary function
+#				ifdef _FURTHER_CONDITIONS_
+				for(uint ac =0; ac < f->argument_count(); ++ac){
+					const Item * ia = f->arguments()[ac];
+					Item::Type it = ia->type();
+					cond_push_(ia);			
+				}
+#				endif
+				break;
+			}
+
+		}
+		virtual void pop_conditions(){
+		}
+		virtual _Rid evaluate_and(_Rid start){
+
+			return 0;
+		}
+		
 		virtual void erase_row(collums::_Rid row){
 			col.erase(row);
 		}
@@ -217,7 +336,7 @@ namespace tree_stored{
 			const _Fieldt& field = col.seek_by_tree(r);
 			to.add(field);
 		}
-
+		
 		virtual void compose(CompositeStored & to, Field* f, const uchar * ptr, uint flags){
 			//convertor.fget(temp, f, ptr, flags);
 			//to.add(temp.get_value());// TODO: due to this interface, BLOBS are impossible in indexes
@@ -1085,7 +1204,18 @@ namespace tree_stored{
 
 			return input.row;
 		}
+		void push_gt_condition(const Item_field * fi,const Item * val){
+		}
+		void push_condition(const Item_field * fi,const Item_func * fun,const Item * val){
+			
+			cols[fi->field->field_index]->push_condition( fun, val, fi->field);
+		}
+		void pop_all_conditions(){
+			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				(*c)->pop_conditions();
 
+			}
+		}
 		uint count_parts(TABLE* table,uint ax, uint key_part_map){
 			KEY & ki = table->key_info[ax];
 			uint r = 0;

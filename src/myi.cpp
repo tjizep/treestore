@@ -620,6 +620,7 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
+		get_tree_table()->pop_all_conditions();
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			(*s).restore_ptr();
 		}
@@ -639,7 +640,9 @@ public:
 	{
 
 	}
-	~ha_treestore(){
+
+	~ha_treestore()
+	{
 	}
 
 
@@ -656,15 +659,17 @@ public:
 
 	int info(uint which){
 
-
 		if(get_tree_table() == NULL){
 			return 0;
 		}
+		
 		bool do_unlock = false;
+		
 		if(get_tree_table()->table==nullptr){
 			do_unlock = true;
 			get_tree_table()->begin(true);
 		}
+		
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = get_tree_table()->table_size();
 			stats.block_size = 1;
@@ -707,6 +712,7 @@ public:
 				table->key_info[i].rec_per_key[j] = tt->get_rows_per_key(i,j);
 			}
 		}
+		
 		if(which & HA_STATUS_ERRKEY) // - status pertaining to last error key (errkey and dupp_ref)
 		{}
 
@@ -725,9 +731,11 @@ public:
 	const char *table_type(void) const{
 		return "TREESTORE";
 	}
+
 	const char *index_type(uint /*keynr*/) const{
 		return("BTREE");
 	}
+
 	const char **bas_ext(void) const{
 		static const char * exts[] = {TREESTORE_FILE_EXTENSION, NullS};
 		return exts;
@@ -1062,21 +1070,52 @@ public:
 
 		DBUG_RETURN(0);
 	}
-	const Item *cond_push_it(const Item *acon) {
-		printf("Condition pushed\n");
+	void cond_field(const Item_field *f){
+	}
+
+	void push_func(const Item_func* f){
+		if(f->argument_count() == 2){
+			const Item * i0 = f->arguments()[0];
+			const Item * val = f->arguments()[1];
+			Item::Type t1 = i0->type();
+			if(t1 == Item::FIELD_ITEM){
+				const Item_field * fi = (const Item_field*)i0;
+				get_tree_table()->push_condition(fi, f, val);				
+			}
+			
+		}		
+	}
+
+	void cond_push_(const Item *acon) {
+		if(acon == NULL) return;
+
 		Item::Type t = acon->type();
 		if(t == Item::FUNC_ITEM){
+		
 			const Item_func* f = (const Item_func*)acon;
-			//Item_func::Functype ft = f->functype();
-
-			for(uint ac =0; ac < f->argument_count(); ++ac){
-				//const Item * ia = f->arguments()[ac];
-				//Item::Type it = ia->type();
-				printf("argument type\n");
-			}
-			printf("function type");
+			push_func(f);
+			
+			
+		}else if(t==Item::COND_ITEM){
+			Item_cond* c = (Item_cond* )acon;
+			List_iterator<Item> i = *(c->argument_list());
+			for(;;){
+				const Item *cc = i++;
+				if(NULL == cc)
+					break;
+				cond_push_(cc);
+			}			
+		}else if(t == Item::FIELD_ITEM){
+			const Item_field* f = (Item_field*)t;
+			cond_field(f);
 		}
-		//const char * n = acon->full_name();
+			
+		
+	}
+	const Item *_cond_push(const Item *acon) {
+
+		cond_push_(acon);
+		/// const char * n = acon->full_name();
 		return acon;
 
 	};
