@@ -169,7 +169,7 @@ namespace tree_stored{
 			}
 		}
 		void make_item_val(_Fieldt& v, const Item* val){
-			
+            #ifdef _MSC_VER_
 			switch(val->type()){
 				case Item::INT_ITEM:
 					v.set_value(((const Item_int*)val)->value);
@@ -184,7 +184,8 @@ namespace tree_stored{
 					break;
 				default:
 					break;
-			};
+			}
+			#endif;
 		}
 	public:
 
@@ -252,7 +253,7 @@ namespace tree_stored{
 			}
 		};
 		/// push doen condition evaluations
-		
+
 		void push_gt_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
@@ -302,7 +303,7 @@ namespace tree_stored{
 				for(uint ac =0; ac < f->argument_count(); ++ac){
 					const Item * ia = f->arguments()[ac];
 					Item::Type it = ia->type();
-					cond_push_(ia);			
+					cond_push_(ia);
 				}
 #				endif
 				break;
@@ -315,7 +316,7 @@ namespace tree_stored{
 
 			return 0;
 		}
-		
+
 		virtual void erase_row(collums::_Rid row){
 			col.erase(row);
 		}
@@ -336,7 +337,7 @@ namespace tree_stored{
 			const _Fieldt& field = col.seek_by_tree(r);
 			to.add(field);
 		}
-		
+
 		virtual void compose(CompositeStored & to, Field* f, const uchar * ptr, uint flags){
 			//convertor.fget(temp, f, ptr, flags);
 			//to.add(temp.get_value());// TODO: due to this interface, BLOBS are impossible in indexes
@@ -820,60 +821,60 @@ namespace tree_stored{
 							break;
 						case HA_KEYTYPE_FLOAT:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::FloatStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_DOUBLE:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::DoubleStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_SHORT_INT:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::ShortStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
-						case HA_KEYTYPE_LONG_INT:							
+						case HA_KEYTYPE_LONG_INT:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::IntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_USHORT_INT:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::UShortStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_ULONG_INT:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::ULongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
-						case HA_KEYTYPE_LONGLONG:							
+						case HA_KEYTYPE_LONGLONG:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::LongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 
 							break;
-						case HA_KEYTYPE_ULONGLONG:							
+						case HA_KEYTYPE_ULONGLONG:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::ULongIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 
 							break;
-						case HA_KEYTYPE_INT24:							
+						case HA_KEYTYPE_INT24:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::IntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 							break;
 						case HA_KEYTYPE_UINT24:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::UIntStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_INT8:
 							index = new tree_index<stored::PrimitiveDynamicKey<stored::CharStored>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
-							
+
 							break;
 						case HA_KEYTYPE_BIT:
-						case HA_KEYTYPE_NUM:			
-						case HA_KEYTYPE_TEXT:			
-						case HA_KEYTYPE_BINARY:			
-						case HA_KEYTYPE_VARTEXT1:       						
-						case HA_KEYTYPE_VARTEXT2:									
-						case HA_KEYTYPE_VARBINARY1:     							
-						case HA_KEYTYPE_VARBINARY2:									
+						case HA_KEYTYPE_NUM:
+						case HA_KEYTYPE_TEXT:
+						case HA_KEYTYPE_BINARY:
+						case HA_KEYTYPE_VARTEXT1:
+						case HA_KEYTYPE_VARTEXT2:
+						case HA_KEYTYPE_VARBINARY1:
+						case HA_KEYTYPE_VARBINARY2:
 						default:
-							field_primitive = false;						
+							field_primitive = false;
 							break; //do nothing pass
 					}//switch
-					
+
 
 				}
 
@@ -1128,7 +1129,7 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
-			
+
 		}
 		void reduce_use_collum_trees(){
 
@@ -1207,7 +1208,7 @@ namespace tree_stored{
 		void push_gt_condition(const Item_field * fi,const Item * val){
 		}
 		void push_condition(const Item_field * fi,const Item_func * fun,const Item * val){
-			
+
 			cols[fi->field->field_index]->push_condition( fun, val, fi->field);
 		}
 		void pop_all_conditions(){
@@ -1354,13 +1355,13 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		
+
 		){
 			check_load(table);
 			_compose_query(table, 0ull, ax, key, key_l, key_map);
-			
+
 			indexes[ax]->find(out, temp);
-			
+
 		}
 
 
@@ -1373,7 +1374,7 @@ namespace tree_stored{
 
 		,	uint key_map
 		){
-			
+
 			check_load(table);
 			if(!key_map || key==NULL){
 				indexes[ax]->end(r);
@@ -1381,7 +1382,7 @@ namespace tree_stored{
 			}
 			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
 			indexes[ax]->upper(r, temp);
-			
+
 		}
 
 		void compose_query_upper_r
@@ -1393,14 +1394,14 @@ namespace tree_stored{
 		,	uint key_map
 		){
 			check_load(table);
-			
+
 			if(!key_map || key==NULL){
 				indexes[ax]->end(r);
 				return ;
 			}
 			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
 			indexes[ax]->upper(r,temp);
-			
+
 		}
 
 		void compose_query_lower
@@ -1455,15 +1456,15 @@ namespace tree_stored{
 		,	uint key_map
 		){
 			check_load(table);
-			
+
 			if(!key_map || key==NULL){
 				indexes[ax]->first(r);
-				
+
 			}else{
 				_compose_query(table, 0ull, ax, key, key_l, key_map);
 				indexes[ax]->lower(r, temp);
 			}
-			
+
 		}
 
 		void compose_query_find

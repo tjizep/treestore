@@ -45,7 +45,7 @@ namespace tree_stored{
 	class col_index{
 	public:
 		typedef stored::IntTypeStored<char> index_value;
-		typedef typename index_key_type index_key;//StaticKey
+		typedef index_key_type index_key;//StaticKey
 		stored::abstracted_storage storage;
 		typedef stx::btree_set< index_key, stored::abstracted_storage> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
@@ -142,7 +142,7 @@ namespace tree_stored{
 				if(!buffer.empty()){
 					std::sort(buffer.begin(), buffer.end());
 
-					for(_KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
+					for(typename _KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
 						index.insert((*b));
 					}
 					if(flush_keys){
@@ -355,12 +355,12 @@ namespace tree_stored{
 		}
 	};
 	/// stored::DynamicKey
-	template<typename index_key_type> 
+	template<typename index_key_type>
 	class tree_index : public stored::index_interface{
 	public:
 		typedef col_index<index_key_type> ColIndex;
 		typedef typename ColIndex::IndexIterator IndexIterator;
-	private:		
+	private:
 		//CachedRow empty;
 	private:
 		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
@@ -378,7 +378,7 @@ namespace tree_stored{
 		}
 		stored::_Rid get_rid(const CompositeStored& input){
 			return input.row;
-			
+
 		}
 		_PredictiveCache *cache;
 		ColIndex index;
@@ -386,11 +386,11 @@ namespace tree_stored{
 		typename ColIndex::index_iterator_impl _1st;
 		typename ColIndex::index_iterator_impl _lst;
 	public:
-		
+
 		stored::index_iterator_interface * get_index_iterator() {
 			return &cur;
 		}
-		
+
 		stored::index_iterator_interface * get_first1() {
 			return &_1st;
 		}
@@ -399,7 +399,7 @@ namespace tree_stored{
 			return &_lst;
 		}
 
-		
+
 		stored::_Rid predictor;
 		bool unique;
 		tree_index(std::string name, bool unique)
@@ -408,13 +408,13 @@ namespace tree_stored{
 			cache = get_pcache(name);
 		}
 		virtual ~tree_index(){}
-		
+
 		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){
-			return cache->predict_row(predictor,((ColIndex::index_iterator_impl&)io).value.get_i(),q);
-			
+			return cache->predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
+
 		}
 		void cache_it(stored::index_iterator_interface& io){
-			cache->store(((ColIndex::index_iterator_impl&)io).value.get_i());
+			cache->store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 		}
 		bool is_unique() const {
 			return unique;
@@ -441,19 +441,19 @@ namespace tree_stored{
 			return density[at];
 		}
 		void end(stored::index_iterator_interface& out){
-			((ColIndex::index_iterator_impl&)out).value = index.end();
+			((typename ColIndex::index_iterator_impl&)out).value = index.end();
 		}
 		void first(stored::index_iterator_interface& out){
-			((ColIndex::index_iterator_impl&)out).value = index.first();
+			((typename ColIndex::index_iterator_impl&)out).value = index.first();
 		}
 		void lower_(stored::index_iterator_interface& out,const tree_stored::CompositeStored& key){
-			index.lower_(((ColIndex::index_iterator_impl&)out).value, key);
+			index.lower_(((typename ColIndex::index_iterator_impl&)out).value, key);
 		}
 		void lower(stored::index_iterator_interface& out,const tree_stored::CompositeStored& key){
-			index.lower_(((ColIndex::index_iterator_impl&)out).value , key);
+			index.lower_(((typename ColIndex::index_iterator_impl&)out).value , key);
 		}
 		void upper(stored::index_iterator_interface& out, const tree_stored::CompositeStored& key){
-			((ColIndex::index_iterator_impl&)out).value  = index.upper(key);
+			((typename ColIndex::index_iterator_impl&)out).value  = index.upper(key);
 		}
 		void add(const tree_stored::CompositeStored& k){
 			index.add(k, 0);
@@ -462,10 +462,10 @@ namespace tree_stored{
 			index.remove(k);
 		}
 		void find(stored::index_iterator_interface& out, const tree_stored::CompositeStored& key){
-			((ColIndex::index_iterator_impl&)out).value = index.find(key);
+			((typename ColIndex::index_iterator_impl&)out).value = index.find(key);
 		}
 		void from_initializer(stored::index_iterator_interface& out, const stx::initializer_pair& ip){
-			index.from_initializer(((ColIndex::index_iterator_impl&)out).value ,ip);
+			index.from_initializer(((typename ColIndex::index_iterator_impl&)out).value ,ip);
 		}
 		void reduce_use(){
 			index.reduce_use();
@@ -482,28 +482,28 @@ namespace tree_stored{
 		void commit1(){
 			index.commit1();
 		}
-		
+
 		void commit2(){
 			index.commit2();
 		}
-		
+
 		void rollback(){
 			index.rollback();
 		}
-		
+
 		void share(){
 		}
 		void unshare(){
 		}
-		
+
 		void clear_cache(){
 			index.reduce_use();
 		}
 		void reduce_cache(){
-			
+
 		}
 		typedef tree_index* ptr;
 	};
-	
+
 };
 #endif

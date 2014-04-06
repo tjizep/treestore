@@ -119,7 +119,7 @@ namespace tree_stored{
 				predictor = 0;
 				return NULL;
 			}
-			BasicIterator::key_type kin = input;
+			typename BasicIterator::key_type kin = input;
 			unsigned int h = ((size_t)kin) % HASH_SIZE;
 			predictor = cache_index[h];
 
@@ -176,7 +176,7 @@ namespace tree_stored{
 
 			size_t s = cache_index[h];
 			if(s == 0){
-				cache_index[h] = (_Rid)sec_cache.size(); //store_pos+1;
+				cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
 			}
 			CachedRow cr;
 			cr.i = iter.construction();
@@ -226,6 +226,6 @@ namespace tree_stored{
 
 	};
 
-	
+
 };
 #endif

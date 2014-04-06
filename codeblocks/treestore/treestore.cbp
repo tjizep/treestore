@@ -19,6 +19,7 @@
 					<Add option="-ftemplate-backtrace-limit=0" />
 					<Add option="-fpermissive" />
 					<Add option="-fPIC" />
+					<Add option="-fno-strict-aliasing" />
 					<Add option="-D_GLIBCXX_USE_C00_MATH" />
 					<Add directory="../../src" />
 					<Add directory="../../repo" />
@@ -36,22 +37,34 @@
 				<Option createDefFile="1" />
 				<Option createStaticLib="1" />
 				<Compiler>
-					<Add option="-O2" />
+					<Add option="-march=core2" />
+					<Add option="-fexpensive-optimizations" />
+					<Add option="-Os" />
+					<Add option="-O3" />
 					<Add option="-std=c++11" />
 					<Add option="-ftemplate-backtrace-limit=0" />
 					<Add option="-fpermissive" />
 					<Add option="-fPIC" />
-					<Add option="-DPOCO_STATIC" />
 					<Add directory="../../src" />
 					<Add directory="../../repo" />
 					<Add directory="../../repo/lz4-r101" />
-					<Add directory="/usr/local/src/mysql/mysql-5.6.14/include" />
-					<Add directory="/usr/local/src/mysql/mysql-5.6.14/sql" />
-					<Add directory="/usr/local/src/mysql/mysql-5.6.14/regex" />
+					<Add directory="../../../repo/mysql-5.6.16/include" />
+					<Add directory="../../../repo/mysql-5.6.16/regex" />
+					<Add directory="../../../repo/mysql-5.6.16/sql" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add library="/usr/local/lib/libPocoFoundation.a" />
+					<Add library="/usr/local/lib/libPocoUtil.a" />
+					<Add library="/usr/local/lib/libPocoData.a" />
+					<Add library="/usr/local/lib/libPocoDataSQLite.a" />
+					<Add library="/usr/local/mysql/lib/libmysqld.a" />
+					<Add library="/usr/local/mysql/lib/libmysqlservices.a" />
 				</Linker>
+				<ExtraCommands>
+					<Add before="export POCO_BASE=${HOME}/Desktop/repo/poco-1.4.6p2" />
+					<Mode after="always" />
+				</ExtraCommands>
 			</Target>
 		</Build>
 		<Compiler>
@@ -70,6 +83,7 @@
 		<Unit filename="../../src/conversions.h" />
 		<Unit filename="../../src/fields.cpp" />
 		<Unit filename="../../src/fields.h" />
+		<Unit filename="../../src/instances.cpp" />
 		<Unit filename="../../src/myi.cpp" />
 		<Unit filename="../../src/myi.h" />
 		<Unit filename="../../src/stx/btree" />
