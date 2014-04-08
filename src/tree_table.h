@@ -918,8 +918,8 @@ namespace tree_stored{
 		,	last_unlock_time(os::micros())
 		,	row_datas(nullptr)
 		,	storage(table_arg->s->path.str)
-		,	table(nullptr)
-
+		,	locks(0)
+		,	table(nullptr)		
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1513,11 +1513,13 @@ namespace tree_stored{
 		/// aquire lock and resources
 		void lock(bool writer)
 		{
-			changed = writer;
-			if(changed)
-				 (*this).share->last_write_lock_time = ::os::millis();
-			last_lock_time = os::micros();
-			begin(!changed);
+			if(locks++ == 0){
+				changed = writer;
+				if(changed)
+					 (*this).share->last_write_lock_time = ::os::millis();
+				last_lock_time = os::micros();
+				begin(!changed);
+			}
 
 		}
 
@@ -1531,29 +1533,36 @@ namespace tree_stored{
 		/// release locks and resources
 		void unlock(Poco::Mutex* p2_lock)
 		{
-			if(changed)
-			{
-				commit1();
-				/// locks so that all the storages can commit atomically allowing
-				/// other transactions to start on the same version
-				synchronized _s(*p2_lock);
-
-				commit2();
-				if(calc_total_use() > treestore_max_mem_use){
-					stored::reduce_all();
-				}
-				changed = false;
-			}else
-			{
-				bool rolling = false; //treestore_reduce_tree_use_on_unlock;
-				if
-				(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-					||	calc_total_use() > treestore_max_mem_use*0.7f
-					||  rolling
-				)
-					rollback();/// relieves the version load when new data is added to the collums
+			if(locks==0){
+				printf("too many unlocks \n");
+				return;
 			}
-			last_unlock_time = os::micros();
+
+			if(--locks == 0){
+				if(changed)
+				{
+					commit1();
+					/// locks so that all the storages can commit atomically allowing
+					/// other transactions to start on the same version
+					synchronized _s(*p2_lock);
+
+					commit2();
+					if(calc_total_use() > treestore_max_mem_use){
+						stored::reduce_all();
+					}
+					changed = false;
+				}else
+				{
+					bool rolling = false; //treestore_reduce_tree_use_on_unlock;
+					if
+					(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
+						||	calc_total_use() > treestore_max_mem_use*0.7f
+						||  rolling
+					)
+						rollback();/// relieves the version load when new data is added to the collums
+				}
+				last_unlock_time = os::micros();
+			}
 		}
 
 		void write(TABLE* table){

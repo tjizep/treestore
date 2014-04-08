@@ -282,8 +282,15 @@ public:
 		journal_ostr.rdbuf()->pubsync();
 		Poco::File jf(journal_name);
 		if(jf.exists()){
-			set_treestore_journal_size( jf.getSize() );
-			if(force || jf.getSize() > (nst::u64)get_treestore_journal_lower_max() ){
+			nst::u64 jsize = 0;
+			try{
+				jsize = jf.getSize();
+			}catch(...){
+				printf("error getting journal size\n");
+			}
+			set_treestore_journal_size( jsize );
+
+			if(force || jsize > (nst::u64)get_treestore_journal_lower_max() ){
 
 				nst::u64 singles = 0;
 				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
