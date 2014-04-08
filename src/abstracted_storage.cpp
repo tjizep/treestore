@@ -287,6 +287,7 @@ public:
 				jsize = jf.getSize();
 			}catch(...){
 				printf("error getting journal size\n");
+				return;
 			}
 			set_treestore_journal_size( jsize );
 
