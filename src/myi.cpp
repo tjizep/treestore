@@ -994,16 +994,7 @@ public:
 		}
 		bool writer = false;
 
-		printf
-		(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
-		,	lock_type == F_UNLCK ? "-":"+"
-		,	table->s->normalized_path.str
-		,	(double)calc_total_use()/units::MB
-		,	(double)nst::buffer_use/units::MB
-		,	(double)nst::col_use/units::MB
-		,	(double)btree_totl_used/units::MB
-		,	(double)total_cache_size/units::MB
-		);
+		
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
 			while
@@ -1015,7 +1006,19 @@ public:
 				os::zzzz(100);
 			}
 		}
+		if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
+			printf
+			(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+			,	lock_type == F_UNLCK ? "-":"+"
+			,	table->s->normalized_path.str
+			,	(double)calc_total_use()/units::MB
+			,	(double)nst::buffer_use/units::MB
+			,	(double)nst::col_use/units::MB
+			,	(double)btree_totl_used/units::MB
+			,	(double)total_cache_size/units::MB
+			);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
+			
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 
 				return HA_ERR_LOCK_TABLE_FULL;
