@@ -346,7 +346,8 @@ namespace tree_stored{
 		/// item conversions
 		template<typename _IntType>
 		inline void make_int_item_val(_IntType& i,const Item* val){
-			switch(val->type()){
+			Item::Type t = val->type();
+			switch(t){
 				case Item::INT_ITEM:
 					i.set_value((typename _IntType::value_type)((const Item_int*)val)->value);
 					break;
@@ -361,6 +362,7 @@ namespace tree_stored{
 					i.set_value((typename _IntType::value_type)((Item_string*)val)->val_int());
 					break;
 				default:
+					i.set_value((typename _IntType::value_type)((Item*)val)->val_int());
 					break;
 			};
 		}
@@ -382,13 +384,14 @@ namespace tree_stored{
 					i.set_value((typename _FloatType::value_type)((Item_string*)val)->val_real());
 					break;
 				default:
+					i.set_value((typename _FloatType::value_type)((Item*)val)->val_real());
 					break;
 			};
 		}
 
 		template<typename _BinaryType>
 		inline void make_binary_item_val(_BinaryType& b, Field* conversion, const Item* val){
-			#ifdef _MSC_VER_
+			#ifdef _MSC_VER
 			String *sv;
 			switch(val->type()){
 				case Item::INT_ITEM:

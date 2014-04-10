@@ -620,7 +620,7 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-		get_tree_table()->pop_all_conditions();
+		
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			(*s).restore_ptr();
 		}
@@ -1073,55 +1073,109 @@ public:
 
 		DBUG_RETURN(0);
 	}
-	void cond_field(const Item_field *f){
-	}
 
-	void push_func(const Item_func* f){
-		if(f->argument_count() == 2){
+
+	bool push_func(const Item_func* f,tree_stored::logical_conditional_iterator::ptr parent){
+		int argc = f->argument_count();
+		Item_func::Functype ft = f->functype();
+		if(ft==Item_func::COND_OR_FUNC || ft==Item_func::COND_AND_FUNC){
+			Item_cond_or* c = (Item_cond_or* )f;
+			tree_stored::logical_conditional_iterator::ptr lor ;
+			lor = ft==Item_func::COND_OR_FUNC ? get_tree_table()->create_or_condition() : get_tree_table()->create_and_condition();
+			if(parent == nullptr){
+				
+				get_tree_table()->set_root_condition(lor);
+			}else{
+				parent->push_condition(lor);
+			}
+				
+			List_iterator<Item> i = *(c->argument_list());
+			for(;;){
+				const Item *cc = i++;
+				
+				if(NULL == cc)
+					break;
+				Item::Type ct = cc->type(); 
+				if(cc->type() == Item::FUNC_ITEM){
+					const Item_func* f = (const Item_func*)cc;
+					if(!push_func(f,lor)) return false;
+				}else
+					return false;
+			}			
+			return true;
+		}else if(Item_func::COND_ITEM && f->argument_count() == 2){
 			const Item * i0 = f->arguments()[0];
 			const Item * val = f->arguments()[1];
 			Item::Type t1 = i0->type();
 			if(t1 == Item::FIELD_ITEM){
 				const Item_field * fi = (const Item_field*)i0;
-				get_tree_table()->push_condition(fi, f, val);				
+							
+				tree_stored::abstract_conditional_iterator::ptr local = get_tree_table()->create_field_condition(fi, f, val);				
+				if(parent == nullptr)
+					get_tree_table()->set_root_condition(local);
+				else
+					parent->push_condition(local);
+				return true;
 			}
 			
 		}		
+		return false;
 	}
-
-	void cond_push_(const Item *acon) {
-		if(acon == NULL) return;
-
+	bool push_cond(const Item * acon,tree_stored::logical_conditional_iterator::ptr parent){
 		Item::Type t = acon->type();
-		if(t == Item::FUNC_ITEM){
-		
+		if(t == Item::FUNC_ITEM){		
 			const Item_func* f = (const Item_func*)acon;
-			push_func(f);
-			
-			
+			return push_func(f,parent);			
 		}else if(t==Item::COND_ITEM){
 			Item_cond* c = (Item_cond* )acon;
-			List_iterator<Item> i = *(c->argument_list());
-			for(;;){
-				const Item *cc = i++;
-				if(NULL == cc)
-					break;
-				cond_push_(cc);
-			}			
-		}else if(t == Item::FIELD_ITEM){
-			const Item_field* f = (Item_field*)t;
-			cond_field(f);
+			if(c->functype() == Item_func::COND_AND_FUNC || c->functype() == Item_func::COND_OR_FUNC){
+				tree_stored::logical_conditional_iterator::ptr lcond ;					
+				lcond = (c->functype() == Item_func::COND_AND_FUNC) ? get_tree_table()->create_and_condition() : get_tree_table()->create_or_condition();
+				if(parent == nullptr){
+					
+					get_tree_table()->set_root_condition(lcond);
+				}else{
+					parent->push_condition(lcond);
+				}
+				List_iterator<Item> i = *(c->argument_list());
+				for(;;){
+					const Item *cc = i++;
+				
+					if(NULL == cc)
+						break;
+					Item::Type ct = cc->type(); 
+					if(cc->type() == Item::FUNC_ITEM){
+						const Item_func* f = (const Item_func*)cc;
+						if(!push_func(f,lcond)){							
+							return false;
+						}
+					}else{
+						if(!push_cond(cc,lcond)){
+							return false;
+						}						
+					}					
+				}
+				return true;
+			}else
+				return false;
 		}
-			
-		
+		return false;
 	}
-	const Item *_cond_push(const Item *acon) {
-
-		cond_push_(acon);
-		/// const char * n = acon->full_name();
+	
+	/// call by MySQL to advertise push down conditions
+	const Item *cond_push(const Item *acon) {
+		if(push_cond(acon,nullptr))
+			return NULL;
+		get_tree_table()->pop_all_conditions();
 		return acon;
+		
+		/// const char * n = acon->full_name();
+		
 
 	};
+	void cond_pop(){
+		get_tree_table()->pop_condition();
+	}
 	// tscan 3
 	int rnd_init(bool scan){
 		row = 0;
@@ -1142,9 +1196,19 @@ public:
 	int rnd_next(byte *buf){
 		DBUG_ENTER("rnd_next");
 		if((*this).r == (*this).r_stop){
+			get_tree_table()->pop_all_conditions();
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
+		
 		last_resolved = (*this).r.key().get_value();
+		while(!(*this).get_tree_table()->evaluate_and_conditions(last_resolved)){
+			++((*this).r);
+			if((*this).r == (*this).r_stop){
+				get_tree_table()->pop_all_conditions();
+				DBUG_RETURN(HA_ERR_END_OF_FILE);
+			}else
+				last_resolved = (*this).r.key().get_value();
+		}
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
 		resolve_selection(last_resolved);
 

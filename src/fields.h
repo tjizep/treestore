@@ -110,6 +110,9 @@ namespace stored{
 		inline bool operator<(const IntTypeStored& right) const {
 			return (value < right.value);
 		}
+		inline bool operator>(const IntTypeStored& right) const {
+			return (value > right.value);
+		}
 		inline bool operator!=(const IntTypeStored& right) const {
 			return (value != right.value);
 		}
@@ -157,6 +160,9 @@ namespace stored{
 			return *this;
 		}
 		inline bool operator<(const FTypeStored& right) const {
+			return (value < right.value);
+		}
+		inline bool operator>(const FTypeStored& right) const {
 			return (value < right.value);
 		}
 		inline bool operator!=(const FTypeStored& right) const {
@@ -304,6 +310,18 @@ namespace stored{
 			}
 
 			return (size < right.size);
+		}
+		bool greater(const Blobule& right) const {
+			using namespace NS_STORAGE;
+
+			const u8 * lp = data();
+			const u8 * rp = right.data();
+			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));
+			if(r != 0){
+				return (r > 0);
+			}
+
+			return (size > right.size);
 		}
 		bool not_equal(const Blobule& right) const {
 			using namespace NS_STORAGE;
@@ -459,11 +477,13 @@ namespace stored{
 			set(right);
 			return *this;
 		}
-
+		inline bool operator>(const Blobule& right) const {
+			return greater(right);
+		}
 		inline bool operator<(const Blobule& right) const {
 			return less(right);
 		}
-
+		
 		inline bool operator!=(const Blobule& right) const {
 
 			return not_equal(right);

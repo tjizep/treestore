@@ -645,8 +645,7 @@ namespace collums{
 		}
 		_CacheEntry* load_cache(std::string name, bool lazy, size_t col_size){
 			_CacheEntry * result = 0;
-
-			
+				
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
 				if(calc_total_use() + col_size*sizeof(_Stored) > treestore_max_mem_use){

@@ -48,6 +48,89 @@ namespace tree_stored{
 		InvalidTablePointer () throw(){
 		}
 	};
+	
+	class abstract_conditional_iterator{
+	public:
+		abstract_conditional_iterator(){};
+		virtual ~abstract_conditional_iterator(){};
+		static const _Rid NoRecord = 0xFFFFFFFF;
+		/// returns NoRecord if no records where found
+		virtual _Rid iterate(_Rid start) = 0;
+		virtual _Rid evaluate(_Rid start) = 0;
+		typedef std::shared_ptr<abstract_conditional_iterator> ptr;
+	};
+	class logical_conditional_iterator : public abstract_conditional_iterator{
+	protected:
+		typedef std::vector<abstract_conditional_iterator::ptr> _LogicalConditions;
+		_LogicalConditions logical;
+	public:
+		logical_conditional_iterator(){};
+		virtual ~logical_conditional_iterator(){};
+		void push_condition(abstract_conditional_iterator::ptr condition){
+			logical.push_back(condition);
+		}
+		/// returns NoRecord if no records where found
+		virtual _Rid iterate(_Rid start) = 0;
+		virtual _Rid evaluate(_Rid start) = 0;
+		
+		typedef std::shared_ptr<logical_conditional_iterator> ptr;
+	};
+
+	class conditional_and_iterator : public logical_conditional_iterator{
+	
+	public:
+		
+		conditional_and_iterator(){
+			
+		};
+		virtual ~conditional_and_iterator(){};
+
+		
+		/// returns NoRecord if no records where found
+		virtual _Rid iterate(_Rid start) {
+			return NoRecord;
+		}
+		virtual _Rid evaluate(_Rid start) {
+			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+				if((*l)->evaluate(start) != start){
+					return NoRecord;
+				}
+			}
+			return start;
+			
+			
+		}
+		typedef std::shared_ptr<conditional_and_iterator> ptr;
+	};
+
+	
+	class conditional_or_iterator : public logical_conditional_iterator{
+	
+	public:
+		
+		conditional_or_iterator(){
+			
+		};
+		virtual ~conditional_or_iterator(){};
+
+		
+
+		/// returns NoRecord if no records could be found
+		virtual _Rid iterate(_Rid start) {
+			return NoRecord;
+		}
+
+		virtual _Rid evaluate(_Rid start) {
+			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+				if((*l)->evaluate(start) == start){
+					return start;
+				}
+			}
+			return NoRecord;
+			
+		}
+		typedef std::shared_ptr<conditional_or_iterator> ptr;
+	};
 
 	class abstract_my_collumn {
 	public:
@@ -77,8 +160,8 @@ namespace tree_stored{
 		virtual void commit2() = 0;
 		virtual void rollback() = 0;
 		/// push down condition
-		virtual void push_condition(const Item_func* f, const Item* val, Field* target) = 0;
-		virtual void pop_conditions() = 0;
+		virtual abstract_conditional_iterator::ptr create_condition(const Item_func* f, const Item* val, Field* target) = 0;
+		
 	};
 
 
@@ -219,84 +302,174 @@ namespace tree_stored{
 
 		}
 	protected:
-		class conditional_iterator{
-		public:
-			virtual _Rid iterate(_Rid start) = 0;
-
+		struct eq_condition{
+			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
+				return right == left;
+			}
+		};
+		
+		struct gt_condition{
+			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
+				return right > left; 
+			}
+		};
+		
+		struct ge_condition{
+			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
+				return !(right < left);
+			}
+		};
+		
+		struct lt_condition{
+			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
+				return right < left;
+			}
+		};
+		
+		struct le_condition{
+			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
+				return !(right > left);
+			}
 		};
 
+		struct empty_condition{
+			inline bool is_true(const _Fieldt &,const _Fieldt &) const {
+				return true;
+			}
+		};
 		template<typename _Condition>
-		class entropic_conditional_iterator{
+		class entropic_conditional_iterator : public abstract_conditional_iterator{
 		protected:
 			_Condition contition;
 			_Fieldt value;
+			_Colt * col;
 		public:
-			entropic_conditional_iterator(_Fieldt value){
+			virtual ~entropic_conditional_iterator(){};
+			entropic_conditional_iterator(_Colt* col, _Fieldt value){
+				(*this).col = col;
 				(*this).value = value;
 			}
+			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid start) {
-				return 0;
+				if(start >= col->get_rows()){
+					return NoRecord;
+				}
+				while(!condition.is_true(col->seek_by_cache(start), value)){
+					++start;
+					if(start >= col->get_rows()){
+						return NoRecord;
+					}
+				}
+				return start;
+			}
+			virtual _Rid evaluate(_Rid start) {
+				
+				if(start >= col->get_rows()){
+					return NoRecord;
+				}
+
+				if(!condition.is_true(col->seek_by_cache(start), value)){
+					return NoRecord;					
+				}
+
+				return start;
 			}
 		};
 
 		template<typename _Condition>
-		class standard_conditional_iterator{
+		class standard_conditional_iterator : public abstract_conditional_iterator{
 		protected:
 			_Condition condition;
 			_Fieldt value;
+			_Colt * col;
 		public:
-			standard_conditional_iterator(_Fieldt value){
+			standard_conditional_iterator(_Colt* col, _Fieldt value){
+				(*this).col = col;
 				(*this).value = value;
 			}
+			virtual ~standard_conditional_iterator(){};
+			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid start) {
-				return 0;
+
+				if(start >= col->get_rows()){
+					return NoRecord;
+				}
+				while(!condition.is_true(col->seek_by_cache(start), value)){
+					++start;
+					if(start >= col->get_rows()){
+						return NoRecord;
+					}
+				}
+				return start;
+			}
+			virtual _Rid evaluate(_Rid start) {
+				
+				if(start >= col->get_rows()){
+					return NoRecord;
+				}
+
+				if(!condition.is_true(col->seek_by_cache(start), value)){
+					return NoRecord;					
+				}
+
+				return start;
 			}
 		};
-		/// push doen condition evaluations
+		/// push does condition evaluations
 
-		void push_gt_condition(Field* target, const Item* val){
+		abstract_conditional_iterator::ptr push_gt_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<gt_condition>>(&col, pushed);
 		}
 
-		void push_ge_condition(Field* target, const Item* val){
+		abstract_conditional_iterator::ptr push_ge_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<ge_condition>>(&col, pushed);
 		}
 
-		void push_e_condition(Field* target, const Item* val){
+		abstract_conditional_iterator::ptr push_e_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<eq_condition>>(&col, pushed);
 		}
 
-		void push_lt_condition(Field* target, const Item* val){
+		abstract_conditional_iterator::ptr push_lt_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<lt_condition>>(&col, pushed);
 		}
 
-		void push_le_condition(Field* target, const Item* val){
+		abstract_conditional_iterator::ptr push_le_condition(Field* target, const Item* val){
 			_Fieldt pushed;
 			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<le_condition>>(&col, pushed);
+		}
+		abstract_conditional_iterator::ptr push_empty_condition(Field* target, const Item* val){
+			_Fieldt pushed;
+			convertor.make_item_val(pushed,target,val);
+			return std::make_shared<standard_conditional_iterator<empty_condition>>(&col, pushed);
 		}
 
 	public:
-		virtual void push_condition(const Item_func* f, const Item* val, Field* target){
+		virtual abstract_conditional_iterator::ptr create_condition(const Item_func* f, const Item* val, Field* target){
 			Item_func::Functype ft = f->functype();
 			switch(ft){
 			case Item_func::GT_FUNC: // greater than
-				push_gt_condition(target,val);
+				return push_gt_condition(target,val);
 				break;
 			case Item_func::GE_FUNC: // greater than
-				push_ge_condition(target,val);
+				return push_ge_condition(target,val);
 				break;
 			case Item_func::EQ_FUNC: // equal
-				push_e_condition(target,val);
+				return push_e_condition(target,val);
 				break;
 			case Item_func::LE_FUNC: // less or equal
-				push_le_condition(target,val);
+				return push_le_condition(target,val);
 				break;
 			case Item_func::LT_FUNC: // less than
-				push_lt_condition(target,val);
+				return push_lt_condition(target,val);
 				break;
 			default: // unimplemented type of conditional binary function
 #				ifdef _FURTHER_CONDITIONS_
@@ -307,15 +480,13 @@ namespace tree_stored{
 				}
 #				endif
 				break;
-			}
+			};
 
+			return push_empty_condition(target, val);
 		}
 		virtual void pop_conditions(){
 		}
-		virtual _Rid evaluate_and(_Rid start){
-
-			return 0;
-		}
+		
 
 		virtual void erase_row(collums::_Rid row){
 			col.erase(row);
@@ -634,6 +805,8 @@ namespace tree_stored{
 	public:
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
+		typedef std::vector<abstract_conditional_iterator::ptr> _Conditional;
+
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
 		struct shared_data{
 			shared_data(){
@@ -937,7 +1110,8 @@ namespace tree_stored{
 			clear();
 			delete_extendsions();
 		}
-
+		_Conditional conditional;
+		abstract_conditional_iterator::ptr rcond;
 		CompositeStored temp;
 		_Indexes indexes;
 		_Collumns cols;
@@ -1205,17 +1379,37 @@ namespace tree_stored{
 
 			return input.row;
 		}
-		void push_gt_condition(const Item_field * fi,const Item * val){
+		
+		void pop_condition(){
+			rcond = nullptr;
 		}
-		void push_condition(const Item_field * fi,const Item_func * fun,const Item * val){
+		void set_root_condition(abstract_conditional_iterator::ptr rcond){
+			(*this).rcond = rcond;
+		}
+		logical_conditional_iterator::ptr create_and_condition(){
+			return std::make_shared<conditional_and_iterator>();
+		}
 
-			cols[fi->field->field_index]->push_condition( fun, val, fi->field);
+		logical_conditional_iterator::ptr create_or_condition(){
+			return std::make_shared<conditional_or_iterator>();
+		}
+
+		abstract_conditional_iterator::ptr create_field_condition(const Item_field * fi,const Item_func * fun,const Item * val){
+
+			return cols[fi->field->field_index]->create_condition( fun, val, fi->field);
+		}
+		bool evaluate_and_conditions(_Rid row){
+			if(rcond == nullptr) return true;/// always true if there are no conditions
+			/// very under optimized algorithm
+			
+			if(rcond->evaluate(row) != row){
+				return false;
+			}
+			
+			return true;
 		}
 		void pop_all_conditions(){
-			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				(*c)->pop_conditions();
-
-			}
+			rcond = nullptr;			
 		}
 		uint count_parts(TABLE* table,uint ax, uint key_part_map){
 			KEY & ki = table->key_info[ax];

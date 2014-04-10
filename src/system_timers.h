@@ -27,11 +27,11 @@ namespace os{
 		return now.epochMicroseconds();
 	}
 	
-	/// zzzz because ms compilers have some strange unhealthy fascination with the word 'sleep'
+	/// zzzz because mysql redefines 'sleep' as a macro
 
 	inline void zzzz(Poco::UInt32 millis){
 #ifdef _MSC_VER
-				Poco::Thread::__sleep(millis);
+				Poco::Thread::sleep(millis);
 #else
 				Poco::Thread::sleep(millis);
 #endif
