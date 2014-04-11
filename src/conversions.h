@@ -394,11 +394,16 @@ namespace tree_stored{
 			#ifdef _MSC_VER
 			String *sv;
 			switch(val->type()){
-				case Item::INT_ITEM:
-					b.add(((const Item_int*)val)->value);
+				case Item::INT_ITEM:		{			
+					stored::LongIntStored l;
+					l.set_value(((const Item_int*)val)->value);
+					fset(0,conversion,l);
+					fget(b,conversion,NULL,0);					
+											}
 					break;
-				case Item::REAL_ITEM:
-					b.add(((const Item_float*)val)->value);
+				case Item::REAL_ITEM:					
+					fset(0,conversion,stored::DoubleStored(((const Item_float*)val)->value));
+					fget(b,conversion,NULL,0);
 					break;
 				case Item::DECIMAL_ITEM:
 					conversion->store_decimal(((Item_decimal*)val)->val_decimal(&md_buffer));

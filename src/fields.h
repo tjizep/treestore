@@ -94,7 +94,7 @@ namespace stored{
 			value = nv;
 		}
 
-		explicit IntTypeStored(_IntType i):value(i){
+		explicit IntTypeStored(const _IntType i):value(i){
 		}
 
 		IntTypeStored():value(0){
