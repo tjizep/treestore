@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.28 (beta)
+TuReestore MySQL Storage Engine version 0.29 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.17
@@ -45,7 +45,7 @@ Results (cold start 30 % variance)
 Microsoft Windows Installation
 ------------------------------
 
-+ Download and install MySQL 5.6.16 x64 from [MySQL downloads](http://dev.mysql.com/downloads/mysql/)
++ Download and install MySQL 5.6.17 x64 from [MySQL downloads](http://dev.mysql.com/downloads/mysql/)
 + Locate 'plugin' folder in MySQL installation directory
 + Copy treestore.dll from x64/Release to the previously located plugin folder
 + Install MSVC 11 x64 runtime dependencies from [MSVC Redistributable download](http://www.microsoft.com/en-za/download/details.aspx?id=30679)
@@ -67,7 +67,7 @@ Technical
 + Very Efficient sparse column storage due to no null format and runlength + differencial encoding
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 + Simple entropy coding is used for in memory compression 
-
++ filter expressions are evaluated in the storage engine for better performance
 
 Configuration
 -------------
@@ -108,6 +108,11 @@ This table supplies configuration options for sacrificing performance for less m
 
 Changes
 -------
+
+0.29 beta
+
+1. Added conditional push downs to improve table scan performance by 3 to 5 times
+2. Added primitive indexes for reduced memory use
 
 0.28 beta
 
