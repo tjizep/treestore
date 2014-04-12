@@ -77,82 +77,90 @@ namespace tree_stored{
 	};
 
 	class conditional_and_iterator : public logical_conditional_iterator{
-	
-	public:
+		private:
 		
-		conditional_and_iterator(){
+
+		public:
+		
+			conditional_and_iterator(){
 			
-		};
-		virtual ~conditional_and_iterator(){};
+			
+			};
+			virtual ~conditional_and_iterator(){};
 
 		
-		/// returns NoRecord if no records where found
-		virtual _Rid iterate(_Rid _start) {
-			_Rid start = _start;
-			/// iterative optimization for and condition(s)
-			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
-				_Rid pstart = (*l)->iterate(start);
-				if(pstart > start){
-					/// skip evaluations on sibling/co conditions
-					start = pstart;
+			/// returns NoRecord if no records where found
+			virtual _Rid iterate(_Rid _start) {
+				_Rid start = _start;
+				/// iterative optimization for and condition(s)
+				for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+					_Rid pstart = (*l)->iterate(start);
+					if(pstart > start){
+						/// skip evaluations on sibling/co conditions
+						start = pstart;
+					}
+					if(start == NoRecord)
+						break;
+
 				}
-				if(start == NoRecord)
-					break;
-
+				return start;
 			}
-			return start;
-		}
-		virtual _Rid evaluate(_Rid _start) {
-			_Rid start = _start;
+			virtual _Rid evaluate(_Rid _start) {
+				_Rid start = _start;
 			
-			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
-				if((*l)->evaluate(start) != start){
-					return NoRecord;
+				for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+					if((*l)->evaluate(start) != start){
+						return NoRecord;
+					}
 				}
+				return start;
+			
+			
 			}
-			return start;
-			
-			
-		}
-		typedef std::shared_ptr<conditional_and_iterator> ptr;
-	};
+			typedef std::shared_ptr<conditional_and_iterator> ptr;
+		};
 
 	
-	class conditional_or_iterator : public logical_conditional_iterator{
-	
-	public:
+		class conditional_or_iterator : public logical_conditional_iterator{
+		private:
+			_Rid max_rid;
+		public:
 		
-		conditional_or_iterator(){
+			conditional_or_iterator(_Rid max_rid){
+				(*this).max_rid = max_rid;
 			
-		};
-		virtual ~conditional_or_iterator(){};
+			};
+			virtual ~conditional_or_iterator(){};
 		
-		/// returns NoRecord if no records could be found
-		virtual _Rid iterate(_Rid _start) {
-			_Rid start = _start;
-			while(start != NoRecord){
+			/// returns NoRecord if no records could be found
+			virtual _Rid iterate(_Rid _start) {
+				_Rid start = _start;
+				while(start < max_rid){
+				
+					for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+						_Rid r = (*l)->evaluate(start) ;
+						if(r == start){
+							return start;
+						}										
+					}				
+					++start;					
+				}			
+				return NoRecord;
+			}
+
+			virtual _Rid evaluate(_Rid start) {
 				for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
 					if((*l)->evaluate(start) == start){
 						return start;
 					}
 				}
-				++start;
-			}			
-			return NoRecord;
-		}
-
-		virtual _Rid evaluate(_Rid start) {
-			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
-				if((*l)->evaluate(start) == start){
-					return start;
-				}
-			}
-			return NoRecord;
+				return NoRecord;
 			
-		}
-		typedef std::shared_ptr<conditional_or_iterator> ptr;
-	};
+			}
+			typedef std::shared_ptr<conditional_or_iterator> ptr;
+		};
 
+	
 	class abstract_my_collumn {
 	public:
 		abstract_my_collumn(){
@@ -182,7 +190,7 @@ namespace tree_stored{
 		virtual void rollback() = 0;
 		/// push down condition
 		virtual abstract_conditional_iterator::ptr create_condition(const Item_func* f, const Item* val, Field* target) = 0;
-		
+
 	};
 
 
@@ -437,6 +445,7 @@ namespace tree_stored{
 				return start;
 			}
 		};
+		
 		/// push does condition evaluations
 
 		abstract_conditional_iterator::ptr push_gt_condition(Field* target, const Item* val){
@@ -475,6 +484,7 @@ namespace tree_stored{
 		}
 
 	public:
+
 		virtual abstract_conditional_iterator::ptr create_condition(const Item_func* f, const Item* val, Field* target){
 			Item_func::Functype ft = f->functype();
 			switch(ft){
@@ -1413,7 +1423,7 @@ namespace tree_stored{
 		}
 
 		logical_conditional_iterator::ptr create_or_condition(){
-			return std::make_shared<conditional_or_iterator>();
+			return std::make_shared<conditional_or_iterator>((*this)._row_count);
 		}
 
 		abstract_conditional_iterator::ptr create_field_condition(const Item_field * fi,const Item_func * fun,const Item * val){
