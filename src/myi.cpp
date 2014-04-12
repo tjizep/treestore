@@ -1107,15 +1107,24 @@ public:
 			const Item * i0 = f->arguments()[0];
 			const Item * val = f->arguments()[1];
 			Item::Type t1 = i0->type();
+			Item::Type t2 = val->type();
+			
 			if(t1 == Item::FIELD_ITEM){
-				const Item_field * fi = (const Item_field*)i0;
-							
-				tree_stored::abstract_conditional_iterator::ptr local = get_tree_table()->create_field_condition(fi, f, val);				
-				if(parent == nullptr)
-					get_tree_table()->set_root_condition(local);
-				else
-					parent->push_condition(local);
-				return true;
+				switch(t2){
+				case Item::STRING_ITEM: case Item::INT_ITEM: case Item::REAL_ITEM:case Item::VARBIN_ITEM:case Item::DECIMAL_ITEM:{
+
+					const Item_field * fi = (const Item_field*)i0;				
+				
+					tree_stored::abstract_conditional_iterator::ptr local = get_tree_table()->create_field_condition(fi, f, val);				
+					if(parent == nullptr)
+						get_tree_table()->set_root_condition(local);
+					else
+						parent->push_condition(local);
+					return true;
+								  }
+				default:
+					break;
+				}
 			}
 			
 		}		
@@ -1164,8 +1173,8 @@ public:
 	
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
-		//if(push_cond(acon,nullptr))
-		//	return NULL;
+		if(push_cond(acon,nullptr))
+			return NULL;
 		get_tree_table()->pop_all_conditions();
 		return acon;
 		
