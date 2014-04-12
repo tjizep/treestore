@@ -1164,8 +1164,8 @@ public:
 	
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
-		if(push_cond(acon,nullptr))
-			return NULL;
+		//if(push_cond(acon,nullptr))
+		//	return NULL;
 		get_tree_table()->pop_all_conditions();
 		return acon;
 		
