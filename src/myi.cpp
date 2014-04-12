@@ -1201,15 +1201,38 @@ public:
 		}
 		
 		last_resolved = (*this).r.key().get_value();
-		while(!(*this).get_tree_table()->evaluate_and_conditions(last_resolved)){
-			++((*this).r);
-			if((*this).r == (*this).r_stop){
+		stored::_Rid c = tree_stored::abstract_conditional_iterator::NoRecord;
+		while(c != last_resolved){
+			/// get the next record that matches 
+			/// returns last_resolved if current i.e. first record matches
+			c = (*this).get_tree_table()->iterate_conditions(last_resolved); 
+			/// c is either valid or NoRecord
+			if(c == tree_stored::abstract_conditional_iterator::NoRecord){ 
+				/// no record inclusive of last_resolved matched
 				get_tree_table()->pop_all_conditions();
 				DBUG_RETURN(HA_ERR_END_OF_FILE);
-			}else
-				last_resolved = (*this).r.key().get_value();
+			}
+			
+			if(c > last_resolved + 20){
+
+				(*this).r =  get_tree_table()->get_table().lower_bound(c);
+
+			}else{
+				
+				while((*this).r.key().get_value() < c ){
+					++((*this).r);
+					if((*this).r == (*this).r_stop){
+						get_tree_table()->pop_all_conditions();
+						DBUG_RETURN(HA_ERR_END_OF_FILE);
+					}
+				}
+			}
+			/// c == last_resolved
+			last_resolved = (*this).r.key().get_value();
 		}
+
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
+		
 		resolve_selection(last_resolved);
 
 		++((*this).r);

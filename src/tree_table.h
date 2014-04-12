@@ -87,10 +87,24 @@ namespace tree_stored{
 
 		
 		/// returns NoRecord if no records where found
-		virtual _Rid iterate(_Rid start) {
-			return NoRecord;
+		virtual _Rid iterate(_Rid _start) {
+			_Rid start = _start;
+			/// iterative optimization for and condition(s)
+			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+				_Rid pstart = (*l)->iterate(start);
+				if(pstart > start){
+					/// skip evaluations on sibling/co conditions
+					start = pstart;
+				}
+				if(start == NoRecord)
+					break;
+
+			}
+			return start;
 		}
-		virtual _Rid evaluate(_Rid start) {
+		virtual _Rid evaluate(_Rid _start) {
+			_Rid start = _start;
+			
 			for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
 				if((*l)->evaluate(start) != start){
 					return NoRecord;
@@ -112,11 +126,18 @@ namespace tree_stored{
 			
 		};
 		virtual ~conditional_or_iterator(){};
-
 		
-
 		/// returns NoRecord if no records could be found
-		virtual _Rid iterate(_Rid start) {
+		virtual _Rid iterate(_Rid _start) {
+			_Rid start = _start;
+			while(start != NoRecord){
+				for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
+					if((*l)->evaluate(start) == start){
+						return start;
+					}
+				}
+				++start;
+			}			
 			return NoRecord;
 		}
 
@@ -252,7 +273,7 @@ namespace tree_stored{
 			}
 		}
 		void make_item_val(_Fieldt& v, const Item* val){
-            #ifdef _MSC_VER_
+            #ifdef _MSC_VER
 			switch(val->type()){
 				case Item::INT_ITEM:
 					v.set_value(((const Item_int*)val)->value);
@@ -396,6 +417,7 @@ namespace tree_stored{
 				}
 				while(!condition.is_true(col->seek_by_cache(start), value)){
 					++start;
+					
 					if(start >= col->get_rows()){
 						return NoRecord;
 					}
@@ -1398,7 +1420,7 @@ namespace tree_stored{
 
 			return cols[fi->field->field_index]->create_condition( fun, val, fi->field);
 		}
-		bool evaluate_and_conditions(_Rid row){
+		bool evaluate_conditions(_Rid row){
 			if(rcond == nullptr) return true;/// always true if there are no conditions
 			/// very under optimized algorithm
 			
@@ -1408,6 +1430,28 @@ namespace tree_stored{
 			
 			return true;
 		}
+		/// return value is either valid or equal to NoRecord
+		_Rid iterate_conditions(_Rid row){
+			if(rcond == nullptr) return row;/// always true if there are no conditions			
+			_Rid r = row;
+			while(r <= (*this)._row_count){
+				r = rcond->iterate(r) ;				
+				if(!(r <= (*this)._row_count))
+					return abstract_conditional_iterator::NoRecord;
+				if(!is_allocated_row(r)){
+					++r;
+				}else {
+					return r;
+				}
+			}
+			return abstract_conditional_iterator::NoRecord ;
+			
+		}
+		bool is_allocated_row(_Rid row){
+			/// TODO: check allocation map 2
+			return row < (*this)._row_count;
+		}
+
 		void pop_all_conditions(){
 			rcond = nullptr;			
 		}
