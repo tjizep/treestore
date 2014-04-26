@@ -1455,7 +1455,7 @@ namespace stored{
 			}
 
 		};
-
+		
 
 		class UninitializedCodeException : public std::exception{
 		public :
@@ -1919,6 +1919,7 @@ namespace stored{
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;
 		virtual DynamicKey& get_key() = 0;
 		virtual void set_end(index_iterator_interface& in) = 0;
+		
 	};
 
 	class index_interface{
@@ -1942,7 +1943,7 @@ namespace stored{
 		virtual index_iterator_interface * get_index_iterator() = 0;
 		virtual index_iterator_interface * get_first1() = 0;
 		virtual index_iterator_interface * get_last1() = 0;
-
+		
 		virtual void first(index_iterator_interface& out)=0;
 		virtual void lower_(index_iterator_interface& out,const DynamicKey& key)=0;
 		virtual void lower(index_iterator_interface& out,const DynamicKey& key)=0;

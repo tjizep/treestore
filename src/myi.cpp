@@ -161,6 +161,7 @@ nst::u64 get_treestore_journal_lower_max(){
 
 static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
+
 long long calc_total_use(){
 	treestore_current_mem_use =  NS_STORAGE::total_use+btree_totl_used+total_cache_size;
 	return treestore_current_mem_use;
@@ -171,12 +172,38 @@ void print_read_lookups();
 #include "conversions.h"
 #include "tree_index.h"
 #include "tree_table.h"
+
 typedef std::map<std::string, _FileNames > _Extensions;
 typedef std::unordered_map<std::string, int > _LoadingData;
+typedef std::map<std::string, tree_stored::tree_table* > _InfoTables;
+
+static _InfoTables info_tables;
 
 Poco::Mutex tree_stored::tree_table::shared_lock;
 Poco::Mutex single_writer_lock;
 Poco::Mutex data_loading_lock;
+Poco::Mutex tt_info_lock;
+
+tree_stored::tree_table * get_info_table(TABLE* table){
+	nst::synchronized synch(tt_info_lock);
+	
+
+	tree_stored::tree_table * result = info_tables[table->s->path.str];
+	if(NULL == result){
+		result = new tree_stored::tree_table(table);
+		info_tables[table->s->path.str] = result;
+		
+	}
+	return result;
+
+}
+void clear_info_tables(){
+	nst::synchronized synch(tt_info_lock);
+	for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
+		delete (*i).second;
+	}
+	info_tables.clear();
+}
 tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 _LoadingData loading_data;
 
@@ -295,10 +322,11 @@ namespace tree_stored{
 			bool writer = changed;
 			compose_table(table_arg)->unlock(&p2_lock);
 			if(1==locks){
+				
 				if
 				(	changed
 				)
-					NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
+					NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage
 
 				print_read_lookups();
 
@@ -658,22 +686,20 @@ public:
 	}
 
 	int info(uint which){
-
+		
 		if(get_tree_table() == NULL){
 			return 0;
 		}
 		
-		bool do_unlock = false;
 		
-		if(get_tree_table()->table==nullptr){
-			do_unlock = true;
-			get_tree_table()->begin(true);
-		}
+		nst::synchronized synch(tt_info_lock);
+		tree_stored::tree_table * tt = get_info_table((*this).table);
+		tt->begin(true);
 		
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
-			stats.data_file_length = get_tree_table()->table_size();
+			stats.data_file_length = tt->table_size();
 			stats.block_size = 1;
-			stats.records = std::max<stored::_Rid>(2, get_tree_table()->row_count());
+			stats.records = std::max<stored::_Rid>(2, tt->row_count());
 		}
 
 		if(which & HA_STATUS_TIME) // - only update of stats->update_time required
@@ -700,9 +726,9 @@ public:
 		}
 
 		if(which & HA_STATUS_VARIABLE) {// - records, deleted, data_file_length, index_file_length, delete_length, check_time, mean_rec_length
-			stats.data_file_length = get_tree_table()->table_size();
+			stats.data_file_length = tt->table_size();
 			stats.block_size = 4096;
-			stats.records = std::max<stored::_Rid>(2, get_tree_table()->row_count());
+			stats.records = std::max<stored::_Rid>(2, tt->row_count());
 			stats.mean_rec_length =(ulong) stats.data_file_length / stats.records;
 
 		}
@@ -722,8 +748,7 @@ public:
 			//handler::auto_increment_value = get_tree_table()->row_count();
 		}
 
-		if(do_unlock)
-			get_tree_table()->rollback();
+		tt->rollback();
 
 		return 0;
 	}
@@ -997,13 +1022,22 @@ public:
 		
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
+			bool high_mem = calc_total_use() > treestore_max_mem_use ;
 			while
 			(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
+			||	high_mem
 			)
 			{
+				if(high_mem){
+					stored::reduce_all();
+				}
 				st.check_journal();
-				NS_STORAGE::journal::get_instance().synch(); /// synchronize to storage
+				NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage
 				os::zzzz(100);
+				if( high_mem ){
+					stored::reduce_all();
+					high_mem = false;
+				}
 			}
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
@@ -1131,7 +1165,7 @@ public:
 		return false;
 	}
 	bool push_cond(const Item * acon,tree_stored::logical_conditional_iterator::ptr parent){
-		Item::Type t = acon->type();
+		Item::Type t = acon->type();		
 		if(t == Item::FUNC_ITEM){		
 			const Item_func* f = (const Item_func*)acon;
 			return push_func(f,parent);			
@@ -1750,6 +1784,7 @@ int treestore_db_init(void *p)
 
 int treestore_done(void *p)
 {
+	clear_info_tables();
 
 	return 0;
 }

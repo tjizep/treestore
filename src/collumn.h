@@ -950,20 +950,26 @@ namespace collums{
 			}
 
 			col.reduce_use();
-			modified = false;
-			storage.rollback();
+			modified = false;			
 			release_cache();
 			reset_cache_locals();
+			storage.rollback();
 		}
 
 		void reduce_cache_use(){
+			bool tx = storage.is_transacted();
 			release_cache();
 			unload_cache();
 			reset_cache_locals();
+			if(!tx)
+				storage.rollback();
 		}
 
 		void reduce_tree_use(){
+			bool tx = storage.is_transacted();
 			col.reduce_use();
+			if(!tx)
+				storage.rollback();
 		}
 
 		ImplIterator<_ColMap> find(_Rid rid){

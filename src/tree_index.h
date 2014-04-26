@@ -51,6 +51,7 @@ namespace tree_stored{
 		typedef typename _IndexMap::iterator iterator_type;
 		typedef iterator::ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key> _KeyBuffer;
+
 		class index_iterator_impl : public stored::index_iterator_interface{
 		private:
 			stored::DynamicKey returned;
@@ -83,7 +84,9 @@ namespace tree_stored{
 			void set_end(index_iterator_interface& in) {
 				value.set_end(((index_iterator_impl&)in).value);
 			}
+			
 		};
+
 		class IndexScanner : public asynchronous::AbstractWorker
 		{
 		protected:

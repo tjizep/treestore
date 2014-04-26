@@ -708,7 +708,7 @@ namespace storage{
 				if(get_use() > 1024*1024*2){
 					//ptrdiff_t before = get_use();
 
-					//flush_back(0.4,);
+					//flush_back(0.0,true);
 					last_flush_time = ::os::millis();
 					//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				}
@@ -1201,7 +1201,7 @@ namespace storage{
 			syncronized ul(lock);
 			if(modified()) return;
 			
-			//printf("reducing storage %s\n", get_name().c_str());
+			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
 				flush_back(0.0,true,false);
 		}
@@ -2049,6 +2049,7 @@ namespace storage{
 				(*c)->commit();
 
 			}
+			
 		}
 		virtual bool make_singular()  {
 			synchronized _sync(*lock);
@@ -2063,6 +2064,7 @@ namespace storage{
 		virtual void journal_synch_end(){
 			synchronized _sync(*lock);
 			journal_synching = false;
+			this->reduce();
 		}
 		virtual std::string get_name() const {
 			return this->initial->get_name();

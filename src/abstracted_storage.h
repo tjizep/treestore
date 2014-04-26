@@ -191,7 +191,9 @@ namespace stored{
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
 		}
-
+		bool is_transacted() const {
+			return (_transaction!=nullptr);
+		}
 		void set_reader(){
 			set_transaction_r(true);
 		}

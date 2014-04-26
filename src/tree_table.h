@@ -657,15 +657,15 @@ namespace tree_stored{
 		};
 
 
-#define _EXPERIMENT_PCACHEd
+#define _EXPERIMENT_PCACHEp
 #ifdef _EXPERIMENT_PCACHE
 
 		template<>
-		struct _PredictorContext<IntStored>{
+		struct _PredictorContext<stored::IntStored>{
 			//_PredictorContextImplmentor<IntStored> implementation;
-			_SimplePredictorContextImplmentor<IntStored> implementation;
+			_SimplePredictorContextImplmentor<stored::IntStored> implementation;
 
-			void store(_Rid row, const IntStored& t ){
+			void store(_Rid row, const stored::IntStored& t ){
 				implementation.store(row, t);
 			}
 
@@ -675,11 +675,11 @@ namespace tree_stored{
 		};
 
 		template<>
-		struct _PredictorContext<UIntStored>{
+		struct _PredictorContext<stored::UIntStored>{
 			//_PredictorContextImplmentor<IntStored> implementation;
-			_SimplePredictorContextImplmentor<UIntStored> implementation;
+			_SimplePredictorContextImplmentor<stored::UIntStored> implementation;
 
-			void store(_Rid row, const UIntStored& t ){
+			void store(_Rid row, const stored::UIntStored& t ){
 				implementation.store(row, t);
 			}
 
@@ -1137,6 +1137,7 @@ namespace tree_stored{
 			}
 			load(table_arg);
 			_row_count = 0;
+			rollback();
 		}
 		~tree_table(){
 			clear();
@@ -1188,6 +1189,10 @@ namespace tree_stored{
 			if(changed){
 				storage.commit();
 			}
+		}
+		
+		bool is_transacted() const {
+			return storage.is_transacted();
 		}
 
 		void begin(bool read){
