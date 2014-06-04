@@ -3124,13 +3124,20 @@ namespace stx
 
 			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;
-			flush();
+			if(reduce){
+				if((*this).stats.surface_use + (*this).stats.interior_use > 0){
+					flush();
+				}
+			}else
+				flush();
 			nst::u64 flushed = 0;
 
 			this->headsurface.unload();
 			this->last_surface.unload();
-
-			flush_recursive(flushed,root);
+			
+			if((*this).stats.surface_use + (*this).stats.interior_use > 0){
+				flush_recursive(flushed,root);
+			}
 
 			_ToDelete td;
 
@@ -3486,7 +3493,7 @@ namespace stx
 
 				}
 				interiornode.save(*this);
-			}else{
+			}else {
 				//typename surface_node::ptr c = n;
 				n.save(*this);
 

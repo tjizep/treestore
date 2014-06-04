@@ -290,6 +290,7 @@
     <ClCompile Include="..\src\abstracted_storage.cpp" />
     <ClCompile Include="..\src\collumn.cpp" />
     <ClCompile Include="..\src\fields.cpp" />
+    <ClCompile Include="..\src\journal.cpp" />
     <ClCompile Include="..\src\MurmurHash3.cpp" />
     <ClCompile Include="..\src\myi.cpp" />
     <ClCompile Include="..\src\transactional_storage.cpp" />

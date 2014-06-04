@@ -149,6 +149,9 @@
     <ClCompile Include="..\src\abstracted_storage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\journal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\stx\btree">

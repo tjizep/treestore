@@ -23,7 +23,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 /// is where it should be changed
 
 #define TREESTORE_FILE_EXTENSION ""
-#define TREESTORE_FILE_SEPEARTOR "_"
+#define TREESTORE_FILE_SEPERATOR "_"
 
 #include <stdlib.h>
 #include <memory>

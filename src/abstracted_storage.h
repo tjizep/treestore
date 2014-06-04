@@ -324,5 +324,9 @@ namespace stored{
 			}
 		}
 	}
+	/// definitions for registry functions
+	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;
+	
+	extern _Allocations* _get_abstracted_storage(std::string name);
 };
 #endif

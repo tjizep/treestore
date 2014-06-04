@@ -842,7 +842,7 @@ public:
 
 		size_t e = (components.count()-1);
 		filestart = components[e];
-		filestart += TREESTORE_FILE_SEPEARTOR;
+		filestart += TREESTORE_FILE_SEPERATOR;
 
 		for(size_t s = 0; s < e; ++s){
 			path += components[s] ;
@@ -1065,6 +1065,9 @@ public:
 			(*this).tt = thread->lock(table, writer);
 		}else if(lock_type == F_UNLCK){
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
+			if(thread->get_locks()==1){
+				st.check_use();
+			}
 			thread->release(table);
 			if(thread->get_locks()==0){
 
