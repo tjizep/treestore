@@ -230,13 +230,16 @@ namespace tree_stored{
 			using namespace NS_STORAGE;
 			the_end = index.end();
 			index.share(name);
+			
 		}
 
 		~col_index(){
 			wait_for_loaders();
 			storage.close();
 		}
-
+		nst::u64 get_size(){
+			return index.size();
+		}
 		void set_end(){
 			the_end = index.end();
 		}
@@ -367,23 +370,71 @@ namespace tree_stored{
 		//CachedRow empty;
 	private:
 		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
-		typedef std::unordered_map<std::string, _PredictiveCache*> _PCaches;
-		_PredictiveCache* get_pcache(std::string name){
+		typedef std::vector<eraser_interface*> _ErasorList;
+		typedef std::shared_ptr<_ErasorList> _ErasorListPtr;
+		typedef std::unordered_map<std::string, std::shared_ptr<_ErasorList>> _ECaches;
+		_ECaches* get_erasers(){
+			static _ECaches pc;
+			return &pc;
+		}
+		
+		void register_eraser(std::string name,eraser_interface* er){
 			stx::storage::syncronized ul(plock);
-			static _PCaches pc;
-			_PredictiveCache * r = pc[name];
-			if(r == nullptr){
-				printf("creating p-cache for %s\n",name.c_str());
-				r = new _PredictiveCache();
-				pc[name] = r;
+			_ECaches * erasers = get_erasers();
+			_ECaches::iterator e = erasers->find(name);
+			_ErasorListPtr elist;
+			if(e == erasers->end()){
+				elist = std::make_shared<_ErasorList>();
+				(*erasers)[name] = elist;				
+			}else{
+				elist = (*e).second;
 			}
-			return r;
+			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
+				if((*el) == er){
+					return;
+				}
+			}
+			elist->push_back(er);
+		}
+
+		void unregister_eraser(std::string name,eraser_interface* er){
+			stx::storage::syncronized ul(plock);
+			_ECaches * erasers = get_erasers();
+			_ECaches::iterator e = erasers->find(name);
+			_ErasorListPtr elist;
+			if(e == erasers->end()){
+				elist = std::make_shared<_ErasorList>();
+				(*erasers)[name] = elist;				
+			}else{
+				elist = (*e).second;
+			}
+			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
+				if((*el) == er){
+					elist->erase(el,el);
+					return;
+				}
+			}
+			
+		}
+		void send_erase(const std::string &name,const CompositeStored& input){
+			stx::storage::syncronized ul(plock);
+			_ECaches * erasers = get_erasers();
+			_ECaches::iterator e = erasers->find(name);
+			_ErasorListPtr elist;
+			if(e == erasers->end()){
+				return;
+			}else{
+				elist = (*e).second;
+			}
+			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
+				(*el)->erase(input);
+			}
 		}
 		stored::_Rid get_rid(const CompositeStored& input){
 			return input.row;
 
 		}
-		_PredictiveCache *cache;
+		_PredictiveCache cache;
 		ColIndex index;
 		typename ColIndex::index_iterator_impl cur;
 		typename ColIndex::index_iterator_impl _1st;
@@ -405,19 +456,27 @@ namespace tree_stored{
 
 		stored::_Rid predictor;
 		bool unique;
+		std::string name;
 		tree_index(std::string name, bool unique)
 		:	index(name)	, predictor(0), unique(unique)
 		{
-			cache = get_pcache(name);
+			//cache = get_pcache(name);
+			register_eraser(name, &cache);
+			(*this).name = name;
 		}
-		virtual ~tree_index(){}
+		virtual ~tree_index(){
+			unregister_eraser(name, &cache);
+		}
 
 		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){
-			return cache->predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
+			return cache.predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
 
 		}
 		void cache_it(stored::index_iterator_interface& io){
-			cache->store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
+			if(unique){
+				cache.set_hash_size((nst::u32)index.get_size()*2);
+			}
+			cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 		}
 		bool is_unique() const {
 			return unique;
@@ -472,6 +531,7 @@ namespace tree_stored{
 		}
 		void reduce_use(){
 			index.reduce_use();
+			cache.clear();
 		}
 
 		void begin(bool read){
@@ -484,6 +544,7 @@ namespace tree_stored{
 
 		void commit1(){
 			index.commit1();
+			cache.flush_erases();
 		}
 
 		void commit2(){
@@ -492,6 +553,7 @@ namespace tree_stored{
 
 		void rollback(){
 			index.rollback();
+			cache.flush_erases();/// respond to erase messages
 		}
 
 		void share(){

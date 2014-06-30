@@ -46,7 +46,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <mysql/plugin.h>
 #include "fields.h"
 #ifdef _MSC_VER
-#define CONVERSION_NOINLINE_ _declspec(noinline)
+#define CONVERSION_NOINLINE_ //_declspec(noinline)
 #else
 #define CONVERSION_NOINLINE_
 #endif

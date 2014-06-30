@@ -183,7 +183,8 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 512
+			keys_per_page = 512,
+			caches_per_page = 16
 		};
 	};
 
@@ -210,7 +211,10 @@ namespace stx
 		/// Number of slots in each surface of the tree. Estimated so that each node
 		/// has a size of about btree_traits::bytes_per_page bytes.
 		static const int    surfaces = btree_traits::keys_per_page; //max_const( 8l, btree_traits::bytes_per_page / (sizeof(key_proxy)) );
-
+		
+		/// Number of cached keys
+		static const int	caches = btree_traits::caches_per_page;
+		
 		/// Number of slots in each interior node of the tree. Estimated so that each node
 		/// has a size of about btree_traits::bytes_per_page bytes.
 		static const int    interiorslots = btree_traits::keys_per_page; //max_const( 8l, btree_traits::bytes_per_page / (sizeof(key_proxy) + sizeof(void*)) );
@@ -244,7 +248,9 @@ namespace stx
 		typedef _Key key_type;
 
 		typedef _Data data_type;
-
+		/// Base B+ tree parameter: The number of cached key/data slots in each surface
+		
+		static const int	caches = btree_traits::caches_per_page ;
 
 		/// Number of slots in each surface of the tree. A page has a size of about btree_traits::bytes_per_page bytes.
 
@@ -369,6 +375,9 @@ namespace stx
 
 		/// Base B+ tree parameter: The number of key/data slots in each surface
 		static const unsigned short         surfaceslotmax =  traits::surfaces;
+		
+		/// Base B+ tree parameter: The number of cached key slots in each surface
+		static const unsigned short         cacheslotmax =  traits::caches;
 
 		/// Base B+ tree parameter: The number of key slots in each interior node,
 		/// this can differ from slots in each surface.
@@ -642,6 +651,7 @@ namespace stx
 					(*this).set_state(changed);
 
 				}
+				rget()->reset_cache_occupants();
 				if(rget()->shared){
 					throw std::exception();//"cannot change state of shared node"
 				}
@@ -975,18 +985,60 @@ namespace stx
 
 			/// occupants: since all pages are the same size - its like a block of flats
 			/// where the occupant count varies over time the size stays the same
-
+			storage::u16  cache_occupants;
 			storage::u16  occupants;
 			mutable storage::i32  llb;
+			/// cpu cache keys
+			key_type        cached[cacheslotmax+1];
+		protected:
+			/// populate cache
+
+			template<typename key_type>
+			int populate_cache( key_type* cache, int cache_size, const key_type* keys, int keys_size) const {
+				/// distribute cache nodes into cache
+				int step = keys_size / cache_size;
+				int c = 0;
+				if(step > 2){
+					for(int k = 0; c < cache_size && k < keys_size; k += step){
+						cache[c++]  = keys[k];
+					}
+					cache[c] = keys[keys_size-1];
+				}
+				return c;
+			}
+			template<typename key_type>
+			void check_cache(const key_type* keys){
+
+				if(get_cache_occupants() == 0){
+					set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants())); 
+				}
+			}
+			
+			template<typename key_type>			
+			void check_cache(const key_type* keys) const {
+				((node*)this)->check_cache(keys);
+			}
 
 		public:
 			bool shared;
 
+			void reset_cache_occupants(){
+				set_cache_occupants(0);
+			}
+			
 			void inc_occupants(){
 				++occupants;
+				set_cache_occupants(0);
 			}
+			
 			void dec_occupants(){
 				--occupants;
+				set_cache_occupants(0);
+			}
+			/// return the cache key count
+
+			storage::u16 get_cache_occupants() const {
+				return cache_occupants;
 			}
 
 			/// return the key value pair count
@@ -999,8 +1051,13 @@ namespace stx
 
 			void set_occupants(storage::u16 o) {
 				occupants = o;
+				set_cache_occupants(0);
 			}
 
+			/// set cache size
+			void set_cache_occupants(storage::u16 o){
+				cache_occupants = o;
+			}
 			/// Level in the b-tree, if level == 0 -> surface node
 
 			storage::u16  level;
@@ -1017,6 +1074,7 @@ namespace stx
 				occupants = 0;
 				shared = false;
 				llb = 0;
+				cache_occupants = 0;
 
 			}
 			bool is_modified() const {
@@ -1043,7 +1101,7 @@ namespace stx
 			{
 				return !key_less(a, b) && !key_less(b, a);
 			}
-
+			
 			/// multiple search type lower bound template function
 			/// performs a lower bound mapping using a couple of techniques simultaneously
 
@@ -1051,11 +1109,12 @@ namespace stx
 			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key, bool do_llb = true) const {
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
+				check_cache(keys);
 
 				register unsigned int l = 0, ll=llb, h = o;
 
 				/// multiple search type lower bound function
-				if(do_llb){
+				/*if(do_llb){
 					/// history optimized linear search
 					unsigned int llo = std::min<unsigned int>(o,llb+3);
 					while (ll < llo && key_less(keys[ll],key)) ++ll;
@@ -1063,7 +1122,41 @@ namespace stx
 						llb = ll;
 						return ll;
 					}
+				}*/
+				unsigned int ml  = 0,mb = 0;
+				unsigned int step = o / cacheslotmax;
+				if(get_cache_occupants()){
+					ml = min_find_lower(key_less,&cached[0],get_cache_occupants(),key);
+					if(ml > 0) mb = ml-1;
+					l = mb * step ;
+					h =(ml==cacheslotmax) ? o : ml * step;
+					
+				}else{
+
+					/// truncated binary search
+					while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
+						int m = (l + h) >> 1;
+						if (key_lessequal(key_less, key, keys[m])) {
+							h = m;
+						}else {
+							l = m + 1;
+						}
+					}
 				}
+				/// residual linear search
+				while (l < h && key_less(keys[l],key)) ++l;
+				
+				
+				llb = l;
+				
+				return l;
+			}
+
+			/// simple search type lower bound template function			
+			template<typename key_compare>
+			inline unsigned int min_find_lower(key_compare key_less,const key_type* keys, int o, const key_type& key) const {				
+				if (o  == 0) return 0;
+				register unsigned int l = 0, h = o;
 				/// truncated binary search
 				while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
 					int m = (l + h) >> 1;
@@ -1075,7 +1168,6 @@ namespace stx
 				}
 				/// residual linear search
 				while (l < h && key_less(keys[l],key)) ++l;
-				llb = l;
 
 				return l;
 			}
@@ -1093,7 +1185,7 @@ namespace stx
 
 			/// persisted reference type providing unobtrusive page management
 			typedef pointer_proxy<interior_node> ptr;
-
+			
 			/// Keys of children or data pointers
 			key_type        keys[interiorslotmax];
 
@@ -1138,6 +1230,7 @@ namespace stx
 			{
 			    using namespace stx::storage;
 				buffer_type::const_iterator reader = buffer.begin();
+				(*this).set_cache_occupants (0);
 				(*this).set_occupants (leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
 
@@ -1149,6 +1242,7 @@ namespace stx
 					childid[k].set_context(context);
 					childid[k].set_where(sa);
 				}
+				(*this).check_cache(keys);
 			}
 
 			/// encodes a node into storage page and resizes the output buffer accordingly
@@ -1203,7 +1297,7 @@ namespace stx
 
 			/// shared counter used when page is shared, only surfaces can be shared
 			Poco::AtomicCounter a_refs;
-
+						
 			/// Keys of children or data pointers
 			key_type        keys[surfaceslotmax];
 
@@ -1348,11 +1442,12 @@ namespace stx
 							}
 						}else
 						{
+							
 							std::stable_sort(unsorted, unsorted + node::get_occupants() );
 
 							int i = 0, s = 0, p = 0;
 							keys[i] = unsorted[i].key;
-
+							values[i] = unsorted[i].value ;
 							++i;++s;
 
 							for(; i < node::get_occupants(); ++i)
@@ -1397,6 +1492,7 @@ namespace stx
 
 				/// size_t bs = buffer.size();
 				buffer_type::const_iterator reader = buffer.begin();
+				(*this).set_cache_occupants (0);
 				(*this).set_occupants(leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
 
@@ -1425,6 +1521,7 @@ namespace stx
 					BTREE_ASSERT(d == buffer.size());
 				}
 				sorted = (*this).get_occupants();
+				(*this).check_cache(keys);
 			}
 
 			/// Encode a stored page from input buffer to node instance
@@ -2745,6 +2842,10 @@ namespace stx
 
 			/// number of pages changed since last flush
 			size_t changes;
+
+			/// Base B+ tree parameter: The number of cached key/data slots in each surface
+			static const unsigned short         caches =  btree_self::cacheslotmax;
+
 			/// Base B+ tree parameter: The number of key/data slots in each surface
 			static const unsigned short     surfaces = btree_self::surfaceslotmax;
 
@@ -4594,6 +4695,7 @@ namespace stx
 					{
 						BTREE_ASSERT(parent->childid[parentslot] == curr);
 						parent->keys[parentslot] = surface->keys[surface->get_occupants() - 1];
+						parent.change();
 					}
 					else
 					{
@@ -5261,6 +5363,10 @@ namespace stx
 			BTREE_ASSERT(left->get_occupants() < right->get_occupants());
 			BTREE_ASSERT(parent->childid[parentslot] == left);
 
+			right.change();
+			left.change();
+			parent.change();
+
 			unsigned int shiftnum = (right->get_occupants() - left->get_occupants()) >> 1;
 
 			BTREE_PRINT("Shifting (surface) " << shiftnum << " entries to left " << left << " from right " << right << " with common parent " << parent << "." << std::endl);
@@ -5297,6 +5403,7 @@ namespace stx
 			{
 				return result_t(btree_update_lastkey, left->keys[left->get_occupants() - 1]);
 			}
+			
 		}
 
 		/// Balance two interior nodes. The function moves key/data pairs from right
@@ -5320,6 +5427,10 @@ namespace stx
 			BTREE_PRINT("Shifting (interior) " << shiftnum << " entries to left " << left << " from right " << right << " with common parent " << parent << "." << std::endl);
 
 			BTREE_ASSERT(left->get_occupants() + shiftnum < interiorslotmax);
+			
+			right.change();
+			left.change();
+			parent.change();
 
 			if (selfverify)
 			{
@@ -5362,6 +5473,7 @@ namespace stx
 				right->childid[i] = right->childid[i + shiftnum];
 			}
 			right->childid[right->get_occupants()] = right->childid[right->get_occupants() + shiftnum];
+		
 		}
 
 		/// Balance two surface nodes. The function moves key/data pairs from left to
@@ -5386,6 +5498,10 @@ namespace stx
 			unsigned int shiftnum = (left->get_occupants() - right->get_occupants()) >> 1;
 
 			BTREE_PRINT("Shifting (surface) " << shiftnum << " entries to right " << right << " from left " << left << " with common parent " << parent << "." << std::endl);
+			
+			right.change();
+			left.change();
+			parent.change();
 
 			if (selfverify)
 			{
@@ -5423,6 +5539,7 @@ namespace stx
 			left->set_occupants(left->get_occupants() - shiftnum);
 
 			parent->keys[parentslot] = left->keys[left->get_occupants()-1];
+			
 		}
 
 		/// Balance two interior nodes. The function moves key/data pairs from left to
@@ -5440,6 +5557,10 @@ namespace stx
 
 			BTREE_ASSERT(left->get_occupants() > right->get_occupants());
 			BTREE_ASSERT(parent->childid[parentslot] == left);
+			
+			right.change();
+			left.change();
+			parent.change();
 
 			unsigned int shiftnum = (left->get_occupants() - right->get_occupants()) >> 1;
 
@@ -5486,6 +5607,7 @@ namespace stx
 			parent->keys[parentslot] = left->keys[left->get_occupants() - shiftnum];
 
 			left->set_occupants(left->get_occupants() - shiftnum);
+			
 		}
 
 #ifdef BTREE_DEBUG

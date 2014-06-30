@@ -34,9 +34,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _PREDICTIVECACHE_H_CEP2013_
 #define _PREDICTIVECACHE_H_CEP2013_
+
 #include "tree_stored.h"
+
 extern NS_STORAGE::u64 hash_hits;
 extern NS_STORAGE::u64 hash_predictions;
+
 namespace tree_stored{
 	template<typename _Keytype>
 	struct cached_row{
@@ -48,19 +51,53 @@ namespace tree_stored{
 		stx::initializer_pair i;
 
 	};
+
+	class eraser_interface{
+	public:		
+		virtual void erase(const CompositeStored& input)=0;
+	};
+	
+	
 	/// The predictive cache acts like an adaptive 'derandomizer'
+
 	template<typename BasicIterator>
-	struct predictive_cache{
-		static const NS_STORAGE::u64 CIRC_SIZE = 8000000;/// about 128 MB shared - the cachedrow is 32 bytes
-		static const NS_STORAGE::u64 HASH_SIZE = 32452843; // 86028121; //49979687;  32452843 ;5800079; 2750159; 15485863;
+	struct predictive_cache : public eraser_interface{
+	private:
+		static const NS_STORAGE::u64 CIRC_SIZE = 10000000;/// about 128 MB shared - the cachedrow is 32 bytes
+		
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
 		typedef cached_row<typename BasicIterator::key_type> CachedRow;
-		stored::DynamicKey rval;
-		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false){
+		typedef std::vector<CompositeStored> _Erased;
+		_Erased erased;
+		stored::DynamicKey rval;	
+		nst::u32 hash_size;
+		Poco::Mutex erase_lock;
+	private:
+		void _erase(const CompositeStored& input){
+			unsigned int h = ((size_t)input) % hash_size;
+			unsigned int predictor = cache_index[h];
+
+			if(predictor && sec_cache[predictor].k.left_equal_key(input) ){
+				CachedRow cr;
+				sec_cache[predictor] = cr;
+				cache_index[h] = 0;
+			}
+		}
+	public:
+		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false),hash_size(11){
 
 		}
+		
+		void set_hash_size(nst::u32 hash_size){
+			if((*this).hash_size != hash_size){
+				(*this).clear();
+				(*this).hash_size = hash_size;
+			}
+		}
+		
 		~predictive_cache(){
 		}
+		
 		inline bool hashed() const {
 			return !cache_index.empty();
 		}
@@ -76,21 +113,22 @@ namespace tree_stored{
 		bool load(){
 
 			if(!loaded){
-				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(stored::_Rid)*HASH_SIZE > (nst::u64)treestore_max_mem_use){
+				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(stored::_Rid)*hash_size > (nst::u64)treestore_max_mem_use){
 					return false;
 				}
-				stx::storage::syncronized ul((*this).plock);
+				//stx::storage::syncronized ul((*this).plock);
 				using namespace NS_STORAGE;
 				if(cache_index.empty()){
-					cache_index.resize(HASH_SIZE);
+					cache_index.resize(hash_size);
 					sec_cache.reserve(CIRC_SIZE/8);
-					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*HASH_SIZE);
+					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*hash_size);
 					printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
 				}
 				loaded = true;
 			}
 			return loaded;
 		}
+		
 		/// TODO: NB: the return value should be const
 		const CompositeStored* _int_predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
@@ -120,7 +158,7 @@ namespace tree_stored{
 				return NULL;
 			}
 			typename BasicIterator::key_type kin = input;
-			unsigned int h = ((size_t)kin) % HASH_SIZE;
+			unsigned int h = ((nst::u32)(size_t)kin) % hash_size;
 			predictor = cache_index[h];
 
 			if(predictor && sec_cache[predictor].k.left_equal_key(kin) ){
@@ -141,23 +179,27 @@ namespace tree_stored{
 
 		const CompositeStored*  predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
-			stx::storage::syncronized ul((*this).plock);
 			return _int_predict_row(predictor, out, input);
-
 
 		}
 
 		/// remove an entry if it exists
 		void erase(const CompositeStored& input){
-			unsigned int h = ((size_t)input) % HASH_SIZE;
-			unsigned int predictor = cache_index[h];
-
-			if(predictor && sec_cache[predictor].k.left_equal_key(input) ){
-				CachedRow cr;
-				sec_cache[predictor] = cr;
-				cache_index[h] = 0;
-			}
+			nst::synchronized critical(erase_lock);
+			/// push it on the erase buffer
+			erased.push_back(input);
 		}
+
+		/// called when the cached isnt used for reading
+		void flush_erases(){
+			nst::synchronized critical(erase_lock);
+			for(_Erased::iterator e = erased.begin(); e != erased.end(); ++e){
+				_erase((*e));
+			}
+			erased.clear();
+
+		}
+		
 
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
@@ -168,11 +210,11 @@ namespace tree_stored{
 			}
 			if(!enabled) return;
 			if(iter.invalid()) return;
-			stx::storage::syncronized ul((*this).plock);
+			
 			if(!load()) return;
 			store_pos = sec_cache.size();
 			if(store_pos >= CIRC_SIZE) return;
-			size_t h = ((size_t)iter.key()) % HASH_SIZE;
+			size_t h = ((nst::u32)(size_t)iter.key()) % hash_size;
 
 			size_t s = cache_index[h];
 			if(s == 0){
@@ -194,9 +236,9 @@ namespace tree_stored{
 		/// remove everything
 
 		void clear(){
-			stx::storage::syncronized ul((*this).plock);
+			//stx::storage::syncronized ul((*this).plock);
 			if(!cache_index.empty()){
-				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(stored::_Rid)*HASH_SIZE);
+				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(stored::_Rid)*hash_size);
 				cache_index.clear();
 				sec_cache.clear();
 				sec_cache.resize(1);
@@ -210,7 +252,7 @@ namespace tree_stored{
 		_SecCache sec_cache;
 		_RowCache cache_index;
 		CachedRow empty_row;
-		Poco::Mutex plock;
+		//Poco::Mutex plock;
 
 		NS_STORAGE::u64 store_pos;
 		NS_STORAGE::u64 hits;

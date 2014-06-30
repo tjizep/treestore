@@ -153,23 +153,25 @@ int strings_test(){
 	return 0;
 }
 
-int test()
+int pt_test()
 {
+	printf("press a key to continue\n");
+	getch();
 	Poco::Data::SQLite::Connector::registerConnector();
-	return strings_test();
+	//return strings_test();
 
 	allocator_test::test_allocators();
 
 	{
 		typedef int key_type;
 		typedef int value_type;
-		example_storage<key_type, value_type> storage;
+		example_storage<key_type, value_type> storage("test_data");
 		typedef std::unordered_set<key_type> _TestSet;
 		typedef stx::btree_map<key_type,value_type,example_storage<key_type,value_type>> _IntMap;
 		//typedef std::map<int,int> _IntMap;
 
 		typedef std::vector<key_type> _Script;
-		static const int MAX_ITEMS = 1000000;
+		static const int MAX_ITEMS = 10000000;
 		static const int INTERVAL = MAX_ITEMS/10;
 		_IntMap int_map(storage);
 		_TestSet against;
@@ -206,9 +208,7 @@ int test()
 			}
 
 			printf("%ld items in %lld ms\n", script.size(), ::os::millis()-t);
-			int_map.flush();
-
-
+			//int_map.flush();
 
 			t = ::os::millis();
 			int iter = 0;
@@ -226,36 +226,69 @@ int test()
 
 		}
 		if(true){
-
 			size_t t = ::os::millis();
 			_IntMap::iterator f;
-			for(int i=0;i < MAX_ITEMS;++i){
-				f = int_map.find(script[i]);
-				if(f==int_map.end() ){//
-					printf("tree structure or insert error(-1)\n");
-					return -1;
-				}
-				/*if (int_map.count(script[i])==0 ){
-					printf("tree structure or insert error(0)\n");
-					return -1;
-				}*/
+			{
+				t = ::os::millis();
+				
+				for(int i=0;i < MAX_ITEMS;++i){
+					f = int_map.find(script[i]);
+					if(f==int_map.end() ){//
+						printf("tree structure or insert error(-1)\n");
+						return -1;
+					}
+					if(f.key() != script[i]){
+						/*if (int_map.count(script[i])==0 ){*/
+						printf("tree structure or insert error(0)\n");
+						return -1;
+					}
 
-				if(f.data() != script[i]){//
-					printf("tree structure or insert error(1. %ld!=%ld)\n", f.data(), script[i]);
-					return -1;
-				}
-				if(i % INTERVAL == 0){
-					printf("read %ld items in %ld ms\n", i, ::os::millis()-t);
-					//int_map.reduce_use();
-				}
+					if(f.data() != script[i]){//
+						key_type k = f.key();
+						printf("tree structure or insert error(1. %ld!=%ld)\n", f.data(), script[i]);
+						return -1;
+					}
+					if(i % INTERVAL == 0){
+						printf("read %ld items in %ld ms\n", i, ::os::millis()-t);
+						//int_map.reduce_use();
+					}
 
+				}
+				printf("read %ld items in %ld ms\n", script.size(), ::os::millis()-t);
 			}
-			printf("read %ld items in %ld ms\n", script.size(), ::os::millis()-t);
+			{
+				t = ::os::millis();
+				for(int i=0;i < MAX_ITEMS;++i){
+					f = int_map.find(script[i]);
+					if(f==int_map.end() ){//
+						printf("tree structure or insert error(-1)\n");
+						return -1;
+					}
+					if(f.key() != script[i]){
+						/*if (int_map.count(script[i])==0 ){*/
+						printf("tree structure or insert error(0)\n");
+						return -1;
+					}
+
+					if(f.data() != script[i]){//
+						key_type k = f.key();
+						printf("tree structure or insert error(1. %ld!=%ld)\n", f.data(), script[i]);
+						return -1;
+					}
+					if(i % INTERVAL == 0){
+						printf("read %ld items in %ld ms\n", i, ::os::millis()-t);
+						//int_map.reduce_use();
+					}
+
+				}
+				printf("read %ld items in %ld ms\n", script.size(), ::os::millis()-t);
+			}
+			
 			t = ::os::millis();
 			for(int i=0;i < MAX_ITEMS/2;++i){
 				int_map.erase(script[i]);
 				if(i % INTERVAL == 0){
-					printf("erased %ld items in %ld ms\n", i, ::os::millis-t);
+					printf("erased %ld items in %ld ms\n", i, ::os::millis()-t);
 					//int_map.reduce_use();
 				}
 			}

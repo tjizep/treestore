@@ -1012,7 +1012,7 @@ namespace storage{
 		void initialize(const address_type& which){
 			syncronized ul(lock);
 			if(!(*this).get_buffer(which)){
-				result = new block_descriptor(); //std::make_shared<block_descriptor>();
+				ref_block_descriptor result = new block_descriptor(0);
 				result->set_storage_action(create);
 				allocations[which] = result;
 				changed.insert(which);

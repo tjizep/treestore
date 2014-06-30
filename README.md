@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.29 (beta)
+TuReestore MySQL Storage Engine version 0.30 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.17
@@ -52,7 +52,7 @@ Microsoft Windows Installation
 + Start MySQL
 + Using the client run the statement INSTALL PLUGIN TREESTORE SONAME 'treestore.dll'
 + use create table syntax with a suffix like engine='treestore'
-
++ mini b-tree on page provides CPU cache awarenes
 
 Technical
 ---------
@@ -108,6 +108,22 @@ This table supplies configuration options for sacrificing performance for less m
 
 Changes
 -------
+0.30 beta
+
+1. Added b-tree CPU cache conscious optimization 
+similar to optimization described here 
+http://ftp.cse.buffalo.edu/users/azhang/disc/disc01/cd1/out/papers/sigmod/p475-rao/p475-rao.pdf
+just a lot simpler, 20% random read rate improvement on loads exceeding CPU cache size
+
+2. Made Predictive hash, lock free on reads
+
+3. Added back test code
+
+Fixes:
+
+1. Fix B-tree erase issues
+2. Fix B-tree bulk load sorting optimization
+
 
 0.29 beta
 
@@ -132,8 +148,8 @@ Building
 GCC and MSVC is supported under windows amd64 and linux amd64 only (no 32 bit)
 
 
-TODO FOR GA 0.3
----------------
+TODO FOR GA 0.3x
+----------------
 
  1. Replication
  2. DONE: Multi threaded writes

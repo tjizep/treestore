@@ -29,16 +29,17 @@ private:
 
 	_Allocations allocations;
 	NS_STORAGE::stream_address boot;
+	std::string name;
 public:
 
-	example_storage() : allocations( NS_STORAGE::default_name_factory("hello_data")), boot(1){
+	example_storage(std::string name) : name(name),allocations( NS_STORAGE::default_name_factory(name)), boot(1){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 
 		/// create a block at the boot address if its not there
 
 		allocations.initialize(boot);
-
+		allocations.set_transient();
     }
 
 
@@ -48,10 +49,28 @@ public:
 			allocations.rollback();
 		}catch(const std::exception& ){
 			/// nothing todo in destructor
-		}
+		}//stx::storage::i64
     }
+	bool is_end(NS_STORAGE::buffer_type &b) const {
+		return allocations.is_end(b);
+	}
+	NS_STORAGE::version_type get_allocated_version(){
+		return allocations.get_allocated_version();
+	}
+	void complete(){
+		allocations.complete();
+	}
+	std::string get_name() const {
+		return name;
+	}
+	bool is_readonly() const{
+		return false;
+	}
+	bool get_boot_value(NS_STORAGE::i64 &r, NS_STORAGE::stream_address boot){
+		return get_boot_value(r);
+	}
 
-	bool get_boot_value(NS_STORAGE::stream_address &r){
+	bool get_boot_value(NS_STORAGE::i64 &r){
 		r = 0;
 		NS_STORAGE::buffer_type &ba = allocations.allocate(boot, NS_STORAGE::read); /// read it
 		if(!ba.empty()){
@@ -61,8 +80,10 @@ public:
 		}
 		return !ba.empty();
 	}
-
-	void set_boot_value(NS_STORAGE::stream_address r){
+	void set_boot_value(NS_STORAGE::i64 r,NS_STORAGE::i64 boot){
+		set_boot_value(r);
+	}
+	void set_boot_value(NS_STORAGE::i64 r){
 
 		NS_STORAGE::buffer_type &buffer = allocations.allocate(boot, NS_STORAGE::write); /// read it
 		buffer.resize(NS_STORAGE::leb128::signed_size(r));

@@ -330,7 +330,7 @@ namespace collums{
 				return rows_cached;
 			}
 
-			const _Stored& get(_Rid row) const {
+			const _Stored& get(_Rid row)  {
 				if(encoded.good()){
 
 					return encoded.get(row);;
@@ -345,7 +345,7 @@ namespace collums{
 				}
 			}
 			/// subscript operator
-			const _Stored& operator[](_Rid at)  const {
+			const _Stored& operator[](_Rid at){ //  const {
 				return get(at);
 			}
 			bool empty() const {
