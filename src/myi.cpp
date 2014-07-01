@@ -1780,7 +1780,7 @@ int treestore_db_init(void *p)
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 
-	pt_test();
+	//pt_test();
 	//treestore_hton->commit= 0;
 	//treestore_hton->rollback= 0;
 	DBUG_RETURN(FALSE);
