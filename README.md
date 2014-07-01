@@ -111,9 +111,17 @@ Changes
 0.30 beta
 
 1. Added b-tree CPU cache conscious optimization 
+
 similar to optimization described here 
 http://ftp.cse.buffalo.edu/users/azhang/disc/disc01/cd1/out/papers/sigmod/p475-rao/p475-rao.pdf
-just a lot simpler, 20% random read rate improvement on loads exceeding CPU cache size
+and here
+http://didawiki.cli.di.unipi.it/lib/exe/fetch.php/magistraleinformatica/alg2/algo2_12/tree_layout_2.pdf
+This paper gives a much simpler description on static cache conscious tree layouts
+
+Although the implementation in treestore is a lot simpler there is still a 20% random read rate improvement 
+on loads exceeding CPU cache size. Loads fitting completely in L3 cache does not benefit.
+This optimization also allows for larger page sizes which in turn will improve compression on disk. 
+Transactional performance for small changes will not benefit from larger page sizes.
 
 2. Made Predictive hash, lock free on reads
 
