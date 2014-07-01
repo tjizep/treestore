@@ -48,8 +48,6 @@ namespace tree_stored{
 
 		_Keytype k;
 
-		stx::initializer_pair i;
-
 	};
 
 	class eraser_interface{
@@ -140,12 +138,10 @@ namespace tree_stored{
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
 					if(sec_cache[predictor].k.left_equal_key(input) ){
-						out = sec_cache[predictor].i;
-						//if(out.valid()){
 						++hash_hits;
 						++hash_predictions;
 						return  &sec_cache[predictor].k.return_or_copy(rval);
-						//}
+
 					}
 					predictor++;
 				}
@@ -163,13 +159,9 @@ namespace tree_stored{
 
 			if(predictor && sec_cache[predictor].k.left_equal_key(kin) ){
 
-				out = sec_cache[predictor].i;
-
-				if(out.valid()){
-					++hash_hits; // neither hit nor miss
-
-					return &sec_cache[predictor].k.return_or_copy(rval);
-				}
+				++hash_hits; // neither hit nor miss
+				return &sec_cache[predictor].k.return_or_copy(rval);
+			
 			}
 			predictor = 0;
 			++misses;
@@ -221,7 +213,7 @@ namespace tree_stored{
 				cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
 			}
 			CachedRow cr;
-			cr.i = iter.construction();
+			//cr.i = iter.construction();
 			cr.k = iter.key();
 			total_cache_size-=(sizeof(CachedRow)*sec_cache.capacity());
 			sec_cache.push_back(cr);
