@@ -732,6 +732,7 @@ public:
 			stats.mean_rec_length =(ulong) stats.data_file_length / stats.records;
 
 		}
+		tt->calc_density(table);
 		for (ulong	i = 0; i < table->s->keys; i++) {
 			for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
 
@@ -788,7 +789,7 @@ public:
 
 	double scan_time()
 	{
-		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size()/8192)));/*assume an average page size of 8192 bytes*/
+		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())*8192));/*assume an average page size of 8192 bytes*/
 	}
 	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows)

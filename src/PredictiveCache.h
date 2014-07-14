@@ -69,6 +69,7 @@ namespace tree_stored{
 		_Erased erased;
 		stored::DynamicKey rval;	
 		nst::u32 hash_size;
+		nst::u32 last_store;
 		Poco::Mutex erase_lock;
 	private:
 		void _erase(const CompositeStored& input){
@@ -83,7 +84,7 @@ namespace tree_stored{
 		}
 	public:
 		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false),hash_size(11){
-
+			last_store = 3;
 		}
 		
 		void set_hash_size(nst::u32 hash_size){
@@ -133,7 +134,7 @@ namespace tree_stored{
 			using namespace NS_STORAGE;
 			if(predictor){
 				predictor++;
-				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
+				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 4);
 
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
@@ -199,7 +200,7 @@ namespace tree_stored{
 			if((nst::u64)calc_total_use() > (nst::u64)treestore_max_mem_use){
 				clear();
 				return;
-			}
+			}			
 			if(!enabled) return;
 			if(iter.invalid()) return;
 			
@@ -207,11 +208,14 @@ namespace tree_stored{
 			store_pos = sec_cache.size();
 			if(store_pos >= CIRC_SIZE) return;
 			size_t h = ((nst::u32)(size_t)iter.key()) % hash_size;
-
-			size_t s = cache_index[h];
-			if(s == 0){
-				cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
-			}
+			//if(last_store == 3){
+				size_t s = cache_index[h];
+				if(s == 0){
+					cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
+				};
+			//	last_store = 0;
+			//}
+			//++last_store;
 			CachedRow cr;
 			//cr.i = iter.construction();
 			cr.k = iter.key();

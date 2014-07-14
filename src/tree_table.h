@@ -38,6 +38,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "conversions.h"
 #include "tree_index.h"
 #include "system_timers.h"
+#include <random>
 
 typedef std::vector<std::string> _FileNames;
 extern my_bool treestore_efficient_text;
@@ -537,7 +538,7 @@ namespace tree_stored{
 		}
 
 		virtual void compose(stored::_Rid r, CompositeStored & to){
-			const _Fieldt& field = col.seek_by_tree(r);
+			const _Fieldt& field = col.seek_by_cache(r);
 			to.add(field);
 		}
 
@@ -573,8 +574,8 @@ namespace tree_stored{
 		template<typename _StoredType>
 		struct _SimplePredictorContextImplmentor{
 			enum {
-				MaxStored = 8000000,
-				MaxMapped = 5000000
+				MaxStored = 800000,
+				MaxMapped = 500000
 			};
 			typedef stored::_Rid _MappingPrimitive;
 
@@ -612,11 +613,6 @@ namespace tree_stored{
 			}
 
 			const _StoredType* find(stored::_Rid row) const {
-				//++finds;
-				//if(finds % 1000000 == 0){
-				//	printf("finds %lld, predicted %lld, unpredicted %lld, not found %lld\n", finds, predicted, unpredicted, nothing);
-				//}
-				/**/
 				if(last_found < stored.size()-4){
 
 					for(int i=0;i<4;++i){
@@ -657,7 +653,7 @@ namespace tree_stored{
 		};
 
 
-#define _EXPERIMENT_PCACHEp
+#define _EXPERIMENT_PCACHE
 #ifdef _EXPERIMENT_PCACHE
 
 		template<>
@@ -726,12 +722,12 @@ namespace tree_stored{
 
 		virtual void seek_retrieve(stored::_Rid row, Field* f) {
 
-			const _Fieldt * predicted = predictor.find(row);
+			/*const _Fieldt * predicted = predictor.find(row);
 			if(predicted!=nullptr){
 				f->set_notnull();
 				convertor.fset(row, f, * predicted);
 				return;
-			}
+			}*/
 			const _Fieldt& t = col.seek_by_cache(row);
 
 			if(col.is_null(t)){
@@ -969,42 +965,8 @@ namespace tree_stored{
 
 			return names;
 		}
-		void calc_density(TABLE *table_arg){
-				uint i, j;
-			KEY *pos;
-			TABLE_SHARE *share= table_arg->s;
-			pos = table_arg->key_info;
-			std::string path = share->path.str;
-			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
-				std::string index_name = path + INDEX_SEP() + pos->name;
 
-				stored::index_interface::ptr index = (*this).indexes[i];
-
-				for (j= 0; j < pos->usable_key_parts; j++){
-					Field *field = pos->key_part[j].field;// the jth field in the key
-					nst::u32 fi=field->field_index;
-					if(j == 0){
-						index->push_density((*this).cols[fi]->get_rows_per_key());
-					}else{
-						/*const _Rid sample = std::min<_Rid>(_row_count, 10000);
-						typedef std::set<CompositeStored> _Uniques;
-						_Uniques uniques;
-						CompositeStored ir;
-						for(_Rid row = 0; row < sample; ++row){
-							for(_Parts::iterator p = index->parts.begin(); p != index->parts.end(); ++p){
-								(*this).cols[(*p)]->compose(row, ir);
-							}
-							uniques.insert(ir);
-							ir.clear();
-						}
-						_Rid d = sample / uniques.size();
-						if(d > 1) d /= 2;*/
-						stored::_Rid d = 1;
-						index->push_density(d);
-					}
-				}
-			}
-		}
+		
 		void load_indexes(TABLE *table_arg){
 			uint i, j;
 			KEY *pos;
@@ -1107,6 +1069,7 @@ namespace tree_stored{
 		int locks;
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
+		nst::u64 last_density_calc;
 		collums::_LockedRowData* row_datas;
 
 	public:
@@ -1125,6 +1088,7 @@ namespace tree_stored{
 		,	storage(table_arg->s->path.str)
 		,	locks(0)
 		,	table(nullptr)		
+		,	last_density_calc(0)
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1166,7 +1130,75 @@ namespace tree_stored{
 			return *table;
 
 		}
+		
+		struct hash_composite{
+			size_t operator()(const CompositeStored& q) const{
+				return (size_t)q;
+			}
+		};
+		void calc_density(TABLE *table_arg){
+			if(os::millis() - last_density_calc < 300000){
+				return;
+			}
+			uint i, j;
+			KEY *pos;
+			TABLE_SHARE *share= table_arg->s;
+			pos = table_arg->key_info;
+			std::string path = share->path.str;
+			
+			if(!_row_count){
+				init_rowcount();
+			}
+			
+			if(!_row_count){
+				return;
+			}
 
+			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
+				printf("Calculating cardinality of index parts for %s\n",pos->name);
+				std::string index_name = path + INDEX_SEP() + pos->name;
+				stored::index_interface::ptr index = (*this).indexes[i];
+				const _Rid sample = _row_count > 5 ? _row_count/5 : _row_count;
+				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
+				typedef std::vector<_Unique> _Uniques;
+				typedef std::vector<_Rid> _Samples;
+				_Uniques uniques( index->parts.size() );
+				CompositeStored ir;
+				typedef std::minstd_rand G;
+				G g;
+				typedef std::uniform_int_distribution<_Rid> D;
+				D d(0, _row_count-1);
+				_Samples samples;
+				for(_Rid row = 0; row < sample; ++row){
+					samples.push_back(d(g));
+				}
+				std::sort(samples.begin(), samples.end());
+
+				for(_Samples::iterator sample = samples.begin(); sample != samples.end();++sample){
+					nst::u32 u = 0;				
+					stored::_Parts::iterator pend = index->parts.end();									
+					for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
+						int ip = (*p);
+						
+						(*this).cols[ip]->compose((*sample), ir);
+						uniques[u].insert(ir);							
+						
+						++u;
+						
+					}	
+					ir.clear();	
+					
+				}
+				nst::u32 partx = 1;
+				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
+					_Rid d = samples.size() / (*u).size();							
+					printf("Calculating cardinality of index parts for %s px %ld as %ld\n",pos->name,partx,d);
+					index->push_density(d);
+					partx++;
+				}									
+			}
+			last_density_calc = os::millis();
+		}
 		void begin_table(){
 			stored::abstracted_tx_begin(!changed, storage, get_table());
 			init_rowcount();
@@ -1288,8 +1320,7 @@ namespace tree_stored{
 			clear();
 			printf("load table %s\n", table_arg->alias);
 			(*this).load_indexes(table_arg);
-			(*this).load_cols(table_arg);
-			(*this).calc_density(table_arg);
+			(*this).load_cols(table_arg);			
 			file_names = create_file_names(table_arg);
 		}
 
@@ -1754,7 +1785,9 @@ namespace tree_stored{
 				_row_count = t.key().get_value();
 				++_row_count;
 			}
+
 			if(false){
+				/// row data cache specific stuff - disabled for now
 				(*this).row_datas = collums::get_locked_rows(storage.get_name());
 				if(get_row_datas()->rows.size() < _row_count){
 					nst::synchronized sr(get_row_datas()->lock);

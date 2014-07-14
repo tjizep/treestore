@@ -840,7 +840,7 @@ namespace collums{
 		nst::u32 get_rows_per_key(){
 			typedef std::set<_Stored> _Uniques;
 			if(has_cache()){
-				rows_per_key = get_cache().density;
+				//rows_per_key = get_cache().density;
 			}
 			if(rows_per_key == 0){
 

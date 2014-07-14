@@ -475,8 +475,9 @@ namespace tree_stored{
 		void cache_it(stored::index_iterator_interface& io){
 			if(unique){
 				cache.set_hash_size((nst::u32)index.get_size()*2); 
+				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 			}
-			cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
+			
 		}
 		bool is_unique() const {
 			return unique;
