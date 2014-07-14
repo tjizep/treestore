@@ -789,7 +789,7 @@ public:
 
 	double scan_time()
 	{
-		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())*8192));/*assume an average page size of 8192 bytes*/
+		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/8192));/*assume an average page size of 8192 bytes*/
 	}
 	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows)
