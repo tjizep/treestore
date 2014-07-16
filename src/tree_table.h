@@ -538,7 +538,7 @@ namespace tree_stored{
 		}
 
 		virtual void compose(stored::_Rid r, CompositeStored & to){
-			const _Fieldt& field = col.seek_by_cache(r);
+			const _Fieldt& field = col.seek_by_tree(r);
 			to.add(field);
 		}
 

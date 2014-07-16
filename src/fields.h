@@ -976,7 +976,7 @@ namespace stored{
 					else r = 0;
 					break;
 				case DynamicKey::I8 :
-					l = 8;
+					l = sizeof(nst::i64);
 					if(*(nst::i64*)ld < *(nst::i64*)rd)
 						return true;
 					else if(*(nst::i64*)ld > *(nst::i64*)rd)

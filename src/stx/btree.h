@@ -1429,7 +1429,7 @@ namespace stx
 
 
 
-						if(btree::allow_duplicates)
+						if(true|| btree::allow_duplicates)
 						{
 							std::sort(unsorted, unsorted + node::get_occupants() );
 

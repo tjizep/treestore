@@ -634,6 +634,7 @@ public:
 	stored::index_iterator_interface& get_index_iterator(){
 		return *current_index->get_index_iterator();
 	}
+
 	tree_stored::tree_thread* get_thread(THD* thd){
 		return new_thread_from_thd(thd);
 	}
@@ -653,7 +654,7 @@ public:
 			(*s).restore_ptr();
 		}
 		selected.clear();
-		current_index = NULL;
+		
 	}
 
 	ha_treestore
@@ -1432,15 +1433,15 @@ public:
 	}
 
 
-	void resolve_selection_from_index(uint ax){
+	void resolve_selection_from_index(uint ax,stored::index_interface * current_index){
 
-		tree_stored::CompositeStored& iinfo = get_index_iterator().get_key();
+		tree_stored::CompositeStored& iinfo = current_index->get_index_iterator()->get_key();
 		resolve_selection_from_index(ax, iinfo);
 
 	}
 
 	void resolve_selection_from_index(){
-		resolve_selection_from_index(active_index);
+		resolve_selection_from_index(active_index,current_index);
 	}
 
 	int basic_index_read_idx_map
@@ -1449,39 +1450,42 @@ public:
 	,	const byte * key
 	,	key_part_map keypart_map
 	,	enum ha_rkey_function find_flag
+	,	stored::index_interface * current_index
 	){
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
+		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator());
+		
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 
 		read_lookups++;
-		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map, get_index_iterator());
+		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		if(pred==NULL){
 			print_read_lookups();
-			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,get_index_iterator());
+			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		}
 		
 		
-		if(get_index_iterator().valid()){
+		if(current_iterator.valid()){
 
 			switch(find_flag){
 			case HA_READ_AFTER_KEY:
-				get_index_iterator().next();
-				if(get_index_iterator().invalid()){
+				current_iterator.next();
+				if(current_iterator.invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
 
 				break;
 			case HA_READ_BEFORE_KEY:
-				get_index_iterator().previous();
-				if(get_index_iterator().invalid()){
+				current_iterator.previous();
+				if(current_iterator.invalid()){
 					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
 
 				break;
 			case HA_READ_KEY_EXACT:
 				{
-					const tree_stored::CompositeStored& current = pred == NULL ?get_index_iterator().get_key(): *pred;
+					const tree_stored::CompositeStored& current = pred == NULL ?current_iterator.get_key(): *pred;
 					if(!tt->check_key_match2(current,table,keynr,keypart_map)){
 						DBUG_RETURN(HA_ERR_END_OF_FILE);
 					}
@@ -1497,7 +1501,7 @@ public:
 			if(pred != NULL)
 				resolve_selection_from_index(keynr, *pred);
 			else
-				resolve_selection_from_index(keynr);
+				resolve_selection_from_index(keynr,current_index);
 			//if(HA_READ_KEY_EXACT != find_flag)
 
 		}
@@ -1509,7 +1513,7 @@ public:
 	,	key_part_map keypart_map
 	,	enum ha_rkey_function find_flag)
 	{
-		int r = basic_index_read_idx_map(buf, active_index, key, keypart_map, find_flag);
+		int r = basic_index_read_idx_map(buf, active_index, key, keypart_map, find_flag, current_index);
 
 		DBUG_RETURN(r);
 
@@ -1534,7 +1538,8 @@ public:
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 		clear_selection(selected);
 		selected = tt->create_output_selection(table);
-		int r = basic_index_read_idx_map(buf, keynr, key, keypart_map, find_flag);
+
+		int r = basic_index_read_idx_map(buf, keynr, key, keypart_map, find_flag,get_tree_table()->get_index_interface(keynr));
 
 		DBUG_RETURN(r);
 	}
