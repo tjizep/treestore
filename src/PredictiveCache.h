@@ -134,7 +134,7 @@ namespace tree_stored{
 			using namespace NS_STORAGE;
 			if(predictor){
 				predictor++;
-				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 4);
+				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 8);
 
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 

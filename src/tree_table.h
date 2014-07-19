@@ -653,7 +653,7 @@ namespace tree_stored{
 		};
 
 
-#define _EXPERIMENT_PCACHE
+#define _EXPERIMENT_PCACHEn
 #ifdef _EXPERIMENT_PCACHE
 
 		template<>
@@ -693,7 +693,7 @@ namespace tree_stored{
 			inline nst::u16 * u16from_rd(std::vector<nst::u8>& row_data){
 				return ((nst::u16*)&row_data[0]);
 			}
-
+#ifdef _ROW_CACHE_
 			void seek_retrieve_from_shared_row_data(Field* f, stored::_Rid row, collums::_RowData& row_data) {
 
 				nst::u16 dpos = u16from_rd(row_data)[number];
@@ -718,30 +718,37 @@ namespace tree_stored{
 				}
 
 			}
+#endif
 		public:
 
 		virtual void seek_retrieve(stored::_Rid row, Field* f) {
-
-			/*const _Fieldt * predicted = predictor.find(row);
+#			ifdef _EXPERIMENT_PCACHE
+			const _Fieldt * predicted = predictor.find(row);
 			if(predicted!=nullptr){
 				f->set_notnull();
 				convertor.fset(row, f, * predicted);
 				return;
-			}*/
+			}
+#			endif
 			const _Fieldt& t = col.seek_by_cache(row);
 
 			if(col.is_null(t)){
 				f->set_null();
 			}else{
 				f->set_notnull();
-
+#				ifdef _EXPERIMENT_PCACHE
 				predictor.store(row, t);
-
+#				endif
 				convertor.fset(row, f, t);
 			}
 		}
 		virtual	void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data) {
+#ifdef _ROW_CACHE_
 			seek_retrieve_from_shared_row_data(f, row, row_data);
+#else
+			printf("Row Cache not implemented\n");
+#endif
+			
 		}
 
 		virtual stored::_Rid stored_rows() const {
