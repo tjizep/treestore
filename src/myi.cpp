@@ -695,6 +695,7 @@ public:
 		
 		nst::synchronized synch(tt_info_lock);
 		tree_stored::tree_table * tt = get_info_table((*this).table);
+		
 		tt->begin(true);
 		
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared

@@ -1144,7 +1144,11 @@ namespace tree_stored{
 			}
 		};
 		void calc_density(TABLE *table_arg){
-			if(os::millis() - last_density_calc < 300000){
+			if(!storage.stale() && last_density_calc > 0){
+				last_density_calc = os::millis();
+				return;
+			}
+			if(os::millis() - last_density_calc < 3000000){
 				return;
 			}
 			uint i, j;
