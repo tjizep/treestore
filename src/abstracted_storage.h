@@ -187,6 +187,10 @@ namespace stored{
 			get_allocations();
 			get_transaction();
 		}
+
+		NS_STORAGE::i64 current_transaction_order() const{
+			return get_allocations().get_order();
+		}
 		bool stale() const {
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());

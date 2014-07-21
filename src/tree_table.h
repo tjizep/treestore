@@ -1077,6 +1077,7 @@ namespace tree_stored{
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
 		nst::u64 last_density_calc;
+		nst::u64 last_density_tx;
 		collums::_LockedRowData* row_datas;
 
 	public:
@@ -1096,6 +1097,7 @@ namespace tree_stored{
 		,	locks(0)
 		,	table(nullptr)		
 		,	last_density_calc(0)
+		,	last_density_tx(99999999)
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1124,7 +1126,7 @@ namespace tree_stored{
 		shared_data * share;
 
 		_TableMap& get_table(){
-
+			
 			if(nullptr==table)
 				table = new _TableMap(storage);
 			return *table;
@@ -1144,11 +1146,11 @@ namespace tree_stored{
 			}
 		};
 		void calc_density(TABLE *table_arg){
-			if(!storage.stale() && last_density_calc > 0){
-				last_density_calc = os::millis();
+			if(os::millis() - last_density_calc < 3000000){ 
 				return;
 			}
-			if(os::millis() - last_density_calc < 3000000){
+			if(last_density_tx == storage.current_transaction_order()){
+				last_density_calc = os::millis();
 				return;
 			}
 			uint i, j;
@@ -1209,6 +1211,7 @@ namespace tree_stored{
 				}									
 			}
 			last_density_calc = os::millis();
+			last_density_tx= storage.current_transaction_order();
 		}
 		void begin_table(){
 			stored::abstracted_tx_begin(!changed, storage, get_table());
