@@ -68,7 +68,7 @@ Technical
 + Simple entropy coding is used for in memory compression 
 + filter expressions are evaluated in the storage engine for better performance
 + Mini B-tree static page stores most frequently used keys in continous memory area (i.e. 'harmonic' keys in binary  search). 
-  The CPU cache is usually an LRU (least frequently used) type which throws away the harmonic keys or the middle key of each binary search iteration.
+  The CPU cache is usually an LRU (least recently used) type which throws away the harmonic keys or the middle key of each binary search iteration.
   This reduces the average CPU cache miss rate by about 50% while overall performance
   is improved by 20% on loads exceeding CPU cache size until there are no more CPU cache
   space available for mini pages.
