@@ -1,0 +1,12 @@
+﻿Build started 2013-08-26 01:36:32 PM.
+     1>Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\CppUnit\WinTestRunner\WinTestRunner_x64_vs110.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe /c /Iinclude /I..\include /Zi /nologo /W3 /WX- /Od /D WIN32 /D _DEBUG /D _WINDOWS /D POCO_STATIC /D WINVER=0x0500 /D _CRT_SECURE_NO_DEPRECATE /D _MBCS /D _AFXDLL /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /GR /Fo"obj64\debug_static_md\\" /Fd"..\..\lib64\WinTestRunnermdd.pdb" /Gd /TP /errorReport:prompt src\ActiveTest.cpp src\GUITestResult.cpp src\ProgressBar.cpp src\TestRunnerDlg.cpp src\WinTestRunner.cpp
+     1>TRACKER : error TRK0002: Failed to execute command: ""C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe" @C:\Users\christiaan\AppData\Local\Temp\tmp64250f19bef74e81b8b1a6ec8a4b6bd9.rsp". The operation identifier is not valid.
+         
+         
+     1>Done Building Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\CppUnit\WinTestRunner\WinTestRunner_x64_vs110.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.03

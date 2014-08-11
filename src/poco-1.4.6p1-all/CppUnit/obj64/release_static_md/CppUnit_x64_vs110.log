@@ -1,0 +1,12 @@
+﻿Build started 2013-08-26 01:36:34 PM.
+     1>Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\CppUnit\CppUnit_x64_vs110.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe /c /Iinclude /Zi /nologo /W3 /WX- /Od /Ob1 /Oi /Ot /Oy /D WIN32 /D NDEBUG /D _WINDOWS /D _AFXDLL /D POCO_STATIC /D _CRT_SECURE_NO_DEPRECATE /D _MBCS /GF /Gm- /EHsc /MD /GS- /fp:precise /Zc:wchar_t /Zc:forScope /GR /Fo"obj64\release_static_md\\" /Fd"obj64\release_static_md\vc70.pdb" /Gd /TP /errorReport:prompt src\CppUnitException.cpp src\TestCase.cpp src\TestDecorator.cpp src\TestFailure.cpp src\TestResult.cpp src\TestRunner.cpp src\TestSuite.cpp src\TextTestResult.cpp
+     1>TRACKER : error TRK0002: Failed to execute command: ""C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe" @C:\Users\christiaan\AppData\Local\Temp\tmpf38f635a7cba4ca3b25acd1546fd76d5.rsp". The operation identifier is not valid.
+         
+         
+     1>Done Building Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\CppUnit\CppUnit_x64_vs110.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.06

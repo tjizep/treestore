@@ -1,0 +1,12 @@
+﻿Build started 2013-08-26 01:32:31 PM.
+     1>Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\Data\ODBC\testsuite\TestSuite_x64_vs110.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe /c /I..\include /I..\..\..\CppUnit\include /I..\..\..\CppUnit\WinTestRunner\include /I..\..\..\Foundation\include /I..\..\..\Data\include /Zi /nologo /W3 /WX- /Od /D WIN32 /D _DEBUG /D _WINDOWS /D WINVER=0x0600 /D POCO_STATIC /D _MBCS /D _AFXDLL /GF /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /GR /Fo"obj64\debug_static_md\\" /Fd"obj64\debug_static_md\vc110.pdb" /Gd /TP /errorReport:prompt src\ODBCAccessTest.cpp src\ODBCDB2Test.cpp src\ODBCMySQLTest.cpp src\ODBCOracleTest.cpp src\ODBCPostgreSQLTest.cpp src\ODBCSQLiteTest.cpp src\ODBCSQLServerTest.cpp src\SQLExecutor.cpp src\ODBCTestSuite.cpp src\WinDriver.cpp
+     1>TRACKER : error TRK0002: Failed to execute command: ""C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\CL.exe" @C:\Users\christiaan\AppData\Local\Temp\tmpd144df204b814ea2a1ee926ca8446aa8.rsp". The operation identifier is not valid.
+         
+         
+     1>Done Building Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\Data\ODBC\testsuite\TestSuite_x64_vs110.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.03

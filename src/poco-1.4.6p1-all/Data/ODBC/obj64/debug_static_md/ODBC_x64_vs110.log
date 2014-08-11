@@ -1,0 +1,24 @@
+﻿Build started 2013-08-26 01:32:31 PM.
+     1>Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\Data\ODBC\ODBC_x64_vs110.vcxproj" on node 2 (Build target(s)).
+     1>Lib:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\Lib.exe /OUT:"..\..\lib64\PocoDataODBCmdd.lib" /NOLOGO /MACHINE:X64 obj64\debug_static_md\Binder.obj
+         obj64\debug_static_md\ConnectionHandle.obj
+         obj64\debug_static_md\Connector.obj
+         obj64\debug_static_md\DataTypes.obj
+         obj64\debug_static_md\EnvironmentHandle.obj
+         obj64\debug_static_md\Extractor.obj
+         obj64\debug_static_md\ODBCColumn.obj
+         obj64\debug_static_md\ODBCException.obj
+         obj64\debug_static_md\ODBCStatementImpl.obj
+         obj64\debug_static_md\Parameter.obj
+         obj64\debug_static_md\Preparation.obj
+         obj64\debug_static_md\SessionImpl.obj
+         obj64\debug_static_md\Utility.obj
+     1>TRACKER : error TRK0002: Failed to execute command: ""C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\BIN\amd64\Lib.exe" @C:\Users\christiaan\AppData\Local\Temp\tmp2e4958b940c54cdcb29516f0081c9981.rsp". The operation identifier is not valid.
+         
+         
+     1>Done Building Project "C:\dev\cpp_all\repo\poco-1.4.6p1-all\Data\ODBC\ODBC_x64_vs110.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.09
