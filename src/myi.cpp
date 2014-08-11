@@ -2017,7 +2017,9 @@ mysql_declare_plugin_end;
 #include "Foundation/src/UUID.cpp"
 #include "Foundation/src/UUIDGenerator.cpp"
 #include "Foundation/src/Void.cpp"
+#ifndef _MSC_VER
 typedef char BOOL;
+#endif
 #include "Foundation/src/Unicode.cpp"
 #include "Foundation/src/UnicodeConverter.cpp"
 #include "Foundation/src/Windows1252Encoding.cpp"
