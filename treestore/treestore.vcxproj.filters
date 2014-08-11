@@ -16,6 +16,15 @@
     <Filter Include="Source Files\zlib">
       <UniqueIdentifier>{48d57f3a-3962-40a8-8bdb-29d87e4cc4ba}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\poco">
+      <UniqueIdentifier>{e3422b1a-13f4-4128-87b0-909738435b4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\poco\Data">
+      <UniqueIdentifier>{5def5e31-6083-4382-b64d-b0bece0327af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\poco\Data\SQLite">
+      <UniqueIdentifier>{824cd979-4929-4831-b9b2-c8037bec5550}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -154,6 +163,51 @@
     </ClCompile>
     <ClCompile Include="..\src\persist_tree.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Data\SQLite\src\sqlite3.c">
+      <Filter>Source Files\poco\Data\SQLite</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_chartables.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_compile.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_exec.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_fullinfo.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_globals.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_maketables.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_newline.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_ord2utf8.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_study.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_tables.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_try_flipped.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_ucd.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_valid_utf8.c">
+      <Filter>Source Files\poco</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_xclass.c">
+      <Filter>Source Files\poco</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

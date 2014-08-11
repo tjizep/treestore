@@ -483,7 +483,7 @@ namespace stored{
 		inline bool operator<(const Blobule& right) const {
 			return less(right);
 		}
-		
+
 		inline bool operator!=(const Blobule& right) const {
 
 			return not_equal(right);
@@ -726,24 +726,24 @@ namespace stored{
 
 		void add4(long v){
 
-			addDynInt(v);
+			addDynInt((nst::i32)v);
 
 		}
 
 		void addu4(unsigned int v){
 
-			addDynInt(v);
+			addDynInt((nst::i32)v);
 
 		}
 
 		void add2(short v){
 
-			addDynInt(v);
+			addDynInt((nst::i16)v);
 		}
 
 		void addu2(unsigned short v){
 
-			addDynInt(v);
+			addDynInt((nst::u16)v);
 		}
 		/// 3rd level
 		void add(const stored::FloatStored & v){
@@ -872,10 +872,10 @@ namespace stored{
 		template<typename _IntType>
 		bool p_decode(_IntType& out, int n = 1) const {
 			const nst::u8 *ld = data();
-			
+
 			nst::u8 lt = *ld;
-			
-			int r = 0,l=0,ll=0;
+
+			int l=0;
 			while(n > 0){
 				--n;
 				++ld;
@@ -883,29 +883,29 @@ namespace stored{
 				case DynamicKey::I1 :
 					l=sizeof(nst::i8);
 					if(!n){
-						out = (_IntType)(*(nst::i8*)ld )	;				
-						
+						out = (_IntType)(*(nst::i8*)ld )	;
+
 					}
 					break;
 				case DynamicKey::I2:
 					l = sizeof(nst::i16);
 					if(!n){
 						out = (_IntType)(*(nst::i16*)ld );
-									
+
 					}
 					break;
 				case DynamicKey::I4:
 					l = sizeof(nst::i32);
 					if(!n){
 						out = (_IntType)(*(nst::i32*)ld);
-						
+
 					}
 					break;
 				case DynamicKey::I8 :
 					l = 8;
 					if(!n){
 						out = (_IntType)(*(nst::i64*)ld);
-						
+
 					}
 					break;
 				case DynamicKey::R4 :
@@ -1009,7 +1009,7 @@ namespace stored{
 					break;
 				};
 				if( r != 0 ) break;
-				
+
 				ld += l;
 				rd += l;
 				ll += l;
@@ -1076,7 +1076,7 @@ namespace stored{
 	class PrimitiveDynamicKey{
 	public:
 		typedef typename _FieldType::value_type _DataType ;
-		
+
 		typedef unsigned char	uchar;	/* Short for unsigned char */
 		typedef signed char int8;       /* Signed integer >= 8  bits */
 		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
@@ -1101,7 +1101,7 @@ namespace stored{
 	protected:
 
 		_DataType data;
-		
+
 		/// 1st level
 		void addDynInt(nst::i64 v){
 			data = v;
@@ -1135,7 +1135,7 @@ namespace stored{
 		}
 	public:
 		void add(const char* k, size_t s){
-			
+
 		}
 	public:
 		row_type row;
@@ -1267,7 +1267,7 @@ namespace stored{
 		}
 
 		~PrimitiveDynamicKey(){
-			
+
 		}
 
 		PrimitiveDynamicKey():
@@ -1282,7 +1282,7 @@ namespace stored{
 			*this = right;
 		}
 		PrimitiveDynamicKey(const DynamicKey& right)
-		
+
 		{
 			row =right.row;
 			right.p_decode(data);
@@ -1294,7 +1294,7 @@ namespace stored{
 		}
 
 		inline bool left_equal_key(const PrimitiveDynamicKey& right) const {
-			
+
 			return data == right.data;
 		}
 
@@ -1307,16 +1307,16 @@ namespace stored{
 
 		PrimitiveDynamicKey& operator=(const PrimitiveDynamicKey& right){
 			data = right.data;
-			row = right.row;			
+			row = right.row;
 			return *this;
 		}
-	
+
 		PrimitiveDynamicKey& operator=(const DynamicKey& right){
 			row =right.row;
 			right.p_decode(data);
 			return *this;
 		}
-		
+
 		DynamicKey& return_or_copy(DynamicKey& x){
 			x.clear();
 			_FieldType f;
@@ -1328,22 +1328,22 @@ namespace stored{
 		inline operator size_t() const {
 			//size_t r = 0;
 			//MurmurHash3_x86_32(&data, sizeof(data), 0, &r);
-			//return r;			
+			//return r;
 			return (size_t)data;
 		}
-		
+
 
 		bool operator<(const PrimitiveDynamicKey& right) const {
 			if( data == right.data)
 				return row < right.row;
-			
+
 			return (data < right.data);
 		}
 
 		inline bool operator!=(const PrimitiveDynamicKey& right) const {
 			if( data == right.data)
 				return row != right.row;
-			
+
 			return data != right.data;
 		}
 
@@ -1362,11 +1362,11 @@ namespace stored{
 		};
 
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
-			using namespace NS_STORAGE;			
+			using namespace NS_STORAGE;
 			_FieldType f;
 			DynamicKey s;
-			f.set_value((*this).data);			
-			s.add(f);			
+			f.set_value((*this).data);
+			s.add(f);
 			s.row = (*this).row;
 			return s.store(w);
 		};
@@ -1374,7 +1374,7 @@ namespace stored{
 		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			DynamicKey s;			
+			DynamicKey s;
 			reader = s.read(reader);
 			s.p_decode(data);
 			row = s.row;
@@ -1455,7 +1455,7 @@ namespace stored{
 			}
 
 		};
-		
+
 
 		class UninitializedCodeException : public std::exception{
 		public :
@@ -1463,7 +1463,7 @@ namespace stored{
 			UninitializedCodeException() throw(){
 				printf("*********** UninitializedCodeException\n");
 			}
-			~UninitializedCodeException(){};
+			~UninitializedCodeException() throw(){};
 		};
 
 		/// class for fixed size entropy coded buffer
@@ -1905,8 +1905,8 @@ namespace stored{
 	class index_iterator_interface{
 	public:
 		///for quick type check
-		int type_id; 
-		
+		int type_id;
+
 		index_iterator_interface() : type_id(0){
 		}
 		virtual ~index_iterator_interface(){
@@ -1919,7 +1919,7 @@ namespace stored{
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;
 		virtual DynamicKey& get_key() = 0;
 		virtual void set_end(index_iterator_interface& in) = 0;
-		
+
 	};
 
 	class index_interface{
@@ -1936,14 +1936,14 @@ namespace stored{
 		virtual void set_fields_indexed(int indexed)=0;
 		virtual void push_part(_Rid part)=0;
 		virtual void push_density(_Rid dens) = 0;
-		virtual size_t densities() const = 0;		
+		virtual size_t densities() const = 0;
 		virtual int& density_at(size_t at) = 0;
 		virtual const int& density_at(size_t at) const = 0;
 		virtual void end(index_iterator_interface& out)=0;
 		virtual index_iterator_interface * get_index_iterator() = 0;
 		virtual index_iterator_interface * get_first1() = 0;
 		virtual index_iterator_interface * get_last1() = 0;
-		
+
 		virtual void first(index_iterator_interface& out)=0;
 		virtual void lower_(index_iterator_interface& out,const DynamicKey& key)=0;
 		virtual void lower(index_iterator_interface& out,const DynamicKey& key)=0;
@@ -1959,19 +1959,19 @@ namespace stored{
 		virtual void commit1_asynch() = 0;
 
 		virtual void commit1()= 0;
-		
+
 		virtual void commit2() = 0;
-		
+
 		virtual void rollback() = 0;
-		
+
 		virtual void share() = 0;
 		virtual void unshare() = 0;
-		
+
 		virtual void clear_cache() = 0;
 		virtual void reduce_cache() = 0;
 
 		typedef index_interface * ptr;
 	};
-	
+
 };
 #endif

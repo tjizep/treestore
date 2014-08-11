@@ -1876,7 +1876,7 @@ namespace storage{
 			--references;
 			/// TODO: if references == 0 the handles held to resources
 			///	need to let go so that maintenance can happen (i.e. drop table)
-			if(0==references){
+			if(references==0){
 
 				/// merge_down();
 				if(storages.size()==1){

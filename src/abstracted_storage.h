@@ -203,7 +203,7 @@ namespace stored{
 		}
 
 		void set_transaction_r(bool read){
-			if(_transaction==nullptr) 
+			if(_transaction==nullptr)
 				throw TransactionNotStartedException();
 			if(read)
 				get_transaction().set_readonly();
@@ -308,29 +308,29 @@ namespace stored{
 	void abstracted_tx_begin(bool read, _Storage& storage, _Map& map){
 		if(!read){
 			storage.rollback();
-			storage.begin();		
+			storage.begin();
 			storage.set_transaction_r(read);
 			map.unshare();
 			map.reload();
-		}			 
-		else 
+		}
+		else
 		{
-					
+
 			if(storage.stale()){
 				storage.rollback();
 				storage.begin();
 				storage.set_transaction_r(read);
-				map.share(storage.get_name());		
+				map.share(storage.get_name());
 				map.reload();
 			}else{
-				map.share(storage.get_name());	
+				map.share(storage.get_name());
 				storage.set_transaction_r(read);
 			}
 		}
 	}
 	/// definitions for registry functions
 	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;
-	
+
 	extern _Allocations* _get_abstracted_storage(std::string name);
 };
 #endif

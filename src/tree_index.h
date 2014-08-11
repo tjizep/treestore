@@ -84,7 +84,7 @@ namespace tree_stored{
 			void set_end(index_iterator_interface& in) {
 				value.set_end(((index_iterator_impl&)in).value);
 			}
-			
+
 		};
 
 		class IndexScanner : public asynchronous::AbstractWorker
@@ -230,7 +230,7 @@ namespace tree_stored{
 			using namespace NS_STORAGE;
 			the_end = index.end();
 			index.share(name);
-			
+
 		}
 
 		~col_index(){
@@ -368,6 +368,7 @@ namespace tree_stored{
 		typedef typename ColIndex::IndexIterator IndexIterator;
 	private:
 		//CachedRow empty;
+		Poco::Mutex plock;
 	private:
 		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
 		typedef std::vector<eraser_interface*> _ErasorList;
@@ -377,7 +378,7 @@ namespace tree_stored{
 			static _ECaches pc;
 			return &pc;
 		}
-		
+
 		void register_eraser(std::string name,eraser_interface* er){
 			stx::storage::syncronized ul(plock);
 			_ECaches * erasers = get_erasers();
@@ -385,7 +386,7 @@ namespace tree_stored{
 			_ErasorListPtr elist;
 			if(e == erasers->end()){
 				elist = std::make_shared<_ErasorList>();
-				(*erasers)[name] = elist;				
+				(*erasers)[name] = elist;
 			}else{
 				elist = (*e).second;
 			}
@@ -404,7 +405,7 @@ namespace tree_stored{
 			_ErasorListPtr elist;
 			if(e == erasers->end()){
 				elist = std::make_shared<_ErasorList>();
-				(*erasers)[name] = elist;				
+				(*erasers)[name] = elist;
 			}else{
 				elist = (*e).second;
 			}
@@ -414,7 +415,7 @@ namespace tree_stored{
 					return;
 				}
 			}
-			
+
 		}
 		void send_erase(const std::string &name,const CompositeStored& input){
 			stx::storage::syncronized ul(plock);
@@ -474,10 +475,10 @@ namespace tree_stored{
 		}
 		void cache_it(stored::index_iterator_interface& io){
 			if(unique){
-				cache.set_hash_size((nst::u32)index.get_size()*2); 
+				cache.set_hash_size((nst::u32)index.get_size()*2);
 				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 			}
-			
+
 		}
 		bool is_unique() const {
 			return unique;

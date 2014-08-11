@@ -30,9 +30,11 @@ public:
 protected:
 	_Data data;
 	_BucketType code_size;
+	_BucketType code_shift;
 public:
 	symbol_vector(){
 		code_size = 0;
+		code_shift = 0;
 	}
 
 	const bool empty() const {
@@ -46,6 +48,7 @@ public:
 	/// the code size can be any positive integer <= sizeof(_IntSymBolType)*8
 	void set_code_size(_BucketType code_size){
 		(*this).code_size = std::min<_BucketType>(sizeof(_IntSymBolType)*8,code_size);
+		(*this).code_shift = ( ( 1 << code_size ) - 1);
 	}
 	/// create buckets by the ns
 	void resize(_IndexType ns){
@@ -90,16 +93,17 @@ public:
 		_BucketType bucket_start, bucket;
 		_IndexType bit_start = index * code_size;
 		const _BucketType* current = &data[bit_start / BUCKET_BITS];
-		_IndexType code_left = code_size;
-		_IndexType code_complete = 0;
 		bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 		if(bucket_start + code_size < BUCKET_BITS){
 
-			bucket = (*current >> bucket_start) & ( ( 1 << code_size ) - 1); /// this is a hot line
+			bucket = (*current >> bucket_start) & code_shift; /// this is a hot line
 
-			code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
-			return code;
+			///code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
+			return bucket;
 		}
+		_IndexType code_left = code_size;
+		_IndexType code_complete = 0;
+		
 		for(;;){	/// read from BUCKET_BITS-bit buckets
 			
 			

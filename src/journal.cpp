@@ -171,7 +171,8 @@ public:
 				}
 
 				if(entry.command == nst::JOURNAL_COMMIT){
-					printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)reader.stream().tellg()/MB );
+
+					printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)(reader.stream().tellg()/(double)MB) );
 					for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
 
 						_Command &entry =  (*c);

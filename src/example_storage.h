@@ -32,7 +32,7 @@ private:
 	std::string name;
 public:
 
-	example_storage(std::string name) : name(name),allocations( NS_STORAGE::default_name_factory(name)), boot(1){
+	example_storage(std::string name) : allocations( NS_STORAGE::default_name_factory(name)), boot(1), name(name){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 

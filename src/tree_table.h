@@ -49,7 +49,7 @@ namespace tree_stored{
 		InvalidTablePointer () throw(){
 		}
 	};
-	
+
 	class abstract_conditional_iterator{
 	public:
 		abstract_conditional_iterator(){};
@@ -73,23 +73,23 @@ namespace tree_stored{
 		/// returns NoRecord if no records where found
 		virtual _Rid iterate(_Rid start) = 0;
 		virtual _Rid evaluate(_Rid start) = 0;
-		
+
 		typedef std::shared_ptr<logical_conditional_iterator> ptr;
 	};
 
 	class conditional_and_iterator : public logical_conditional_iterator{
 		private:
-		
+
 
 		public:
-		
+
 			conditional_and_iterator(){
-			
-			
+
+
 			};
 			virtual ~conditional_and_iterator(){};
 
-		
+
 			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid _start) {
 				_Rid start = _start;
@@ -108,44 +108,44 @@ namespace tree_stored{
 			}
 			virtual _Rid evaluate(_Rid _start) {
 				_Rid start = _start;
-			
+
 				for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
 					if((*l)->evaluate(start) != start){
 						return NoRecord;
 					}
 				}
 				return start;
-			
-			
+
+
 			}
 			typedef std::shared_ptr<conditional_and_iterator> ptr;
 		};
 
-	
+
 		class conditional_or_iterator : public logical_conditional_iterator{
 		private:
 			_Rid max_rid;
 		public:
-		
+
 			conditional_or_iterator(_Rid max_rid){
 				(*this).max_rid = max_rid;
-			
+
 			};
 			virtual ~conditional_or_iterator(){};
-		
+
 			/// returns NoRecord if no records could be found
 			virtual _Rid iterate(_Rid _start) {
 				_Rid start = _start;
 				while(start < max_rid){
-				
+
 					for(_LogicalConditions::iterator l = logical.begin();l != logical.end();++l){
 						_Rid r = (*l)->evaluate(start) ;
 						if(r == start){
 							return start;
-						}										
-					}				
-					++start;					
-				}			
+						}
+					}
+					++start;
+				}
 				return NoRecord;
 			}
 
@@ -156,12 +156,12 @@ namespace tree_stored{
 					}
 				}
 				return NoRecord;
-			
+
 			}
 			typedef std::shared_ptr<conditional_or_iterator> ptr;
 		};
 
-	
+
 	class abstract_my_collumn {
 	public:
 		abstract_my_collumn(){
@@ -298,7 +298,7 @@ namespace tree_stored{
 				default:
 					break;
 			}
-			#endif;
+			#endif
 		}
 	public:
 
@@ -337,25 +337,25 @@ namespace tree_stored{
 				return right == left;
 			}
 		};
-		
+
 		struct gt_condition{
 			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
-				return right > left; 
+				return right > left;
 			}
 		};
-		
+
 		struct ge_condition{
 			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
 				return !(right < left);
 			}
 		};
-		
+
 		struct lt_condition{
 			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
 				return right < left;
 			}
 		};
-		
+
 		struct le_condition{
 			inline bool is_true(const _Fieldt &right,const _Fieldt &left) const {
 				return !(right > left);
@@ -370,7 +370,7 @@ namespace tree_stored{
 		template<typename _Condition>
 		class entropic_conditional_iterator : public abstract_conditional_iterator{
 		protected:
-			_Condition contition;
+			_Condition condition;
 			_Fieldt value;
 			_Colt * col;
 		public:
@@ -393,13 +393,13 @@ namespace tree_stored{
 				return start;
 			}
 			virtual _Rid evaluate(_Rid start) {
-				
+
 				if(start >= col->get_rows()){
 					return NoRecord;
 				}
 
 				if(!condition.is_true(col->seek_by_cache(start), value)){
-					return NoRecord;					
+					return NoRecord;
 				}
 
 				return start;
@@ -426,7 +426,7 @@ namespace tree_stored{
 				}
 				while(!condition.is_true(col->seek_by_cache(start), value)){
 					++start;
-					
+
 					if(start >= col->get_rows()){
 						return NoRecord;
 					}
@@ -434,19 +434,19 @@ namespace tree_stored{
 				return start;
 			}
 			virtual _Rid evaluate(_Rid start) {
-				
+
 				if(start >= col->get_rows()){
 					return NoRecord;
 				}
 
 				if(!condition.is_true(col->seek_by_cache(start), value)){
-					return NoRecord;					
+					return NoRecord;
 				}
 
 				return start;
 			}
 		};
-		
+
 		/// push does condition evaluations
 
 		abstract_conditional_iterator::ptr push_gt_condition(Field* target, const Item* val){
@@ -519,7 +519,7 @@ namespace tree_stored{
 		}
 		virtual void pop_conditions(){
 		}
-		
+
 
 		virtual void erase_row(collums::_Rid row){
 			col.erase(row);
@@ -653,7 +653,7 @@ namespace tree_stored{
 		};
 
 
-#define _EXPERIMENT_PCACHEn
+//#define _EXPERIMENT_PCACHE
 #ifdef _EXPERIMENT_PCACHE
 
 		template<>
@@ -748,7 +748,7 @@ namespace tree_stored{
 #else
 			printf("Row Cache not implemented\n");
 #endif
-			
+
 		}
 
 		virtual stored::_Rid stored_rows() const {
@@ -973,7 +973,7 @@ namespace tree_stored{
 			return names;
 		}
 
-		
+
 		void load_indexes(TABLE *table_arg){
 			uint i, j;
 			KEY *pos;
@@ -988,7 +988,7 @@ namespace tree_stored{
 					field_primitive = true;
 					Field **field = &(pos->key_part[0].field);// the jth field in the key
 					ha_base_keytype bt = (*field)->key_type();
-					nst::u32 fi = (*field)->field_index;
+
 					switch(bt){
 						case HA_KEYTYPE_END:
 							// ERROR ??
@@ -1077,9 +1077,17 @@ namespace tree_stored{
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
 		nst::u64 last_density_calc;
-		nst::u64 last_density_tx;
+		nst::i64 last_density_tx;
 		collums::_LockedRowData* row_datas;
-
+    public:
+        _Conditional conditional;
+		abstract_conditional_iterator::ptr rcond;
+		CompositeStored temp;
+		_Indexes indexes;
+		_Collumns cols;
+		stored::abstracted_storage storage;
+		_TableMap * table;
+		shared_data * share;
 	public:
 		nst::u32 get_col_count() const {
 			return cols.size();
@@ -1090,14 +1098,16 @@ namespace tree_stored{
 		tree_table(TABLE *table_arg)
 		:	changed(false)
 		,	_row_count(0)
+		,	locks(0)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
-		,	row_datas(nullptr)
-		,	storage(table_arg->s->path.str)
-		,	locks(0)
-		,	table(nullptr)		
 		,	last_density_calc(0)
 		,	last_density_tx(99999999)
+		,	row_datas(nullptr)
+		,	storage(table_arg->s->path.str)
+
+		,	table(nullptr)
+
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1116,17 +1126,10 @@ namespace tree_stored{
 			clear();
 			delete_extendsions();
 		}
-		_Conditional conditional;
-		abstract_conditional_iterator::ptr rcond;
-		CompositeStored temp;
-		_Indexes indexes;
-		_Collumns cols;
-		stored::abstracted_storage storage;
-		_TableMap * table;
-		shared_data * share;
+
 
 		_TableMap& get_table(){
-			
+
 			if(nullptr==table)
 				table = new _TableMap(storage);
 			return *table;
@@ -1139,30 +1142,33 @@ namespace tree_stored{
 			return *table;
 
 		}
-		
+
 		struct hash_composite{
 			size_t operator()(const CompositeStored& q) const{
 				return (size_t)q;
 			}
 		};
 		void calc_density(TABLE *table_arg){
-			if(os::millis() - last_density_calc < 3000000){ 
+
+			if(os::millis() - last_density_calc < 3000000){
+
 				return;
 			}
+
 			if(last_density_tx == storage.current_transaction_order()){
 				last_density_calc = os::millis();
 				return;
 			}
-			uint i, j;
+			uint i;
 			KEY *pos;
 			TABLE_SHARE *share= table_arg->s;
 			pos = table_arg->key_info;
 			std::string path = share->path.str;
-			
+
 			if(!_row_count){
 				init_rowcount();
 			}
-			
+
 			if(!_row_count){
 				return;
 			}
@@ -1188,27 +1194,27 @@ namespace tree_stored{
 				std::sort(samples.begin(), samples.end());
 
 				for(_Samples::iterator sample = samples.begin(); sample != samples.end();++sample){
-					nst::u32 u = 0;				
-					stored::_Parts::iterator pend = index->parts.end();									
+					nst::u32 u = 0;
+					stored::_Parts::iterator pend = index->parts.end();
 					for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
 						int ip = (*p);
-						
+
 						(*this).cols[ip]->compose((*sample), ir);
-						uniques[u].insert(ir);							
-						
+						uniques[u].insert(ir);
+
 						++u;
-						
-					}	
-					ir.clear();	
-					
+
+					}
+					ir.clear();
+
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
-					_Rid d = samples.size() / (*u).size();							
-					printf("Calculating cardinality of index parts for %s px %ld as %ld\n",pos->name,partx,d);
+					_Rid d = samples.size() / (*u).size();
+					printf("Calculating cardinality of index parts for %s px %li as %li\n",pos->name,(long int)partx,(long int)d);
 					index->push_density(d);
 					partx++;
-				}									
+				}
 			}
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
@@ -1236,7 +1242,7 @@ namespace tree_stored{
 				storage.commit();
 			}
 		}
-		
+
 		bool is_transacted() const {
 			return storage.is_transacted();
 		}
@@ -1334,7 +1340,7 @@ namespace tree_stored{
 			clear();
 			printf("load table %s\n", table_arg->alias);
 			(*this).load_indexes(table_arg);
-			(*this).load_cols(table_arg);			
+			(*this).load_cols(table_arg);
 			file_names = create_file_names(table_arg);
 		}
 
@@ -1461,7 +1467,7 @@ namespace tree_stored{
 
 			return input.row;
 		}
-		
+
 		void pop_condition(){
 			rcond = nullptr;
 		}
@@ -1483,19 +1489,19 @@ namespace tree_stored{
 		bool evaluate_conditions(_Rid row){
 			if(rcond == nullptr) return true;/// always true if there are no conditions
 			/// very under optimized algorithm
-			
+
 			if(rcond->evaluate(row) != row){
 				return false;
 			}
-			
+
 			return true;
 		}
 		/// return value is either valid or equal to NoRecord
 		_Rid iterate_conditions(_Rid row){
-			if(rcond == nullptr) return row;/// always true if there are no conditions			
+			if(rcond == nullptr) return row;/// always true if there are no conditions
 			_Rid r = row;
 			while(r <= (*this)._row_count){
-				r = rcond->iterate(r) ;				
+				r = rcond->iterate(r) ;
 				if(!(r <= (*this)._row_count))
 					return abstract_conditional_iterator::NoRecord;
 				if(!is_allocated_row(r)){
@@ -1505,7 +1511,7 @@ namespace tree_stored{
 				}
 			}
 			return abstract_conditional_iterator::NoRecord ;
-			
+
 		}
 		bool is_allocated_row(_Rid row){
 			/// TODO: check allocation map 2
@@ -1513,7 +1519,7 @@ namespace tree_stored{
 		}
 
 		void pop_all_conditions(){
-			rcond = nullptr;			
+			rcond = nullptr;
 		}
 		uint count_parts(TABLE* table,uint ax, uint key_part_map){
 			KEY & ki = table->key_info[ax];

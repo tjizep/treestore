@@ -1,9 +1,8 @@
 #include "myi.h"
-
 /*
 Copyright (c) 2012,2013,2014 Christiaan Pretorius. All rights reserved.
 MySQL TreeStore Storage Engine
-myi.cpp - MySQL Storage Engine Interfaces
+myi.cpp" - MySQL Storage Engine Interfaces
 
 */
 
@@ -25,7 +24,7 @@ myi.cpp - MySQL Storage Engine Interfaces
 
 #ifndef _MSC_VER
 #include <cmath>
-#define isfinite std::isfinite
+//#define isfinite std::isfinite
 #endif
 
 #include "sql_priv.h"
@@ -38,23 +37,26 @@ myi.cpp - MySQL Storage Engine Interfaces
 
 #include "sql_table.h"                          // tablename_to_filename
 #include "sql_class.h"                          // THD
-
-
+/// TREESTORE specific includes
 #include <limits>
-
 #include <map>
 #include <string>
 #include "collumn.h"
+#include "tree_stored.h"
+#include "conversions.h"
+#include "tree_index.h"
+#include "tree_table.h"
+
 typedef uchar byte;
 ptrdiff_t MAX_PC_MEM = 1024ll*1024ll*1024ll*4ll;
 namespace nst = NS_STORAGE;
 nst::u64 pk_lookups = 0;
-static NS_STORAGE::u64 read_lookups =0;
+NS_STORAGE::u64 read_lookups =0;
 NS_STORAGE::u64 hash_hits =0;
 NS_STORAGE::u64 hash_predictions =0;
-static NS_STORAGE::u64 last_read_lookups ;
-static NS_STORAGE::u64 total_cache_size=0;
-static NS_STORAGE::u64 ltime = 0;
+NS_STORAGE::u64 last_read_lookups ;
+NS_STORAGE::u64 total_cache_size=0;
+NS_STORAGE::u64 ltime = 0;
 
 /// instances of config variables
 long long treestore_max_mem_use = 0;
@@ -168,10 +170,6 @@ long long calc_total_use(){
 }
 void print_read_lookups();
 
-#include "tree_stored.h"
-#include "conversions.h"
-#include "tree_index.h"
-#include "tree_table.h"
 
 typedef std::map<std::string, _FileNames > _Extensions;
 typedef std::unordered_map<std::string, int > _LoadingData;
@@ -186,13 +184,13 @@ Poco::Mutex tt_info_lock;
 
 tree_stored::tree_table * get_info_table(TABLE* table){
 	nst::synchronized synch(tt_info_lock);
-	
+
 
 	tree_stored::tree_table * result = info_tables[table->s->path.str];
 	if(NULL == result){
 		result = new tree_stored::tree_table(table);
 		info_tables[table->s->path.str] = result;
-		
+
 	}
 	return result;
 
@@ -322,7 +320,7 @@ namespace tree_stored{
 			bool writer = changed;
 			compose_table(table_arg)->unlock(&p2_lock);
 			if(1==locks){
-				
+
 				if
 				(	changed
 				)
@@ -548,7 +546,7 @@ public:
 
 static static_threads st;
 void print_read_lookups(){
-
+	return;
 	if(os::millis()-ltime > 1000){
 		st.check_use();
 		stx::storage::syncronized ul(plock);
@@ -628,11 +626,11 @@ public:
 	stored::_Rid last_resolved;
 	typedef tree_stored::_Selection  _Selection;
 	tree_stored::_Selection selected;// direct selection filter
-	
-	stored::index_interface * current_index;
 
-	stored::index_iterator_interface& get_index_iterator(){
-		return *current_index->get_index_iterator();
+	stored::index_interface * current_index;
+	stored::index_iterator_interface * current_index_iterator;
+	inline stored::index_iterator_interface& get_index_iterator(){
+		return *current_index_iterator;
 	}
 
 	tree_stored::tree_thread* get_thread(THD* thd){
@@ -649,12 +647,12 @@ public:
 		return tt;
 	}
 	void clear_selection(_Selection & selected){
-		
+
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			(*s).restore_ptr();
 		}
 		selected.clear();
-		
+
 	}
 
 	ha_treestore
@@ -687,17 +685,17 @@ public:
 	}
 
 	int info(uint which){
-		
+
 		if(get_tree_table() == NULL){
 			return 0;
 		}
-		
-		
+
+
 		nst::synchronized synch(tt_info_lock);
 		tree_stored::tree_table * tt = get_info_table((*this).table);
-		
+
 		tt->begin(true);
-		
+
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = tt->table_size();
 			stats.block_size = 1;
@@ -741,7 +739,7 @@ public:
 				table->key_info[i].rec_per_key[j] = tt->get_rows_per_key(i,j);
 			}
 		}
-		
+
 		if(which & HA_STATUS_ERRKEY) // - status pertaining to last error key (errkey and dupp_ref)
 		{}
 
@@ -791,7 +789,7 @@ public:
 
 	double scan_time()
 	{
-		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/8192));/*assume an average page size of 8192 bytes*/
+		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/16384));/*assume an average page size of 8192 bytes*/
 	}
 	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows)
@@ -999,6 +997,7 @@ public:
 			tt->clear();
 		tt = NULL;
 		current_index = NULL;
+		current_index_iterator = NULL;
 		return 0;
 	}
 
@@ -1022,7 +1021,7 @@ public:
 		}
 		bool writer = false;
 
-		
+
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(thread->get_locks()==0){
 			bool high_mem = calc_total_use() > treestore_max_mem_use ;
@@ -1055,7 +1054,7 @@ public:
 			,	(double)total_cache_size/units::MB
 			);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
-			
+
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 
 				return HA_ERR_LOCK_TABLE_FULL;
@@ -1116,46 +1115,46 @@ public:
 
 
 	bool push_func(const Item_func* f,tree_stored::logical_conditional_iterator::ptr parent){
-		int argc = f->argument_count();
+		/// int argc = f->argument_count();
 		Item_func::Functype ft = f->functype();
 		if(ft==Item_func::COND_OR_FUNC || ft==Item_func::COND_AND_FUNC){
 			Item_cond_or* c = (Item_cond_or* )f;
 			tree_stored::logical_conditional_iterator::ptr lor ;
 			lor = ft==Item_func::COND_OR_FUNC ? get_tree_table()->create_or_condition() : get_tree_table()->create_and_condition();
 			if(parent == nullptr){
-				
+
 				get_tree_table()->set_root_condition(lor);
 			}else{
 				parent->push_condition(lor);
 			}
-				
+
 			List_iterator<Item> i = *(c->argument_list());
 			for(;;){
 				const Item *cc = i++;
-				
+
 				if(NULL == cc)
 					break;
-				Item::Type ct = cc->type(); 
+				/// Item::Type ct = cc->type();
 				if(cc->type() == Item::FUNC_ITEM){
 					const Item_func* f = (const Item_func*)cc;
 					if(!push_func(f,lor)) return false;
 				}else
 					return false;
-			}			
+			}
 			return true;
 		}else if(Item_func::COND_ITEM && f->argument_count() == 2){
 			const Item * i0 = f->arguments()[0];
 			const Item * val = f->arguments()[1];
 			Item::Type t1 = i0->type();
 			Item::Type t2 = val->type();
-			
+
 			if(t1 == Item::FIELD_ITEM){
 				switch(t2){
 				case Item::STRING_ITEM: case Item::INT_ITEM: case Item::REAL_ITEM:case Item::VARBIN_ITEM:case Item::DECIMAL_ITEM:{
 
-					const Item_field * fi = (const Item_field*)i0;				
-				
-					tree_stored::abstract_conditional_iterator::ptr local = get_tree_table()->create_field_condition(fi, f, val);				
+					const Item_field * fi = (const Item_field*)i0;
+
+					tree_stored::abstract_conditional_iterator::ptr local = get_tree_table()->create_field_condition(fi, f, val);
 					if(parent == nullptr)
 						get_tree_table()->set_root_condition(local);
 					else
@@ -1166,22 +1165,22 @@ public:
 					break;
 				}
 			}
-			
-		}		
+
+		}
 		return false;
 	}
 	bool push_cond(const Item * acon,tree_stored::logical_conditional_iterator::ptr parent){
-		Item::Type t = acon->type();		
-		if(t == Item::FUNC_ITEM){		
+		Item::Type t = acon->type();
+		if(t == Item::FUNC_ITEM){
 			const Item_func* f = (const Item_func*)acon;
-			return push_func(f,parent);			
+			return push_func(f,parent);
 		}else if(t==Item::COND_ITEM){
 			Item_cond* c = (Item_cond* )acon;
 			if(c->functype() == Item_func::COND_AND_FUNC || c->functype() == Item_func::COND_OR_FUNC){
-				tree_stored::logical_conditional_iterator::ptr lcond ;					
+				tree_stored::logical_conditional_iterator::ptr lcond ;
 				lcond = (c->functype() == Item_func::COND_AND_FUNC) ? get_tree_table()->create_and_condition() : get_tree_table()->create_or_condition();
 				if(parent == nullptr){
-					
+
 					get_tree_table()->set_root_condition(lcond);
 				}else{
 					parent->push_condition(lcond);
@@ -1189,20 +1188,20 @@ public:
 				List_iterator<Item> i = *(c->argument_list());
 				for(;;){
 					const Item *cc = i++;
-				
+
 					if(NULL == cc)
 						break;
-					Item::Type ct = cc->type(); 
+					/// Item::Type ct = cc->type();
 					if(cc->type() == Item::FUNC_ITEM){
 						const Item_func* f = (const Item_func*)cc;
-						if(!push_func(f,lcond)){							
+						if(!push_func(f,lcond)){
 							return false;
 						}
 					}else{
 						if(!push_cond(cc,lcond)){
 							return false;
-						}						
-					}					
+						}
+					}
 				}
 				return true;
 			}else
@@ -1210,16 +1209,16 @@ public:
 		}
 		return false;
 	}
-	
+
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
 		if(push_cond(acon,nullptr))
 			return NULL;
 		get_tree_table()->pop_all_conditions();
 		return acon;
-		
+
 		/// const char * n = acon->full_name();
-		
+
 
 	};
 	void cond_pop(){
@@ -1248,26 +1247,26 @@ public:
 			get_tree_table()->pop_all_conditions();
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
-		
+
 		last_resolved = (*this).r.key().get_value();
 		stored::_Rid c = tree_stored::abstract_conditional_iterator::NoRecord;
 		while(c != last_resolved){
-			/// get the next record that matches 
+			/// get the next record that matches
 			/// returns last_resolved if current i.e. first record matches
-			c = (*this).get_tree_table()->iterate_conditions(last_resolved); 
+			c = (*this).get_tree_table()->iterate_conditions(last_resolved);
 			/// c is either valid or NoRecord
-			if(c == tree_stored::abstract_conditional_iterator::NoRecord){ 
+			if(c == tree_stored::abstract_conditional_iterator::NoRecord){
 				/// no record inclusive of last_resolved matched
 				get_tree_table()->pop_all_conditions();
 				DBUG_RETURN(HA_ERR_END_OF_FILE);
 			}
-			
+
 			if(c > last_resolved + 20){
 
 				(*this).r =  get_tree_table()->get_table().lower_bound(c);
 
 			}else{
-				
+
 				while((*this).r.key().get_value() < c ){
 					++((*this).r);
 					if((*this).r == (*this).r_stop){
@@ -1281,7 +1280,7 @@ public:
 		}
 
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
-		
+
 		resolve_selection(last_resolved);
 
 		++((*this).r);
@@ -1360,9 +1359,9 @@ public:
 		ha_rows rows = 0;
 		DBUG_ENTER("records_in_range");
 		//read_lookups+=2;
-		
+
 		stored::index_interface*current_index = get_tree_table()->get_index_interface(inx);
-		
+
 		get_index_iterator_lower(*current_index->get_first1(),inx, start_key) ;
 		get_index_iterator_upper(*current_index->get_last1(), inx, end_key);
 		rows = current_index->get_first1()->count(*current_index->get_last1());
@@ -1381,12 +1380,14 @@ public:
 		tt = NULL;
 		clear_selection(selected);
 		current_index = get_tree_table()->get_index_interface(handler::active_index);
+		current_index_iterator = current_index->get_index_iterator();
+
 		selected = get_tree_table()->create_output_selection(table);
 		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
 
 		return 0;
 	}
-	
+
 	inline stored::_Rid key_to_rid
 	(	uint ax
 	,	const tree_stored::CompositeStored& input
@@ -1412,17 +1413,17 @@ public:
 
 		}else
 #endif
-		{		
+		{
 			_Selection::iterator s = selected.begin();
-		
+
 			for(; s != selected.end(); ++s){
 				tree_stored::selection_tuple & sel = (*s);
 				sel.col->seek_retrieve(row,sel.field);
 			}
-			
+
 
 		}
-		
+
 	}
 	void resolve_selection_from_index(uint ax,  const tree_stored::CompositeStored& iinfo){
 
@@ -1456,7 +1457,7 @@ public:
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
 		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator());
-		
+
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 
 		read_lookups++;
@@ -1465,8 +1466,8 @@ public:
 			print_read_lookups();
 			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		}
-		
-		
+
+
 		if(current_iterator.valid()){
 
 			switch(find_flag){
@@ -1718,9 +1719,7 @@ static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 	DBUG_RETURN(return_val);
 }
 
-#include "Poco/Logger.h"
-#include "Poco/SimpleFileChannel.h"
-#include "Poco/AutoPtr.h"
+
 namespace storage_workers{
 
     struct _storage_worker{
@@ -1740,7 +1739,9 @@ namespace storage_workers{
 	}
 }
 /// example code
+
 void initialize_loggers(){
+#ifdef POCO_LOGGING
 	using Poco::Logger;
 	using Poco::SimpleFileChannel;
 	using Poco::AutoPtr;
@@ -1755,9 +1756,10 @@ void initialize_loggers(){
 	Logger& buffers = Logger::get("buffers");
 	logger.setChannel(pChannel);
 	buffers.setChannel(pBuffers);
-
+#endif
 }
 extern int pt_test();
+extern int linitialize();
 int treestore_db_init(void *p)
 {
 #ifdef _MSC_VER
@@ -1775,8 +1777,7 @@ int treestore_db_init(void *p)
 #endif
 	printf(" *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));
 	DBUG_ENTER("treestore_db_init");
-	//initialize_loggers();
-
+	initialize_loggers();
 	Poco::Data::SQLite::Connector::registerConnector();
 	handlerton *treestore_hton= (handlerton *)p;
 	static_treestore_hton = treestore_hton;
@@ -1787,9 +1788,7 @@ int treestore_db_init(void *p)
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 
-	//pt_test();
-	//treestore_hton->commit= 0;
-	//treestore_hton->rollback= 0;
+	/// pt_test();
 	DBUG_RETURN(FALSE);
 }
 
@@ -1837,3 +1836,195 @@ mysql_declare_plugin(treestore)
 		0,                          /* flags                           */
 }
 mysql_declare_plugin_end;
+/// unfortunately mysql has the tendency to redefine system and primitive types like CHAR for instance which changes the
+/// interfaces of other libraries include files as to be incompatible with their own source files
+/// this neccecitates the inclusion of source files in lieu of the mysql definitions
+#include "Poco/Platform.h"
+
+#include "Data/src/Connector.cpp"
+#include "Data/src/AbstractBinder.cpp"
+#include "Data/src/AbstractBinding.cpp"
+#include "Data/src/AbstractExtraction.cpp"
+#include "Data/src/AbstractExtractor.cpp"
+#include "Data/src/AbstractPreparation.cpp"
+#include "Data/src/AbstractPrepare.cpp"
+#include "Data/src/BLOB.cpp"
+#include "Data/src/BLOBStream.cpp"
+#include "Data/src/DataException.cpp"
+#include "Data/src/Limit.cpp"
+#include "Data/src/MetaColumn.cpp"
+#include "Data/src/PooledSessionHolder.cpp"
+#include "Data/src/PooledSessionImpl.cpp"
+#include "Data/src/Range.cpp"
+#include "Data/src/RecordSet.cpp"
+#include "Data/src/Session.cpp"
+#include "Data/src/SessionImpl.cpp"
+#include "Data/src/SessionPool.cpp"
+#include "Data/src/SessionFactory.cpp"
+#include "Data/src/Statement.cpp"
+#include "Data/src/StatementCreator.cpp"
+#include "Data/src/StatementImpl.cpp"
+#include "Data/SQLite/src/Connector.cpp"
+#include "Data/SQLite/src/Binder.cpp"
+#include "Data/SQLite/src/Extractor.cpp"
+#include "Data/SQLite/src/SessionImpl.cpp"
+#include "Data/SQLite/src/SQLiteException.cpp"
+#include "Data/SQLite/src/SQLiteStatementImpl.cpp"
+#include "Data/SQLite/src/Utility.cpp"
+
+#include "Foundation/src/ActiveDispatcher.cpp"
+#include "Foundation/src/ArchiveStrategy.cpp"
+#include "Foundation/src/Ascii.cpp"
+#include "Foundation/src/ASCIIEncoding.cpp"
+#include "Foundation/src/AsyncChannel.cpp"
+#include "Foundation/src/AtomicCounter.cpp"
+#include "Foundation/src/Base64Decoder.cpp"
+#include "Foundation/src/Base64Encoder.cpp"
+#include "Foundation/src/BinaryReader.cpp"
+#include "Foundation/src/BinaryWriter.cpp"
+#include "Foundation/src/Bugcheck.cpp"
+#include "Foundation/src/ByteOrder.cpp"
+
+#include "Foundation/src/Channel.cpp"
+#include "Foundation/src/Checksum.cpp"
+#include "Foundation/src/Condition.cpp"
+#include "Foundation/src/Configurable.cpp"
+#include "Foundation/src/ConsoleChannel.cpp"
+
+#include "Foundation/src/CountingStream.cpp"
+#include "Foundation/src/DateTime.cpp"
+#include "Foundation/src/DateTimeFormat.cpp"
+#include "Foundation/src/DateTimeFormatter.cpp"
+#include "Foundation/src/DateTimeParser.cpp"
+
+#include "Foundation/src/Debugger.cpp"
+#include "Foundation/src/DeflatingStream.cpp"
+#include "Foundation/src/DigestEngine.cpp"
+#include "Foundation/src/DigestStream.cpp"
+#include "Foundation/src/DirectoryIterator.cpp"
+#include "Foundation/src/DirectoryWatcher.cpp"
+
+#include "Foundation/src/DynamicAny.cpp"
+#include "Foundation/src/DynamicAnyHolder.cpp"
+#include "Foundation/src/ErrorHandler.cpp"
+#include "Foundation/src/Event.cpp"
+#include "Foundation/src/EventArgs.cpp"
+#ifdef POCO_OS_FAMILY_WINDOWS
+#include "Foundation/src/EventLogChannel.cpp"
+#endif
+#include "Foundation/src/Exception.cpp"
+
+#include "Foundation/src/File.cpp"
+
+#include "Foundation/src/FileChannel.cpp"
+#include "Foundation/src/FileStream.cpp"
+#include "Foundation/src/FileStreamFactory.cpp"
+#include "Foundation/src/Format.cpp"
+#include "Foundation/src/Formatter.cpp"
+#include "Foundation/src/FormattingChannel.cpp"
+//#include "Foundation/src/FPEnvironment.cpp"
+#include "Foundation/src/Glob.cpp"
+#include "Foundation/src/Hash.cpp"
+#include "Foundation/src/HashStatistic.cpp"
+#include "Foundation/src/HexBinaryDecoder.cpp"
+#include "Foundation/src/HexBinaryEncoder.cpp"
+#include "Foundation/src/InflatingStream.cpp"
+#include "Foundation/src/Latin1Encoding.cpp"
+#include "Foundation/src/Latin9Encoding.cpp"
+#include "Foundation/src/LineEndingConverter.cpp"
+#include "Foundation/src/LocalDateTime.cpp"
+#include "Foundation/src/LogFile.cpp"
+#include "Foundation/src/Logger.cpp"
+#include "Foundation/src/LoggingFactory.cpp"
+#include "Foundation/src/LoggingRegistry.cpp"
+#include "Foundation/src/LogStream.cpp"
+#include "Foundation/src/Manifest.cpp"
+//#include "Foundation/src/MD4Engine.cpp"
+#include "Foundation/src/MD5Engine.cpp"
+#include "Foundation/src/MemoryPool.cpp"
+#include "Foundation/src/MemoryStream.cpp"
+#include "Foundation/src/Message.cpp"
+#include "Foundation/src/Mutex.cpp"
+#include "Foundation/src/NamedEvent.cpp"
+#ifdef POCO_OS_FAMILY_WINDOWS
+#include "Foundation/src/NamedMutex.cpp"
+#endif
+#include "Foundation/src/NestedDiagnosticContext.cpp"
+#include "Foundation/src/Notification.cpp"
+#include "Foundation/src/NotificationCenter.cpp"
+#include "Foundation/src/NotificationQueue.cpp"
+#include "Foundation/src/NullChannel.cpp"
+#include "Foundation/src/NullStream.cpp"
+#include "Foundation/src/NumberFormatter.cpp"
+#include "Foundation/src/NumberParser.cpp"
+//#include "Foundation/src/OpcomChannel.cpp"
+#include "Foundation/src/Path.cpp"
+#include "Foundation/src/PatternFormatter.cpp"
+#include "Foundation/src/Pipe.cpp"
+#include "Foundation/src/PipeImpl.cpp"
+#include "Foundation/src/PipeStream.cpp"
+#include "Foundation/src/PriorityNotificationQueue.cpp"
+#include "Foundation/src/Process.cpp"
+#include "Foundation/src/PurgeStrategy.cpp"
+#include "Foundation/src/Random.cpp"
+#include "Foundation/src/RandomStream.cpp"
+#include "Foundation/src/RefCountedObject.cpp"
+//#include "Foundation/src/RegularExpression.cpp"
+#include "Foundation/src/RotateStrategy.cpp"
+#include "Foundation/src/Runnable.cpp"
+#include "Foundation/src/RWLock.cpp"
+#include "Foundation/src/Semaphore.cpp"
+#include "Foundation/src/SHA1Engine.cpp"$(TARGET_OUTPUT_DIR)$(TARGET_OUTPUT_BASENAME)
+#include "Foundation/src/SharedLibrary.cpp"
+#include "Foundation/src/SharedMemory.cpp"
+#include "Foundation/src/SignalHandler.cpp"
+#include "Foundation/src/SimpleFileChannel.cpp"
+#include "Foundation/src/SplitterChannel.cpp"
+#include "Foundation/src/Stopwatch.cpp"
+#include "Foundation/src/StreamChannel.cpp"
+#include "Foundation/src/StreamConverter.cpp"
+#include "Foundation/src/StreamCopier.cpp"
+#include "Foundation/src/StreamTokenizer.cpp"
+#include "Foundation/src/String.cpp"
+#include "Foundation/src/StringTokenizer.cpp"
+#include "Foundation/src/SynchronizedObject.cpp"
+//#include "Foundation/src/SyslogChannel.cpp"
+#include "Foundation/src/Task.cpp"
+#include "Foundation/src/TaskManager.cpp"
+#include "Foundation/src/TaskNotification.cpp"
+#include "Foundation/src/TeeStream.cpp"
+#include "Foundation/src/TemporaryFile.cpp"
+#include "Foundation/src/TextBufferIterator.cpp"
+#include "Foundation/src/TextConverter.cpp"
+#include "Foundation/src/TextEncoding.cpp"
+#include "Foundation/src/TextIterator.cpp"
+#include "Foundation/src/Thread.cpp"
+#include "Foundation/src/ThreadLocal.cpp"
+#include "Foundation/src/ThreadPool.cpp"
+#include "Foundation/src/ThreadTarget.cpp"
+#include "Foundation/src/TimedNotificationQueue.cpp"
+#include "Foundation/src/Timer.cpp"
+#include "Foundation/src/Timespan.cpp"
+#include "Foundation/src/Timestamp.cpp"
+#include "Foundation/src/Timezone.cpp"
+#include "Foundation/src/Token.cpp"
+#include "Foundation/src/URI.cpp"
+#include "Foundation/src/URIStreamFactory.cpp"
+#include "Foundation/src/URIStreamOpener.cpp"
+#include "Foundation/src/UTF16Encoding.cpp"
+#include "Foundation/src/UTF8Encoding.cpp"
+#include "Foundation/src/UTF8String.cpp"
+#include "Foundation/src/UUID.cpp"
+#include "Foundation/src/UUIDGenerator.cpp"
+#include "Foundation/src/Void.cpp"
+typedef char BOOL;
+#include "Foundation/src/Unicode.cpp"
+#include "Foundation/src/UnicodeConverter.cpp"
+#include "Foundation/src/Windows1252Encoding.cpp"
+#ifdef POCO_OS_FAMILY_WINDOWS
+#include "Foundation/src/WindowsConsoleChannel.cpp"
+#endif
+int main(int argc, char *argv[]){
+    pt_test();
+    return 0;
+}

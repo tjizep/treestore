@@ -39,7 +39,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 extern NS_STORAGE::u64 hash_hits;
 extern NS_STORAGE::u64 hash_predictions;
-
+extern NS_STORAGE::u64 total_cache_size;
 namespace tree_stored{
 	template<typename _Keytype>
 	struct cached_row{
@@ -51,26 +51,22 @@ namespace tree_stored{
 	};
 
 	class eraser_interface{
-	public:		
+	public:
 		virtual void erase(const CompositeStored& input)=0;
 	};
-	
-	
+
+
 	/// The predictive cache acts like an adaptive 'derandomizer'
 
 	template<typename BasicIterator>
 	struct predictive_cache : public eraser_interface{
 	private:
 		static const NS_STORAGE::u64 CIRC_SIZE = 10000000;/// about 128 MB shared - the cachedrow is 32 bytes
-		
+
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
 		typedef cached_row<typename BasicIterator::key_type> CachedRow;
 		typedef std::vector<CompositeStored> _Erased;
-		_Erased erased;
-		stored::DynamicKey rval;	
-		nst::u32 hash_size;
-		nst::u32 last_store;
-		Poco::Mutex erase_lock;
+
 	private:
 		void _erase(const CompositeStored& input){
 			unsigned int h = ((size_t)input) % hash_size;
@@ -83,20 +79,18 @@ namespace tree_stored{
 			}
 		}
 	public:
-		predictive_cache():store_pos(0),hits(0),misses(0),multi(0),enabled(treestore_predictive_hash!=0),loaded(false),hash_size(11){
-			last_store = 3;
-		}
-		
+
+
 		void set_hash_size(nst::u32 hash_size){
 			if((*this).hash_size != hash_size){
 				(*this).clear();
 				(*this).hash_size = hash_size;
 			}
 		}
-		
+
 		~predictive_cache(){
 		}
-		
+
 		inline bool hashed() const {
 			return !cache_index.empty();
 		}
@@ -127,7 +121,7 @@ namespace tree_stored{
 			}
 			return loaded;
 		}
-		
+
 		/// TODO: NB: the return value should be const
 		const CompositeStored* _int_predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 
@@ -162,7 +156,7 @@ namespace tree_stored{
 
 				++hash_hits; // neither hit nor miss
 				return &sec_cache[predictor].k.return_or_copy(rval);
-			
+
 			}
 			predictor = 0;
 			++misses;
@@ -192,7 +186,7 @@ namespace tree_stored{
 			erased.clear();
 
 		}
-		
+
 
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
@@ -200,10 +194,10 @@ namespace tree_stored{
 			if((nst::u64)calc_total_use() > (nst::u64)treestore_max_mem_use){
 				clear();
 				return;
-			}			
+			}
 			if(!enabled) return;
 			if(iter.invalid()) return;
-			
+
 			if(!load()) return;
 			store_pos = sec_cache.size();
 			if(store_pos >= CIRC_SIZE) return;
@@ -243,7 +237,13 @@ namespace tree_stored{
 
 		typedef std::vector<CachedRow> _SecCache;
 		typedef std::vector<unsigned int> _RowCache;
-
+    private:
+        _Erased erased;
+		stored::DynamicKey rval;
+		nst::u32 hash_size;
+		nst::u32 last_store;
+		Poco::Mutex erase_lock;
+    public:
 		stored::_Rid rows;
 		_SecCache sec_cache;
 		_RowCache cache_index;
@@ -259,7 +259,20 @@ namespace tree_stored{
         bool enabled;
 		bool loaded;
 
+    public:
+		predictive_cache()
+		:   hash_size(11)
+		,   store_pos(0)
+		,   hits(0)
+		,   misses(0)
+		,   multi(0)
+		,   enabled(treestore_predictive_hash!=0)
+		,   loaded(false)
 
+		{
+			last_store = 3;
+
+		}
 
 
 	};

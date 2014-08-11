@@ -140,10 +140,10 @@ namespace stx
 {
 	/// mini pointer for portable iterator references
 	struct mini_pointer{
-		
+
 		storage::stream_address w;
 	};
-	
+
 	/// an iterator intializer pair
 	typedef std::pair<mini_pointer, unsigned short> initializer_pair;
 
@@ -211,10 +211,10 @@ namespace stx
 		/// Number of slots in each surface of the tree. Estimated so that each node
 		/// has a size of about btree_traits::bytes_per_page bytes.
 		static const int    surfaces = btree_traits::keys_per_page; //max_const( 8l, btree_traits::bytes_per_page / (sizeof(key_proxy)) );
-		
+
 		/// Number of cached keys
 		static const int	caches = btree_traits::caches_per_page;
-		
+
 		/// Number of slots in each interior node of the tree. Estimated so that each node
 		/// has a size of about btree_traits::bytes_per_page bytes.
 		static const int    interiorslots = btree_traits::keys_per_page; //max_const( 8l, btree_traits::bytes_per_page / (sizeof(key_proxy) + sizeof(void*)) );
@@ -249,7 +249,7 @@ namespace stx
 
 		typedef _Data data_type;
 		/// Base B+ tree parameter: The number of cached key/data slots in each surface
-		
+
 		static const int	caches = btree_traits::caches_per_page ;
 
 		/// Number of slots in each surface of the tree. A page has a size of about btree_traits::bytes_per_page bytes.
@@ -265,7 +265,7 @@ namespace stx
 
 	};
 
-	enum states
+	enum states_
 	{
 		initial = 1,
 		created,
@@ -273,18 +273,21 @@ namespace stx
 		loaded,
 		changed
 	};
-
+	typedef short states;
 	struct node_ref{
 		/// references for eviction
-		int refs;
-		states s;
+		short refs;
+		short s;
+		/// shared counter used when page is shared, only surfaces can be shared
+		Poco::AtomicCounter a_refs;
+		/// is the node shared or not
+		bool shared;
 
-
-		node_ref() : refs(0), s(initial)//, shared(false)
+		node_ref() : refs(0), s(initial), a_refs(0), shared(false)
 		{
 		}
 	};
-	
+
 
 	/// as a test the null ref was actually defined as a real address
 	/// static node_ref null_ref;
@@ -375,7 +378,7 @@ namespace stx
 
 		/// Base B+ tree parameter: The number of key/data slots in each surface
 		static const unsigned short         surfaceslotmax =  traits::surfaces;
-		
+
 		/// Base B+ tree parameter: The number of cached key slots in each surface
 		static const unsigned short         cacheslotmax =  traits::caches;
 
@@ -411,7 +414,7 @@ namespace stx
 		/// proxy and interceptor class for reference counted pointers
 		/// and automatic loading
 
-		
+
 		class base_proxy
 		{
 		protected:
@@ -527,52 +530,30 @@ namespace stx
 				//if((*this).ptr)
 				//	static_cast<_Loaded*>((*this).ptr)->cc = ++stx::cgen;
 			}
-			inline void unref(typename btree::surface_node* ptr){
-				if(ptr != NULL_REF){
-					if(ptr->shared)
-						--(ptr->a_refs);
-					else
-						ptr->refs--;
-				}
-			}
-			inline void ref(typename btree::surface_node* ptr){
-				if(ptr != NULL_REF){
-					if(ptr->shared)
-						++(ptr->a_refs);
-					else
-						ptr->refs++;
-				}
-			}
 
-			inline void unref(typename btree::interior_node* ptr){
-				if(ptr != NULL_REF){
-					ptr->refs--;
-				}
-			}
-			inline void ref(typename btree::interior_node* ptr){
-				if(ptr != NULL_REF){
-					ptr->refs++;
-				}
-			}
-			inline void unref(typename btree::node* ptr){
+			inline void unref(typename stx::node_ref* ptr){
 				if(ptr != NULL_REF)
 				{
-					if(ptr->issurfacenode())
+					if(ptr->shared)
 					{
-						unref(static_cast<surface_node*>(ptr));
+						--(ptr->a_refs);
 
 					}else
 					{
-						unref(static_cast<interior_node*>(ptr));
+						ptr->refs--;
 					}
 				}
 			}
-			inline void ref(typename btree::node* ptr){
-				if(ptr != NULL_REF){
-					if(ptr->issurfacenode()){
-						ref(static_cast<surface_node*>(ptr));
-					}else{
-						ref(static_cast<interior_node*>(ptr));
+			inline void ref(typename stx::node_ref* ptr){
+				if(ptr != NULL_REF)
+				{
+					if(ptr->shared)
+					{
+						++(ptr->a_refs);
+
+					}else
+					{
+						ptr->refs++;
 					}
 				}
 			}
@@ -606,13 +587,13 @@ namespace stx
 			inline void ref(){
 
 
-					ref(static_cast<_Loaded*>(super::ptr));
+					ref(super::ptr);
 			}
 
 			/// removes a reference for page management
 			inline void unref(){
 
-					unref(static_cast<_Loaded*>(super::ptr));
+					unref(super::ptr);
 
 			}
 
@@ -965,6 +946,18 @@ namespace stx
 				return *rget();
 			}
 
+			/// the 'safe' pointer getter
+			inline const _Loaded * get() const
+			{
+				load();
+				return rget();
+			}
+			/// the 'safe' pointer getter
+			inline _Loaded * get()
+			{
+				load();
+				return rget();
+			}
 		};
 
 		/// The header structure of each node in-memory. This structure is extended
@@ -979,17 +972,22 @@ namespace stx
 		/// very high so the optimization may not be relevant
 		struct node : public node_ref
 		{
+		public:
+
 		private:
+
 			/// Number of key occupants, so number of valid nodes or data
 			/// pointers
 
 			/// occupants: since all pages are the same size - its like a block of flats
 			/// where the occupant count varies over time the size stays the same
+
 			storage::u16  cache_occupants;
+
 			storage::u16  occupants;
-			mutable storage::i32  llb;
 			/// cpu cache keys
 			key_type        cached[cacheslotmax+1];
+
 		protected:
 			/// populate cache
 
@@ -1010,27 +1008,27 @@ namespace stx
 			void check_cache(const key_type* keys){
 
 				if(get_cache_occupants() == 0){
-					set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants())); 
+					set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
 				}
 			}
-			
-			template<typename key_type>			
+
+			template<typename key_type>
 			void check_cache(const key_type* keys) const {
 				((node*)this)->check_cache(keys);
 			}
 
 		public:
-			bool shared;
+
 
 			void reset_cache_occupants(){
 				set_cache_occupants(0);
 			}
-			
+
 			void inc_occupants(){
 				++occupants;
 				set_cache_occupants(0);
 			}
-			
+
 			void dec_occupants(){
 				--occupants;
 				set_cache_occupants(0);
@@ -1073,7 +1071,6 @@ namespace stx
 				level = l;
 				occupants = 0;
 				shared = false;
-				llb = 0;
 				cache_occupants = 0;
 
 			}
@@ -1101,28 +1098,19 @@ namespace stx
 			{
 				return !key_less(a, b) && !key_less(b, a);
 			}
-			
+
 			/// multiple search type lower bound template function
 			/// performs a lower bound mapping using a couple of techniques simultaneously
 
 			template<typename key_compare, typename key_interpolator >
-			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key, bool do_llb = true) const {
+			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key) const {
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
 				check_cache(keys);
 
-				register unsigned int l = 0, ll=llb, h = o;
+				register unsigned int l = 0, h = o;
 
 				/// multiple search type lower bound function
-				/*if(do_llb){
-					/// history optimized linear search
-					unsigned int llo = std::min<unsigned int>(o,llb+3);
-					while (ll < llo && key_less(keys[ll],key)) ++ll;
-					if(ll > llb && ll < llo){
-						llb = ll;
-						return ll;
-					}
-				}*/
 				unsigned int ml  = 0,mb = 0;
 				unsigned int step = o / cacheslotmax;
 				if(get_cache_occupants()){
@@ -1130,35 +1118,34 @@ namespace stx
 					if(ml > 0) mb = ml-1;
 					l = mb * step ;
 					h =(ml==cacheslotmax) ? o : ml * step;
-					
-				}else{
 
+				}else{
 					/// truncated binary search
-					while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
-						int m = (l + h) >> 1;
+					int m;
+					while(h-l > (unsigned int)traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
+						m = (l + h) >> 1;
 						if (key_lessequal(key_less, key, keys[m])) {
 							h = m;
 						}else {
 							l = m + 1;
 						}
 					}
+
 				}
+
 				/// residual linear search
 				while (l < h && key_less(keys[l],key)) ++l;
-				
-				
-				llb = l;
-				
+
 				return l;
 			}
 
-			/// simple search type lower bound template function			
+			/// simple search type lower bound template function
 			template<typename key_compare>
-			inline unsigned int min_find_lower(key_compare key_less,const key_type* keys, int o, const key_type& key) const {				
+			inline unsigned int min_find_lower(key_compare key_less,const key_type* keys, int o, const key_type& key) const {
 				if (o  == 0) return 0;
 				register unsigned int l = 0, h = o;
 				/// truncated binary search
-				while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
+				while(h-l > (unsigned int)traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
 					int m = (l + h) >> 1;
 					if (key_lessequal(key_less, key, keys[m])) {
 						h = m;
@@ -1185,7 +1172,7 @@ namespace stx
 
 			/// persisted reference type providing unobtrusive page management
 			typedef pointer_proxy<interior_node> ptr;
-			
+
 			/// Keys of children or data pointers
 			key_type        keys[interiorslotmax];
 
@@ -1295,9 +1282,7 @@ namespace stx
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
 
-			/// shared counter used when page is shared, only surfaces can be shared
-			Poco::AtomicCounter a_refs;
-						
+
 			/// Keys of children or data pointers
 			key_type        keys[surfaceslotmax];
 
@@ -1305,7 +1290,7 @@ namespace stx
 			data_type       values[surfaceslotmax];
 
 			/// Is the node sorted or not
-			int sorted;
+			short sorted;
 
 
 			/// Set variables to initial values
@@ -1314,7 +1299,7 @@ namespace stx
 				node::initialize(0);
 				sorted = 0;
 				(*this).shared = false;
-				a_refs = 0;
+				(*this).a_refs = 0;
 				preceding = next = NULL_REF;
 
 			}
@@ -1326,7 +1311,7 @@ namespace stx
 				(*this).a_refs = (*this).refs;
 			}
 			bool unshare(){
-				if((*this).shared && a_refs == 1){
+				if((*this).shared && (*this).a_refs == 1){
 					(*this).shared = false;
 					(*this).refs = (*this).a_refs ;
 					(*this).a_refs = 0;
@@ -1365,7 +1350,7 @@ namespace stx
 			{
 				this->sort(stats, key_less);
 
-				return node::find_lower(key_less, interp, keys, key, !(*this).shared);//a_refs < 4
+				return node::find_lower(key_less, interp, keys, key);//a_refs < 4
 
 			}
 
@@ -1442,7 +1427,7 @@ namespace stx
 							}
 						}else
 						{
-							
+
 							std::stable_sort(unsorted, unsorted + node::get_occupants() );
 
 							int i = 0, s = 0, p = 0;
@@ -1764,7 +1749,7 @@ namespace stx
 			/// TODO: NB! double mutex
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
-				printf("bad allocation at %lld in %s\n",(long long)w, get_storage()->get_name().c_str());
+				printf("bad allocation at %li in %s\n",(long int)w, get_storage()->get_name().c_str());
 				BTREE_ASSERT(get_storage()->is_end(dangling_buffer) && dangling_buffer.size() > 0);
 				throw std::exception();
 			}
@@ -1912,7 +1897,7 @@ namespace stx
 
 			/// an iterator intializer pair
 			typedef stx::initializer_pair initializer_pair;
-			
+
 		private:
 			// *** Members
 
@@ -3235,7 +3220,7 @@ namespace stx
 
 			this->headsurface.unload();
 			this->last_surface.unload();
-			
+
 			if((*this).stats.surface_use + (*this).stats.interior_use > 0){
 				flush_recursive(flushed,root);
 			}
@@ -3898,15 +3883,13 @@ namespace stx
 		/// equal to or greater than key, or end() if all keys are smaller.
 		iterator lower_bound(const key_type& key)
 		{
-			typename node::ptr n = root;
-			if (n==NULL_REF) return end();
-
+			if (root==NULL_REF) return end();
+			typename interior_node::ptr n = root;
 			while(!n->issurfacenode())
 			{
-				const typename interior_node::ptr interior = n;
-				int slot = find_lower(interior, key);
-				interior->childid[slot].load();
-				n = interior->childid[slot];
+				int slot = find_lower(n, key);
+				n->childid[slot].load();
+				n = n->childid[slot];
 			}
 
 			typename surface_node::ptr surface = n;
@@ -3920,16 +3903,15 @@ namespace stx
 		/// are smaller.
 		const_iterator lower_bound(const key_type& key) const
 		{
-			typename node::ptr n = root;
-			if (n==NULL_REF) return end();
+			if (root==NULL_REF) return end();
+			typename interior_node::ptr n = root;
 
 			while(!n->issurfacenode())
 			{
 
-				typename interior_node::ptr interior = n;
-				int slot = find_lower(interior, key);
-
-				n = interior->childid[slot];
+				int slot = find_lower(n, key);
+				n->childid[slot].load();
+				n = n->childid[slot];
 			}
 
 			typename surface_node::ptr surface = n;
@@ -5403,7 +5385,7 @@ namespace stx
 			{
 				return result_t(btree_update_lastkey, left->keys[left->get_occupants() - 1]);
 			}
-			
+
 		}
 
 		/// Balance two interior nodes. The function moves key/data pairs from right
@@ -5427,7 +5409,7 @@ namespace stx
 			BTREE_PRINT("Shifting (interior) " << shiftnum << " entries to left " << left << " from right " << right << " with common parent " << parent << "." << std::endl);
 
 			BTREE_ASSERT(left->get_occupants() + shiftnum < interiorslotmax);
-			
+
 			right.change();
 			left.change();
 			parent.change();
@@ -5473,7 +5455,7 @@ namespace stx
 				right->childid[i] = right->childid[i + shiftnum];
 			}
 			right->childid[right->get_occupants()] = right->childid[right->get_occupants() + shiftnum];
-		
+
 		}
 
 		/// Balance two surface nodes. The function moves key/data pairs from left to
@@ -5498,7 +5480,7 @@ namespace stx
 			unsigned int shiftnum = (left->get_occupants() - right->get_occupants()) >> 1;
 
 			BTREE_PRINT("Shifting (surface) " << shiftnum << " entries to right " << right << " from left " << left << " with common parent " << parent << "." << std::endl);
-			
+
 			right.change();
 			left.change();
 			parent.change();
@@ -5539,7 +5521,7 @@ namespace stx
 			left->set_occupants(left->get_occupants() - shiftnum);
 
 			parent->keys[parentslot] = left->keys[left->get_occupants()-1];
-			
+
 		}
 
 		/// Balance two interior nodes. The function moves key/data pairs from left to
@@ -5557,7 +5539,7 @@ namespace stx
 
 			BTREE_ASSERT(left->get_occupants() > right->get_occupants());
 			BTREE_ASSERT(parent->childid[parentslot] == left);
-			
+
 			right.change();
 			left.change();
 			parent.change();
@@ -5607,7 +5589,7 @@ namespace stx
 			parent->keys[parentslot] = left->keys[left->get_occupants() - shiftnum];
 
 			left->set_occupants(left->get_occupants() - shiftnum);
-			
+
 		}
 
 #ifdef BTREE_DEBUG

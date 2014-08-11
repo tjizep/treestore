@@ -40,3 +40,4 @@ namespace stored{
 	}
 }; //stored
 
+#include "Foundation/src/Environment.cpp"
