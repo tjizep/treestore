@@ -14,7 +14,7 @@ Features
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads, similar or exceeding row databases
-+ High read performance - average increase of 200% performance on tpc-h (HammerDB) and more when running from cold cache
++ High read performance - average increase of 200% performance on tpc-h (HammerDB) from hot cache and more up to 600%    when running from cold cache
 + In memory compression without performance loss
 
 Benchmarks
