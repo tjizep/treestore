@@ -42,6 +42,15 @@ Results (cold start 30 % variance)
 + InnoDB 660 secs
 + TuReestore 105 secs
 
+Linux Installation and Notes
+----------------------------
+
++ find libtreestore.so under codeblocks/treestore/bin/Release
++ put it in your plugin directory
++ execute INSTALL PLUGIN TREESTORE SONAME 'libtreestore.so'
++ Treestore is **case** sensitive so a table with name **EMPLOYEES** does
+  not equal **employees**
+
 Microsoft Windows Installation
 ------------------------------
 
@@ -115,7 +124,7 @@ Changes
 0.31 beta
 
 1. Performance Improvements 10% on average
-2. Linux builds, added libtreestore under codeblocks/bin/Release foler
+2. Linux builds, added libtreestore under codeblocks/treestore/bin/Release folder
 
 0.30 beta
 
