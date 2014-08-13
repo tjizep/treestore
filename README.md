@@ -1,10 +1,10 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.30 (beta)
+TuReestore MySQL Storage Engine version 0.31 (beta)
 --------------------------------------------------
 
-TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.17
+TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.20
 
 Features
 --------
@@ -112,6 +112,11 @@ This table supplies configuration options for sacrificing performance for less m
 
 Changes
 -------
+0.31 beta
+
+1. Performance Improvements 10% on average
+2. Linux builds, added libtreestore under codeblocks/bin/Release foler
+
 0.30 beta
 
 1. Added b-tree CPU cache conscious optimization 
