@@ -1916,6 +1916,8 @@ namespace stored{
 		virtual bool invalid() const = 0;
 		virtual void next() = 0;
 		virtual void previous() = 0;
+		virtual void first() = 0;
+		virtual void last() = 0;
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;
 		virtual DynamicKey& get_key() = 0;
 		virtual void set_end(index_iterator_interface& in) = 0;
@@ -1941,6 +1943,7 @@ namespace stored{
 		virtual const int& density_at(size_t at) const = 0;
 		virtual void end(index_iterator_interface& out)=0;
 		virtual index_iterator_interface * get_index_iterator() = 0;
+		virtual index_iterator_interface * get_prepared_index_iterator() = 0;
 		virtual index_iterator_interface * get_first1() = 0;
 		virtual index_iterator_interface * get_last1() = 0;
 

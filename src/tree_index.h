@@ -75,6 +75,12 @@ namespace tree_stored{
 			void previous() {
 				value.previous();
 			};
+			void first() {
+				value.first();
+			};
+			void last() {
+				value.last();
+			};
 			nst::u64 count(const index_iterator_interface& in) {
 				return value.count(((index_iterator_impl&)in).value);
 			};
@@ -443,6 +449,10 @@ namespace tree_stored{
 	public:
 
 		stored::index_iterator_interface * get_index_iterator() {
+			return &cur;
+		}
+		stored::index_iterator_interface * get_prepared_index_iterator() {
+			cur.value = index.first();
 			return &cur;
 		}
 

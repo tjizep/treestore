@@ -113,6 +113,14 @@ namespace iterator{
 			iend = get_map().end();
 			check();
 		}
+		void last(){
+			check();
+			
+			iend = get_map().end();
+			i = iend;
+			--i;
+			check();
+		}
 
 		_Rid count(const ImplIterator &last){
 			_Rid r = (_Rid)i.count(last.i);

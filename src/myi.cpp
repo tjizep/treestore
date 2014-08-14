@@ -1587,14 +1587,28 @@ public:
 
 		DBUG_ENTER("index_first");
 		ha_statistic_increment(&SSV::ha_read_first_count);
-
-		r = index_read(buf, NULL, 0, HA_READ_AFTER_KEY);
+		stored::index_iterator_interface & current_iterator = *(current_index->get_prepared_index_iterator());
+		current_iterator.first();
+		table->status = STATUS_NOT_FOUND;
+		if(get_index_iterator().valid()){
+			resolve_selection_from_index();
+			r = 0;
+			table->status = 0;			
+		}
 
 		DBUG_RETURN(r);
 	}
 
 	int index_last(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
+		stored::index_iterator_interface & current_iterator = *(current_index->get_prepared_index_iterator());
+		current_iterator.last();
+		table->status = STATUS_NOT_FOUND;
+		if(get_index_iterator().valid()){
+			resolve_selection_from_index();
+			r = 0;
+			table->status = 0;			
+		}
 		DBUG_RETURN(r);
 	}
 
