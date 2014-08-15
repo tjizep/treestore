@@ -25,6 +25,7 @@ namespace iterator{
 	private:
 		typename _MapType::iterator i;
 		typename _MapType::iterator iend;
+		
 		_MapType * map;
 
 		_MapType &get_map(){
@@ -98,27 +99,32 @@ namespace iterator{
 		}
 
 		void lower(const key_type &k){
+			
 			i = get_map().lower_bound(k);
 			check();
 		}
 		void find(const key_type &k){
+			
 			check();
 			i = get_map().find(k);
 			iend = get_map().end();
 			check();
 		}
 		void first(){
+			
 			check();
 			i = get_map().begin();
 			iend = get_map().end();
 			check();
 		}
 		void last(){
+			
 			check();
 			
 			iend = get_map().end();
 			i = iend;
-			--i;
+			if(i != get_map().begin())
+				--i;
 			check();
 		}
 
@@ -146,11 +152,13 @@ namespace iterator{
 		}
 
 		bool valid() const {
+			if(map == NULL) return false;
 			check();
 			return (i!=iend);
 		};
 
 		bool invalid() const {
+			if(map == NULL) return true;
 			check();
 			return (i==iend);
 		};
@@ -172,10 +180,12 @@ namespace iterator{
 		}
 
 		void next(){
+			
 			check();
 			++i;
 		}
 		void previous(){
+			
 			--i;
 		}
 	};
