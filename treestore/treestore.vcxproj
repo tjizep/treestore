@@ -312,6 +312,7 @@
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_ucd.c" />
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_valid_utf8.c" />
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_xclass.c" />
+    <ClCompile Include="..\src\stx\btree.cpp" />
     <ClCompile Include="..\src\transactional_storage.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>

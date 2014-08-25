@@ -278,7 +278,7 @@ namespace stored{
 		NS_STORAGE::u8* _resize_buffer(size_t nbytes){
 			using namespace NS_STORAGE;
 			NS_STORAGE::u8* r = data();
-			if(nbytes > bytes){
+  			if(nbytes > bytes){
 				nst::add_buffer_use (nbytes);
 				NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
 				memcpy(nbuf, r, std::min<size_t>(nbytes, size));

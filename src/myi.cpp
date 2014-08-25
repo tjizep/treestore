@@ -51,13 +51,14 @@ typedef uchar byte;
 ptrdiff_t MAX_PC_MEM = 1024ll*1024ll*1024ll*4ll;
 namespace nst = NS_STORAGE;
 nst::u64 pk_lookups = 0;
-NS_STORAGE::u64 read_lookups =0;
-NS_STORAGE::u64 hash_hits =0;
-NS_STORAGE::u64 hash_predictions =0;
-NS_STORAGE::u64 last_read_lookups ;
-NS_STORAGE::u64 total_cache_size=0;
-NS_STORAGE::u64 ltime = 0;
-
+nst::u64 read_lookups =0;
+nst::u64 hash_hits =0;
+nst::u64 hash_predictions =0;
+nst::u64 last_read_lookups ;
+nst::u64 total_cache_size=0;
+nst::u64 ltime = 0;
+static nst::u64 total_locks = 0;
+static Poco::Mutex mut_total_locks;
 /// instances of config variables
 long long treestore_max_mem_use = 0;
 long long treestore_current_mem_use = 0;
@@ -689,7 +690,10 @@ public:
 		if(get_tree_table() == NULL){
 			return 0;
 		}
-
+		{
+			nst::synchronized s(mut_total_locks);
+			++total_locks;
+		}
 
 		nst::synchronized synch(tt_info_lock);
 		tree_stored::tree_table * tt = get_info_table((*this).table);
@@ -750,7 +754,10 @@ public:
 		}
 
 		tt->rollback();
-
+		{
+			nst::synchronized s(mut_total_locks);
+			--total_locks;
+		}
 		return 0;
 	}
 
@@ -1023,22 +1030,21 @@ public:
 
 
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
-		if(thread->get_locks()==0){
-			bool high_mem = calc_total_use() > treestore_max_mem_use ;
-			while
-			(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
-			||	high_mem
-			)
-			{
+		if(total_locks==0){
+			nst::synchronized s(mut_total_locks);
+			if(total_locks==0){
+				bool high_mem = calc_total_use() > treestore_max_mem_use ;
+				
+				if
+				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
+				||	high_mem
+				)
+				{					
+					st.check_journal();/// function releases all idle reading transaction locks
+					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage									
+				}
 				if(high_mem){
 					stored::reduce_all();
-				}
-				st.check_journal();
-				NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage
-				os::zzzz(100);
-				if( high_mem ){
-					stored::reduce_all();
-					high_mem = false;
 				}
 			}
 		}
@@ -1054,7 +1060,10 @@ public:
 			,	(double)total_cache_size/units::MB
 			);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
-
+			{
+				nst::synchronized s(mut_total_locks);
+				++total_locks;
+			}
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 
 				return HA_ERR_LOCK_TABLE_FULL;
@@ -1067,9 +1076,7 @@ public:
 			(*this).tt = thread->lock(table, writer);
 		}else if(lock_type == F_UNLCK){
 			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
-			if(thread->get_locks()==1){
-				st.check_use();
-			}
+			
 			thread->release(table);
 			if(thread->get_locks()==0){
 
@@ -1087,7 +1094,7 @@ public:
 				st.check_use();
 				/// for testing
 				//st.reduce_all();
-				if(calc_total_use() > treestore_max_mem_use || treestore_reduce_storage_use_on_unlock){
+				if(calc_total_use() > (treestore_max_mem_use * 0.75) || treestore_reduce_storage_use_on_unlock){
 
 					DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 
@@ -1107,6 +1114,17 @@ public:
 
 			}
 			st.check_use();
+			{
+				nst::synchronized s(mut_total_locks);
+				--total_locks;
+				if(total_locks==0){
+					if(calc_total_use() > treestore_max_mem_use){
+						nst::synchronized s2(tt_info_lock);/// the info function may be called in another thread
+						printf("Releasing shared memory: total locks reached 0 processing idle pages\n");
+						stx::process_idle_times();
+					}
+				}			
+			}
 		}
 
 

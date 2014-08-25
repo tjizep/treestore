@@ -209,6 +209,9 @@
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_xclass.c">
       <Filter>Source Files\poco</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\stx\btree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\stx\btree">
