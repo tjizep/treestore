@@ -38,12 +38,18 @@ namespace stx{
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){
 
 			int d = *((int*)&buff[0]) ;
+			decoded.reserve(d);
 			decoded.resize(d);
 			LZ4_decompress_fast((const char *)&buff[sizeof(int)],(char *)&decoded[0],d);
 		}
 		static void inplace_decompress_lz4(buffer_type& buff){
 			if(buff.empty()) return;
 			buffer_type dt;
+			decompress_lz4(dt, buff);
+			buff = dt;
+		}
+		static void inplace_decompress_lz4(buffer_type& buff, buffer_type& dt){
+			if(buff.empty()) return;			
 			decompress_lz4(dt, buff);
 			buff = dt;
 		}

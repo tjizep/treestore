@@ -1203,7 +1203,7 @@ namespace storage{
 			
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.0,true,false);
+				flush_back(0.85,true,false);
 		}
 	};
 

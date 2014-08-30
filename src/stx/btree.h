@@ -144,6 +144,7 @@ namespace stx
 	};
 	typedef std::vector<idle_processor*> _idle_processors;
 	extern _idle_processors idle_processors;
+	extern bool memory_low_state;
 	static void process_idle_times(){
 		for(_idle_processors::iterator i = idle_processors.begin(); i != idle_processors.end(); ++i){
 			(*i)->idle_time();
@@ -561,10 +562,6 @@ namespace stx
 					}else
 					{
 						ptr->refs--;
-					
-						if(ptr->refs == 0 && ptr->is_orphaned()){							
-							get_context()->free_node(static_cast<btree::node*>(ptr),0);										
-						}
 					
 					}
 				}
@@ -1731,13 +1728,12 @@ namespace stx
 			_AddressedVersionNodes* nodes;
 		};
 		
-		/// used to consistently report nodes loaded memory use;
+		
 		nst::u64 _nodes_loaded_mem_reported;
 		void report_nodes_loaded_mem(){
-			remove_btree_totl_used (_nodes_loaded_mem_reported);
-			_nodes_loaded_mem_reported = nodes_loaded.size()*32;
-			add_btree_totl_used (_nodes_loaded_mem_reported);
+			
 		}
+
 		/// provides register for currently loaded/decoded nodes
 		/// used to prevent reinstantiation of existing nodes
 		/// therefore providing consistency to updates to any
@@ -1879,7 +1875,8 @@ namespace stx
 
 		/// called to route the loading of a interior or exterior node to storage through instance
 		/// management routines in the b-tree
-
+		buffer_type load_buffer ;
+		buffer_type temp_buffer;
 		typename node::ptr load(stream_address w) {
 			using namespace stx::storage;
 			
@@ -1929,21 +1926,21 @@ namespace stx
 				}
 			}
 
-			buffer_type buffer = dangling_buffer ;
+			load_buffer = dangling_buffer ;
 			get_storage()->complete();
 			if(lz4){
-				inplace_decompress_lz4(buffer);
+				inplace_decompress_lz4(load_buffer,temp_buffer);
 			}else{
-				inplace_decompress_zlib(buffer);
+				inplace_decompress_zlib(load_buffer);
 			}
-			buffer_type::iterator reader = buffer.begin();
+			buffer_type::iterator reader = load_buffer.begin();
 			leb128::read_signed(reader);
 			level = leb128::read_signed(reader);
 
 			if(level==0){ // its a surface
 				typename surface_node::ptr s ;
 				s = allocate_surface(w);
-				s->load(this, *(get_storage()), buffer, key_interpolator());
+				s->load(this, *(get_storage()), load_buffer, key_interpolator());
 				s.set_state(loaded);
 				s.set_where(w);
 				nodes_loaded[w] = s.rget();
@@ -1957,7 +1954,7 @@ namespace stx
 			}else{
 				typename interior_node::ptr s;
 				s = allocate_interior(level,w);
-				s->load(this, *(get_storage()), buffer);
+				s->load(this, *(get_storage()), load_buffer);
 				s.set_state(loaded);
 				s.set_where(w);
 				nodes_loaded[w] = s.rget();
@@ -3085,6 +3082,7 @@ namespace stx
 		,	last_surface(NULL_REF)
 		,	allocator(alloc)
 		,	storage(&storage)
+		,	liberator(surface_node_allocator())
 		{
 			++btree_totl_instances;
 			initialize_contexts();
@@ -3103,6 +3101,7 @@ namespace stx
 		,	key_less(kcf)
 		,	allocator(alloc)
 		,	storage(&storage)
+		,	liberator(surface_node_allocator())
 		{
 			++btree_totl_instances;
 			initialize_contexts();
@@ -3121,6 +3120,7 @@ namespace stx
 		,	last_surface(NULL_REF)
 		,	allocator(alloc)
 		,	storage(&storage)
+		,	liberator(surface_node_allocator())
 		{
 			++btree_totl_instances;
 			insert(first, last);
@@ -3142,6 +3142,7 @@ namespace stx
 		,	key_less(kcf)
 		,	allocator(alloc)
 		,	storage(&storage)
+		,	liberator(surface_node_allocator())
 		{
 			++btree_totl_instances;
 			insert(first, last);
@@ -3267,8 +3268,8 @@ namespace stx
 			stx::storage::u64 flushed = 0;
 			if(stats.tree_size){				
 				if(shared.nodes == NULL_REF){
-					_AddressedNodes togo = nodes_loaded;
-					for(typename _AddressedNodes::iterator n = togo.begin(); n != togo.end(); ++n){
+					
+					for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 						this->save((*n).second,(*n).first);
 					}							
 					write_boot_values();				
@@ -3282,27 +3283,26 @@ namespace stx
 		typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
 		typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
 		/// remove inter node dependencies
+		
 		void raw_unlink_nodes(){
+			
 			this->headsurface.discard(*this);
 			this->last_surface.discard(*this);			
 			this->root.discard(*this);
 			typedef std::vector<node::ptr> _LinkedList;
-			_LinkedList linked;
+		
+			node::ptr t;
 			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
-				
-				if((*n).second == NULL_REF){
-					printf("WARNING: cannot unlink null node\n");
-				}else if(!(*n).second->shared){
-					save((*n).second,(*n).first);
-					linked.push_back((*n).second);					
-					linked.back().set_context(this);					
+				if(nodes_loaded.count((*n).first) > 0){
+					if((*n).second == NULL_REF){
+						printf("WARNING: cannot unlink null node\n");
+					}else if(!(*n).second->shared){
+						t = (*n).second;
+						t.unlink();
+					}
 				}
 			}
 
-			for(typename _LinkedList::iterator l = linked.begin(); l != linked.end(); ++l){
-				(*l).unlink();
-			}
-			linked.clear();
 		}
 		
 		void unlink_local_nodes(){
@@ -3341,6 +3341,11 @@ namespace stx
 		
 			}
 		}
+		void check_low_memory_state(){
+			if(::stx::memory_low_state){				
+				reduce_use();
+			}
+		}
 		public:
 		/// writes all modified pages to storage and frees all surface nodes
 		void reduce_use(){
@@ -3355,7 +3360,8 @@ namespace stx
 			flush();
 			if(reduce){
 				if((*this).stats.surface_use + (*this).stats.interior_use > 0){
-					unlink_local_nodes();					
+					unlink_local_nodes();			
+					local_free();
 				}
 				release_shared();
 				if(save_tot > btree_totl_used)
@@ -3432,6 +3438,67 @@ namespace stx
 		}
 		/// Correctly free either interior or surface node, destructs all contained key
 		/// and value objects
+		template<typename _Allocator,typename _ToFree, int MAX_PRISONERS = 32>
+		class mt_free{
+		private:
+			_Allocator a;
+			typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
+			
+			_WorkerManager& get_worker(){
+				static _WorkerManager w(2);
+				return w;
+			}
+			class liberatir : public asynchronous::AbstractWorker{
+			private:				
+				size_t added;
+				_ToFree* prisoners[MAX_PRISONERS];
+				_Allocator a;
+			public:
+				
+				bool full() const {
+					return (added >= MAX_PRISONERS);
+				}
+
+				void emancipate(_ToFree* in){
+					if(added < MAX_PRISONERS){
+						prisoners[added++] = in;
+					}
+				}
+				
+				liberatir(_Allocator a) : added(0),a(a){
+				}
+				
+				virtual void work(){
+					for(size_t f = 0; f < added; ++f){						
+						a.destroy(prisoners[f]);
+						a.deallocate(prisoners[f], 1);
+					}
+				}
+				
+				virtual ~liberatir(){
+				}
+			};
+			liberatir * current;
+		public:
+			mt_free(_Allocator& a) : a(a),current(NULL){
+				current = new liberatir(a);
+			}
+			~mt_free(){
+				current->work();
+				delete current;
+			}
+			void liberate(_ToFree* f){
+				
+				current->emancipate(f);
+				if(current->full()){
+					get_worker().add(current);
+					current = new liberatir(a);
+				}
+			}
+		};
+
+		typedef mt_free<typename surface_node::alloc_type ,typename surface_node> _Liberator;
+		_Liberator liberator;
 
 		inline void free_node( surface_node* n, stream_address w ){
 
@@ -3440,15 +3507,14 @@ namespace stx
 				if(!n->is_orphaned())
 					nodes_loaded.erase(w);
 				surface_node *ln = n;
-				typename surface_node::alloc_type a(surface_node_allocator());
+				//typename surface_node::alloc_type a(surface_node_allocator());
 				/// TODO: adding multithreaded freeing of pages can improve transactional
 				/// performance where small ammounts of random page access is prevalent
 
-				//static mt_free liberator(surface_node_allocator());
+				
 				surface_node * removed = ln;
-				//liberator.liberate(removed);
-				a.destroy(removed);
-				a.deallocate(removed, 1);
+				
+				liberator.liberate(removed);
 				change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
 				stats.leaves--;
 			}
@@ -3540,10 +3606,11 @@ namespace stx
 		///
 		void share(std::string name){
 			if(NULL == shared.nodes){
-				clear();
+				/*clear();
 				shared.share(name);
-				reload();
+				reload();*/
 			}
+			unshare();
 
 		}
 
@@ -3563,16 +3630,37 @@ namespace stx
 
 			initialize_contexts();
 		}
+		_AddressedNodes local_togo ;
+		void local_free(){
+			if(shared.nodes == NULL_REF){
+				typedef std::pair<stream_address, node*> _NodePair;
+				if(nodes_loaded.size() < 256){
+					_NodePair node_pairs[256];
+					size_t nodes = nodes_loaded.size();
+					size_t p = 0;
+					for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+						node_pairs[p++] = (*n);
+						
+					}
+					for(size_t r = 0; r < nodes; ++r){
+						this->free_node(node_pairs[r].second,node_pairs[r].first);
+					}
+				}else{
+					_AddressedNodes todo = nodes_loaded;
+					for(typename _AddressedNodes::iterator n = todo.begin(); n != todo.end(); ++n){
+						this->free_node((*n).second,(*n).first);
+						
+					}
+				}
+
+			}
+		}
 		/// orphan the nodes which are still referenced
 		/// shared nodes cant be orphaned
 		void orphan_remaining(){
 			if(shared.nodes == NULL_REF){
-				_AddressedNodes togo = nodes_loaded;
-				
-				for(typename _AddressedNodes::iterator n = togo.begin(); n != togo.end(); ++n){
-					this->free_node((*n).second,(*n).first);
-				}
-
+				local_free();
+				/// printf("There are %ld orphans in an instance of %s\n",(long int)nodes_loaded.size(),get_storage()->get_name().c_str());
 				for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 					BTREE_ASSERT((*n).second==NULL_REF);
 					BTREE_ASSERT((*n).second->refs==0);
@@ -3583,6 +3671,13 @@ namespace stx
 				
 			}else{
 				printf("WARNING: trying to orphan shared nodes\n");
+			}
+		}
+		void local_clear_and_orphan_remaining(){
+			if(shared.nodes == NULL_REF){
+				orphan_remaining();
+				nodes_loaded.clear();
+				report_nodes_loaded_mem();
 			}
 		}
 		/// Frees all key/data pairs and all nodes of the tree
@@ -3632,6 +3727,8 @@ namespace stx
 		/// the first surface of the B+ tree.
 		inline iterator begin()
 		{
+			check_low_memory_state();
+
 			return iterator(headsurface, 0);
 		}
 
@@ -3639,6 +3736,8 @@ namespace stx
 		/// slot in the last surface of the B+ tree.
 		inline iterator end()
 		{
+			check_low_memory_state();
+
 			return iterator(last_surface, last_surface != NULL_REF ? last_surface->get_occupants() : 0);
 		}
 
@@ -3660,6 +3759,8 @@ namespace stx
 		/// invalid slot in the last surface of the B+ tree. Uses STL magic.
 		inline reverse_iterator rbegin()
 		{
+			check_low_memory_state();
+
 			return reverse_iterator(end());
 		}
 
@@ -3667,6 +3768,8 @@ namespace stx
 		/// slot in the first surface of the B+ tree. Uses STL magic.
 		inline reverse_iterator rend()
 		{
+			check_low_memory_state();
+
 			return reverse_iterator(begin());
 		}
 
@@ -3844,6 +3947,8 @@ namespace stx
 		/// key/data slot if found. If unsuccessful it returns end().
 		iterator find(const key_type &key)
 		{
+			check_low_memory_state();
+
 			typename node::ptr n = root;
 			if (n==NULL_REF) return end();
 
@@ -3922,7 +4027,11 @@ namespace stx
 		/// equal to or greater than key, or end() if all keys are smaller.
 		iterator lower_bound(const key_type& key)
 		{
+
 			if (root==NULL_REF) return end();
+			
+			check_low_memory_state();
+
 			typename interior_node::ptr n = root;
 			while(!n->issurfacenode())
 			{
@@ -3965,6 +4074,8 @@ namespace stx
 		{
 			typename node::ptr n = root;
 			if (n==NULL_REF) return end();
+
+			check_low_memory_state();
 
 			while(!n->issurfacenode())
 			{
@@ -4212,6 +4323,8 @@ namespace stx
 		std::pair<iterator, bool> insert_start(const key_type& key, const data_type& value)
 		{
 			unshare();
+
+			check_low_memory_state();
 
 			typename node::ptr newchild ;
 			key_type newkey = key_type();

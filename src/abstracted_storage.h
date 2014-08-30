@@ -305,7 +305,7 @@ namespace stored{
 
 	};
 	template<typename _Storage, typename _Map>
-	void abstracted_tx_begin(bool read, _Storage& storage, _Map& map){
+	void abstracted_tx_begin(bool read,bool shared, _Storage& storage, _Map& map){
 		if(!read){
 			storage.rollback();
 			storage.begin();
@@ -320,10 +320,14 @@ namespace stored{
 				storage.rollback();
 				storage.begin();
 				storage.set_transaction_r(read);
-				map.share(storage.get_name());
+				if(shared)
+					map.share(storage.get_name());
+				else map.unshare();
 				map.reload();
 			}else{
-				map.share(storage.get_name());
+				if(shared)
+					map.share(storage.get_name());
+				else map.unshare();
 				storage.set_transaction_r(read);
 			}
 		}

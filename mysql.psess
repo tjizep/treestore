@@ -67,16 +67,7 @@
   </Binaries>
   <Reports>
     <Report>
-      <Path>mysql140819.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql140819(1).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql140823.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql140824.vspx</Path>
+      <Path>mysql140830.vspx</Path>
     </Report>
   </Reports>
   <Launches>

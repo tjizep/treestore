@@ -196,6 +196,12 @@ tree_stored::tree_table * get_info_table(TABLE* table){
 	return result;
 
 }
+void reduce_info_tables(){
+	nst::synchronized synch(tt_info_lock);
+	for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
+		(*i).second->reduce_use();
+	}
+}
 void clear_info_tables(){
 	nst::synchronized synch(tt_info_lock);
 	for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
@@ -393,7 +399,7 @@ namespace tree_stored{
 				_LastUsedTimes lru;
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 					if((*t).second){
-						printf("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time());
+						DBUG_PRINT("info",("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time()));
 						lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
 					}else
 						DBUG_PRINT("info", ("table entry %s is NULL\n", (*t).first.c_str()));
@@ -546,10 +552,41 @@ public:
 };
 
 static static_threads st;
-void print_read_lookups(){
-	return;
-	if(os::millis()-ltime > 1000){
+
+void reduce_thread_usage(){
+	if(calc_total_use() > treestore_max_mem_use){
 		st.check_use();
+		//reduce_info_tables();	
+		//nst::synchronized s(mut_total_locks);				
+		//if(total_locks==0){
+		if(calc_total_use() > treestore_max_mem_use){
+			//nst::synchronized s2(tt_info_lock);/// the info function may be called in another thread
+			printf("Releasing shared memory: total locks reached 0 processing idle pages\n");
+			stx::process_idle_times();	
+		}
+		//}		
+	}
+	
+	if(calc_total_use() > treestore_max_mem_use){
+		
+			stored::reduce_all();
+	}
+	printf
+	(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+	,	"oo"
+	,	"global"
+	,	(double)calc_total_use()/units::MB
+	,	(double)nst::buffer_use/units::MB
+	,	(double)nst::col_use/units::MB
+	,	(double)btree_totl_used/units::MB
+	,	(double)total_cache_size/units::MB
+	);
+}
+
+void print_read_lookups(){
+	
+	if(os::millis()-ltime > 1000){
+		
 		stx::storage::syncronized ul(plock);
 		if(os::millis()-ltime > 1000){
 			if(ltime){
@@ -698,7 +735,7 @@ public:
 		nst::synchronized synch(tt_info_lock);
 		tree_stored::tree_table * tt = get_info_table((*this).table);
 
-		tt->begin(true);
+		tt->begin(true,false);
 
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = tt->table_size();
@@ -1091,15 +1128,9 @@ public:
 
 				st.release_thread(thread);
 				/// (*this).tt = 0;
-				st.check_use();
+				
 				/// for testing
 				//st.reduce_all();
-				if(calc_total_use() > (treestore_max_mem_use * 0.75) || treestore_reduce_storage_use_on_unlock){
-
-					DBUG_PRINT("info",("reducing block storage %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-
-					stored::reduce_all();
-				}
 
 				printf
 				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
@@ -1113,17 +1144,11 @@ public:
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 
 			}
-			st.check_use();
+			
 			{
 				nst::synchronized s(mut_total_locks);
 				--total_locks;
-				if(total_locks==0){
-					if(calc_total_use() > treestore_max_mem_use){
-						nst::synchronized s2(tt_info_lock);/// the info function may be called in another thread
-						printf("Releasing shared memory: total locks reached 0 processing idle pages\n");
-						stx::process_idle_times();
-					}
-				}			
+					
 			}
 		}
 
@@ -1481,7 +1506,7 @@ public:
 		read_lookups++;
 		const tree_stored::CompositeStored *pred = tt->predict_sequential(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		if(pred==NULL){
-			print_read_lookups();
+			
 			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		}
 
@@ -1707,7 +1732,7 @@ public:
 			}else
 				r = HA_ERR_END_OF_FILE;
 		}
-		print_read_lookups();
+		
 		DBUG_RETURN(r);
 	}
 
@@ -1792,6 +1817,7 @@ void initialize_loggers(){
 }
 extern int pt_test();
 extern int linitialize();
+void start_cleaning();
 int treestore_db_init(void *p)
 {
 #ifdef _MSC_VER
@@ -1819,7 +1845,7 @@ int treestore_db_init(void *p)
 	treestore_hton->rollback = treestore_rollback;
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
-
+	start_cleaning();
 	/// pt_test();
 	DBUG_RETURN(FALSE);
 }
@@ -2061,4 +2087,32 @@ typedef char BOOL;
 int main(int argc, char *argv[]){
     pt_test();
     return 0;
+}
+namespace ts_cleanup{
+	class print_cleanup_worker : public Poco::Runnable{
+	public:
+		void run(){
+			while(Poco::Thread::current()->isRunning()){
+				Poco::Thread::sleep(1000);
+				if(calc_total_use() > treestore_max_mem_use){
+					stx::memory_low_state = true;
+					reduce_thread_usage();
+				}else{
+					stx::memory_low_state = false;
+				}
+			}
+		}
+	};
+	static print_cleanup_worker the_worker;
+	static Poco::Thread cleanup_thread;
+	static void start_cleaning(){
+		try{
+			cleanup_thread.start(the_worker);
+		}catch(Poco::Exception &e){
+			printf("Could not start cleanup thread : %s\n",e.name());
+		}
+	}
+};
+void start_cleaning(){
+	ts_cleanup::start_cleaning();
 }

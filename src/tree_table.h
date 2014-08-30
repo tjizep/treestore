@@ -184,7 +184,7 @@ namespace tree_stored{
 
 		virtual nst::u32 get_rows_per_key() = 0;
 		virtual void flush() = 0;
-		virtual void begin(bool read) = 0;
+		virtual void begin(bool read,bool shared=true) = 0;
 		virtual void commit1_asynch() = 0;
 		virtual void commit1() = 0;
 		virtual void commit2() = 0;
@@ -776,9 +776,9 @@ namespace tree_stored{
 			col.commit2();
 		}
 
-		virtual void begin(bool read) {
+		virtual void begin(bool read,bool shared) {
 			wait_for_workers();
-			col.tx_begin(read);
+			col.tx_begin(read,shared);
 		}
 		virtual void rollback() {
 
@@ -1192,7 +1192,8 @@ namespace tree_stored{
 					samples.push_back(d(g));
 				}
 				std::sort(samples.begin(), samples.end());
-
+				_Rid ten = std::max<_Rid>(1,sample/10);
+				_Rid ctr = 0;
 				for(_Samples::iterator sample = samples.begin(); sample != samples.end();++sample){
 					nst::u32 u = 0;
 					stored::_Parts::iterator pend = index->parts.end();
@@ -1206,7 +1207,8 @@ namespace tree_stored{
 
 					}
 					ir.clear();
-
+					
+					++ctr;
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
@@ -1216,11 +1218,12 @@ namespace tree_stored{
 					partx++;
 				}
 			}
+			reduce_use();
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
 		}
-		void begin_table(){
-			stored::abstracted_tx_begin(!changed, storage, get_table());
+		void begin_table(bool shared = true){
+			stored::abstracted_tx_begin(!changed,shared, storage, get_table());
 			init_rowcount();
 
 		}
@@ -1247,15 +1250,15 @@ namespace tree_stored{
 			return storage.is_transacted();
 		}
 
-		void begin(bool read){
+		void begin(bool read,bool shared = true){
 			changed = !read;
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				(*x)->begin(read);
+				(*x)->begin(read,shared);
 			}
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				(*c)->begin(read);
+				(*c)->begin(read,shared);
 			}
-			begin_table();
+			begin_table(shared);
 		}
 
 		void commit1(){

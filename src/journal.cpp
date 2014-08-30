@@ -46,6 +46,7 @@ private:
 	Poco::BinaryWriter compacted_writer;
 	size_t bytes_used;
 	nst::u64 sequence;
+	nst::u64 last_synch;
 	participants_type participants;
 public:
 	static const std::ios_base::openmode o_mode = std::ios::binary|std::ios::app;
@@ -58,6 +59,7 @@ public:
 	,	compacted_writer(compacted_ostr)
 	,	bytes_used(0)
 	,	sequence(0)
+	,	last_synch(0)
 	{
 	}
 	~journal_state(){
@@ -150,6 +152,7 @@ public:
 		std::ifstream journal_istr(journal_name, std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
 		nst::u64 sequence = 0;
+		nst::u64 last_synch = 0;
 		_PendingTransactions pending;
 		_Commands commands;
 		const double MB = 1024.0*1024.0;
@@ -221,6 +224,7 @@ public:
 
 		pending.clear();
 		(*this).sequence = 0;
+		(*this).last_synch = 0;
 		bytes_used = 0;
 		journal_istr.close();
 		journal_ostr.close();
@@ -232,52 +236,55 @@ public:
 	void synch(bool force)
 	{
 		nst::synchronized s(jlock);
+		if(last_synch != sequence){
+			
+			add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary
 
-		add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary
-
-		writer.flush();
-		journal_ostr.flush();
-		journal_ostr.rdbuf()->pubsync();
-		Poco::File jf(journal_name);
-		if(jf.exists()){
-			nst::u64 jsize = 0;
-			try{
-				jsize = jf.getSize();
-			}catch(...){
-				printf("error getting journal size\n");
-				return;
-			}
-			set_treestore_journal_size( jsize );
-
-			if(force || jsize > (nst::u64)get_treestore_journal_lower_max() ){
-
-				nst::u64 singles = 0;
-				for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-					singles += (*p).second->make_singular() ? 1 : 0;
+			writer.flush();
+			journal_ostr.flush();
+			journal_ostr.rdbuf()->pubsync();
+			Poco::File jf(journal_name);
+			if(jf.exists()){
+				nst::u64 jsize = 0;
+				try{
+					jsize = jf.getSize();
+				}catch(...){
+					printf("error getting journal size\n");
+					return;
 				}
-				if(singles == participants.size()){
-					set_treestore_journal_size( 0 );
-					printf("journal file > n GB compacting\n");
-					//compact();
-					log_journal(journal_name,"commit",0);
+				set_treestore_journal_size( jsize );
+
+				if(force || jsize > (nst::u64)get_treestore_journal_lower_max() ){
+
+					nst::u64 singles = 0;
 					for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-						(*p).second->journal_synch_start();
+						singles += (*p).second->make_singular() ? 1 : 0;
 					}
-					for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-						/// test if the data files have not been deleted
-						if(is_valid_storage_directory((*p).second->get_name())){
-							(*p).second->journal_commit();
+					if(singles == participants.size()){
+						set_treestore_journal_size( 0 );
+						printf("journal file > n GB compacting\n");
+						//compact();
+						log_journal(journal_name,"commit",0);
+						for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
+							(*p).second->journal_synch_start();
 						}
+						for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
+							/// test if the data files have not been deleted
+							if(is_valid_storage_directory((*p).second->get_name())){
+								(*p).second->journal_commit();
+							}
+						}
+						for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
+							(*p).second->journal_synch_end();
+						}
+						printf("journal file compacting complete\n");
+						journal_ostr.close();
+						jf.remove();
+						sequence = 0;
+						last_synch = sequence;
+						journal_ostr.open(journal_name, std::ios::binary);
+						set_treestore_journal_size( jf.getSize() );
 					}
-					for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
-						(*p).second->journal_synch_end();
-					}
-					printf("journal file compacting complete\n");
-					journal_ostr.close();
-					jf.remove();
-					sequence = 0;
-					journal_ostr.open(journal_name, std::ios::binary);
-					set_treestore_journal_size( jf.getSize() );
 				}
 			}
 		}

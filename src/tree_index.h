@@ -320,8 +320,8 @@ namespace tree_stored{
 			set_end();
 		}
 
-		void begin(bool read){
-			stored::abstracted_tx_begin(read, storage, index);
+		void begin(bool read,bool shared=true){
+			stored::abstracted_tx_begin(read, shared, storage, index);
 			set_end();
 		}
 
@@ -546,8 +546,8 @@ namespace tree_stored{
 			cache.clear();
 		}
 
-		void begin(bool read){
-			index.begin(read);
+		void begin(bool read,bool shared){
+			index.begin(read,shared);
 		}
 
 		void commit1_asynch(){

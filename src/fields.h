@@ -1957,7 +1957,7 @@ namespace stored{
 		virtual void from_initializer(index_iterator_interface& out, const stx::initializer_pair& ip) = 0;
 		virtual void reduce_use() = 0;
 
-		virtual void begin(bool read) = 0;
+		virtual void begin(bool read,bool shared=true) = 0;
 
 		virtual void commit1_asynch() = 0;
 

@@ -541,7 +541,7 @@ namespace collums{
 				storage.begin();
 				storage.set_reader();
 				_ColMap col(storage);
-
+				//col.unshare();
 
 				//col.share(storage.get_name());
 				//col.reload();
@@ -939,8 +939,8 @@ namespace collums{
 			modified = false;
 		}
 
-		void tx_begin(bool read){
-			stored::abstracted_tx_begin(read, storage, col);
+		void tx_begin(bool read,bool shared= true){
+			stored::abstracted_tx_begin(read,shared, storage, col);
 
 		}
 
