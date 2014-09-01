@@ -555,28 +555,28 @@ namespace stx
 			inline void unref(typename stx::node_ref* ptr){
 				if(ptr != NULL_REF)
 				{
-					if(ptr->shared)
+					/*if(ptr->shared)
 					{
 						--(ptr->a_refs);
 						
 					}else
-					{
+					{*/
 						ptr->refs--;
 					
-					}
+					//}
 				}
 			}
 			inline void ref(typename stx::node_ref* ptr){
 				if(ptr != NULL_REF)
 				{
-					if(ptr->shared)
+					/*if(ptr->shared)
 					{						
 						++(ptr->a_refs);
 
 					}else
-					{
+					{*/
 						ptr->refs++;
-					}
+					//}
 				}
 			}
 		public:

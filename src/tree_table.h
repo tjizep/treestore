@@ -1177,7 +1177,8 @@ namespace tree_stored{
 				printf("Calculating cardinality of index parts for %s\n",pos->name);
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				stored::index_interface::ptr index = (*this).indexes[i];
-				const _Rid sample = _row_count > 5 ? _row_count/5 : _row_count;
+				const _Rid sample = _row_count > 5 ? _row_count/5: _row_count;
+				const _Rid page_size = 1024;
 				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
 				typedef std::vector<_Unique> _Uniques;
 				typedef std::vector<_Rid> _Samples;
@@ -1187,32 +1188,27 @@ namespace tree_stored{
 				G g;
 				typedef std::uniform_int_distribution<_Rid> D;
 				D d(0, _row_count-1);
-				_Samples samples;
-				for(_Rid row = 0; row < sample; ++row){
-					samples.push_back(d(g));
-				}
-				std::sort(samples.begin(), samples.end());
-				_Rid ten = std::max<_Rid>(1,sample/10);
-				_Rid ctr = 0;
-				for(_Samples::iterator sample = samples.begin(); sample != samples.end();++sample){
-					nst::u32 u = 0;
-					stored::_Parts::iterator pend = index->parts.end();
-					for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
-						int ip = (*p);
+				
+				for(_Rid row = 0; row < ((sample/page_size)+1); ++row){
+					_Rid gen = d(g);
+					for(_Rid ss = gen; ss < std::min<_Rid>(_row_count-1,gen+page_size);++ss){					
+						nst::u32 u = 0;
+						stored::_Parts::iterator pend = index->parts.end();
+						for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
+							int ip = (*p);
+							(*this).cols[ip]->compose(ss, ir);
+							uniques[u].insert(ir);
 
-						(*this).cols[ip]->compose((*sample), ir);
-						uniques[u].insert(ir);
+							++u;
 
-						++u;
-
+						}
+						ir.clear();
 					}
-					ir.clear();
-					
-					++ctr;
+									
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
-					_Rid d = samples.size() / (*u).size();
+					_Rid d = sample / (*u).size();
 					printf("Calculating cardinality of index parts for %s px %li as %li\n",pos->name,(long int)partx,(long int)d);
 					index->push_density(d);
 					partx++;

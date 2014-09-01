@@ -907,7 +907,7 @@ namespace storage{
 			if(!is_new){
 				get_session();
 				/// readahead io opt
-				os::read_ahead(get_storage_path() + name + extension);
+				/// os::read_ahead(get_storage_path() + name + extension);
 				
 			}
 

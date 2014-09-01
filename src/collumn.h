@@ -1012,7 +1012,7 @@ namespace collums{
 
 
 
-	void test_ints(){
+	static void test_ints(){
 		typedef stored::DynamicKey _Sk;
 		typedef std::map<_Sk, int> _TestMap;
 		int mv = 1000000;
