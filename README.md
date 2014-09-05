@@ -14,7 +14,7 @@ Features
 + Global journal provides cross database consistency and durability
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads, similar or exceeding row databases
-+ High read performance - average increase of 200% performance on tpc-h (HammerDB) from hot cache and more up to 600%    when running from cold cache
++ High read performance - average increase of 200% performance on tpc-h (HammerDB) from hot cache and more up to 1000% (10x)when running from cold cache
 + In memory compression without performance loss
 
 Benchmarks
@@ -27,20 +27,20 @@ Machine
 + Windows 8.1 x64
 
 Software
-+ Mysql 5.6.13
++ Mysql 5.6.20
 + HammerDB 2.1.4
-+ Treestore 0.27 beta
++ Treestore 0.31 beta
 
 Load
 + TPC-H Scale 1 all queries
 
 Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
-+ Treestore 27 secs
++ Treestore 25 secs
 
 Results (cold start 30 % variance)
 + InnoDB 660 secs
-+ TuReestore 105 secs
++ TuReestore 59 secs
 
 Linux Installation and Notes
 ----------------------------

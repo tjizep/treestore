@@ -1187,11 +1187,11 @@ namespace tree_stored{
 				typedef std::minstd_rand G;
 				G g;
 				typedef std::uniform_int_distribution<_Rid> D;
-				D d(0, _row_count-1);
+				D d(0, _row_count);
 				
 				for(_Rid row = 0; row < ((sample/page_size)+1); ++row){
 					_Rid gen = d(g);
-					for(_Rid ss = gen; ss < std::min<_Rid>(_row_count-1,gen+page_size);++ss){					
+					for(_Rid ss = gen; ss < std::min<_Rid>(_row_count,gen+page_size);++ss){					
 						nst::u32 u = 0;
 						stored::_Parts::iterator pend = index->parts.end();
 						for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
@@ -1208,7 +1208,7 @@ namespace tree_stored{
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
-					_Rid d = sample / (*u).size();
+					_Rid d = sample / (*u).size();/// accurate to the nearest page
 					printf("Calculating cardinality of index parts for %s px %li as %li\n",pos->name,(long int)partx,(long int)d);
 					index->push_density(d);
 					partx++;

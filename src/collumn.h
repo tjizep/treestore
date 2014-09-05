@@ -391,10 +391,6 @@ namespace collums{
 					}
 					ctr++;
 
-					if(ctr % CKECK ==0){
-						col.reduce_use();
-					}
-
 				}
 				if(kv > 0){
 					for(_Rid n = prev; n < kv-1; ++n){
@@ -423,10 +419,7 @@ namespace collums{
 						_Rid r = c.key().get_value();
 						encoded.sample(c.data());
 						++ctr;
-						if(r % CKECK ==0){
-							col.reduce_use();
-
-						}
+						
 					}
 					col.reduce_use();
 					encoded.finish(rows_cached);
@@ -435,11 +428,6 @@ namespace collums{
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());
-
-						if(r % CKECK ==0){
-							col.reduce_use();
-						}
-
 					}
 					if(calc_use() < use_before ){
 						encoded.optimize();
