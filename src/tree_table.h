@@ -1177,11 +1177,11 @@ namespace tree_stored{
 				printf("Calculating cardinality of index parts for %s\n",pos->name);
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				stored::index_interface::ptr index = (*this).indexes[i];
-				const _Rid sample = _row_count > 5 ? _row_count/5: _row_count;
-				const _Rid page_size = 1024;
+				const _Rid ratio = 7;
+				const _Rid sample = _row_count > ratio ? _row_count/ratio: _row_count;
+				const _Rid page_size = 512;
 				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
-				typedef std::vector<_Unique> _Uniques;
-				typedef std::vector<_Rid> _Samples;
+				typedef std::vector<_Unique> _Uniques;				
 				_Uniques uniques( index->parts.size() );
 				CompositeStored ir;
 				typedef std::minstd_rand G;

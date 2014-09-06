@@ -94,9 +94,8 @@ namespace stored{
 			value = nv;
 		}
 
-		explicit IntTypeStored(const _IntType i):value(i){
+		explicit IntTypeStored(_IntType i):value(i){
 		}
-
 		IntTypeStored():value(0){
 		}
 		IntTypeStored (const _IntType& init):value(init){
@@ -1382,58 +1381,19 @@ namespace stored{
 		};
 	};
 
-	static const nst::u32 MAX_HIST = 1 << 20;
-	static const nst::u32 MAX_ENTROPY = 1 << 16;
-	template<class _Data>
-		struct entropy_t{
-			nst::u64 samples;
-
-			entropy_t():samples(0){
-
-			}
-			void sample(const _Data& data){
-				++samples;
-			}
-			nst::u64 get_samples() const {
-				return samples;
-			}
-			nst::u64 get_entropy() const {
-				return samples;
-			}
-		};
-
-		template<>
-		struct entropy_t<stored::IntStored>{
-			typedef stored::IntStored _Sampled;
-			typedef std::unordered_map<nst::i64,nst::u64> _Histogram;
-			nst::u64 samples;
-			_Histogram histogram;
-
-			entropy_t():samples(0){
-
-			}
-			void sample(const _Sampled & data){
-				if(histogram.size() < MAX_HIST)
-					histogram[data.get_value()]++;
-			}
-			nst::u64 get_samples() const {
-				return samples;
-			}
-			nst::u64 get_entropy() const {
-				return histogram.size();
-			}
-
-		};
+	static const nst::u32 MAX_HIST = 1 << 24;
+	static const nst::u32 MAX_ENTROPY = 1 << 24;
+	
 
 		template<typename _IntType>
-		struct int_entropy_t{
+		struct entropy_t{
 			typedef _IntType _Sampled;
 			typedef std::map<_Sampled, nst::u64> _Histogram;
 			nst::u64 samples;
 
 			_Histogram histogram;
 
-			int_entropy_t():samples(0){
+			entropy_t():samples(0){
 
 			}
 			void clear(){
@@ -1453,7 +1413,37 @@ namespace stored{
 			nst::u64 get_entropy(){
 				return histogram.size();
 			}
+					
+		};
 
+		template<typename _IntType>
+		struct int_entropy_t : public entropy_t<_IntType>{
+			
+			
+			typename _IntType::value_type get_max_val() const {
+				if(histogram.empty())
+					return 0;
+				
+				_Histogram::const_iterator i = histogram.end();
+				return (*(--i)).first.get_value();
+
+			}
+			
+			typename _IntType::value_type get_min_val() const {
+				if(histogram.empty())
+					return 0;
+				_Histogram::const_iterator i = histogram.begin();
+				
+				return (*i).first.get_value();
+
+			}
+			
+			typename nst::u32 get_abs() const {
+				if(histogram.empty())
+					return 0;
+				
+				return ( nst::u32 ) labs(get_max_val()-get_min_val());
+			}
 		};
 
 
@@ -1472,7 +1462,7 @@ namespace stored{
 			typedef nst::u32 _CodeType;
 			typedef symbol_vector<_CodeType> _Symbols;
 
-			typedef int_entropy_t<_IntType> _Entropy;
+			typedef entropy_t<_IntType> _Entropy;
 			struct hash_fixed{
 				size_t operator()(const _IntType& i) const {
 					return i.get_hash();
@@ -1550,7 +1540,9 @@ namespace stored{
 				_CodeType code = 0;
 				if(code_size > 0){
 					code = symbols.get(row);
+					
 					return decodes[code];
+					
 				}else
 					throw UninitializedCodeException();
 				return _null_val;
@@ -1578,6 +1570,158 @@ namespace stored{
 						symbols.set_code_size(code_size);
 
 						resize(rows);
+					}
+
+
+				}
+				return code_size > 0;
+
+			}
+			void optimize(){
+                _CodeMap c;
+				(*this).codes.swap(c);
+				(*this).stats.clear();
+			}
+		};	/// fixed in encoded buffer
+
+		/// class for fixed size entropy coded buffer
+		template<typename _IntType>
+		struct int_fix_unmapped_encoded_buffer{
+			typedef nst::u32 _CodeType;
+			typedef symbol_vector<_CodeType> _Symbols;
+
+			typedef int_entropy_t<_IntType> _Entropy;
+			struct hash_fixed{
+				size_t operator()(const _IntType& i) const {
+					return i.get_hash();
+				}
+			};
+            typedef std::map<_IntType, _CodeType> _CodeMap;
+			typedef std::vector<_IntType> _DeCodeMap;
+
+			_Entropy stats;
+			_CodeMap codes;
+			_DeCodeMap decodes;
+
+			_Symbols symbols;
+			_IntType _null_val;
+			_CodeType code_size;
+			typename _IntType::value_type min_decoded;
+			mutable _IntType unmapped;
+			int_fix_unmapped_encoded_buffer() : code_size(0){
+				
+			}
+
+			size_t capacity() const {
+				size_t is = sizeof(_IntType);
+				size_t bs = sizeof(_CodeType);
+				return (is+bs)*codes.size()+is*decodes.capacity()+symbols.capacity();
+			}
+
+			_Entropy& get_stats(){
+				return stats;
+			}
+
+			void clear(){
+                _CodeMap c;
+                _DeCodeMap d;
+				code_size = 0;
+				stats.clear();
+				codes.swap(c);
+				decodes.swap(d);
+				symbols.clear();
+			}
+
+			/// Find smallest X in 2^X >= value
+			inline nst::u32 bit_log2(nst::u32 value){
+
+				nst::u32 log = 0; /// satisfies 2^0 = 1
+				nst::u32 bit  = 1; /// current value of 2^log
+
+				while(bit < value){
+					bit = bit <<1;
+					++log;
+				}
+
+				return log;
+			}
+
+			bool empty() const {
+				return code_size == 0;
+			}
+
+			void resize(_Rid rows){
+				if(code_size==0) throw UninitializedCodeException();
+				symbols.resize(rows);
+
+			}
+
+
+			void encode(_Rid row, const _IntType &val){
+				if(codes.empty()){
+					_CodeType code = val.get_value() - min_decoded;
+					symbols.set(row, code);
+					return;
+				}
+				if(codes.count(val)){
+					_CodeType code = codes[val];
+					symbols.set(row, code);
+
+				}else
+					throw UninitializedCodeException();
+			}
+
+			const _IntType& decode(_Rid row) const {
+				_CodeType code = 0;
+				if(code_size > 0){
+					code = symbols.get(row);
+					if(decodes.empty()){
+						unmapped.set_value(code + min_decoded);
+						return unmapped;
+					}
+					
+					return decodes[code];
+					
+				}else
+					throw UninitializedCodeException();
+				return _null_val;
+			}
+			bool initialize(_Rid rows){
+
+				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
+					nst::u32 bits_in_histogram = bit_log2((nst::u32)(*this).stats.get_entropy())+2;
+					nst::u32 bits_in_abs = bit_log2((nst::u32)(*this).stats.get_abs());
+					/// not sure about negative values yet, although translation i.o. mapping should sort them out
+					if(bits_in_abs <= bits_in_histogram){						
+						decodes.clear();
+						codes.clear();
+						min_decoded = stats.get_min_val() ;
+						code_size = std::max<_CodeType>(1, bit_log2((_CodeType)stats.get_abs()));	
+						symbols.set_code_size(code_size);
+						resize(rows);
+						
+					}else{
+
+						typename _Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
+						nst::u32 words = 0;
+
+						for(;h != (*this).stats.histogram.end();++h){
+
+							codes[(*h).first] = words;
+							decodes.resize(words+1);
+							decodes[words] = (*h).first;
+							++words;
+
+						}
+						(*this).stats.clear();
+
+						if(words > 0){
+
+							code_size = std::max<_CodeType>(1, bit_log2((_CodeType)words));
+							symbols.set_code_size(code_size);
+
+							resize(rows);
+						}
 					}
 
 
@@ -1677,7 +1821,7 @@ namespace stored{
 		template<>
 		struct standard_entropy_coder<IntStored >{
 			typedef IntStored _DataType;
-			int_fix_encoded_buffer<_DataType> coder;
+			int_fix_unmapped_encoded_buffer<_DataType> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -1716,7 +1860,7 @@ namespace stored{
 		template<>
 		struct standard_entropy_coder<UIntStored >{
 			typedef UIntStored _DataType;
-			int_fix_encoded_buffer<_DataType> coder;
+			int_fix_unmapped_encoded_buffer<_DataType> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -1754,7 +1898,7 @@ namespace stored{
 
 		template<>
 		struct standard_entropy_coder<ShortStored >{
-			int_fix_encoded_buffer<ShortStored> coder;
+			int_fix_unmapped_encoded_buffer<ShortStored> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -1791,7 +1935,7 @@ namespace stored{
 		};
 		template<>
 		struct standard_entropy_coder<UShortStored >{
-			int_fix_encoded_buffer<UShortStored> coder;
+			int_fix_unmapped_encoded_buffer<UShortStored> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -1826,6 +1970,7 @@ namespace stored{
 				return coder.capacity();
 			}
 		};
+
 		template<>
 		struct standard_entropy_coder<VarCharStored >{
 			int_fix_encoded_buffer<VarCharStored> coder;
