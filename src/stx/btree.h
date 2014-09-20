@@ -729,6 +729,13 @@ namespace stx
 						unload_only();
 					}
 				}
+				/// sort a node
+				void sort(){
+					if(ptr != NULL && (*this).rget()->issurfacenode()){
+						
+						(*this).get_context()->sort(static_cast<surface_node*>((*this).rget()));
+					}
+				}
 			private:
 				void update_links(typename btree::surface_node* l){
 					if(rget()->issurfacenode()){
@@ -2183,28 +2190,6 @@ namespace stx
 			inline bool valid() const {
 				return (currnode.has_context() && currnode.get_where()!=0);
 			}
-
-			/// ++Prefix advance the iterator to the next slot
-			inline self& operator++()
-			{
-				if (current_slot + 1 < currnode->get_occupants())
-				{
-					++current_slot;
-				}
-				else if (currnode->next != NULL_REF)
-				{
-					currnode = currnode->next;
-					current_slot = 0;
-				}
-				else
-				{
-					// this is end()
-					current_slot = currnode->get_occupants();
-				}
-
-				return *this;
-			}
-
 			/// mechanism to quickly count the keys between this and another iterator
 			/// providing the other iterator is at a higher position
 
@@ -2217,7 +2202,7 @@ namespace stx
 
 				while(first_node != NULL_REF && first_node != last_node)
 				{
-
+					first_node.sort();
 					total += first_node->get_occupants();
 					first_node = first_node->next;
 				}
@@ -2227,6 +2212,30 @@ namespace stx
 
 				return total;
 			}
+
+			/// ++Prefix advance the iterator to the next slot
+			inline self& operator++()
+			{
+				if (current_slot + 1 < currnode->get_occupants())
+				{
+					++current_slot;
+				}
+				else if (currnode->next != NULL_REF)
+				{
+					currnode = currnode->next;
+					currnode.sort();
+					current_slot = 0;
+				}
+				else
+				{
+					// this is end()
+					current_slot = currnode->get_occupants();
+				}
+
+				return *this;
+			}
+
+			
 			/// Postfix++ advance the iterator to the next slot
 			inline self operator++(int)
 			{
@@ -2239,6 +2248,7 @@ namespace stx
 				else if (currnode->next != NULL_REF)
 				{
 					currnode = currnode->next;
+					currnode.sort();
 					current_slot = 0;
 				}
 				else
@@ -2264,6 +2274,7 @@ namespace stx
 				else if (currnode->preceding != NULL_REF)
 				{
 					currnode = currnode->preceding;
+					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
 				}
 				else
@@ -2286,7 +2297,9 @@ namespace stx
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+
 					currnode = currnode->preceding;
+					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
 				}
 				else
@@ -3719,6 +3732,10 @@ namespace stx
 			set_root_address(r);
 		}
 
+		// sort a possibly unsorted page
+		void sort(typename surface_node* surface){			
+			surface->sort(((btree&)(*this)).stats, key_less);
+		}
 		
 	public:
 		// *** STL Iterator Construction Functions
@@ -3847,6 +3864,7 @@ namespace stx
 			n->sort(((btree&)(*this)).stats, key_less);
 			return _find_upper( static_cast<const node*>(n), n->keys, key);
 		}
+		
 		inline int _find_upper(const node * n, const key_type* keys,  const key_type& key) const
 		{
 
@@ -4183,10 +4201,10 @@ namespace stx
 				if (other.size() != 0)
 				{
 					stats.leaves = stats.interiornodes = 0;
-					if (other.root)
-					{
-						root = copy_recursive(other.root);
-					}
+					//if (other.root)
+					//{
+					//	root = copy_recursive(other.root);
+					//}
 					stats = other.stats;
 				}
 

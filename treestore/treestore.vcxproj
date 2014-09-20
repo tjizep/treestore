@@ -207,6 +207,8 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <LevelOfStaticAnalysis>None</LevelOfStaticAnalysis>
+      <ModeOfStaticAnalysis>None</ModeOfStaticAnalysis>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -269,6 +271,7 @@
     <ClInclude Include="..\src\stx\btree_multimap.h" />
     <ClInclude Include="..\src\stx\btree_multiset.h" />
     <ClInclude Include="..\src\stx\btree_set.h" />
+    <ClInclude Include="..\src\suffix_array.h" />
     <ClInclude Include="..\src\system_timers.h" />
     <ClInclude Include="..\src\transactional_storage.h" />
     <ClInclude Include="..\src\tree_index.h" />

@@ -20,7 +20,7 @@
 /// TODO: the example storage cannot be exchanged between threads
 namespace NS_STORAGE = stx::storage;
 template<typename _KeyType,typename _ValueType>
-class example_storage : public NS_STORAGE::basic_storage{
+class simple_storage : public NS_STORAGE::basic_storage{
 public:
 
 private:
@@ -32,7 +32,7 @@ private:
 	std::string name;
 public:
 
-	example_storage(std::string name) : allocations( NS_STORAGE::default_name_factory(name)), boot(1), name(name){
+	simple_storage(std::string name) : allocations( NS_STORAGE::default_name_factory(name)), boot(1), name(name){
 		allocations.set_limit(1024*1024*32);
 		allocations.begin();
 
@@ -43,7 +43,7 @@ public:
     }
 
 
-	~example_storage() {
+	~simple_storage() {
 		try{
 			/// TODO: for test move it to a specific 'close' ? function or remove completely
 			allocations.rollback();

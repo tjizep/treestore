@@ -96,6 +96,9 @@
     <ClInclude Include="..\src\iterator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\suffix_array.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="treestore.cpp">
