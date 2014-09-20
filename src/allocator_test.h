@@ -1,6 +1,6 @@
 #ifndef _ALLOCATOR_TEST_CEP_2013_
 #define _ALLOCATOR_TEST_CEP_2013_
-#include "example_storage.h"
+#include "simple_storage.h"
 namespace allocator_test{
 	int test_allocators(){
 		typedef stx::storage::sqlite_allocator<NS_STORAGE::stream_address, NS_STORAGE::buffer_type> test_alloc_type;

@@ -6,7 +6,7 @@
 #include <windows.h>
 #endif
 
-#include "example_storage.h"
+#include "simple_storage.h"
 #include "allocator_test.h"
 #include "fields.h"
 #include "system_timers.h"
@@ -169,9 +169,9 @@ int pt_test()
 	{
 		typedef int key_type;
 		typedef int value_type;
-		example_storage<key_type, value_type> storage("test_data");
+		simple_storage<key_type, value_type> storage("test_data");
 		typedef std::unordered_set<key_type> _TestSet;
-		typedef stx::btree_map<key_type,value_type,example_storage<key_type,value_type>> _IntMap;
+		typedef stx::btree_map<key_type,value_type,simple_storage<key_type,value_type>> _IntMap;
 		//typedef std::map<int,int> _IntMap;
 
 		typedef std::vector<key_type> _Script;

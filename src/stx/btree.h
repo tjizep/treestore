@@ -260,6 +260,9 @@ namespace stx
 		typedef _Key key_type;
 
 		typedef _Data data_type;
+
+		typedef _Data mapped_type;
+
 		/// Base B+ tree parameter: The number of cached key/data slots in each surface
 
 		static const int	caches = btree_traits::caches_per_page ;
@@ -729,6 +732,13 @@ namespace stx
 						unload_only();
 					}
 				}
+				/// sort a node
+				void sort(){
+					if(ptr != NULL && (*this).rget()->issurfacenode()){
+						
+						(*this).get_context()->sort(static_cast<surface_node*>((*this).rget()));
+					}
+				}
 			private:
 				void update_links(typename btree::surface_node* l){
 					if(rget()->issurfacenode()){
@@ -1154,11 +1164,11 @@ namespace stx
 					if(ml > 0) mb = ml-1;
 					l = mb * step ;
 					h =(ml==cacheslotmax) ? o : ml * step;
-
+					/// residual linear search
+					/// 
 				}else{
-					/// truncated binary search
 					int m;
-					while(h-l > (unsigned int)traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
+					while(h-l > traits::max_scan) { //		(l < h) {  //(h-l > traits::max_scan) { //
 						m = (l + h) >> 1;
 						if (key_lessequal(key_less, key, keys[m])) {
 							h = m;
@@ -1166,10 +1176,7 @@ namespace stx
 							l = m + 1;
 						}
 					}
-
 				}
-
-				/// residual linear search
 				while (l < h && key_less(keys[l],key)) ++l;
 
 				return l;
@@ -1433,6 +1440,7 @@ namespace stx
 
 			template< typename key_compare >
 			int sort(tree_stats& stats, key_compare key_less){
+				check_cache(keys);
 				int r = 0;
 				if(sorted < node::get_occupants()){
 					bool unsorted = false;
@@ -1890,7 +1898,8 @@ namespace stx
 			}
 
 			nodes_loaded.erase(w);
-			synchronized synched(shared.get_named_mutex());
+			
+			//synchronized synched(shared.get_named_mutex());
 
 			i32 level = 0;
 			/// TODO: NB! double mutex
@@ -2183,28 +2192,6 @@ namespace stx
 			inline bool valid() const {
 				return (currnode.has_context() && currnode.get_where()!=0);
 			}
-
-			/// ++Prefix advance the iterator to the next slot
-			inline self& operator++()
-			{
-				if (current_slot + 1 < currnode->get_occupants())
-				{
-					++current_slot;
-				}
-				else if (currnode->next != NULL_REF)
-				{
-					currnode = currnode->next;
-					current_slot = 0;
-				}
-				else
-				{
-					// this is end()
-					current_slot = currnode->get_occupants();
-				}
-
-				return *this;
-			}
-
 			/// mechanism to quickly count the keys between this and another iterator
 			/// providing the other iterator is at a higher position
 
@@ -2217,7 +2204,7 @@ namespace stx
 
 				while(first_node != NULL_REF && first_node != last_node)
 				{
-
+					first_node.sort();
 					total += first_node->get_occupants();
 					first_node = first_node->next;
 				}
@@ -2227,6 +2214,30 @@ namespace stx
 
 				return total;
 			}
+
+			/// ++Prefix advance the iterator to the next slot
+			inline self& operator++()
+			{
+				if (current_slot + 1 < currnode->get_occupants())
+				{
+					++current_slot;
+				}
+				else if (currnode->next != NULL_REF)
+				{
+					currnode = currnode->next;
+					currnode.sort();
+					current_slot = 0;
+				}
+				else
+				{
+					// this is end()
+					current_slot = currnode->get_occupants();
+				}
+
+				return *this;
+			}
+
+			
 			/// Postfix++ advance the iterator to the next slot
 			inline self operator++(int)
 			{
@@ -2239,6 +2250,7 @@ namespace stx
 				else if (currnode->next != NULL_REF)
 				{
 					currnode = currnode->next;
+					currnode.sort();
 					current_slot = 0;
 				}
 				else
@@ -2264,6 +2276,7 @@ namespace stx
 				else if (currnode->preceding != NULL_REF)
 				{
 					currnode = currnode->preceding;
+					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
 				}
 				else
@@ -2286,7 +2299,9 @@ namespace stx
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+
 					currnode = currnode->preceding;
+					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
 				}
 				else
@@ -3483,7 +3498,7 @@ namespace stx
 			mt_free(_Allocator& a) : a(a),current(NULL){
 				current = new liberatir(a);
 			}
-			~mt_free(){
+			virtual ~mt_free(){
 				current->work();
 				delete current;
 			}
@@ -3693,6 +3708,10 @@ namespace stx
 					orphan_remaining();
 					nodes_loaded.clear();
 					report_nodes_loaded_mem();
+					(*this).headsurface = NULL_REF;
+					(*this).root = NULL_REF;
+					(*this).last_surface = NULL_REF;
+					stats = tree_stats();
 				}
 			}
 
@@ -3719,6 +3738,10 @@ namespace stx
 			set_root_address(r);
 		}
 
+		// sort a possibly unsorted page
+		void sort(typename surface_node* surface){			
+			surface->sort(((btree&)(*this)).stats, key_less);
+		}
 		
 	public:
 		// *** STL Iterator Construction Functions
@@ -3847,6 +3870,7 @@ namespace stx
 			n->sort(((btree&)(*this)).stats, key_less);
 			return _find_upper( static_cast<const node*>(n), n->keys, key);
 		}
+		
 		inline int _find_upper(const node * n, const key_type* keys,  const key_type& key) const
 		{
 
@@ -4183,10 +4207,10 @@ namespace stx
 				if (other.size() != 0)
 				{
 					stats.leaves = stats.interiornodes = 0;
-					if (other.root)
-					{
-						root = copy_recursive(other.root);
-					}
+					//if (other.root)
+					//{
+					//	root = copy_recursive(other.root);
+					//}
 					stats = other.stats;
 				}
 
@@ -4477,6 +4501,7 @@ namespace stx
 
 				if
 				(	//surface->sorted==0 &&
+					false && 
 					!allow_duplicates &&
 					!surface->isfull()
 				)

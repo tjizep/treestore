@@ -19,7 +19,15 @@ void clear_info_tables(){
 	info_tables.clear();
 }
 
-
+void delete_info_table(const char* name){
+	nst::synchronized synch(tt_info_lock);
+	tree_stored::tree_table * result = info_tables[name];
+	if(NULL != result){
+		delete result ;
+		info_tables.erase(name);
+	}
+	
+}
 tree_stored::tree_table * get_info_table(TABLE* table){
 	nst::synchronized synch(tt_info_lock);
 

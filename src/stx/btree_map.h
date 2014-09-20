@@ -55,6 +55,8 @@ public:
     /// key. Stored in the B+ tree's leaves
     typedef _Data                       data_type;
 
+	typedef _Data                       mapped_type;
+
     /// Third template parameter: Key comparison function object
     typedef _Compare                    key_compare;
 

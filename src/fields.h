@@ -54,6 +54,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <conio.h>
 #endif
 #include "abstracted_storage.h"
+#include "suffix_array.h"
 
 extern	char treestore_column_cache ;
 extern  char treestore_column_encoded ;
@@ -334,7 +335,7 @@ namespace stored{
 				return true;
 			}
 
-			return false;
+			return size != right.size;
 
 		}
 	public:
@@ -1528,12 +1529,12 @@ namespace stored{
 
 
 			void encode(_Rid row, const _IntType &val){
-				if(codes.count(val)){
+				//if(codes.count(val)){
 					_CodeType code = codes[val];
 					symbols.set(row, code);
 
-				}else
-					throw UninitializedCodeException();
+				//}else
+				//	throw UninitializedCodeException();
 			}
 
 			const _IntType& decode(_Rid row) const {

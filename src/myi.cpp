@@ -761,8 +761,8 @@ public:
 		int r = 0;
 		std::string from = _from;
 		std::string to = _to;
-
-
+		delete_info_table(_from);
+		delete_info_table(_to);/// to avoid potential issues
 
 		_FileNames files = extensions_from_table_name(from);
 
@@ -818,7 +818,7 @@ public:
 	int delete_table (const char * name){
 		DBUG_PRINT("info",("deleting files %s\n", name));
 		int r = 0;
-
+		delete_info_table(name);
 		_FileNames files = extensions_from_table_name(name);
 
 		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
@@ -1653,6 +1653,18 @@ void initialize_loggers(){
 extern int pt_test();
 extern int linitialize();
 void start_cleaning();
+void test_suffix_array(){
+	
+	printf("testing suffix array encoding\n");
+	std::ifstream t("suffix_test.dat");
+	t.seekg(0, std::ios::end);
+	size_t size = t.tellg();
+	std::string buffer(size, ' ');
+	t.seekg(0);
+	t.read(&buffer[0], size); 
+	suffix_array_encoder senc;
+	senc.encode(&buffer[0], buffer.size());
+}
 int treestore_db_init(void *p)
 {
 #ifdef _MSC_VER
@@ -1682,6 +1694,7 @@ int treestore_db_init(void *p)
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 	printf("Start cleaning \n");
 	start_cleaning();
+	/// test_suffix_array();
 	/// pt_test();
 	DBUG_RETURN(FALSE);
 }
