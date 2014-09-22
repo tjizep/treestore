@@ -35,12 +35,14 @@ namespace suffix_array{
 		inline void pop(){
 			if(length > 0){
 				--length;
+				(*this).trim();
 			}
 		}
 		inline void  drop(){
 			if(length > 0){
 				--((*this).length);
 				memmove((*this).data,(*this).data+1,(*this).length);
+				(*this).trim();
 			}
 		}
 		void assign(const nst::i8 * s, nst::u32 l){
@@ -351,12 +353,31 @@ class suffix_array_encoder{
 	suffix_array::_SuffixArray::mapped_type get_data(suffix_array::_StdSuffixArray::iterator& in){
 		return (*in).second;
 	}
+private:
 	
+	typedef std::pair<nst::u64, suffix_array::suffix> _FreqPair;
+	typedef std::vector<_FreqPair> _Inverted;
+	typedef std::vector<nst::u8> _Bytes;
+	typedef std::vector<nst::u64> _Frequencies;
+	typedef std::pair<nst::u64, nst::u8> _CharFrequency;
+	typedef std::vector<_CharFrequency> _CharFrequencies;
+			
 
 public:
 	suffix_array_encoder(nst::u32 block_size = 8192) : block_size(block_size){
 	}
 	~suffix_array_encoder(){
+	}
+	inline nst::u32 find_k(nst::u8 the_char, nst::u32 k, _Frequencies& char_frequencies){
+		
+		nst::u32 ic = 0;
+		for(;ic < k;++ic){
+			if(char_frequencies[ic] == the_char){
+				return ic;
+				break;
+			}
+		}
+		return ic;
 	}
 	/// encodes and create internal map 
 	template<typename _SuffixArrayType>
@@ -365,36 +386,35 @@ public:
 		
 		{
 			
-			
-			typedef fe_hash_map<_SuffixArrayType> _HashFe;
-			typedef std::pair<nst::u64, suffix> _FreqPair;
-			typedef std::vector<_FreqPair> _Inverted;
-			typedef std::vector<nst::u8> _Bytes;
+			typedef fe_hash_map<_SuffixArrayType> _HashFe;		
+		
 
 			_HashFe suffix_hasher;
 			nst::u64 remaining = length;
 			nst::u64 factor = remaining/100;
 			size_t t = ::os::millis();
 			suffix_hasher.set_backing(reduced_array);
-			/// scan phase
+		
+			nst::u64 start_pos = 0;
+			nst::u64 end_pos = 0;
 			for(nst::u64 p = 0; p < length ; ){
 				suffix s;
-				nst::u64 skip = std::min<nst::u64>(remaining, suffix_size);
+				nst::u64 skip = std::min<nst::u64>(remaining, suffix_size);				
 				s.assign(&buffer[p], (nst::u32)skip);
+				suffix_hasher[s]++;				
+				remaining -= skip;
+				p += skip;
 				
-				suffix_hasher[s]++;
-				
-				remaining -= 231; // -=skip;
-				p += 231; //+= skip				
 			}
+
 			suffix_hasher.flush();
-			//reduced_array.clear();
+			
 			_Inverted frequencies ;//= succinct;
 			for(_SuffixArrayType::iterator s = reduced_array.begin(); s != reduced_array.end(); ++s){
 				frequencies.push_back(std::make_pair(get_data(s),get_key(s)));
 			}
 			std::sort(frequencies.begin(),frequencies.end());
-			nst::u64 code = frequencies.size()+1;
+			nst::u64 code = frequencies.size()+32;
 			reduced_array.clear();
 			suffix_hasher.set_backing(reduced_array);
 			for(_Inverted::iterator i = frequencies.begin(); i != frequencies.end(); ++i){								
@@ -405,10 +425,15 @@ public:
 			printf("there are %lld codes\n",(nst::u64)frequencies.size());
 			
 			/// encoding phase
+			const size_t MAX_CODE_HIST = 32;
+			typedef std::vector<nst::u64> _Codes;
 			_Bytes encoded(length);
 			_Bytes::iterator writer = encoded.begin();
 			remaining = length;
+			_Codes codes(MAX_CODE_HIST);
+			nst::u64 coded = 0;
 			nst::u64 noncoded = 0;
+			nst::u64 modified = 0;
 			_SuffixArrayType::iterator closest;
 			_SuffixArrayType::iterator ends = reduced_array.end();
 			for(nst::u64 p = 0; p < length ; ){
@@ -422,10 +447,36 @@ public:
 					if(compare<=2){
 						++noncoded;
 					}else if(compare < get_key(closest).size()){
+						++coded;
+						if(code > 127){
+							nst::u64 long_code = code;
+							for(nst::u32 c = 0; c < MAX_CODE_HIST; ++c){
+								if(codes[c] == long_code){
+									code = c;
+									break;
+								}
+
+							}
+							codes[coded & (MAX_CODE_HIST-1)] = long_code;							
+						}
+						
 						writer = nst::leb128::write_unsigned(writer, code);
 						skip = compare;
 						writer = nst::leb128::write_unsigned(writer, compare);
-					}else{					
+						++modified;
+					}else{		
+						++coded;
+						if(code > 127){
+							nst::u64 long_code = code;
+							for(nst::u32 c = 0; c < MAX_CODE_HIST; ++c){
+								if(codes[c] == long_code){
+									code = c;
+									break;
+								}
+
+							}
+							codes[coded & (MAX_CODE_HIST-1)] = long_code;							
+						}
 						writer = nst::leb128::write_unsigned(writer, code);												
 						skip = compare;
 					}
@@ -435,12 +486,12 @@ public:
 				remaining -=skip;
 				p += skip;
 			}
-			printf("created suffix array in %lld millis compressed to %lld bytes (%lld noncoded)\n",::os::millis()-t, (size_t)(suffix_size*(noncoded+frequencies.size()))+(size_t)(writer - encoded.begin()),noncoded);			
+			printf("created suffix array in %lld millis compressed to %lld bytes (%lld noncoded %lld modified)\n",::os::millis()-t, (size_t)(suffix_size*(noncoded+frequencies.size()))+(size_t)(writer - encoded.begin()),noncoded,modified);			
 		}
 
 	}
 	void encode(const char * buffer, nst::u64 length){
-		bool use_std = false;
+		bool use_std = true;
 		using namespace suffix_array;
 		
 		::getch();

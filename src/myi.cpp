@@ -1694,7 +1694,7 @@ int treestore_db_init(void *p)
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 	printf("Start cleaning \n");
 	start_cleaning();
-	/// test_suffix_array();
+	//test_suffix_array();
 	/// pt_test();
 	DBUG_RETURN(FALSE);
 }

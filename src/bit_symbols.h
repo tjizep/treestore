@@ -24,7 +24,7 @@ template<typename _IntSymBolType>
 class symbol_vector{
 public:
 	typedef nst::u32 _BucketType;/// use a configurable bucket type for larger code size performance
-	typedef nst::u32 _IndexType; /// type to index bits
+	typedef nst::u64 _IndexType; /// type to index bits
 	static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
 	typedef std::vector<_BucketType> _Data;
 protected:
@@ -52,7 +52,7 @@ public:
 	}
 	/// create buckets by the ns
 	void resize(_IndexType ns){
-		data.resize(((ns*code_size)/BUCKET_BITS)+1);
+		data.resize(((ns*code_size)/(_IndexType)BUCKET_BITS)+1);
 	}
 
 	/// the capacity in bytes of this bit symbol vector
@@ -71,8 +71,8 @@ public:
 		_BucketType bucket_start;
 		_IntSymBolType code = val;
 		_IndexType bits_done = index * code_size;
-		_IndexType code_left = code_size;
-		_BucketType* current = &data[bits_done / BUCKET_BITS]; /// the first bucket where all the action happens
+		_BucketType code_left = code_size;
+		_BucketType* current = &data[bits_done / (_IndexType)BUCKET_BITS]; /// the first bucket where all the action happens
 		do{	/// write over BUCKET_BITS-bit buckets
 			bucket_start = bits_done & (BUCKET_BITS-1);/// where to begin in the bucket
 			_BucketType todo = std::min<_BucketType>(code_left, BUCKET_BITS-bucket_start);
@@ -92,7 +92,7 @@ public:
 		_IntSymBolType code = 0;
 		_BucketType bucket_start, bucket;
 		_IndexType bit_start = index * code_size;
-		const _BucketType* current = &data[bit_start / BUCKET_BITS];
+		const _BucketType* current = &data[bit_start / (_IndexType)BUCKET_BITS];
 		bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 		if(bucket_start + code_size < BUCKET_BITS){
 
@@ -101,8 +101,8 @@ public:
 			///code |=  bucket << code_complete;		/// if bucket_start == 0 nothing happens
 			return bucket;
 		}
-		_IndexType code_left = code_size;
-		_IndexType code_complete = 0;
+		_BucketType code_left = code_size;
+		_BucketType code_complete = 0;
 		
 		for(;;){	/// read from BUCKET_BITS-bit buckets
 			
@@ -124,7 +124,7 @@ public:
 			if( ( bit_start & (BUCKET_BITS-1) ) == 0){
 				++current; /// increment the bucket
 			}
-			bucket_start = bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
+			bucket_start = (_BucketType)bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 		}
 		return code;
 	}

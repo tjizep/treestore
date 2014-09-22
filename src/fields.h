@@ -1529,12 +1529,12 @@ namespace stored{
 
 
 			void encode(_Rid row, const _IntType &val){
-				//if(codes.count(val)){
+				if(codes.count(val)){
 					_CodeType code = codes[val];
 					symbols.set(row, code);
 
-				//}else
-				//	throw UninitializedCodeException();
+				}else
+					throw UninitializedCodeException();
 			}
 
 			const _IntType& decode(_Rid row) const {
