@@ -814,8 +814,10 @@ namespace stored{
 			row = 0;
 			if(bs==sizeof(_Data)){
 				get_Data().clear();
-			}else
+			}else{
 				bs = 0;
+				memset(buf, 0,sizeof(buf));
+			}
 		}
 
 		~DynamicKey(){
@@ -830,13 +832,14 @@ namespace stored{
 			bs(0),
 			row(0)
 		{
-
+			memset(buf, 0,sizeof(buf));
 		}
 
 		DynamicKey(const DynamicKey& right):
 			bs(0),
 			row(0)
 		{
+			memset(buf, 0,sizeof(buf));
 			*this = right;
 		}
 

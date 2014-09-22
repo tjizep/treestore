@@ -162,6 +162,7 @@ namespace tree_stored{
 				if(fl <= cl) cl = fl;
 
 				memcpy(ptr + lb,b.chars(),cl);
+				ptr [cl + lb] = 0;
 				if (lb == 1)
 					*ptr= (uchar) cl;
 				else
