@@ -1816,6 +1816,7 @@ namespace ts_info{
 			
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(1000);
+
 				/// other threads cant delete while this section is active
 				nst::synchronized synch2(tt_info_delete_lock);
 				typedef std::vector<tree_stored::tree_table*> _Tables;
