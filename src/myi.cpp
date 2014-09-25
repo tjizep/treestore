@@ -566,16 +566,24 @@ public:
 			nst::synchronized s(mut_total_locks);
 			++total_locks;
 		}
+		nst::synchronized synch(tt_info_lock);
+		tree_stored::tree_table * ts = get_info_table((*this).table);
+		tree_stored::table_info tt ;
+		ts->get_calculated_info(tt);
 
-		nst::synchronized synch(get_tt_info_lock());
-		tree_stored::tree_table * tt = get_info_table((*this).table);
+		if(tt.calculated.empty()){
+			
+			ts->begin(true,false);
+			ts->calc_density();
+			ts->rollback();
+			ts->get_calculated_info(tt);
 
-		tt->begin(true,false);
+		}
 
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
-			stats.data_file_length = tt->table_size();
+			stats.data_file_length = tt.table_size;
 			stats.block_size = 1;
-			stats.records = std::max<stored::_Rid>(2, tt->row_count());
+			stats.records = std::max<stored::_Rid>(2, tt.row_count);
 		}
 
 		if(which & HA_STATUS_TIME) // - only update of stats->update_time required
@@ -602,17 +610,21 @@ public:
 		}
 
 		if(which & HA_STATUS_VARIABLE) {// - records, deleted, data_file_length, index_file_length, delete_length, check_time, mean_rec_length
-			stats.data_file_length = tt->table_size();
+			stats.data_file_length = tt.table_size;
 			stats.block_size = 4096;
-			stats.records = std::max<stored::_Rid>(2, tt->row_count());
+			stats.records = std::max<stored::_Rid>(2, tt.row_count);
 			stats.mean_rec_length =(ha_rows) stats.data_file_length / stats.records;
 
 		}
-		tt->calc_density(table);
+		
+		
 		for (ulong	i = 0; i < table->s->keys; i++) {
-			for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
-
-				table->key_info[i].rec_per_key[j] = tt->get_rows_per_key(i,j);
+			if(i < tt.calculated.size()){
+				for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
+					if(j < tt.calculated[i].density.size()){
+						table->key_info[i].rec_per_key[j] = tt.calculated[i].density[j];
+					}
+				}
 			}
 		}
 
@@ -625,7 +637,7 @@ public:
 			//handler::auto_increment_value = get_tree_table()->row_count();
 		}
 
-		tt->rollback();
+		
 		{
 			nst::synchronized s(mut_total_locks);
 			--total_locks;
@@ -1653,6 +1665,8 @@ void initialize_loggers(){
 extern int pt_test();
 extern int linitialize();
 void start_cleaning();
+void start_calculating();
+
 void test_suffix_array(){
 	
 	printf("testing suffix array encoding\n");
@@ -1667,6 +1681,7 @@ void test_suffix_array(){
 }
 int treestore_db_init(void *p)
 {
+	
 #ifdef _MSC_VER
 	LONG  HeapFragValue = 2;
 	if(HeapSetInformation((PVOID)_get_heap_handle(),
@@ -1694,7 +1709,8 @@ int treestore_db_init(void *p)
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
 	printf("Start cleaning \n");
 	start_cleaning();
-	//test_suffix_array();
+	start_calculating();
+	/// test_suffix_array();
 	/// pt_test();
 	DBUG_RETURN(FALSE);
 }
@@ -1750,6 +1766,7 @@ int main(int argc, char *argv[]){
     pt_test();
     return 0;
 }
+
 namespace ts_cleanup{
 	class print_cleanup_worker : public Poco::Runnable{
 	public:
@@ -1781,7 +1798,7 @@ namespace ts_cleanup{
 	};
 	static print_cleanup_worker the_worker;
 	static Poco::Thread cleanup_thread;
-	static void start_cleaning(){
+	static void start(){
 		try{
 			cleanup_thread.start(the_worker);
 		}catch(Poco::Exception &e){
@@ -1790,6 +1807,46 @@ namespace ts_cleanup{
 	}
 };
 void start_cleaning(){
-	ts_cleanup::start_cleaning();
+	ts_cleanup::start();
+}
+namespace ts_info{
+	class info_worker : public Poco::Runnable{
+	public:
+		void run(){
+			
+			while(Poco::Thread::current()->isRunning()){
+				Poco::Thread::sleep(1000);
+				
+				typedef std::vector<tree_stored::tree_table*> _Tables;
+				_Tables tables;
+				{
+					nst::synchronized synch(tt_info_lock);
+					for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
+						tables.push_back((*i).second);
+					}		
+				}
+				for(_Tables::iterator i = tables.begin();i!=tables.end();++i){
+					
+					(*i)->begin(true,false);
+					(*i)->calc_density();
+					(*i)->rollback();
+					
+				}	
+
+			}
+		}
+	};
+	static info_worker the_worker;
+	static Poco::Thread info_thread;
+	static void start(){
+		try{
+			info_thread.start(the_worker);
+		}catch(Poco::Exception &e){
+			printf("Could not start cleanup thread : %s\n",e.name());
+		}
+	}
+};
+void start_calculating(){
+	ts_info::start();
 }
 

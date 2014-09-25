@@ -19,6 +19,17 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define _BITSYMBOLS_20140118_CEP_
 #include <stx/storage/basic_storage.h>
 namespace nst = stx::storage;
+namespace bits{
+	inline nst::u32 bit_log2(nst::u32 value){
+		nst::u32 log = 0; /// satisfies 2^0 = 1
+		nst::u32 bit  = 1; /// current value of 2^log
+		while(bit < value){
+			bit = bit <<1;
+			++log;
+		}
+		return log;
+	}
+}
 
 template<typename _IntSymBolType>
 class symbol_vector{
@@ -58,6 +69,11 @@ public:
 	/// the capacity in bytes of this bit symbol vector
 	size_t capacity() const {
 		return data.capacity()*sizeof(_BucketType);
+	}
+	
+	/// the capacity in bytes of this bit symbol vector
+	size_t byte_size() const {
+		return data.size() * sizeof(_BucketType);
 	}
 
 	/// remove data completely - requires resize to enable again

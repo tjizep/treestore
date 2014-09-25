@@ -1507,18 +1507,7 @@ namespace stored{
 			}
 
 			/// Find smallest X in 2^X >= value
-			inline nst::u32 bit_log2(nst::u32 value){
-
-				nst::u32 log = 0; /// satisfies 2^0 = 1
-				nst::u32 bit  = 1; /// current value of 2^log
-
-				while(bit < value){
-					bit = bit <<1;
-					++log;
-				}
-
-				return log;
-			}
+			
 
 			bool empty() const {
 				return code_size == 0;
@@ -1570,7 +1559,7 @@ namespace stored{
 
 					if(words > 0){
 
-						code_size = std::max<_CodeType>(1, bit_log2((_CodeType)words));
+						code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)words));
 						symbols.set_code_size(code_size);
 
 						resize(rows);
@@ -1636,20 +1625,6 @@ namespace stored{
 				symbols.clear();
 			}
 
-			/// Find smallest X in 2^X >= value
-			inline nst::u32 bit_log2(nst::u32 value){
-
-				nst::u32 log = 0; /// satisfies 2^0 = 1
-				nst::u32 bit  = 1; /// current value of 2^log
-
-				while(bit < value){
-					bit = bit <<1;
-					++log;
-				}
-
-				return log;
-			}
-
 			bool empty() const {
 				return code_size == 0;
 			}
@@ -1657,9 +1632,7 @@ namespace stored{
 			void resize(_Rid rows){
 				if(code_size==0) throw UninitializedCodeException();
 				symbols.resize(rows);
-
 			}
-
 
 			void encode(_Rid row, const _IntType &val){
 				if(codes.empty()){
@@ -1693,14 +1666,14 @@ namespace stored{
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
-					nst::u32 bits_in_histogram = bit_log2((nst::u32)(*this).stats.get_entropy())+2;
-					nst::u32 bits_in_abs = bit_log2((nst::u32)(*this).stats.get_abs());
+					nst::u32 bits_in_histogram = bits::bit_log2((nst::u32)(*this).stats.get_entropy())+2;
+					nst::u32 bits_in_abs = bits::bit_log2((nst::u32)(*this).stats.get_abs());
 					/// not sure about negative values yet, although translation i.o. mapping should sort them out
 					if(bits_in_abs <= bits_in_histogram){						
 						decodes.clear();
 						codes.clear();
 						min_decoded = stats.get_min_val() ;
-						code_size = std::max<_CodeType>(1, bit_log2((_CodeType)stats.get_abs()));	
+						code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)stats.get_abs()));	
 						symbols.set_code_size(code_size);
 						resize(rows);
 						
@@ -1721,7 +1694,7 @@ namespace stored{
 
 						if(words > 0){
 
-							code_size = std::max<_CodeType>(1, bit_log2((_CodeType)words));
+							code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)words));
 							symbols.set_code_size(code_size);
 
 							resize(rows);
@@ -2079,6 +2052,8 @@ namespace stored{
 		int fields_indexed;
 		stored::_Parts parts;
 		stored::_Parts density;
+		
+		std::string name;
 
 		virtual const DynamicKey *predict(index_iterator_interface& io, DynamicKey& q)=0;
 		virtual void cache_it(index_iterator_interface& io)=0;

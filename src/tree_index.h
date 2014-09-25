@@ -467,7 +467,6 @@ namespace tree_stored{
 
 		stored::_Rid predictor;
 		bool unique;
-		std::string name;
 		tree_index(std::string name, bool unique)
 		:	index(name)	, predictor(0), unique(unique)
 		{
