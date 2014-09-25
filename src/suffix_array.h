@@ -270,7 +270,7 @@ namespace suffix_array{
 		_MapType* backing;
 		size_t fe_size;
 		size_t hashed;
-		nst::u32 calc_pos(const key_type &k){
+		nst::u32 calc_pos(const key_type &k) const {
 			return(nst::u32) ((size_t)k) % fe_size;
 		}
 		inline bool has_backing() const {
@@ -313,6 +313,23 @@ namespace suffix_array{
 			if (has_backing()) return hashed+get_backing().size();
 			return hashed ;
 		};
+		bool find(data_type& data, const key_type & k) const {
+			nst::u32 pos = calc_pos(k);
+
+			if(flags[pos] == 1){				
+				const _MapPair& r = (*this).data[pos];
+				if(r.first == k){
+					data = r.second;	
+					return true;
+				}
+			}
+			_MapType::const_iterator f = get_backing().find(k);
+			if(f!=get_backing().end()){
+				data = (*f).second;
+				return true;
+			}
+			return false;
+		}
 		data_type& operator[](const key_type & k){
 			nst::u32 pos = calc_pos(k);
 			_MapPair& r = data[pos];
@@ -368,16 +385,54 @@ public:
 	}
 	~suffix_array_encoder(){
 	}
-	inline nst::u32 find_k(nst::u8 the_char, nst::u32 k, _Frequencies& char_frequencies){
+	
+	nst::u32 find_good_bucket_size(const char * buffer, nst::u64 length){
+		using namespace suffix_array;
+		typedef _StdSuffixArray _SuffixArrayType ;
+		typedef fe_hash_map<_SuffixArrayType> _HashFe;		
+		typedef nst::u32 _CodeType;
+		_HashFe suffix_hasher;
+		_SuffixArrayType reduced_array;
 		
-		nst::u32 ic = 0;
-		for(;ic < k;++ic){
-			if(char_frequencies[ic] == the_char){
-				return ic;
-				break;
+		
+		size_t t = ::os::millis();
+		suffix_hasher.set_backing(reduced_array);
+		
+		nst::u32 bucket_size = suffix_size;
+
+		nst::u32 min_bucket_size = 0;
+		nst::u64 min_compressed = length;
+		while(bucket_size > 1){
+			nst::u64 p = 0;
+			nst::u64 remaining = length;
+			nst::u64 buckets = 0;
+			for(; p < length/4 ; ){
+				suffix s;
+				nst::u64 skip = 1;
+				nst::u64 length = std::min<nst::u64>(remaining, bucket_size);				
+				s.assign(&buffer[p], (nst::u32)length);
+				suffix_hasher[s]++;			
+				skip = length;
+				remaining -= skip;
+				p += skip;				
+				++buckets;
+			}			
+			suffix_hasher.flush();
+			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)reduced_array.size()));	
+			printf("array size %lld\n",reduced_array.size());
+			nst::u64 compressed = ( (buckets * code_size)>>3) + reduced_array.size()*suffix_size;
+			if(compressed < min_compressed ){
+				min_bucket_size = bucket_size;
+				min_compressed = compressed;
+				printf("min compressed %lld, min bucket size %lld\n",compressed,bucket_size);
 			}
+			reduced_array.clear();
+			bucket_size -= 1;
 		}
-		return ic;
+
+		return min_bucket_size;
+	}
+	void decode(char * outbuffer, nst::u64 start, nst::u64 length){
 	}
 	/// encodes and create internal map 
 	template<typename _SuffixArrayType>
@@ -395,16 +450,18 @@ public:
 			size_t t = ::os::millis();
 			suffix_hasher.set_backing(reduced_array);
 		
-			nst::u64 start_pos = 0;
-			nst::u64 end_pos = 0;
+			nst::u64 buckets = 0;
+			nst::u32 bucket_size = find_good_bucket_size(buffer, length);
 			for(nst::u64 p = 0; p < length ; ){
 				suffix s;
-				nst::u64 skip = std::min<nst::u64>(remaining, suffix_size);				
-				s.assign(&buffer[p], (nst::u32)skip);
-				suffix_hasher[s]++;				
+				nst::u64 skip = 1;
+				nst::u64 length = std::min<nst::u64>(remaining, bucket_size);				
+				s.assign(&buffer[p], (nst::u32)length);
+				suffix_hasher[s]++;			
+				skip = length;
 				remaining -= skip;
 				p += skip;
-				
+				++buckets;
 			}
 
 			suffix_hasher.flush();
@@ -427,66 +484,36 @@ public:
 			/// encoding phase
 			const size_t MAX_CODE_HIST = 32;
 			typedef std::vector<nst::u64> _Codes;
-			_Bytes encoded(length);
-			_Bytes::iterator writer = encoded.begin();
+			typedef nst::u32 _CodeType;
+			typedef symbol_vector<_CodeType> _Encoded;
+			_Encoded encoded;			
 			remaining = length;
 			_Codes codes(MAX_CODE_HIST);
+			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)frequencies.size()));	
 			nst::u64 coded = 0;
 			nst::u64 noncoded = 0;
-			nst::u64 modified = 0;
+			nst::u64 out_pos = 0;
+			encoded.set_code_size(code_size);
+			encoded.resize(length);
 			_SuffixArrayType::iterator closest;
 			_SuffixArrayType::iterator ends = reduced_array.end();
+			encoded.resize(1+buckets);
 			for(nst::u64 p = 0; p < length ; ){
 				suffix s;
-				nst::u64 skip = std::min<nst::u64>(remaining, suffix_size);
+				nst::u64 skip = std::min<nst::u64>(remaining, bucket_size);
 				s.assign(&buffer[p], (nst::u32)skip);
-				closest = reduced_array.lower_bound(s);
-				if(closest != ends){
-					nst::u32 compare = s.left_compare(get_key(closest));
-					nst::u64 code = get_data(closest);
-					if(compare<=2){
-						++noncoded;
-					}else if(compare < get_key(closest).size()){
-						++coded;
-						if(code > 127){
-							nst::u64 long_code = code;
-							for(nst::u32 c = 0; c < MAX_CODE_HIST; ++c){
-								if(codes[c] == long_code){
-									code = c;
-									break;
-								}
-
-							}
-							codes[coded & (MAX_CODE_HIST-1)] = long_code;							
-						}
-						
-						writer = nst::leb128::write_unsigned(writer, code);
-						skip = compare;
-						writer = nst::leb128::write_unsigned(writer, compare);
-						++modified;
-					}else{		
-						++coded;
-						if(code > 127){
-							nst::u64 long_code = code;
-							for(nst::u32 c = 0; c < MAX_CODE_HIST; ++c){
-								if(codes[c] == long_code){
-									code = c;
-									break;
-								}
-
-							}
-							codes[coded & (MAX_CODE_HIST-1)] = long_code;							
-						}
-						writer = nst::leb128::write_unsigned(writer, code);												
-						skip = compare;
-					}
-					
+				
+				nst::u64 code = 0;
+				if(suffix_hasher.find(code, s)){
+					++coded;
+					encoded.set(out_pos++, (nst::u32)code);						
 				}else
 					++noncoded;
 				remaining -=skip;
 				p += skip;
 			}
-			printf("created suffix array in %lld millis compressed to %lld bytes (%lld noncoded %lld modified)\n",::os::millis()-t, (size_t)(suffix_size*(noncoded+frequencies.size()))+(size_t)(writer - encoded.begin()),noncoded,modified);			
+			printf("code size %ld %lld codes written to %lld bytes\n",code_size,out_pos,encoded.byte_size());
+			printf("created suffix array in %lld millis compressed to %lld bytes (%lld noncoded)\n",::os::millis()-t, (size_t)(bucket_size*(noncoded+frequencies.size()))+(size_t)(encoded.byte_size()),noncoded);			
 		}
 
 	}

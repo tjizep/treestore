@@ -834,8 +834,32 @@ namespace tree_stored{
 		Field * field;
         uchar * saved_ptr;
 	};
+	
+	typedef std::vector<nst::u32> _Density;
 
+	struct density_info{
+		_Density density;
+	};
+	
+	typedef std::vector<density_info> _DensityInfo;
+	
+	struct table_info{
+		
+		table_info() : table_size(0),row_count(0){
+		}
+
+		void clear(){
+			calculated.clear();
+			table_size = 0;
+			row_count = 0;
+		}
+		_DensityInfo calculated;
+		nst::u64 table_size;
+		_Rid row_count;
+	};
+	
 	typedef std::vector<selection_tuple> _Selection;
+	
 	class tree_table{
 	public:
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
@@ -1079,6 +1103,8 @@ namespace tree_stored{
 		nst::u64 last_density_calc;
 		nst::i64 last_density_tx;
 		collums::_LockedRowData* row_datas;
+		Poco::Mutex tt_info_copy_lock;
+		table_info calculated_densities;
     public:
         _Conditional conditional;
 		abstract_conditional_iterator::ptr rcond;
@@ -1086,9 +1112,17 @@ namespace tree_stored{
 		_Indexes indexes;
 		_Collumns cols;
 		stored::abstracted_storage storage;
+		std::string path;
 		_TableMap * table;
 		shared_data * share;
+		
+		
 	public:
+		void get_calculated_info(table_info& calc){
+			nst::synchronized _s(tt_info_copy_lock);			
+			calculated_densities.row_count = _row_count;
+			calc = calculated_densities;
+		}
 		nst::u32 get_col_count() const {
 			return cols.size();
 		}
@@ -1148,7 +1182,7 @@ namespace tree_stored{
 				return (size_t)q;
 			}
 		};
-		void calc_density(TABLE *table_arg){
+		void calc_density(){
 
 			if(os::millis() - last_density_calc < 3000000){
 
@@ -1160,10 +1194,7 @@ namespace tree_stored{
 				return;
 			}
 			uint i;
-			KEY *pos;
-			TABLE_SHARE *share= table_arg->s;
-			pos = table_arg->key_info;
-			std::string path = share->path.str;
+			//std::string path = share->path.str;
 
 			if(!_row_count){
 				init_rowcount();
@@ -1173,11 +1204,12 @@ namespace tree_stored{
 				return;
 			}
 
-			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
-				printf("Calculating cardinality of index parts for %s\n",pos->name);
-				std::string index_name = path + INDEX_SEP() + pos->name;
+			for (i= 0; i < (*this).indexes.size(); i++){//all the indexes in the table ?
+				
+				
 				stored::index_interface::ptr index = (*this).indexes[i];
-				const _Rid ratio = 7;
+				printf("Calculating cardinality of index parts for %s\n",(*this).indexes[i]->name.c_str());
+				const _Rid ratio = 5;
 				const _Rid sample = _row_count > ratio ? _row_count/ratio: _row_count;
 				const _Rid page_size = 512;
 				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
@@ -1209,7 +1241,6 @@ namespace tree_stored{
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
 					_Rid d = sample / (*u).size();/// accurate to the nearest page
-					printf("Calculating cardinality of index parts for %s px %li as %li\n",pos->name,(long int)partx,(long int)d);
 					index->push_density(d);
 					partx++;
 				}
@@ -1217,6 +1248,12 @@ namespace tree_stored{
 			reduce_use();
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
+			nst::synchronized _s_info(tt_info_copy_lock);
+			(*this).calculated_densities.clear();
+			fill_density_info((*this).calculated_densities.calculated);
+			
+			(*this).calculated_densities.table_size = (*this).table_size();
+			(*this).calculated_densities.row_count = (*this)._row_count;
 		}
 		void begin_table(bool shared = true){
 			stored::abstracted_tx_begin(!changed,shared, storage, get_table());
@@ -1423,9 +1460,18 @@ namespace tree_stored{
 		inline const CompositeStored& get_index_query() const {
 			return temp;
 		}
-
+		
+		/// returns the rows per key for all collumns and index parts
+		void fill_density_info(_DensityInfo& info){
+			for(nst::u64 i = 0; i < indexes.size(); ++i){
+				density_info di;
+				for(nst::u64 j = 0; j < indexes[i]->densities(); ++j){
+					di.density.push_back(indexes[i]->density_at(j));
+				}
+				info.push_back(di);
+			}
+		}
 		/// returns the rows per key for a given collumn
-
 		nst::u32 get_rows_per_key(nst::u32 i, nst::u32 part) const {
 			if(indexes.size() > i && indexes[i]->densities() > part){
 				return indexes[i]->density_at(part);
