@@ -2207,6 +2207,8 @@ namespace stx
 					first_node.sort();
 					total += first_node->get_occupants();
 					first_node = first_node->next;
+					if(first_node.has_context())
+						first_node.get_context()->check_low_memory_state();
 				}
 
 				total += to.current_slot;
@@ -2218,6 +2220,9 @@ namespace stx
 			/// ++Prefix advance the iterator to the next slot
 			inline self& operator++()
 			{
+				if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 				if (current_slot + 1 < currnode->get_occupants())
 				{
 					++current_slot;
@@ -2242,6 +2247,9 @@ namespace stx
 			inline self operator++(int)
 			{
 				self tmp = *this;   // copy ourselves
+				
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
 
 				if (current_slot + 1 < currnode->get_occupants())
 				{
@@ -2269,6 +2277,9 @@ namespace stx
 			/// --Prefix backstep the iterator to the last slot
 			inline self& operator--()
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				if (current_slot > 0)
 				{
 					--current_slot;
@@ -2291,6 +2302,9 @@ namespace stx
 			/// Postfix-- backstep the iterator to the last slot
 			inline self operator--(int)
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot > 0)
@@ -2439,6 +2453,9 @@ namespace stx
 			/// Prefix++ advance the iterator to the next slot
 			inline self& operator++()
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				if (current_slot + 1 < currnode->get_occupants())
 				{
 					++current_slot;
@@ -2460,6 +2477,9 @@ namespace stx
 			/// Postfix++ advance the iterator to the next slot
 			inline self operator++(int)
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot + 1 < currnode->get_occupants())
@@ -2483,6 +2503,9 @@ namespace stx
 			/// Prefix-- backstep the iterator to the last slot
 			inline self& operator--()
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				if (current_slot > 0)
 				{
 					--current_slot;
@@ -2504,6 +2527,9 @@ namespace stx
 			/// Postfix-- backstep the iterator to the last slot
 			inline self operator--(int)
 			{
+				if(currnode.has_context())
+					currnode.get_context()->check_low_memory_state();
+
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot > 0)
@@ -3356,12 +3382,15 @@ namespace stx
 		
 			}
 		}
+		public:
+
+		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
 			if(::stx::memory_low_state){				
 				reduce_use();
 			}
 		}
-		public:
+		
 		/// writes all modified pages to storage and frees all surface nodes
 		void reduce_use(){
 			flush_buffers(true);
