@@ -410,21 +410,31 @@ namespace collums{
 				NS_STORAGE::remove_col_use(calc_use());
 				rows_cached = get_v_row_count(col);
 				nst::i64 use_before = rows_cached * sizeof(_StoredEntry);
-
+				nst::u64 used_by_encoding = 0;
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
 				if(treestore_column_encoded){
+					bool ok = true;
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.sample(c.data());
+						encoded.total_bytes_allocated();
 						++ctr;
+
+						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/5){
+							ok = false;
+							break;	
+						}
 						
 					}
 					col.reduce_use();
-					encoded.finish(rows_cached);
+					if(ok){					
+						encoded.finish(rows_cached);
+					}
 				}
 				if(treestore_column_encoded && encoded.good()){
+
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());

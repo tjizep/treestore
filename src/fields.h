@@ -87,6 +87,9 @@ namespace stored{
 		typedef _IntType value_type;
 		_IntType value;
 	public:
+		size_t total_bytes_allocated() const {
+			return sizeof(*this);
+		}
 		inline _IntType get_value() const {
 
 			return value;
@@ -135,7 +138,9 @@ namespace stored{
 			return (size_t)value;
 		}
 	};
-
+	
+	
+	
 	template<typename _FType>
 	class FTypeStored {
 	public:
@@ -143,6 +148,9 @@ namespace stored{
 	protected:
 		_FType value;
 	public:
+		size_t total_bytes_allocated() const {
+			return sizeof(*this);
+		}
 		inline _FType get_value() const {
 			return value;
 		}
@@ -339,7 +347,11 @@ namespace stored{
 
 		}
 	public:
-
+		size_t total_bytes_allocated() const {
+			if(bytes > _ConstSize)
+				return sizeof(*this) + bytes;
+			return sizeof(*this);
+		}
 		char * get_value(){
 			return chars();
 		}
@@ -527,7 +539,14 @@ namespace stored{
 		};
 	};
 
-
+	template <typename _Hashed>
+	struct fields_hash
+	{
+		size_t operator()(_Hashed const & x) const 
+		{
+			return x.get_hash();
+		}
+	};
 
 
 
@@ -547,8 +566,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 14> BlobStored;
-	typedef stored::Blobule<true, 14> VarCharStored;
+	typedef stored::Blobule<false, 24> BlobStored;
+	typedef stored::Blobule<true, 24> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -686,6 +705,11 @@ namespace stored{
 	public:
 		row_type row;
 	public:
+		size_t total_bytes_allocated() const {
+			if(bs==sizeof(_Data))
+				return sizeof(*this) + get_Data().capacity();
+			return sizeof(*this);
+		}
 		int size() const {
 			if(bs==sizeof(_Data))
 				return (int)get_Data().size();
@@ -1392,22 +1416,29 @@ namespace stored{
 		template<typename _IntType>
 		struct entropy_t{
 			typedef _IntType _Sampled;
-			typedef std::map<_Sampled, nst::u64> _Histogram;
+			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _Histogram;
 			nst::u64 samples;
-
+			nst::u64 bytes_allocated;
 			_Histogram histogram;
-
+			size_t total_bytes_allocated() const {
+				return bytes_allocated;
+			}
 			entropy_t():samples(0){
-
+				bytes_allocated = sizeof(*this);
 			}
 			void clear(){
 				samples = 0;
+				bytes_allocated = sizeof(*this);
                 _Histogram h;
 				histogram.swap(h);
 			}
 			void sample(const _IntType& data){
+				size_t before = histogram.size();
 				histogram[data]++;
 				++samples;
+				if(before < histogram.size()){
+					bytes_allocated += data.total_bytes_allocated();
+				}
 			}
 
 			nst::u64 get_samples() const {
@@ -1493,6 +1524,9 @@ namespace stored{
 			}
 
 			_Entropy& get_stats(){
+				return stats;
+			}
+			const _Entropy& get_stats() const {
 				return stats;
 			}
 
@@ -1589,7 +1623,7 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::map<_IntType, _CodeType> _CodeMap;
+            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
 			typedef std::vector<_IntType> _DeCodeMap;
 
 			_Entropy stats;
@@ -1614,7 +1648,9 @@ namespace stored{
 			_Entropy& get_stats(){
 				return stats;
 			}
-
+			const _Entropy& get_stats() const{
+				return stats;
+			}
 			void clear(){
                 _CodeMap c;
                 _DeCodeMap d;
@@ -1766,7 +1802,9 @@ namespace stored{
 			}
 			void clear(){
 			}
-
+			size_t total_bytes_allocated() const{
+				return sizeof(*this);
+			}
 			void sample(const _D &data){
 				++bsamples;
 			}
@@ -1799,15 +1837,23 @@ namespace stored{
 		struct standard_entropy_coder<IntStored >{
 			typedef IntStored _DataType;
 			int_fix_unmapped_encoded_buffer<_DataType> coder;
+			
 			bool empty() const {
 				return coder.empty();
 			}
+			
 			bool applicable() const {
 				return true;
 			}
+			
 			void sample(const IntStored &data){
 				coder.get_stats().sample(data);
 			}
+			
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
+			}
+
 			void finish(_Rid rows){
 				coder.initialize(rows);
 			}
@@ -1847,6 +1893,9 @@ namespace stored{
 			void sample(const UIntStored &data){
 				coder.get_stats().sample(data);
 			}
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
+			}
 			void finish(_Rid rows){
 				coder.initialize(rows);
 			}
@@ -1885,6 +1934,9 @@ namespace stored{
 			void sample(const ShortStored &data){
 				coder.get_stats().sample(data);
 			}
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
+			}
 			void finish(_Rid rows){
 				coder.initialize(rows);
 			}
@@ -1922,6 +1974,9 @@ namespace stored{
 			void sample(const UShortStored &data){
 				coder.get_stats().sample(data);
 			}
+			size_t total_bytes_allocated() const{
+				return coder.get_stats().total_bytes_allocated();
+			}
 			void finish(_Rid rows){
 				coder.initialize(rows);
 			}
@@ -1956,6 +2011,9 @@ namespace stored{
 			}
 			bool applicable() const {
 				return true;
+			}
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
 			}
 			void sample(const VarCharStored &data){
 				coder.get_stats().sample(data);
@@ -1996,6 +2054,9 @@ namespace stored{
 			}
 			void sample(const BlobStored &data){
 				coder.get_stats().sample(data);
+			}
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
 			}
 			void finish(_Rid rows){
 				coder.initialize(rows);

@@ -401,19 +401,23 @@ void reduce_thread_usage(){
 	if(calc_total_use() > treestore_max_mem_use){
 		st.check_use();
 		//reduce_info_tables();	
-		//nst::synchronized s(mut_total_locks);				
-		//if(total_locks==0){
+		
 		if(calc_total_use() > treestore_max_mem_use){
 			//nst::synchronized s2(tt_info_lock);/// the info function may be called in another thread
-			printf("Releasing shared memory: total locks reached 0 processing idle pages\n");
+			
 			stx::process_idle_times();	
 		}
 		//}		
 	}
-	
-	if(calc_total_use() > treestore_max_mem_use){
-		
+	if(calc_total_use() > treestore_max_mem_use){			
+		nst::synchronized s(mut_total_locks);				
+		if(total_locks==0){
+			st.reduce_all();
+		}
+	}
+	if(calc_total_use() > treestore_max_mem_use){			
 			stored::reduce_all();
+			
 	}
 	
 }
