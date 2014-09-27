@@ -1416,7 +1416,8 @@ namespace stored{
 		template<typename _IntType>
 		struct entropy_t{
 			typedef _IntType _Sampled;
-			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _Histogram;
+			//typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _Histogram;
+			typedef std::map<_Sampled, nst::u64 > _Histogram;
 			nst::u64 samples;
 			nst::u64 bytes_allocated;
 			_Histogram histogram;
@@ -1623,7 +1624,8 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
+            //typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
+			typedef std::map<_IntType, _CodeType > _CodeMap;
 			typedef std::vector<_IntType> _DeCodeMap;
 
 			_Entropy stats;
