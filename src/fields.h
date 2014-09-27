@@ -1416,11 +1416,31 @@ namespace stored{
 		template<typename _IntType>
 		struct entropy_t{
 			typedef _IntType _Sampled;
-			//typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _Histogram;
+			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64 > _Histogram;
+		protected:
 			nst::u64 samples;
 			nst::u64 bytes_allocated;
-			_Histogram histogram;
+			_UnsortedHistogram histogram;
+			_Histogram sorted_histogram;
+			void clear_sorted(){
+				_Histogram sorted_histogram;
+				(*this).sorted_histogram.swap(sorted_histogram);
+			}
+		public:
+			_Histogram& get_sorted_histogram(){
+				if(sorted_histogram.empty()){
+					for(_UnsortedHistogram::iterator u = histogram.begin(); u!=histogram.end();++u){
+						sorted_histogram[(*u).first] = (*u).second;
+					}
+				}
+				return sorted_histogram;
+			}
+			
+			const _Histogram& get_sorted_histogram() const {				
+				return sorted_histogram;
+			}
+
 			size_t total_bytes_allocated() const {
 				return bytes_allocated;
 			}
@@ -1430,10 +1450,14 @@ namespace stored{
 			void clear(){
 				samples = 0;
 				bytes_allocated = sizeof(*this);
-                _Histogram h;
+                _UnsortedHistogram h;
 				histogram.swap(h);
+				clear_sorted();
 			}
 			void sample(const _IntType& data){
+				if(!sorted_histogram.empty()){
+					clear_sorted();
+				}
 				size_t before = histogram.size();
 				histogram[data]++;
 				++samples;
@@ -1456,25 +1480,25 @@ namespace stored{
 		struct int_entropy_t : public entropy_t<_IntType>{
 			
 			
-			typename _IntType::value_type get_max_val() const {
+			typename _IntType::value_type get_max_val()  {
 				if(histogram.empty())
 					return 0;
 				
-				_Histogram::const_iterator i = histogram.end();
+				_Histogram::const_iterator i = get_sorted_histogram().end();
 				return (*(--i)).first.get_value();
 
 			}
 			
-			typename _IntType::value_type get_min_val() const {
+			typename _IntType::value_type get_min_val()  {
 				if(histogram.empty())
 					return 0;
-				_Histogram::const_iterator i = histogram.begin();
+				_Histogram::const_iterator i = get_sorted_histogram().begin();
 				
 				return (*i).first.get_value();
 
 			}
 			
-			typename nst::u32 get_abs() const {
+			typename nst::u32 get_abs()  {
 				if(histogram.empty())
 					return 0;
 				
@@ -1504,7 +1528,7 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::map<_IntType, _CodeType> _CodeMap;
+            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
 			typedef std::vector<_IntType> _DeCodeMap;
 
 			_Entropy stats;
@@ -1579,10 +1603,10 @@ namespace stored{
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
 
-					typename _Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
+					typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
 					nst::u32 words = 0;
 
-					for(;h != (*this).stats.histogram.end();++h){
+					for(;h != (*this).stats.get_sorted_histogram().end();++h){
 
 						codes[(*h).first] = words;
 						decodes.resize(words+1);
@@ -1717,10 +1741,10 @@ namespace stored{
 						
 					}else{
 
-						typename _Entropy::_Histogram::iterator h = (*this).stats.histogram.begin();
+						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
 						nst::u32 words = 0;
 
-						for(;h != (*this).stats.histogram.end();++h){
+						for(;h != (*this).stats.get_sorted_histogram().end();++h){
 
 							codes[(*h).first] = words;
 							decodes.resize(words+1);
