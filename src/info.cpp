@@ -38,7 +38,9 @@ tree_stored::tree_table * get_info_table(TABLE* table){
 	if(NULL == result){
 		result = new tree_stored::tree_table(table);
 		info_tables[table->s->path.str] = result;
-
+		result->begin(true,false);
+		result->calc_rowcount(); // the minimum statistics required
+		result->rollback();
 	}
 	return result;
 

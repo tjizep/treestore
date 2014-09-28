@@ -1103,6 +1103,7 @@ namespace tree_stored{
 		nst::u64 last_density_calc;
 		nst::i64 last_density_tx;
 		collums::_LockedRowData* row_datas;
+		bool calculating_statistics;
 		Poco::Mutex tt_info_copy_lock;
 		table_info calculated_densities;
     public:
@@ -1141,7 +1142,7 @@ namespace tree_stored{
 		,	storage(table_arg->s->path.str)
 
 		,	table(nullptr)
-
+		,	calculating_statistics(false)
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1182,6 +1183,16 @@ namespace tree_stored{
 				return (size_t)q;
 			}
 		};
+		void calc_rowcount(){
+			if(!_row_count){
+				init_rowcount();
+			}
+			(*this).calculated_densities.table_size = (*this).table_size();
+			(*this).calculated_densities.row_count = (*this)._row_count;
+		}
+		bool is_calculating() const{
+			return calculating_statistics;
+		}
 		void calc_density(){
 
 			if(os::millis() - last_density_calc < 3000000){
@@ -1203,7 +1214,7 @@ namespace tree_stored{
 			if(!_row_count){
 				return;
 			}
-
+			calculating_statistics = true;
 			for (i= 0; i < (*this).indexes.size(); i++){//all the indexes in the table ?
 				
 				
@@ -1254,6 +1265,7 @@ namespace tree_stored{
 			
 			(*this).calculated_densities.table_size = (*this).table_size();
 			(*this).calculated_densities.row_count = (*this)._row_count;
+			calculating_statistics = false;
 		}
 		void begin_table(bool shared = true){
 			stored::abstracted_tx_begin(!changed,shared, storage, get_table());

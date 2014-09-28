@@ -507,10 +507,10 @@ namespace tree_stored{
 		virtual size_t densities() const {
 			return density.size();
 		}
-		int& density_at(size_t at) {
+		_Rid& density_at(size_t at) {
 			return density[at];
 		}
-		const int& density_at(size_t at) const {
+		const _Rid& density_at(size_t at) const {
 			return density[at];
 		}
 		void end(stored::index_iterator_interface& out){

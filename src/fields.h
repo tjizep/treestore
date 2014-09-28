@@ -552,10 +552,10 @@ namespace stored{
 
 };
 namespace stored{
-	typedef NS_STORAGE::u32 _Rid;
+	typedef NS_STORAGE::u64 _Rid;
 	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
 
-	typedef std::vector<int> _Parts;
+	typedef std::vector<_Rid> _Parts;
 	typedef stored::FTypeStored<float> FloatStored ;
 	typedef stored::FTypeStored<double> DoubleStored ;
 	typedef stored::IntTypeStored<short> ShortStored;
@@ -1409,8 +1409,8 @@ namespace stored{
 		};
 	};
 
-	static const nst::u32 MAX_HIST = 1 << 24;
-	static const nst::u32 MAX_ENTROPY = 1 << 24;
+	static const nst::u32 MAX_HIST = 1 << 28;
+	static const nst::u32 MAX_ENTROPY = 1 << 28;
 	
 
 		template<typename _IntType>
@@ -1427,12 +1427,17 @@ namespace stored{
 				_Histogram sorted_histogram;
 				(*this).sorted_histogram.swap(sorted_histogram);
 			}
+			void clear_unsorted(){
+				_UnsortedHistogram h;
+				(*this).histogram.swap(h);
+			}
 		public:
 			_Histogram& get_sorted_histogram(){
 				if(sorted_histogram.empty()){
 					for(_UnsortedHistogram::iterator u = histogram.begin(); u!=histogram.end();++u){
 						sorted_histogram[(*u).first] = (*u).second;
 					}
+					//clear_unsorted();
 				}
 				return sorted_histogram;
 			}
@@ -1450,8 +1455,7 @@ namespace stored{
 			void clear(){
 				samples = 0;
 				bytes_allocated = sizeof(*this);
-                _UnsortedHistogram h;
-				histogram.swap(h);
+				clear_unsorted();
 				clear_sorted();
 			}
 			void sample(const _IntType& data){
@@ -1605,15 +1609,14 @@ namespace stored{
 
 					typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
 					nst::u32 words = 0;
+					decodes.resize((*this).stats.get_sorted_histogram().size());
 
 					for(;h != (*this).stats.get_sorted_histogram().end();++h){
-
-						codes[(*h).first] = words;
-						decodes.resize(words+1);
+						codes[(*h).first] = words;						
 						decodes[words] = (*h).first;
 						++words;
-
 					}
+
 					(*this).stats.clear();
 
 					if(words > 0){
@@ -2150,8 +2153,8 @@ namespace stored{
 		virtual void push_part(_Rid part)=0;
 		virtual void push_density(_Rid dens) = 0;
 		virtual size_t densities() const = 0;
-		virtual int& density_at(size_t at) = 0;
-		virtual const int& density_at(size_t at) const = 0;
+		virtual stored::_Rid& density_at(size_t at) = 0;
+		virtual const stored::_Rid& density_at(size_t at) const = 0;
 		virtual void end(index_iterator_interface& out)=0;
 		virtual index_iterator_interface * get_index_iterator() = 0;
 		virtual index_iterator_interface * get_prepared_index_iterator() = 0;

@@ -570,18 +570,14 @@ public:
 			nst::synchronized s(mut_total_locks);
 			++total_locks;
 		}
-		nst::synchronized synch(tt_info_lock);
+		
 		tree_stored::tree_table * ts = get_info_table((*this).table);
 		tree_stored::table_info tt ;
 		ts->get_calculated_info(tt);
 
-		if(tt.calculated.empty()){
+		if(tt.row_count==0 && !ts->is_calculating()){
 			
-			ts->begin(true,false);
-			ts->calc_density();
-			ts->rollback();
-			ts->get_calculated_info(tt);
-
+			
 		}
 
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared

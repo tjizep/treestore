@@ -524,7 +524,7 @@ namespace collums{
 			_CacheEntry* cache;
 			size_t col_size;
 			bool lazy;
-			void calc_density(){
+			void _calc_density(){
 				/// get a 5% sample
 				Density d;
 				d.measure((*cache));
@@ -565,7 +565,7 @@ namespace collums{
 				//printf("load %s start system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
 
 				(*cache).finish(col,storage.get_name());
-				calc_density();
+				/// _calc_density();
 				storage.rollback();
 
 				col.reduce_use();
