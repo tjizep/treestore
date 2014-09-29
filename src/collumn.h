@@ -377,7 +377,11 @@ namespace collums{
 					kv = c.key().get_value();
 
 					/// nullify the gaps
-
+					if(stx::memory_low_state){
+						NS_STORAGE::add_col_use(calc_use());
+						unload();
+						return;						
+					}
 					if((*this).size() > kv){
 						if(kv > 0){
 							for(_Rid n = prev; n < kv-1; ++n){
@@ -422,9 +426,10 @@ namespace collums{
 						encoded.total_bytes_allocated();
 						++ctr;
 
-						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/5){
-							ok = false;
-							break;	
+						if(stx::memory_low_state || (used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/5)){
+							NS_STORAGE::add_col_use(calc_use());
+							unload();
+							return;
 						}
 						
 					}
@@ -438,6 +443,7 @@ namespace collums{
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.set(r, c.data());
+						
 					}
 					if(calc_use() < use_before ){
 						encoded.optimize();
@@ -451,12 +457,18 @@ namespace collums{
 
 				}else{
 					encoded.clear();
-					resize(rows_cached);
-					load_data(col);
-					if(treestore_column_encoded)
-						printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-					else
-						printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					if(stx::memory_low_state){
+						NS_STORAGE::add_col_use(calc_use());
+						unload();
+						return;
+					}else{
+						resize(rows_cached);
+						load_data(col);
+						if(treestore_column_encoded)
+							printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+						else
+							printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					}
 				}
 				NS_STORAGE::add_col_use(calc_use());
 
@@ -539,11 +551,7 @@ namespace collums{
 				storage.begin();
 				storage.set_reader();
 				_ColMap col(storage);
-				//col.unshare();
-
-				//col.share(storage.get_name());
-				//col.reload();
-
+				
 
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;

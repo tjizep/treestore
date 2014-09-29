@@ -248,7 +248,7 @@ namespace tree_stored{
 						DBUG_PRINT("info", ("table entry %s is NULL\n", (*t).first.c_str()));
 				}
 				size_t pos = 0;
-				size_t factor =0;// (size_t)(lru.size() *0.55);
+				size_t factor =(size_t)(lru.size() *0.55);
 				for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end() && pos < factor;++l,++pos){
 					(*l).second->reduce_use_collum_caches();
 
@@ -264,10 +264,11 @@ namespace tree_stored{
 			//}
 		}
 		void check_use_col_caches(){
-			//if(calc_total_use() > treestore_max_mem_use){
 
+			if(btree_totl_used < (treestore_max_mem_use*0.1)){				
 				reduce_col_caches();
-			//}
+			}
+
 		}
 		void check_use_indexes(){
 			//if(calc_total_use() > treestore_max_mem_use){
@@ -927,9 +928,7 @@ public:
 					st.check_journal();/// function releases all idle reading transaction locks
 					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage									
 				}
-				if(high_mem){
-					stored::reduce_all();
-				}
+				
 			}
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
@@ -1636,7 +1635,7 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 3;
+	const int MAX_WORKER_MANAGERS = 1;
 	extern _WorkerManager & get_threads(unsigned int which){
 		static _storage_worker _adders[MAX_WORKER_MANAGERS];
 		return _adders[which % MAX_WORKER_MANAGERS].w;
@@ -1815,7 +1814,7 @@ namespace ts_info{
 		void run(){
 			
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(1000);
+				Poco::Thread::sleep(15000);
 
 				/// other threads cant delete while this section is active
 				nst::synchronized synch2(tt_info_delete_lock);

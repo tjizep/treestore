@@ -1221,8 +1221,8 @@ namespace tree_stored{
 				stored::index_interface::ptr index = (*this).indexes[i];
 				printf("Calculating cardinality of index parts for %s\n",(*this).indexes[i]->name.c_str());
 				const _Rid ratio = 5;
-				const _Rid sample = _row_count > ratio ? _row_count/ratio: _row_count;
 				const _Rid page_size = 512;
+				const _Rid sample = std::min<_Rid>(page_size*2048,_row_count > ratio ? _row_count/ratio: _row_count);				
 				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
 				typedef std::vector<_Unique> _Uniques;				
 				_Uniques uniques( index->parts.size() );
@@ -1246,8 +1246,7 @@ namespace tree_stored{
 
 						}
 						ir.clear();
-					}
-									
+					}					
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
@@ -1259,12 +1258,14 @@ namespace tree_stored{
 			reduce_use();
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
-			nst::synchronized _s_info(tt_info_copy_lock);
-			(*this).calculated_densities.clear();
-			fill_density_info((*this).calculated_densities.calculated);
+			{
+				nst::synchronized _s_info(tt_info_copy_lock);
+				(*this).calculated_densities.clear();
+				fill_density_info((*this).calculated_densities.calculated);
 			
-			(*this).calculated_densities.table_size = (*this).table_size();
-			(*this).calculated_densities.row_count = (*this)._row_count;
+				(*this).calculated_densities.table_size = (*this).table_size();
+				(*this).calculated_densities.row_count = (*this)._row_count;
+			}
 			calculating_statistics = false;
 		}
 		void begin_table(bool shared = true){

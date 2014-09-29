@@ -1409,8 +1409,8 @@ namespace stored{
 		};
 	};
 
-	static const nst::u32 MAX_HIST = 1 << 28;
-	static const nst::u32 MAX_ENTROPY = 1 << 28;
+	static const nst::u32 MAX_HIST = 1 << 31;
+	static const nst::u32 MAX_ENTROPY = 1 << 31;
 	
 
 		template<typename _IntType>
@@ -1853,7 +1853,7 @@ namespace stored{
 			const _D& get(_Rid _Rid) const {
 				return empty_Val;
 			}
-			nst::u64 get_entropy() const {
+			nst::u64 get_entropy()  {
 				return 0;
 			}
 			size_t capacity() const {
@@ -1901,8 +1901,8 @@ namespace stored{
 			const IntStored& get( _Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy() {
+				return 0; //coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
@@ -1943,8 +1943,8 @@ namespace stored{
 			const UIntStored&  get(_Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy() {
+				return 0; //coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
@@ -1984,8 +1984,8 @@ namespace stored{
 			const ShortStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy() {
+				return coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
@@ -2024,8 +2024,8 @@ namespace stored{
 			const UShortStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy() {
+				return 0; //coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
@@ -2065,8 +2065,8 @@ namespace stored{
 			const VarCharStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy()  {
+				return 0; //coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
@@ -2105,8 +2105,8 @@ namespace stored{
 			const BlobStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
-			nst::u64 get_entropy() const {
-				return 0;// coder.get_stats().get_entropy();
+			nst::u64 get_entropy() {
+				return coder.get_stats().get_entropy();
 			}
 			size_t capacity() const {
 				return coder.capacity();
