@@ -378,7 +378,7 @@ namespace collums{
 
 					/// nullify the gaps
 					if(stx::memory_low_state){
-						NS_STORAGE::add_col_use(calc_use());
+						//NS_STORAGE::add_col_use(calc_use());
 						unload();
 						return;						
 					}
@@ -427,7 +427,7 @@ namespace collums{
 						++ctr;
 
 						if(stx::memory_low_state || (used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/5)){
-							NS_STORAGE::add_col_use(calc_use());
+							//NS_STORAGE::add_col_use(calc_use());
 							unload();
 							return;
 						}
@@ -458,7 +458,7 @@ namespace collums{
 				}else{
 					encoded.clear();
 					if(stx::memory_low_state){
-						NS_STORAGE::add_col_use(calc_use());
+						//NS_STORAGE::add_col_use(calc_use());
 						unload();
 						return;
 					}else{

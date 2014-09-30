@@ -180,6 +180,7 @@ namespace tree_stored{
 		virtual bool equal(stored::_Rid row, Field* f)=0;
 		virtual void reduce_cache_use() = 0;
 		virtual void reduce_col_use() = 0;
+		virtual void reduce_tree_use() = 0;
 		virtual void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data ) = 0;
 
 		virtual nst::u32 get_rows_per_key() = 0;
@@ -788,6 +789,9 @@ namespace tree_stored{
 		virtual void reduce_col_use() {
 			col.reduce_tree_use();
 		}
+		virtual void reduce_tree_use() {
+			col.reduce_tree_use();
+		}
 		virtual void reduce_cache_use() {
 			col.reduce_cache_use();
 		}
@@ -1255,7 +1259,7 @@ namespace tree_stored{
 					partx++;
 				}
 			}
-			reduce_use();
+			reduce_use_collum_trees();
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
 			{
@@ -1414,8 +1418,7 @@ namespace tree_stored{
 			get_table().reduce_use();
 
 		}
-
-		void reduce_col_use(){
+		void reduce_tree_use(){
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->clear_cache();
@@ -1424,6 +1427,10 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
+			
+		}
+		void reduce_col_use(){
+			reduce_tree_use();
 
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_cache_use();
@@ -1438,7 +1445,7 @@ namespace tree_stored{
 		void reduce_use_collum_trees_only(){
 
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				(*c)->reduce_col_use();
+				(*c)->reduce_tree_use();
 			}
 
 		}

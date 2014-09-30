@@ -576,11 +576,7 @@ public:
 		tree_stored::table_info tt ;
 		ts->get_calculated_info(tt);
 
-		if(tt.row_count==0 && !ts->is_calculating()){
-			
-			
-		}
-
+		
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = tt.table_size;
 			stats.block_size = 1;
@@ -921,8 +917,7 @@ public:
 				bool high_mem = calc_total_use() > treestore_max_mem_use ;
 				
 				if
-				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
-				||	high_mem
+				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max			
 				)
 				{					
 					st.check_journal();/// function releases all idle reading transaction locks
@@ -1815,7 +1810,10 @@ namespace ts_info{
 			
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(15000);
-
+				{
+					nst::synchronized s(mut_total_locks);
+					++total_locks;
+				}
 				/// other threads cant delete while this section is active
 				nst::synchronized synch2(tt_info_delete_lock);
 				typedef std::vector<tree_stored::tree_table*> _Tables;
@@ -1831,10 +1829,14 @@ namespace ts_info{
 					
 					(*i)->begin(true,false);
 					(*i)->calc_density();
+					(*i)->reduce_use_collum_trees();
 					(*i)->rollback();
 					
 				}	
-
+				{
+					nst::synchronized s(mut_total_locks);
+					--total_locks;
+				}
 			}
 		}
 	};
