@@ -69,8 +69,8 @@ private:
     /// \internal The empty struct used as a placeholder for the data_type
     struct empty_struct
     {
-		template<typename _T>
-		_T read(_T t){return t;};
+		template<typename _T, typename _B>
+		_T read(const _B&, _T t){return t;};
 		template<typename _T>
 		_T store(_T t) const {return t;};
 		nst::u32 stored() const {return 0;};

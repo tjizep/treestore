@@ -169,7 +169,7 @@ namespace stx
 		inline void encode(nst::buffer_type::iterator&, const _KeyType*, nst::u16) const {
 
 		}
-		inline void decode(nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {
+		inline void decode(const nst::buffer_type&, nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {
 		}
 
 		int encoded_size(const _KeyType*, nst::u16){
@@ -1265,10 +1265,10 @@ namespace stx
 				(*this).level = leb128::read_signed(reader);
 
 				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.retrieve(reader, keys[k]);
+					storage.retrieve(buffer, reader, keys[k]);
 				}
 				for(u16 k = 0; k <= (*this).get_occupants();++k){
-					stream_address sa =leb128::read_signed(reader);
+					stream_address sa = (stream_address)leb128::read_signed64(reader,buffer.end());
 					childid[k].set_context(context);
 					childid[k].set_where(sa);
 				}
@@ -1537,16 +1537,16 @@ namespace stx
 				next.set_context(context);
 				next.set_where(sa);
 				if(interp.encoded(btree::allow_duplicates)){
-					interp.decode(reader, keys, (*this).get_occupants());
+					interp.decode(buffer, reader, keys, (*this).get_occupants());
 
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage.retrieve(reader, keys[k]);
+						storage.retrieve(buffer, reader, keys[k]);
 					}
 				}
 
 				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.retrieve(reader, values[k]);
+					storage.retrieve(buffer, reader, values[k]);
 				}
 
 				size_t d = reader - buffer.begin();

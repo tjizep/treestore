@@ -183,7 +183,7 @@ namespace tree_stored{
 		virtual void reduce_tree_use() = 0;
 		virtual void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data ) = 0;
 
-		virtual nst::u32 get_rows_per_key() = 0;
+		virtual stored::_Rid get_rows_per_key() = 0;
 		virtual void flush() = 0;
 		virtual void begin(bool read,bool shared=true) = 0;
 		virtual void commit1_asynch() = 0;
@@ -534,7 +534,7 @@ namespace tree_stored{
 			to.add(temp);
 		}
 
-		virtual nst::u32 get_rows_per_key(){
+		virtual stored::_Rid get_rows_per_key(){
 			return col.get_rows_per_key();
 		}
 
@@ -1218,6 +1218,7 @@ namespace tree_stored{
 			if(!_row_count){
 				return;
 			}
+			
 			calculating_statistics = true;
 			for (i= 0; i < (*this).indexes.size(); i++){//all the indexes in the table ?
 				
@@ -1492,7 +1493,7 @@ namespace tree_stored{
 			}
 		}
 		/// returns the rows per key for a given collumn
-		nst::u32 get_rows_per_key(nst::u32 i, nst::u32 part) const {
+		stored::_Rid get_rows_per_key(nst::u32 i, nst::u32 part) const {
 			if(indexes.size() > i && indexes[i]->densities() > part){
 				return indexes[i]->density_at(part);
 			}
@@ -1868,7 +1869,7 @@ namespace tree_stored{
 			if(!get_table().empty()){
 				--t;
 				_row_count = t.key().get_value();
-				++_row_count;
+				++_row_count;				
 			}
 
 			if(false){

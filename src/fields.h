@@ -129,9 +129,9 @@ namespace stored{
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator writer) const {
 			return NS_STORAGE::leb128::write_signed(writer, (NS_STORAGE::i64)value);
 		};
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			NS_STORAGE::buffer_type::const_iterator reader = r;
-			value = NS_STORAGE::leb128::read_signed(reader);
+			value = (value_type)NS_STORAGE::leb128::read_signed64(reader,buffer.end());
 			return reader;
 		};
 		size_t get_hash() const{
@@ -188,10 +188,13 @@ namespace stored{
 			writer += sizeof(value);
 			return writer;
 		};
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer,NS_STORAGE::buffer_type::const_iterator r) {
+			
 			NS_STORAGE::buffer_type::const_iterator reader = r;
-			memcpy(&value, (const NS_STORAGE::u8*)&(*reader), sizeof(value));
-			reader+=sizeof(value);
+			if(reader != buffer.end()){
+				memcpy(&value, (const NS_STORAGE::u8*)&(*reader), sizeof(value));
+				reader += sizeof(value);
+			}
 			return reader;
 		};
 		size_t get_hash() const{
@@ -242,11 +245,13 @@ namespace stored{
 			return writer;
 		};
 
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			NS_STORAGE::buffer_type::iterator reader = r;
-			value.resize(NS_STORAGE::leb128::read_signed(reader));
-			memcpy(&value, (NS_STORAGE::u8*)reader, value.size()*sizeof(_FType::value_type));
-			reader += value.size();
+			if(reader != buffer.end()){
+				value.resize(NS_STORAGE::leb128::read_signed(reader));
+				memcpy(&value, (NS_STORAGE::u8*)reader, value.size()*sizeof(_FType::value_type));
+				reader += value.size();
+			}
 			return reader;
 		};
 		size_t get_hash() const{
@@ -526,14 +531,16 @@ namespace stored{
 			return writer;
 		};
 
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			size = leb128::read_signed(reader);
-			_resize_buffer(size);
-			const u8 * end = data()+size;
-			for(u8 * d = data(); d < end; ++d,++reader){
-				*d = *reader;
+			if(reader != buffer.end()){
+				size = leb128::read_signed(reader);
+				_resize_buffer(size);
+				const u8 * end = data()+size;
+				for(u8 * d = data(); d < end; ++d,++reader){
+					*d = *reader;
+				}
 			}
 			return reader;
 		};
@@ -1082,19 +1089,20 @@ namespace stored{
 			return writer;
 		};
 
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			row = leb128::read_signed(reader);
-			size_t s = leb128::read_signed(reader);
-			if(s > MAX_BYTES){
-				s = MAX_BYTES;
+			if(reader != buffer.end()){
+				row = leb128::read_signed(reader);
+				size_t s = leb128::read_signed(reader);
+				if(s > MAX_BYTES){
+					s = MAX_BYTES;
+				}
+				u8 * end = _resize_buffer(s)+s;
+				for(u8 * d = data(); d < end; ++d,++reader){
+					*d = *reader;
+				}
 			}
-			u8 * end = _resize_buffer(s)+s;
-			for(u8 * d = data(); d < end; ++d,++reader){
-				*d = *reader;
-			}
-
 
 			return reader;
 		};
@@ -1398,11 +1406,11 @@ namespace stored{
 			return s.store(w);
 		};
 
-		NS_STORAGE::buffer_type::const_iterator read(NS_STORAGE::buffer_type::const_iterator r) {
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
 			DynamicKey s;
-			reader = s.read(reader);
+			reader = s.read(buffer, reader);
 			s.p_decode(data);
 			row = s.row;
 			return reader;

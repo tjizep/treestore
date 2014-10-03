@@ -299,7 +299,7 @@ namespace stx{
 					break;
 			}
 			if (shift < (sizeof (_Signed) * 8) && (byte & 0x40) != 0)
-				result |= -(((_Unsigned) 1) << shift);
+				result |= -(((_Signed) 1) << shift);
 			start = p;
 			return result;
 

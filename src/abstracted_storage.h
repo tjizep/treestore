@@ -139,23 +139,23 @@ namespace stored{
 
 		bool get_boot_value(NS_STORAGE::i64 &r){
 			r = 0;
-			NS_STORAGE::buffer_type &ba = get_transaction().allocate((*this).boot, NS_STORAGE::read); /// read it
+			const NS_STORAGE::buffer_type &ba = get_transaction().allocate((*this).boot, NS_STORAGE::read); /// read it
 			if(!ba.empty()){
 				/// the b+tree/x map needs loading
 				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
-				r = NS_STORAGE::leb128::read_signed(reader);
+				r = NS_STORAGE::leb128::read_signed64(reader,ba.end());
 			}
 			get_transaction().complete();
 			return !ba.empty();
 		}
 		bool get_boot_value(NS_STORAGE::i64 &r, NS_STORAGE::stream_address boot){
 			r = 0;
-			NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
+			const NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
 			if(!ba.empty()){
 				/// the b+tree/x map needs loading
 				NS_STORAGE::buffer_type::const_iterator reader = ba.begin();
 
-				r = NS_STORAGE::leb128::read_signed(reader);
+				r = NS_STORAGE::leb128::read_signed64(reader,ba.end());
 				//printf("[BOOT VAL] %s [%lld] version %lld\n",get_name().c_str(), r, get_transaction().get_allocated_version());
 			}
 			get_transaction().complete();
@@ -298,9 +298,9 @@ namespace stored{
 
 		/// reads a key from a vector::iterator like reader
 
-		template<typename _Iterator,typename _Stored>
-		void retrieve(_Iterator& reader, _Stored &value) const {
-			reader = value.read(reader);
+		template<typename _BufferType,typename _Stored>
+		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, _Stored &value) const {
+			reader = value.read(buffer, reader);
 		}
 
 	};

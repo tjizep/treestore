@@ -7,6 +7,7 @@
 namespace nst = stx::storage;
 namespace suffix_array{
 	const static nst::u32 suffix_size = 16;
+	/// the term suffix is used loosely here
 	struct suffix{
 
 		nst::u8 data[suffix_size];
@@ -113,9 +114,9 @@ namespace suffix_array{
 			return reader;
 		};
 	};
+
 	/// very fast ;-) capable of holding large ammounts in compressed ram and disc
 	
-
 	template<typename _BuffType,typename _IntType>
 	class suffix_storage : public nst::basic_storage{
 	public:
@@ -224,8 +225,8 @@ namespace suffix_array{
 
 
 		/// reads a key from a vector::iterator like reader
-		template<typename _Iterator>
-		void retrieve(_Iterator& reader, _BuffType &value) const {
+		template<typename _BufferType>
+		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, _BuffType &value) const {
 			reader = value.read(reader);
 			
 		}
@@ -245,13 +246,14 @@ namespace suffix_array{
 
 
 		/// reads a key from a vector::iterator like reader
-		template<typename _Iterator>
-		void retrieve(_Iterator& reader, typename _IntType &value) const {
+		template<typename _BufferType>
+		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, typename _IntType &value) const {
 
-			value = nst::leb128::read_signed(reader);
+			value = nst::leb128::read_signed64(reader,buffer.end());
 		}
 
 	};
+	typedef std::vector<suffix> _SuffixVector;
 	typedef suffix_storage<suffix, nst::u64> _SuffixStorage;
 	typedef stx::btree_map<suffix, nst::u64, _SuffixStorage > _SuffixArray;
 	typedef std::map<suffix, nst::u64 > _StdSuffixArray;
@@ -354,7 +356,9 @@ namespace suffix_array{
 /// i.e. const char * get(address,l) where l is < the initial block_size
 /// the suffix size is currently set to 8
 class suffix_array_encoder{
-	
+public:
+
+private:	
 	nst::u32 block_size;
 	/// dependant key type conversion
 	inline suffix_array::_SuffixArray::key_type get_key(suffix_array::_SuffixArray::iterator& in){
@@ -378,7 +382,9 @@ private:
 	typedef std::vector<nst::u64> _Frequencies;
 	typedef std::pair<nst::u64, nst::u8> _CharFrequency;
 	typedef std::vector<_CharFrequency> _CharFrequencies;
-			
+	typedef nst::u32 _CodeType;
+	typedef symbol_vector<_CodeType> _Encoded;		
+	typedef std::vector<nst::u64> _Codes;
 
 public:
 	suffix_array_encoder(nst::u32 block_size = 8192) : block_size(block_size){
@@ -390,7 +396,7 @@ public:
 		using namespace suffix_array;
 		typedef _StdSuffixArray _SuffixArrayType ;
 		typedef fe_hash_map<_SuffixArrayType> _HashFe;		
-		typedef nst::u32 _CodeType;
+		
 		_HashFe suffix_hasher;
 		_SuffixArrayType reduced_array;
 		
@@ -399,7 +405,7 @@ public:
 		suffix_hasher.set_backing(reduced_array);
 		
 		nst::u32 bucket_size = suffix_size;
-
+		
 		nst::u32 min_bucket_size = 0;
 		nst::u64 min_compressed = length;
 		while(bucket_size > 1){
@@ -432,7 +438,16 @@ public:
 
 		return min_bucket_size;
 	}
-	void decode(char * outbuffer, nst::u64 start, nst::u64 length){
+	struct coding_parameters{
+		nst::u32 bucket_size;
+		nst::u32 bit_length;
+		nst::u64 length;
+		suffix_array::_SuffixVector codes;		
+		_Encoded encoded;					
+	};
+	void decode(char * outbuffer, nst::u64 start, nst::u64 length,const coding_parameters& parameters){
+
+
 	}
 	/// encodes and create internal map 
 	template<typename _SuffixArrayType>
@@ -466,6 +481,7 @@ public:
 
 			suffix_hasher.flush();
 			
+			const size_t MAX_CODE_HISTORY = 32;
 			_Inverted frequencies ;//= succinct;
 			for(_SuffixArrayType::iterator s = reduced_array.begin(); s != reduced_array.end(); ++s){
 				frequencies.push_back(std::make_pair(get_data(s),get_key(s)));
@@ -482,13 +498,10 @@ public:
 			printf("there are %lld codes\n",(nst::u64)frequencies.size());
 			
 			/// encoding phase
-			const size_t MAX_CODE_HIST = 32;
-			typedef std::vector<nst::u64> _Codes;
-			typedef nst::u32 _CodeType;
-			typedef symbol_vector<_CodeType> _Encoded;
+						
 			_Encoded encoded;			
 			remaining = length;
-			_Codes codes(MAX_CODE_HIST);
+			_Codes codes(MAX_CODE_HISTORY);
 			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)frequencies.size()));	
 			nst::u64 coded = 0;
 			nst::u64 noncoded = 0;

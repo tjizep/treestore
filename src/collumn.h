@@ -104,10 +104,10 @@ namespace collums{
 			}
 			typedef nst::u16 count_t;
 			/// decode mixed run length and delta for simple sequences
-			void decode(nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
+			void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
 				count_t k = 0, m = occupants - 1;
 				nst::i32 rl = 0;
-				reader = keys[k++].read(reader);
+				reader = keys[k++].read(buffer, reader);
 				for(; k < occupants; ){
 					rl = nst::leb128::read_signed(reader);
 					if(!rl){

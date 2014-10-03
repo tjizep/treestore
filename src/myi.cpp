@@ -1630,7 +1630,7 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 1;
+	const int MAX_WORKER_MANAGERS = 2;
 	extern _WorkerManager & get_threads(unsigned int which){
 		static _storage_worker _adders[MAX_WORKER_MANAGERS];
 		return _adders[which % MAX_WORKER_MANAGERS].w;
@@ -1673,6 +1673,22 @@ void test_suffix_array(){
 	suffix_array_encoder senc;
 	senc.encode(&buffer[0], buffer.size());
 }
+void test_signwriter(){
+	
+	NS_STORAGE::i64 r = 3000000000ll;
+	NS_STORAGE::buffer_type buffer(100);
+	NS_STORAGE::buffer_type::iterator writer = buffer.begin();
+	NS_STORAGE::leb128::write_signed(writer, r);
+	NS_STORAGE::i64 t = NS_STORAGE::leb128::read_signed(buffer.begin());
+	if(t!=r){
+		printf("test failed\n");
+	}
+}
+void test_run(){
+	test_signwriter();
+	test_suffix_array();
+	pt_test();
+}
 int treestore_db_init(void *p)
 {
 	
@@ -1701,11 +1717,12 @@ int treestore_db_init(void *p)
 	treestore_hton->rollback = treestore_rollback;
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION;
+	
 	printf("Start cleaning \n");
+
 	start_cleaning();
 	start_calculating();
-	/// test_suffix_array();
-	/// pt_test();
+	
 	DBUG_RETURN(FALSE);
 }
 
@@ -1791,7 +1808,7 @@ namespace ts_cleanup{
 		}
 	};
 	static print_cleanup_worker the_worker;
-	static Poco::Thread cleanup_thread;
+	static Poco::Thread cleanup_thread("ts:cleanup_thread");
 	static void start(){
 		try{
 			cleanup_thread.start(the_worker);
@@ -1841,7 +1858,7 @@ namespace ts_info{
 		}
 	};
 	static info_worker the_worker;
-	static Poco::Thread info_thread;
+	static Poco::Thread info_thread("ts:info_thread");
 	static void start(){
 		try{
 			info_thread.start(the_worker);

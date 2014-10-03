@@ -125,8 +125,8 @@ public:
 
 
 	/// reads a key from a vector::iterator like reader
-	template<typename _Iterator>
-	void retrieve(_Iterator& reader, _KeyType &value) const {
+	template<typename _BufferType>
+	void retrieve(typename const _BufferType& ,typename _BufferType::const_iterator reader, _KeyType &value) const {
 
 		value = NS_STORAGE::leb128::read_signed(reader);
 	}
