@@ -25,6 +25,9 @@
     <Filter Include="Source Files\poco\Data\SQLite">
       <UniqueIdentifier>{824cd979-4929-4831-b9b2-c8037bec5550}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\fse">
+      <UniqueIdentifier>{d56377e7-01b7-4624-b23d-eca8616aeafa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -214,6 +217,12 @@
     </ClCompile>
     <ClCompile Include="..\src\stx\btree.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\fse\fse.c">
+      <Filter>Source Files\fse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\fse\zlibh.c">
+      <Filter>Source Files\fse</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

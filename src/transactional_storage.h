@@ -24,7 +24,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #define TREESTORE_FILE_EXTENSION ""
 #define TREESTORE_FILE_SEPERATOR "_"
-
+#include <sparsehash/internal/sparseconfig.h>
 #include <stdlib.h>
 #include <memory>
 #include <string>
@@ -33,6 +33,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <unordered_map>
 #include <unordered_set>
 
+#include <sparsehash/type_traits.h>
+#include <sparsehash/dense_hash_map>
+#include <sparsehash/sparse_hash_map>
 
 #include <stx/storage/types.h>
 #include <stx/storage/basic_storage.h>
@@ -209,7 +212,7 @@ namespace storage{
 
 		block_type empty_block;
 	private:
-		typedef std::unordered_map<address_type, block_reference> _Allocations;
+		typedef std::map<address_type, block_reference> _Allocations;
 		_Allocations allocations;
 		address_type next;
 	public:
@@ -393,7 +396,8 @@ namespace storage{
 
 		typedef block_descriptor* ref_block_descriptor;
 
-		typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
+		/// typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
+		typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;
 
 		typedef std::unordered_set<address_type> _Changed;
 
@@ -453,6 +457,7 @@ namespace storage{
 
 		bool is_new;				/// flag set when storage file exists used to suppress file creation if there is nothing in it
 
+		typename _Allocations::iterator finder;
 
 		ptrdiff_t get_block_use(const block_descriptor& v){
 			return v.block.capacity() + sizeof(block_type)+32; /// the 32 is for the increase in the allocations table
@@ -694,7 +699,7 @@ namespace storage{
 		}
 
 		void print_use(){
-
+			return;
 			if(::os::millis()-ptime > 3000){
 				//printf("total use blocks %.4g MiB\n", (double)total_use/(1024.0*1024.0));
 				ptime = ::os::millis();
@@ -736,8 +741,8 @@ namespace storage{
 			currently_active = 0;
 			result = nullptr;
 			if(which){
-
-				if(allocations.count(which) == 0){
+				finder = allocations.find(which);
+				if(finder == allocations.end()){
 					/// load from storage
 					if((*this).get_buffer(which))
 					{
@@ -773,7 +778,7 @@ namespace storage{
 					}
 
 				}else{
-					result = allocations[which];
+					result = (*finder).second; /// allocations[which];
 				}
 				result->set_storage_action(how);
 			}else{
@@ -901,6 +906,8 @@ namespace storage{
 					/// if true the data files are deleted on destruction
 
 		{
+			allocations.set_empty_key(0xFFFFFFFFll);
+			allocations.set_deleted_key(0xFFFFFFFFll-1);
 			using Poco::File;
 			File df (get_storage_path() + name + extension );
 			is_new = !df.exists();

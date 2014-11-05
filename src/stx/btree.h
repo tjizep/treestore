@@ -57,7 +57,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 
 // *** Required Headers from the STL
-
+#include <sparsehash/internal/sparseconfig.h>
 #include <algorithm>
 #include <functional>
 
@@ -79,6 +79,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <Poco/TaskManager.h>
 #include <Poco/Task.h>
 #include <Poco/Timestamp.h>
+
+#include <sparsehash/type_traits.h>
+#include <sparsehash/dense_hash_map>
+#include <sparsehash/sparse_hash_map>
 
 #include "NotificationQueueWorker.h"
 // *** Debugging Macros
@@ -112,6 +116,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #define OS_CLOCK Poco::Timestamp().epochMicroseconds
 
+/// define the memory allocation strategy
+#define AGGRESSIVE_MEM false
 
 /// Compiler options for optimization
 #ifdef _MSC_VER
@@ -165,14 +171,35 @@ namespace stx
 		inline bool encoded( bool ) const {
 			return false;
 		}
+		inline bool encoded_values( bool ) const {
+			return false;
+		}
 
 		inline void encode(nst::buffer_type::iterator&, const _KeyType*, nst::u16) const {
 
 		}
+		
 		inline void decode(const nst::buffer_type&, nst::buffer_type::const_iterator&, _KeyType*, nst::u16) const {
 		}
-
+		template<typename _AnyValue>
+		inline void decode_values(const nst::buffer_type&, nst::buffer_type::const_iterator&, _AnyValue*, nst::u16) const {
+		}
+		template<typename _AnyValue>
+		inline void encode_values(nst::buffer_type&, nst::buffer_type::iterator&, const _AnyValue*, nst::u16) const {
+		}
+		template<typename _AnyValue>
+		inline size_t encoded_values_size(const _AnyValue*, nst::u16) const {
+			return 0;
+		}
 		int encoded_size(const _KeyType*, nst::u16){
+			return 0;
+		}
+		/// interpolation functions can be an something like linear interpolation
+		inline bool can(const _KeyType &, const _KeyType &, int ) const {
+			return false;
+		}
+		
+		unsigned int interpolate(const _KeyType &k, const _KeyType &first , const _KeyType &last, int size) const{
 			return 0;
 		}
 	};
@@ -196,7 +223,8 @@ namespace stx
 			max_scan = 3,
 			interior_mul = 1,
 			keys_per_page = 512,
-			caches_per_page = 16
+			caches_per_page = 16,
+			max_release = 8
 		};
 	};
 
@@ -234,6 +262,9 @@ namespace stx
 		///
 		/// the max scan value for the hybrid lower bound that allows bigger pages
 		static const int    max_scan = btree_traits::max_scan;
+
+		/// Number of cached keys
+		static const int	max_release = btree_traits::max_release;
 
 	};
 
@@ -277,6 +308,10 @@ namespace stx
 		///
 		/// the max scan value for the hybrid lower bound that allows bigger pages
 		static const int    max_scan = btree_traits::max_scan;
+		
+		///
+		/// the max page releases during aggressive cleanup
+		static const int    max_release = btree_traits::max_release;
 
 	};
 
@@ -429,6 +464,8 @@ namespace stx
 		/// with BTREE_DEBUG and the key type must be std::ostream printable.
 		static const bool                   debug = traits::debug;
 
+		/// parameter to control aggressive page release for the improvement of memory use
+		static const int					max_release = traits::max_release;
 		/// forward decl.
 
 		class tree_stats;
@@ -644,9 +681,13 @@ namespace stx
 
 
 			/// load the persist proxy and set its state to changed
+			
 			void change(){
-
+				
 				load();
+				if(rget()->shared){
+					throw std::exception();//"cannot change state of shared node"
+				}
 				switch((*this).get_state()){
 				case created:
 					break;
@@ -656,10 +697,10 @@ namespace stx
 					(*this).set_state(changed);
 
 				}
+
 				rget()->reset_cache_occupants();
-				if(rget()->shared){
-					throw std::exception();//"cannot change state of shared node"
-				}
+				update_interpolator(rget());
+				
 
 			}
 
@@ -701,11 +742,30 @@ namespace stx
 
 			}
 
+			
+			void update_interpolator(typename  btree::surface_node* n){
+				n->initialize_interpolator(typename btree::key_interpolator(),n->keys);
+			}
+
+			void update_interpolator(typename  btree::interior_node* n){
+				n->initialize_interpolator(typename btree::key_interpolator(),n->keys);
+			}
+			
+			void update_interpolator(typename btree::node* l){
+				BTREE_ASSERT(l != NULL_REF);
+				if(l->issurfacenode()){
+					update_interpolator(static_cast<surface_node*>(l));
+				}else{
+					update_interpolator(static_cast<interior_node*>(l));
+				}
+
+			}
 			void update_links(typename btree::interior_node* n){
 				BTREE_ASSERT(n != NULL_REF);
 				
-				for(unsigned short p = 0; p < interiorslotmax+1;++p){
+				for(unsigned short p = 0; p < n->get_occupants()+1;++p){
 					n->childid[p].discard(*get_context());
+					n->childid[p].set_context((*this).get_context());
 				}
 				
 			}
@@ -804,6 +864,12 @@ namespace stx
 				(*p) = (*p).get_context()->load(((super*)p)->w);
 
 			}
+			/// used to hide things from compiler optimizers which may inline to aggresively
+			NO_INLINE void load_this(pointer_proxy* p,stream_address loader, nst::u16 slot) {//
+				/// this is hidden from the MSVC inline optimizer which seems to be overactive
+				(*p) = (*p).get_context()->load(((super*)p)->w,loader,slot);
+
+			}
 
 			/// determines if the page should be loaded loads it and change state to loaded.
 			/// The initial state can be any state
@@ -813,6 +879,16 @@ namespace stx
 						/// (*this) = (*this).get_context()->load(super::w);
 						/// replaced by
 						load_this(this);
+
+					}
+				}
+			}
+			/// The initial state can be any state
+			void load(stream_address loader, nst::u16 slot) {
+				if((*this).ptr == NULL_REF){
+					if(super::w){
+						
+						load_this(this,loader,slot);
 
 					}
 				}
@@ -944,7 +1020,10 @@ namespace stx
 				}
 				return 0;
 			}
-
+			/// return true if the member is not set
+			bool empty() const {
+				return (*this).ptr == NULL_REF;
+			}
 			/// return the raw member ptr without loading
 			/// just the non const version
 
@@ -962,10 +1041,13 @@ namespace stx
 
 			/// 'natural' ref operator returns the pointer with loading
 
-			_Loaded * operator->()
+			inline _Loaded * operator->()
 			{
+				if((*this).ptr != NULL_REF){
+					return (_Loaded*)(super::ptr);
+				}
 				load();
-				return static_cast<_Loaded*>(super::ptr);
+				return (_Loaded*)(super::ptr);
 			}
 
 			/// 'natural' deref operator returns the pointer with loading
@@ -1024,13 +1106,17 @@ namespace stx
 
 			/// Number of key occupants, so number of valid nodes or data
 			/// pointers
+			
+			storage::u16  cache_occupants;
 
 			/// occupants: since all pages are the same size - its like a block of flats
 			/// where the occupant count varies over time the size stays the same
 
-			storage::u16  cache_occupants;
-
 			storage::u16  occupants;
+			bool can_interp;
+			/// iterpolator cached keys
+			key_type        int_lower;
+			key_type        int_upper;
 			/// cpu cache keys
 			key_type        cached[cacheslotmax+1];
 
@@ -1068,6 +1154,7 @@ namespace stx
 
 			void reset_cache_occupants(){
 				set_cache_occupants(0);
+
 			}
 
 			void inc_occupants(){
@@ -1117,6 +1204,7 @@ namespace stx
 				level = l;
 				occupants = 0;
 				shared = false;
+				can_interp = false;
 				cache_occupants = 0;
 
 			}
@@ -1144,6 +1232,15 @@ namespace stx
 			{
 				return !key_less(a, b) && !key_less(b, a);
 			}
+			template<typename key_interpolator>
+			void initialize_interpolator(key_interpolator interp, const key_type* keys){
+				int o = get_occupants() ;
+				if(o > 0){
+					int_lower = keys[0];
+					int_upper = keys[o-1];
+					can_interp = interp.can(keys[0], keys[o-1], o);
+				}
+			}
 
 			/// multiple search type lower bound template function
 			/// performs a lower bound mapping using a couple of techniques simultaneously
@@ -1154,8 +1251,24 @@ namespace stx
 				if (o  == 0) return 0;
 				check_cache(keys);
 
-				register unsigned int l = 0, h = o;
+				unsigned int l = 0, h = o;
+				if(can_interp){
+					l = interp.interpolate(key, int_lower, int_upper, o);
+					if(l >0) --l;
+					if(l < h && key_less(keys[l],key)){
+						l++;
+						if(l < h && key_less(keys[l],key)){
+						}else return l;
+						++l;
+						if(l < h && key_less(keys[l],key)){
+						}else return l;
+						++l;
+						if(l < h && key_less(keys[l],key)){
+						}else return l;
+					}
 
+				}
+				l = 0;
 				/// multiple search type lower bound function
 				unsigned int ml  = 0,mb = 0;
 				unsigned int step = o / cacheslotmax;
@@ -1176,8 +1289,9 @@ namespace stx
 							l = m + 1;
 						}
 					}
+				
 				}
-				while (l < h && key_less(keys[l],key)) ++l;
+				while (l < h && key_less(keys[l],key)) ++l;	
 
 				return l;
 			}
@@ -1248,15 +1362,15 @@ namespace stx
 
 			template<typename key_compare,typename key_interpolator >
 			inline int find_lower(tree_stats& s, key_compare key_less, key_interpolator interp, const key_type& key) const
-			{
+			{				
 				return node::find_lower(key_less, interp, keys, key);
 
 			}
 			/// decodes a page from given storage and buffer and puts it in slots
 			/// the buffer type is expected to be some sort of vector although no strict
 			/// checking is performed
-
-			void load(btree * context, storage_type & storage,const buffer_type& buffer)
+			template<typename key_interpolator >
+			void load(btree * context, storage_type & storage, const buffer_type& buffer, key_interpolator interp)
 			{
 			    using namespace stx::storage;
 				buffer_type::const_iterator reader = buffer.begin();
@@ -1273,6 +1387,8 @@ namespace stx
 					childid[k].set_where(sa);
 				}
 				(*this).check_cache(keys);
+				
+				node::initialize_interpolator(interp, keys);
 			}
 
 			/// encodes a node into storage page and resizes the output buffer accordingly
@@ -1335,12 +1451,34 @@ namespace stx
 			/// Is the node sorted or not
 			short sorted;
 
+			/// the slot loader logical back pointers for quick release alg
 
+			nst::u16 loaded_slot;
+			
+			stream_address loader;
+
+			void set_slot_loader(stream_address loader, nst::u16 loaded_slot){
+				(*this).loaded_slot = loaded_slot;
+				(*this).loader = loader;
+			}
+
+			/// return the slot in which this page belongs
+			nst::u16 get_loaded_slot() const {
+				return (*this).loaded_slot;
+			}
+			
+			/// return the loader of this page (interior node)
+			stream_address get_loader() const {
+				return (*this).loader;
+			}
+			
 			/// Set variables to initial values
 			inline void initialize()
 			{
 				node::initialize(0);
 				sorted = 0;
+				loader = 0;
+				loaded_slot = 0;
 				(*this).shared = false;
 				(*this).a_refs = 0;
 				preceding = next = NULL_REF;
@@ -1538,15 +1676,18 @@ namespace stx
 				next.set_where(sa);
 				if(interp.encoded(btree::allow_duplicates)){
 					interp.decode(buffer, reader, keys, (*this).get_occupants());
-
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage.retrieve(buffer, reader, keys[k]);
 					}
 				}
 
-				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.retrieve(buffer, reader, values[k]);
+				if(interp.encoded_values(btree::allow_duplicates)){
+					interp.decode_values(buffer, reader, values, (*this).get_occupants());
+				}else{
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.retrieve(buffer, reader, values[k]);
+					}
 				}
 
 				size_t d = reader - buffer.begin();
@@ -1556,6 +1697,9 @@ namespace stx
 				}
 				sorted = (*this).get_occupants();
 				(*this).check_cache(keys);
+
+				node::initialize_interpolator(interp, keys);
+
 			}
 
 			/// Encode a stored page from input buffer to node instance
@@ -1570,13 +1714,17 @@ namespace stx
 				storage_use += leb128::signed_size(preceding.get_where());
 				storage_use += leb128::signed_size(next.get_where());
 				if(interp.encoded(btree::allow_duplicates)){
-					storage_use += interp.encoded_size(keys, (*this).get_occupants());
+					storage_use += interp.encoded_size(keys, (*this).get_occupants());					
+				}else{					
 					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage_use += storage.store_size(values[k]);
+						storage_use += storage.store_size(keys[k]);						
 					}
+					
+				}
+				if(interp.encoded_values(btree::allow_duplicates)){
+					storage_use += interp.encoded_values_size(values, (*this).get_occupants());
 				}else{
-					for(u16 k = 0; k < (*this).get_occupants();++k){
-						storage_use += storage.store_size(keys[k]);
+					for(u16 k = 0; k < (*this).get_occupants();++k){						
 						storage_use += storage.store_size(values[k]);
 					}
 				}
@@ -1594,8 +1742,12 @@ namespace stx
 						storage.store(writer, keys[k]);
 					}
 				}
-				for(u16 k = 0; k < (*this).get_occupants();++k){
-					storage.store(writer, values[k]);
+				if(interp.encoded_values(btree::allow_duplicates)){
+					interp.encode_values(buffer, writer, values, (*this).get_occupants());
+				}else{
+					for(u16 k = 0; k < (*this).get_occupants();++k){
+						storage.store(writer, values[k]);
+					}
 				}
 				ptrdiff_t d = writer - buffer.begin();
 				if(d > storage_use){
@@ -1616,10 +1768,11 @@ namespace stx
 		/// and information structure optimization domains to
 		/// be decoupled.
 
-		typedef std::unordered_map<stream_address, node*> _AddressedNodes;
+		/// typedef std::unordered_map<stream_address, node*> _AddressedNodes;
+		typedef ::google::dense_hash_map<stream_address, node*> _AddressedNodes;
 		typedef std::pair<stream_address, stx::storage::version_type> _AddressPair;
 		typedef std::map<_AddressPair, node*> _AddressedVersionNodes;
-
+		typedef std::vector< std::pair<stream_address, surface_node*> > _AllocatedSurfaceNodes;
 
 		
 		class _Shared{
@@ -1748,10 +1901,25 @@ namespace stx
 		/// node
 
 		_AddressedNodes nodes_loaded;
+		_AddressedNodes interiors_loaded;
+		_AddressedNodes surfaces_loaded;
+		_AllocatedSurfaceNodes aggressive_allocated;
 		_Shared shared;
+		/// setup the dense hash table
+
+		void setup_dh(){
+
+			nodes_loaded.set_empty_key(-1);
+			nodes_loaded.set_deleted_key(-2);
+			surfaces_loaded.set_empty_key(-1);
+			surfaces_loaded.set_deleted_key(-2);
+			interiors_loaded.set_empty_key(-1);
+			interiors_loaded.set_deleted_key(-2);
+
+		}
 		///	returns NULL if a node with given storage address is not currently
 		/// loaded. otherwise returns the currently loaded node
-
+		
 		const node* get_loaded(stream_address w) const {
 			typename _AddressedNodes::const_iterator i = nodes_loaded.find(w);
 			if(i!=nodes_loaded.end())
@@ -1885,7 +2053,7 @@ namespace stx
 		/// management routines in the b-tree
 		buffer_type load_buffer ;
 		buffer_type temp_buffer;
-		typename node::ptr load(stream_address w) {
+		typename node::ptr load(stream_address w,stream_address loader=0, nst::u16 slot=0) {
 			using namespace stx::storage;
 			
 			typename btree::node * nt = nodes_loaded[w];
@@ -1897,8 +2065,8 @@ namespace stx
 				return ns;
 			}
 
-			nodes_loaded.erase(w);
-			
+			//nodes_loaded.erase(w);
+			//interiors_loaded.erase(w);
 			//synchronized synched(shared.get_named_mutex());
 
 			i32 level = 0;
@@ -1948,11 +2116,12 @@ namespace stx
 
 			if(level==0){ // its a surface
 				typename surface_node::ptr s ;
-				s = allocate_surface(w);
+				s = allocate_surface(w, loader, slot);
 				s->load(this, *(get_storage()), load_buffer, key_interpolator());
 				s.set_state(loaded);
 				s.set_where(w);
 				nodes_loaded[w] = s.rget();
+				surfaces_loaded[w] = s.rget();
 				if(shared.nodes != NULL){		
 					s.rget()->set_shared();
 					++(s.rget()->a_refs);
@@ -1963,11 +2132,11 @@ namespace stx
 			}else{
 				typename interior_node::ptr s;
 				s = allocate_interior(level,w);
-				s->load(this, *(get_storage()), load_buffer);
+				s->load(this, *(get_storage()), load_buffer, key_interpolator());
 				s.set_state(loaded);
 				s.set_where(w);
 				nodes_loaded[w] = s.rget();
-
+				interiors_loaded[w]= s.rget();
 				return s;
 			}
 			printf("WARNING: returning an empty node\n");
@@ -2069,7 +2238,8 @@ namespace stx
 
 			/// Current key/data slot referenced
 			unsigned short          current_slot;
-
+			key_type * _keys;
+			data_type * _data;
 			/// Friendly to the const_iterator, so it may access the two data items directly.
 			friend class const_iterator;
 
@@ -2092,23 +2262,32 @@ namespace stx
 
 			/// Default-Constructor of a mutable iterator
 			inline iterator()
-				: currnode(NULL_REF), current_slot(0)
+				: currnode(NULL_REF), current_slot(0), _data(NULL_REF), _keys(NULL_REF)
 			{ }
 
 			/// Initializing-Constructor of a mutable iterator
 			inline iterator(typename btree::surface_node::ptr l, unsigned short s)
 				: currnode(l), current_slot(s)
-			{ }
+			{ 
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
+			}
 
 			/// Initializing-Constructor-pair of a mutable iterator
 			inline iterator(const initializer_pair& initializer)
-				: currnode(initializer.first), current_slot(initializer.second)
-			{ }
+				: currnode(initializer.first), current_slot(initializer.second), _data(NULL_REF), _keys(NULL_REF)
+			{ 
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
+			}
 
 			/// Copy-constructor from a reverse iterator
 			inline iterator(const reverse_iterator &it)
-				: currnode(it.currnode), current_slot(it.current_slot)
-			{ }
+				: currnode(it.currnode), current_slot(it.current_slot), _data(NULL_REF), _keys(NULL_REF)
+			{ 
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
+			}
 
 			/// The next to operators have been comented out since they will cause
 			/// problems in shared mode because they cannot 'render' logical
@@ -2137,17 +2316,17 @@ namespace stx
 			/// Key of the current slot
 			inline const key_type& key() const
 			{
-				return currnode->keys[current_slot];
+				return _keys[current_slot];
 			}
 			inline key_type& key()
 			{
-				return currnode->keys[current_slot];
+				return _keys[current_slot];
 			}
 
 			/// Writable reference to the current data object
 			inline data_type& data()
-			{
-				return currnode->values[current_slot];
+			{				
+				return _data[current_slot];
 			}
 
 			/// return true if the iterator is valid
@@ -2166,15 +2345,21 @@ namespace stx
 			inline void from_initializer(_MapType& context, const initializer_pair& init)  {
 				currnode.realize(init.first,&context);
 				current_slot = init.second;
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
 			}
 
 			inline void from_initializer(const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());
 				current_slot = init.second;
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
 			}
 			inline iterator& operator= (const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());
 				current_slot = init.second;
+				_data = &currnode->values[0];
+				_keys = &currnode->keys[0];
 				return *this;
 			}
 			/// returns true if the iterator is invalid
@@ -2186,6 +2371,8 @@ namespace stx
 			inline void clear() {
 				current_slot = 0;
 				currnode.set_context(NULL);
+				_data = NULL_REF;
+				_keys = NULL_REF;
 			}
 
 			/// returns true if the iterator is valid
@@ -2220,22 +2407,26 @@ namespace stx
 			/// ++Prefix advance the iterator to the next slot
 			inline self& operator++()
 			{
-				if(currnode.has_context())
-						currnode.get_context()->check_low_memory_state();
-
+				
 				if (current_slot + 1 < currnode->get_occupants())
 				{
 					++current_slot;
 				}
 				else if (currnode->next != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+					
 					currnode = currnode->next;
 					currnode.sort();
 					current_slot = 0;
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is end()
+					
 					current_slot = currnode->get_occupants();
 				}
 
@@ -2248,22 +2439,26 @@ namespace stx
 			{
 				self tmp = *this;   // copy ourselves
 				
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				if (current_slot + 1 < currnode->get_occupants())
 				{
 					++current_slot;
 				}
 				else if (currnode->next != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 					currnode = currnode->next;
 					currnode.sort();
 					current_slot = 0;
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is end()
+				
 					current_slot = currnode->get_occupants();
 				}
 
@@ -2277,22 +2472,27 @@ namespace stx
 			/// --Prefix backstep the iterator to the last slot
 			inline self& operator--()
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				if (current_slot > 0)
 				{
 					--current_slot;
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 					currnode = currnode->preceding;
 					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is begin()
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 					current_slot = 0;
 				}
 
@@ -2302,9 +2502,7 @@ namespace stx
 			/// Postfix-- backstep the iterator to the last slot
 			inline self operator--(int)
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot > 0)
@@ -2313,15 +2511,21 @@ namespace stx
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
 
 					currnode = currnode->preceding;
 					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is begin()
 					current_slot = 0;
+					_data = &currnode->values[0];
+					_keys = &currnode->keys[0];
 				}
 
 				return tmp;
@@ -2453,15 +2657,16 @@ namespace stx
 			/// Prefix++ advance the iterator to the next slot
 			inline self& operator++()
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				if (current_slot + 1 < currnode->get_occupants())
 				{
 					++current_slot;
 				}
 				else if (currnode->next != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 					currnode = currnode->next;
 					current_slot = 0;
 				}
@@ -2477,9 +2682,7 @@ namespace stx
 			/// Postfix++ advance the iterator to the next slot
 			inline self operator++(int)
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot + 1 < currnode->get_occupants())
@@ -2488,6 +2691,9 @@ namespace stx
 				}
 				else if (currnode->next != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 					currnode = currnode->next;
 					current_slot = 0;
 				}
@@ -2503,15 +2709,16 @@ namespace stx
 			/// Prefix-- backstep the iterator to the last slot
 			inline self& operator--()
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				if (current_slot > 0)
 				{
 					--current_slot;
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+	
 					currnode = currnode->preceding;
 					current_slot = currnode->get_occupants() - 1;
 				}
@@ -2527,9 +2734,7 @@ namespace stx
 			/// Postfix-- backstep the iterator to the last slot
 			inline self operator--(int)
 			{
-				if(currnode.has_context())
-					currnode.get_context()->check_low_memory_state();
-
+				
 				self tmp = *this;   // copy ourselves
 
 				if (current_slot > 0)
@@ -2538,6 +2743,10 @@ namespace stx
 				}
 				else if (currnode->preceding != NULL_REF)
 				{
+					
+					if(currnode.has_context())
+						currnode.get_context()->check_low_memory_state();
+
 					currnode = currnode->preceding;
 					current_slot = currnode->get_occupants() - 1;
 				}
@@ -3082,7 +3291,10 @@ namespace stx
 		/// use lz4 in mem compression otherwize use zlib
 
 		static const bool lz4 = true;
+		
+		static const bool delete_check = true;
 
+		bool aggressive_mem;
 		/// Key comparison object. More comparison functions are generated from
 		/// this < relation.
 		key_compare key_less;
@@ -3095,6 +3307,7 @@ namespace stx
 		storage_type *storage;
 
 		void initialize_contexts(){
+			
 			_nodes_loaded_mem_reported = 0;
 			root.set_context(this);
 			headsurface.set_context(this);
@@ -3121,10 +3334,13 @@ namespace stx
 		:	root(NULL_REF)
 		,	headsurface(NULL_REF)
 		,	last_surface(NULL_REF)
+		,	aggressive_mem(AGGRESSIVE_MEM)
 		,	allocator(alloc)
 		,	storage(&storage)
 		,	liberator(surface_node_allocator())
 		{
+			
+			setup_dh();/// for google dense hash
 			++btree_totl_instances;
 			initialize_contexts();
 		}
@@ -3139,11 +3355,13 @@ namespace stx
 		:	root(NULL_REF)
 		,	headsurface(NULL_REF)
 		,	last_surface(NULL_REF)
+		,	aggressive_mem(AGGRESSIVE_MEM)
 		,	key_less(kcf)
 		,	allocator(alloc)
 		,	storage(&storage)
 		,	liberator(surface_node_allocator())
 		{
+			setup_dh();/// for google dense hash
 			++btree_totl_instances;
 			initialize_contexts();
 		}
@@ -3159,10 +3377,12 @@ namespace stx
 		:	root(NULL_REF)
 		,	headsurface(NULL_REF)
 		,	last_surface(NULL_REF)
+		,	aggressive_mem(AGGRESSIVE_MEM)
 		,	allocator(alloc)
 		,	storage(&storage)
 		,	liberator(surface_node_allocator())
 		{
+			setup_dh();/// for google dense hash
 			++btree_totl_instances;
 			insert(first, last);
 		}
@@ -3180,11 +3400,13 @@ namespace stx
 		:	root(NULL_REF)
 		,	headsurface(NULL_REF)
 		,	last_surface(NULL_REF)
+		,	aggressive_mem(AGGRESSIVE_MEM)
 		,	key_less(kcf)
 		,	allocator(alloc)
 		,	storage(&storage)
 		,	liberator(surface_node_allocator())
 		{
+			setup_dh();/// for google dense hash
 			++btree_totl_instances;
 			insert(first, last);
 		}
@@ -3308,7 +3530,7 @@ namespace stx
 		void flush(){
 			stx::storage::u64 flushed = 0;
 			if(stats.tree_size){				
-				if(shared.nodes == NULL_REF){
+				if(shared.nodes == NULL_REF && (!get_storage()->is_readonly())){
 					
 					for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 						this->save((*n).second,(*n).first);
@@ -3324,7 +3546,34 @@ namespace stx
 		typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
 		typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
 		/// remove inter node dependencies
-		
+		typedef std::vector<std::pair<stream_address,surface_node*>> _UnlinkNodes;
+		_UnlinkNodes unlink_nodes;
+		void raw_unlink_nodes_2(){
+			this->headsurface.discard(*this);
+			this->last_surface.discard(*this);			
+			this->root.discard(*this);
+			typedef std::vector<node::ptr> _LinkedList;
+			_AddressedNodes::iterator i ;
+			node::ptr t;
+			
+			for(typename _AddressedNodes::iterator n = surfaces_loaded.begin(); n != surfaces_loaded.end(); ++n){
+				
+				surface_node* surface = (surface_node*)(*n).second;																
+				if(surface->get_loader() != 0){	
+					/// find the current loaded instance of the interior node
+					i = interiors_loaded.find( surface->get_loader() );
+					if(i!=interiors_loaded.end()){
+						typename btree::interior_node* interior = (btree::interior_node*)(*i).second;																			
+						nst::u16 p = surface->get_loaded_slot(); 								
+						interior->childid[p].discard(*this);																								
+					}/// else interior does not exist anymore = mission accomplished																			
+				}/// this case may result in all the links not being removed
+				t = (*n).second;
+				t.set_context(this);
+				t.unlink();	/// remove its sibling links								
+			}
+
+		}
 		void raw_unlink_nodes(){
 			
 			this->headsurface.discard(*this);
@@ -3339,6 +3588,7 @@ namespace stx
 						printf("WARNING: cannot unlink null node\n");
 					}else if(!(*n).second->shared){
 						t = (*n).second;
+						t.set_context(this);
 						t.unlink();
 					}
 				}
@@ -3351,7 +3601,11 @@ namespace stx
 				raw_unlink_nodes();
 			}
 		}
-
+		void unlink_local_nodes_2(){
+			if(shared.nodes == NULL){				
+				raw_unlink_nodes_2();
+			}
+		}
 		
 		void release_shared(){
 			if(shared.nodes != NULL){
@@ -3386,6 +3640,10 @@ namespace stx
 
 		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
+			
+			if(aggressive_mem){
+				flush_aggressive();
+			}
 			if(::stx::memory_low_state){				
 				reduce_use();
 			}
@@ -3395,17 +3653,23 @@ namespace stx
 		void reduce_use(){
 			flush_buffers(true);
 		}
-
+		
 		void flush_buffers(bool reduce){
-
+			
+			flush_aggressive();
 			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;
-			
 			flush();
 			if(reduce){
+				
 				if((*this).stats.surface_use + (*this).stats.interior_use > 0){
-					unlink_local_nodes();			
-					local_free();
+					if((*this).get_storage()->is_readonly()){
+						unlink_local_nodes_2();			
+						local_reduce_free();
+					}else{
+						unlink_local_nodes();
+						local_free();						
+					}
 				}
 				release_shared();
 				if(save_tot > btree_totl_used)
@@ -3436,41 +3700,157 @@ namespace stx
 		}
 
 		/// Allocate and initialize a surface node
-		typename surface_node::ptr allocate_surface(stream_address w = 0)
+		typename surface_node::ptr allocate_surface(stream_address w = 0, stream_address loader=0,nst::u16 slot =0)
 		{
 			if(nodes_loaded.count(w)){
 				BTREE_PRINT("btree::allocate surface loading a new version of %lld\n",(nst::lld)w);
 			}
-			change_use(sizeof(surface_node),0,sizeof(surface_node));
+			surface_node* pn = NULL_REF;
+			if(aggressive_mem){
+				pn = liberator.opress();
+			}
+			
+			if(pn == NULL_REF){
 
-			surface_node* pn = new (surface_node_allocator().allocate(1)) surface_node();
-			deleted.erase((ptrdiff_t)pn);
+				pn = new (surface_node_allocator().allocate(1)) surface_node();
+				if(delete_check){
+					deleted.erase((ptrdiff_t)pn);
+				}				
+			}
+			change_use(sizeof(surface_node),0,sizeof(surface_node));
+			stats.leaves++;
 			pn->initialize();
+			pn->set_slot_loader(loader, slot);
 			typename surface_node::ptr n = pn;
 			n->next.set_context(this);
 			n->preceding.set_context(this);
 			n.create(this,w);
-			stats.leaves++;
+			if(aggressive_mem && loader > 0){
+				for(typename _AllocatedSurfaceNodes::iterator a = aggressive_allocated.begin(); a != aggressive_allocated.end(); ++a){
+					surface_node* surface = (surface_node*)(*a).second;
+					if(surface==pn){
+						printf("error: node already added to allocated list\n");
+					}
+				}
+				aggressive_allocated.push_back(std::make_pair(n.get_where(), pn));
+
+			}
 			if(n.get_where()){
 				nodes_loaded[n.get_where()] = pn;
+				surfaces_loaded[n.get_where()] = pn;
 			}
 			report_nodes_loaded_mem();
 			return n;
 		}
+		void clear_agg_alloc(){
+			for(typename _AllocatedSurfaceNodes::iterator n = aggressive_allocated.begin(); n != aggressive_allocated.end(); ++n){
+				surface_node* surface = (surface_node*)(*n).second;										
+				surface->set_slot_loader(0, 0);
+			}
+			aggressive_allocated.clear();
+		}
+		/// flush strategy when memory reduction is set to aggressive
+		void flush_aggressive(){
+			if(!aggressive_mem) {
+				clear_agg_alloc();
+				return;
+			}
+			surface_node::ptr t;
+			size_t todo = std::min<size_t>(stats.leaves, max_release);
+			if(stats.leaves > 16){
 
+				unlink_nodes.clear();
+				if(aggressive_allocated.empty()){
+					for(typename _AddressedNodes::iterator n = interiors_loaded.begin(); n != interiors_loaded.end() ; ++n){				
+						if((*n).second->level == 1){
+							typename btree::interior_node* interior = (btree::interior_node*)(*n).second;											
+							for(unsigned short p = 0; p < interior->get_occupants();++p){								
+								if(!interior->childid[p].empty()){								
+									typename btree::surface_node* surface = (btree::surface_node* ) interior->childid[p].rget();									
+									if(surface->get_loader() == 0){
+										surface->set_slot_loader((*n).first, p);
+										aggressive_allocated.push_back(std::make_pair(interior->childid[p].get_where(), surface));
+									}
+								}
+							}						
+						}						
+					}
+				}
+				size_t count = 0;				
+				for(typename _AllocatedSurfaceNodes::iterator n = aggressive_allocated.begin(); n != aggressive_allocated.end(); ++n){
+					t = (*n).second;
+					t.unlink();/// remove sibling dependencies					
+					++count;
+					surface_node* surface = (surface_node*)(*n).second;										
+					unlink_nodes.push_back(std::make_pair((*n).first,surface));	
+					if(surface->get_loader() != 0){	
+						/// find the current loaded instance of the interior node
+						_AddressedNodes::iterator i = interiors_loaded.find( surface->get_loader() );
+						if(i!=interiors_loaded.end()){
+							typename btree::interior_node* interior = (btree::interior_node*)(*i).second;																			
+							nst::u16 p = surface->get_loaded_slot(); 								
+							interior->childid[p].discard(*this);																								
+						}/// else interior does not exist anymore = mission accomplished							
+						
+						
+					}else{
+						printf("node has no valid loader\n");	/// not good in this context				
+					}						
+				}		
+				
+				clear_agg_alloc();
+			
+				
+				
+				t = NULL_REF;/// so that there is no further dependencies on t
+				/// second pass
+				size_t released = 0;
+				for(_UnlinkNodes::iterator s = unlink_nodes.begin(); s != unlink_nodes.end(); ++s){
+					if((*s).second->refs==0){
+						this->free_surface_node((*s).second,(*s).first);									
+						++released;
+					}
+				}
+
+				unlink_nodes.clear();
+				if(stats.leaves > 8 && released == 0){
+					for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){										
+						if((*n).second->level == 0){
+							t = (*n).second;
+							t.unlink();
+							t = NULL_REF;							
+							surface_node* surface = (surface_node*)(*n).second;
+							unlink_nodes.push_back(std::make_pair((*n).first,surface));							
+						}
+					}	
+					for(_UnlinkNodes::iterator s = unlink_nodes.begin(); s != unlink_nodes.end(); ++s){
+						if((*s).second->refs==0){
+							this->free_surface_node((*s).second,(*s).first);									
+						}
+					}
+				}
+
+			}
+				
+					
+			//local_surface_free();
+		}
 		/// Allocate and initialize an interior node
 		typename interior_node::ptr allocate_interior(unsigned short level, stream_address w = 0)
 		{
 			change_use(sizeof(interior_node),sizeof(interior_node),0);
 
 			interior_node* pn = new (interior_node_allocator().allocate(1)) interior_node();
-			deleted.erase((ptrdiff_t)pn);
+			if(delete_check){
+				deleted.erase((ptrdiff_t)pn);
+			}
 			pn->initialize(level);
 			typename interior_node::ptr n = pn;
 			n.create(this,w);
 			stats.interiornodes++;
 			if(n.get_where()){
 				nodes_loaded[n.get_where()] = pn;
+				interiors_loaded[n.get_where()] = pn;
 			}
 			return n;
 		}
@@ -3478,11 +3858,14 @@ namespace stx
 		_Deleted deleted;
 
 		bool is_deleted(node_ref* n) const {
-			return deleted.count((ptrdiff_t)n) > 0;
+			if(delete_check){
+				return deleted.count((ptrdiff_t)n) > 0;
+			}
+			return false;
 		}
 		/// Correctly free either interior or surface node, destructs all contained key
 		/// and value objects
-		template<typename _Allocator,typename _ToFree, int MAX_PRISONERS = 32>
+		template<typename _Allocator,typename _ToFree, int MAX_PRISONERS = 20>
 		class mt_free{
 		private:
 			_Allocator a;
@@ -3508,7 +3891,13 @@ namespace stx
 						prisoners[added++] = in;
 					}
 				}
-				
+				_ToFree* opress(){
+					if(added > 0){
+						return prisoners[--added];
+					}
+					return NULL_REF;
+				}
+
 				liberatir(_Allocator a) : added(0),a(a){
 				}
 				
@@ -3527,15 +3916,23 @@ namespace stx
 			mt_free(_Allocator& a) : a(a),current(NULL){
 				current = new liberatir(a);
 			}
-			virtual ~mt_free(){
+			~mt_free(){
 				current->work();
 				delete current;
+			}
+			_ToFree* opress(){
+				if(current){
+					return current->opress();
+				}
+				return NULL_REF;
 			}
 			void liberate(_ToFree* f){
 				
 				current->emancipate(f);
 				if(current->full()){
-					get_worker().add(current);
+					get_worker().add(current);					
+					//current->work();
+					//delete current;
 					current = new liberatir(a);
 				}
 			}
@@ -3543,13 +3940,18 @@ namespace stx
 
 		typedef mt_free<typename surface_node::alloc_type ,typename surface_node> _Liberator;
 		_Liberator liberator;
-
+		
 		inline void free_node( surface_node* n, stream_address w ){
 
 			if((!(n->shared) && n->refs==0 ) || n->is_orphaned()){ /// the shared nodes will have +1 references
 				save(n,w);
-				if(!n->is_orphaned())
+				if(!n->is_orphaned()){
 					nodes_loaded.erase(w);
+					surfaces_loaded.erase(w);
+				}
+
+				if(aggressive_mem)
+					clear_agg_alloc();/// the allocated list is now invalid
 				surface_node *ln = n;
 				//typename surface_node::alloc_type a(surface_node_allocator());
 				/// TODO: adding multithreaded freeing of pages can improve transactional
@@ -3607,8 +4009,10 @@ namespace stx
 		inline void free_node(interior_node* n, stream_address w){
 			if(n->refs == 0 ){
 				save(n,w);
-				if(!n->is_orphaned())
+				if(!n->is_orphaned()){
 					nodes_loaded.erase(w);
+					interiors_loaded.erase(w);
+				}
 				typename interior_node::alloc_type a(interior_node_allocator());
 				interior_node * removed = n;
 				a.destroy(removed);
@@ -3624,12 +4028,25 @@ namespace stx
 		inline void free_node( typename node::ptr n ){
 			free_node(n.rget(), n.get_where());
 		}
+		inline bool free_surface_node(node* n, stream_address w){
+			if(n == NULL_REF){
+				return false;
+			}
+			//if(n->is_orphaned() || nodes_loaded.count(w) > 0){
+				if (n->issurfacenode())
+				{
+					free_node(static_cast<surface_node*>(n),w);
+					return true;
+				}
+			//}
+			return false;
+		}
 		inline void free_node(node* n, stream_address w)
 		{
 			if(n == NULL_REF){
 				return;
 			}
-			if(n->is_orphaned() || nodes_loaded.count(w) > 0){
+			//if( n->is_orphaned() || nodes_loaded.count(w) > 0){
 				if (n->issurfacenode())
 				{
 					free_node(static_cast<surface_node*>(n),w);
@@ -3638,9 +4055,9 @@ namespace stx
 				{
 					free_node(static_cast<interior_node* >(n),w);
 				}
-			}else{
+			//}else{
 				//printf("node %lld already removed\n", (NS_STORAGE::u64)w);
-			}
+			//}
 			report_nodes_loaded_mem();
 		}
 
@@ -3674,7 +4091,29 @@ namespace stx
 
 			initialize_contexts();
 		}
-		_AddressedNodes local_togo ;
+		
+		/// called when the release mode is set to aggressive
+
+		void local_surface_free(){
+			if(shared.nodes == NULL_REF){
+				typedef std::pair<stream_address, node*> _NodePair;
+				
+				_NodePair node_pairs[max_release];
+				size_t nodes = std::min<size_t>(max_release,stats.leaves);
+				size_t p = 0;
+				for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
+					if((*n).second->issurfacenode() && (*n).second->refs==0){
+						node_pairs[p++] = (*n);
+						if(p == nodes) break;
+					}
+				}
+				for(size_t r = 0; r < p; ++r){
+					this->free_surface_node(node_pairs[r].second,node_pairs[r].first);
+				}
+				
+
+			}
+		}
 		void local_free(){
 			if(shared.nodes == NULL_REF){
 				typedef std::pair<stream_address, node*> _NodePair;
@@ -3699,6 +4138,22 @@ namespace stx
 
 			}
 		}
+		
+		void local_reduce_free(){
+			if(shared.nodes == NULL_REF){
+				clear_agg_alloc();
+				
+				/// typedef std::pair<stream_address, node*> _NodePair;
+				/// typedef std::vector<_NodePair> _Nodes;
+				
+				_AddressedNodes todo = surfaces_loaded;
+				for(typename _AddressedNodes::iterator n = todo.begin(); n != todo.end(); ++n){
+					//if((*n).second->issurfacenode())
+						this->free_node((*n).second,(*n).first);
+						
+				}				
+			}
+		}
 		/// orphan the nodes which are still referenced
 		/// shared nodes cant be orphaned
 		void orphan_remaining(){
@@ -3721,6 +4176,8 @@ namespace stx
 			if(shared.nodes == NULL_REF){
 				orphan_remaining();
 				nodes_loaded.clear();
+				interiors_loaded.clear();
+				surfaces_loaded.clear();
 				report_nodes_loaded_mem();
 			}
 		}
@@ -3736,11 +4193,14 @@ namespace stx
 					unlink_local_nodes();				
 					orphan_remaining();
 					nodes_loaded.clear();
+					interiors_loaded.clear();
+					surfaces_loaded.clear();
+					clear_agg_alloc();
 					report_nodes_loaded_mem();
 					(*this).headsurface = NULL_REF;
 					(*this).root = NULL_REF;
 					(*this).last_surface = NULL_REF;
-					stats = tree_stats();
+					stats = tree_stats();					
 				}
 			}
 
@@ -4011,7 +4471,7 @@ namespace stx
 				typename interior_node::ptr interior = n;
 
 				int slot = find_lower(interior, key);
-				interior->childid[slot].load();
+				interior->childid[slot].load(interior.get_where(),slot);
 				n = interior->childid[slot];
 			}
 
@@ -4033,7 +4493,7 @@ namespace stx
 			{
 				typename interior_node::ptr interior = n;
 				int slot = find_lower(interior, key);
-				interior->childid[slot].load();
+				interior->childid[slot].load(interior.get_where(),slot);
 				n = interior->childid[slot];
 			}
 
@@ -4089,7 +4549,7 @@ namespace stx
 			while(!n->issurfacenode())
 			{
 				int slot = find_lower(n, key);
-				n->childid[slot].load();
+				n->childid[slot].load(n.get_where(), slot);
 				n = n->childid[slot];
 			}
 
@@ -4111,7 +4571,7 @@ namespace stx
 			{
 
 				int slot = find_lower(n, key);
-				n->childid[slot].load();
+				n->childid[slot].load(n.get_where(),slot);
 				n = n->childid[slot];
 			}
 
@@ -4134,7 +4594,7 @@ namespace stx
 			{
 				typename interior_node::ptr interior = n;
 				int slot = find_upper(interior, key);
-
+				interior->childid[slot].load(interior.get_where(), slot);
 				n = interior->childid[slot];
 			}
 
@@ -4156,7 +4616,7 @@ namespace stx
 			{
 				typename interior_node::ptr interior = n;
 				int slot = find_upper(interior, key);
-
+				interior->childid[slot].load(interior.get_where(), slot);
 				n = interior->childid[slot];
 			}
 
@@ -4539,9 +4999,10 @@ namespace stx
 					int i = surface->get_occupants() - 1;
 					BTREE_ASSERT(i + 1 < surfaceslotmax);
 					int at = i + 1;
-					surface.change();
+					
 					surface->insert(at, key, value);
 					surface->sorted = 0;
+					surface.change();
 
 					return std::pair<iterator, bool>(iterator(surface, at), true);
 
@@ -4575,7 +5036,7 @@ namespace stx
 
 					int i = surface->get_occupants() - 1;
 					BTREE_ASSERT(i + 1 < surfaceslotmax);
-					surface.change();
+					
 					surface_node * surfactant = surface.rget();
 					key_type * keys = surfactant->keys;
 					data_type * values = surfactant->values;
@@ -4591,6 +5052,8 @@ namespace stx
 
 					surface->insert(at, key, value);
 					surface->sorted = surface->get_occupants();
+					surface.change();
+
 					if (splitsurface != NULL_REF && surface != splitsurface && at == surface->get_occupants()-1)
 					{
 						// special case: the node was split, and the insert is at the

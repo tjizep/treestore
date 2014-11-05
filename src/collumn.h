@@ -34,6 +34,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _COLLUM_DEF_CEP_20130801_
 #define _COLLUM_DEF_CEP_20130801_
+#include <stdlib.h> 
 #include "fields.h"
 #include "Poco/Mutex.h"
 #include "Poco/Thread.h"
@@ -96,13 +97,35 @@ namespace collums{
 
 		struct int_terpolator{
 
-
+			typedef typename _Stored::list_encoder value_encoder;
+			value_encoder encoder; /// delegate encoder/decoder
 			/// function assumes a list of increasing integer values
 			inline bool encoded(bool multi) const
 			{
 				return !multi; // only encodes uniques;
 			}
+			inline bool encoded_values(bool multi) const
+			{
+				return encoder.encoded(multi); // only encodes uniques;
+			}
 			typedef nst::u16 count_t;
+			/// delegate value decoder
+			void decode_values(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
+				
+				encoder.decode(buffer, reader, values, occupants);
+			}
+			/// delegate value encoder
+			void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
+				
+				encoder.encode(buffer, writer, values, occupants);
+			}
+			/// delegate value encoder
+			size_t encoded_values_size(const _Stored* values, count_t occupants) {
+				
+				return encoder.encoded_size(values, occupants);
+			}
+
+			 
 			/// decode mixed run length and delta for simple sequences
 			void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
 				count_t k = 0, m = occupants - 1;
@@ -114,8 +137,10 @@ namespace collums{
 						rl = nst::leb128::read_signed(reader);
 						count_t e = std::min<count_t>(k+rl,occupants);
 						count_t j = k;
+						_Rid prev = keys[j-1].get_value();
 						for(; j < e; ++j){
-							keys[j].set_value(keys[j-1].value + 1);
+							keys[j].set_value(prev + 1);
+							prev = keys[j].get_value();
 						}
 						k = j;
 					}else{
@@ -173,7 +198,10 @@ namespace collums{
 					}
 				}
 			}
-
+			inline bool can(const _StoredRowId &first , const _StoredRowId &last, int size) const
+			{				
+				return ::abs((long long)size - (long long)::abs( (long long)last.get_value() - (long long)first.get_value() )) > 0 ;
+			}
 			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
 			{
 				if(last.get_value()>first.get_value())
@@ -330,7 +358,14 @@ namespace collums{
 				return rows_cached;
 			}
 
-			const _Stored& get(_Rid row)  {
+			_Stored& get(_Rid row)  {
+				if(encoded.good()){
+
+					return encoded.get(row);;
+				}else
+					return _data[row].key;
+			}
+			const _Stored& get(_Rid row) const {
 				if(encoded.good()){
 
 					return encoded.get(row);;
@@ -874,12 +909,12 @@ namespace collums{
 			return seek_by_cache(row);
 		}
 
-		const _Stored& seek_by_cache(_Rid row)  {
+		inline _Stored& seek_by_cache(_Rid row)  {
 
 
 			if( has_cache() && cache_size > row )
 			{
-				const _Stored & se = _cache->get(row);
+				_Stored & se = _cache->get(row);
 
 				if(nullptr != cache_f ){
 					nst::u8 flags = cache_f[row];

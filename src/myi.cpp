@@ -68,7 +68,10 @@ int collums::get_loading_data(const std::string& name){
 	return loading_data[name] ;///def false
 }
 
-
+namespace ts_info{
+	void perform_active_stats();
+	void perform_active_stats(const std::string table);
+};
 namespace tree_stored{
 	class tt{
 		int x;
@@ -411,13 +414,15 @@ void reduce_thread_usage(){
 		//}		
 	}
 	if(calc_total_use() > treestore_max_mem_use){			
+		
 		nst::synchronized s(mut_total_locks);				
 		if(total_locks==0){
 			st.reduce_all();
 		}
 	}
-	if(calc_total_use() > treestore_max_mem_use){			
-			stored::reduce_all();
+	if(nst::buffer_use > treestore_max_mem_use*0.75){			
+		/// time to reduce some blocks
+		stored::reduce_all();
 			
 	}
 	
@@ -572,8 +577,9 @@ public:
 			++total_locks;
 		}
 		
-		tree_stored::tree_table * ts = get_info_table((*this).table);
+		tree_stored::tree_table * ts = get_info_table((*this).table);		
 		tree_stored::table_info tt ;
+		ts_info::perform_active_stats(table->s->path.str);
 		ts->get_calculated_info(tt);
 
 		
@@ -609,7 +615,7 @@ public:
 		if(which & HA_STATUS_VARIABLE) {// - records, deleted, data_file_length, index_file_length, delete_length, check_time, mean_rec_length
 			stats.data_file_length = tt.table_size;
 			stats.block_size = 4096;
-			stats.records = std::max<stored::_Rid>(2, tt.row_count);
+			stats.records = tt.row_count;
 			stats.mean_rec_length =(ha_rows) stats.data_file_length / stats.records;
 
 		}
@@ -1686,8 +1692,8 @@ void test_signwriter(){
 }
 void test_run(){
 	test_signwriter();
-	test_suffix_array();
-	pt_test();
+	/// test_suffix_array();
+	/// pt_test();
 }
 int treestore_db_init(void *p)
 {
@@ -1722,7 +1728,7 @@ int treestore_db_init(void *p)
 
 	start_cleaning();
 	start_calculating();
-	
+	test_run();
 	DBUG_RETURN(FALSE);
 }
 
@@ -1820,40 +1826,75 @@ namespace ts_cleanup{
 void start_cleaning(){
 	ts_cleanup::start();
 }
+
 namespace ts_info{
+	void perform_active_stats(const std::string table){
+		{
+			nst::synchronized s(mut_total_locks);
+			++total_locks;
+		}
+		/// other threads cant delete while this section is active
+		nst::synchronized synch2(tt_info_delete_lock);
+		typedef std::vector<tree_stored::tree_table*> _Tables;
+		_Tables tables;
+				
+		{
+			nst::synchronized synch(tt_info_lock);
+			_InfoTables::iterator i = info_tables.find(table);
+			if(i!=info_tables.end()){
+				tables.push_back((*i).second);
+			}
+					
+		}
+		for(_Tables::iterator i = tables.begin();i!=tables.end();++i){
+					
+			(*i)->begin(true,false);
+			(*i)->calc_density();
+			(*i)->reduce_use_collum_trees();
+			(*i)->rollback();
+					
+		}	
+		{
+			nst::synchronized s(mut_total_locks);
+			--total_locks;
+		}
+	}
+	void perform_active_stats(){
+		{
+			nst::synchronized s(mut_total_locks);
+			++total_locks;
+		}
+		/// other threads cant delete while this section is active
+		nst::synchronized synch2(tt_info_delete_lock);
+		typedef std::vector<tree_stored::tree_table*> _Tables;
+		_Tables tables;
+				
+		{
+			nst::synchronized synch(tt_info_lock);
+			for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
+				tables.push_back((*i).second);
+			}		
+		}
+		for(_Tables::iterator i = tables.begin();i!=tables.end();++i){
+					
+			(*i)->begin(true,false);
+			(*i)->calc_density();
+			(*i)->reduce_use_collum_trees();
+			(*i)->rollback();
+					
+		}	
+		{
+			nst::synchronized s(mut_total_locks);
+			--total_locks;
+		}
+	}
 	class info_worker : public Poco::Runnable{
 	public:
 		void run(){
 			
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(15000);
-				{
-					nst::synchronized s(mut_total_locks);
-					++total_locks;
-				}
-				/// other threads cant delete while this section is active
-				nst::synchronized synch2(tt_info_delete_lock);
-				typedef std::vector<tree_stored::tree_table*> _Tables;
-				_Tables tables;
-				
-				{
-					nst::synchronized synch(tt_info_lock);
-					for(_InfoTables::iterator i = info_tables.begin();i!=info_tables.end();++i){
-						tables.push_back((*i).second);
-					}		
-				}
-				for(_Tables::iterator i = tables.begin();i!=tables.end();++i){
-					
-					(*i)->begin(true,false);
-					(*i)->calc_density();
-					(*i)->reduce_use_collum_trees();
-					(*i)->rollback();
-					
-				}	
-				{
-					nst::synchronized s(mut_total_locks);
-					--total_locks;
-				}
+				perform_active_stats();
 			}
 		}
 	};

@@ -49,7 +49,7 @@ namespace tree_stored{
 		stored::abstracted_storage storage;
 		typedef stx::btree_set< index_key, stored::abstracted_storage> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
-		typedef iterator::ImplIterator<_IndexMap> IndexIterator;
+		typedef typename ::iterator::ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key> _KeyBuffer;
 
 		class index_iterator_impl : public stored::index_iterator_interface{

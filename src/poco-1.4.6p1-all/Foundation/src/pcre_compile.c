@@ -41,7 +41,7 @@ POSSIBILITY OF SUCH DAMAGE.
 /* This module contains the external function pcre_compile(), along with
 supporting internal functions that are not used by other modules. */
 
-
+#undef DEBUG
 #include "pcre_config.h"
 
 #define NLBLOCK cd             /* Block containing newline information */

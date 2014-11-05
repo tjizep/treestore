@@ -192,7 +192,7 @@ namespace tree_stored{
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
 			if((nst::u64)calc_total_use() > (nst::u64)treestore_max_mem_use){
-				clear();
+				//clear();
 				return;
 			}
 			if(!enabled) return;
@@ -226,9 +226,11 @@ namespace tree_stored{
 		/// remove everything
 
 		void clear(){
+			
 			//stx::storage::syncronized ul((*this).plock);
 			if(!cache_index.empty()){
-				total_cache_size -= (sizeof(CachedRow)*CIRC_SIZE + sizeof(stored::_Rid)*hash_size);
+				
+				total_cache_size -= (sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*hash_size);
 				cache_index.clear();
 				sec_cache.clear();
 				sec_cache.resize(1);

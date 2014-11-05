@@ -70,8 +70,8 @@ namespace stx{
 		template<typename _Iterator >
 		i32 read_signed(_Iterator& input) {
 			_Iterator ptr = input;
-			i32 result = *ptr++;
-
+			i32 result = *ptr;
+			++ptr;
 			if (result <= 0x7f) {
 				result = (result << 25) >> 25;
 			} else {

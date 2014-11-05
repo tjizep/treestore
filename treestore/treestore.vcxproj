@@ -62,7 +62,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v110</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDebug|x64'" Label="Configuration">
@@ -136,9 +136,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <MinimalRebuild>false</MinimalRebuild>
@@ -192,9 +192,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>false</FunctionLevelLinking>
-      <IntrinsicFunctions>false</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;TREESTORE_EXPORTS;POCO_STATIC;SQLite_EXPORTS;Foundation_EXPORTS;Data_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;TREESTORE_EXPORTS;POCO_STATIC;SQLite_EXPORTS;Foundation_EXPORTS;Data_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
@@ -202,7 +202,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <BrowseInformation>false</BrowseInformation>
       <OmitFramePointers>false</OmitFramePointers>
-      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
@@ -228,9 +228,9 @@
       <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <IntrinsicFunctions>false</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
@@ -293,6 +293,8 @@
     <ClCompile Include="..\..\repo\zlib-1.2.8\trees.c" />
     <ClCompile Include="..\..\repo\zlib-1.2.8\uncompr.c" />
     <ClCompile Include="..\..\repo\zlib-1.2.8\zutil.c" />
+    <ClCompile Include="..\repo\fse\fse.c" />
+    <ClCompile Include="..\repo\fse\zlibh.c" />
     <ClCompile Include="..\src\abstracted_storage.cpp" />
     <ClCompile Include="..\src\collumn.cpp" />
     <ClCompile Include="..\src\fields.cpp" />

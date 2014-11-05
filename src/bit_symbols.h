@@ -47,7 +47,10 @@ public:
 		code_size = 0;
 		code_shift = 0;
 	}
-
+	symbol_vector(const symbol_vector& right){
+		*this = right;
+	}
+	/// true if there is no data	
 	const bool empty() const {
 		return data.empty();
 	}
@@ -65,7 +68,7 @@ public:
 	void resize(_IndexType ns){
 		data.resize(((ns*code_size)/(_IndexType)BUCKET_BITS)+1);
 	}
-
+	
 	/// the capacity in bytes of this bit symbol vector
 	size_t capacity() const {
 		return data.capacity()*sizeof(_BucketType);
@@ -104,6 +107,7 @@ public:
 	}
 
 	/// read code_size bits at bit-index index
+	
 	_IntSymBolType get(_IndexType index) const {
 		_IntSymBolType code = 0;
 		_BucketType bucket_start, bucket;
@@ -143,6 +147,20 @@ public:
 			bucket_start = (_BucketType)bit_start & (BUCKET_BITS-1);/// where to begin in the bucket
 		}
 		return code;
+	}
+
+	void trim(_IndexType index){
+		_IndexType bit_start = index * code_size;
+		_IndexType e = bit_start / (_IndexType)BUCKET_BITS;
+		_Data d (e);
+		std::copy(data.begin(),data.begin()+e,d.begin());		
+		data.swap(d);
+	}
+	symbol_vector& operator=(const symbol_vector& right){		
+		(*this).data = right.data;
+		(*this).code_size = right.code_size;
+		(*this).code_shift = right.code_shift;
+		return *this;
 	}
 
 	_IntSymBolType operator[](_IndexType index) const {

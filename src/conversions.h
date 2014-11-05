@@ -45,11 +45,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <mysql.h>
 #include <mysql/plugin.h>
 #include "fields.h"
-#ifdef _MSC_VER
-#define CONVERSION_NOINLINE_ //_declspec(noinline)
-#else
-#define CONVERSION_NOINLINE_
-#endif
+
 namespace units{
 	static const double MB = 1024.0*1024.0;
 	static const double GB = 1024.0*1024.0*1024.0;

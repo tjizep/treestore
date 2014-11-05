@@ -56,6 +56,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "abstracted_storage.h"
 #include "suffix_array.h"
 
+
+#ifdef _MSC_VER
+#define CONVERSION_NOINLINE_ _declspec(noinline)
+#else
+#define CONVERSION_NOINLINE_
+#endif
+
 extern	char treestore_column_cache ;
 extern  char treestore_column_encoded ;
 extern  char treestore_predictive_hash ;
@@ -70,6 +77,7 @@ namespace storage_workers{
 };
 
 namespace NS_STORAGE = stx::storage;
+namespace nst = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
 namespace stored{
 
@@ -80,10 +88,82 @@ namespace stored{
 		return in / unit;
 	}
 
+	struct empty_encoder{
+		inline bool encoded(bool multi) const
+		{
+			return false;
+		}
+		typedef nst::u16 count_t;
+		/// empty value decoder
+		template<typename _Stored>
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) const {			
+		}
+
+		/// empty value encoder
+		template<typename _Stored>
+		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {			
+		}
+
+		/// byte size of encoded buffer for given data values
+		template<typename _Stored>
+		size_t encoded_size(const _Stored* values, count_t occupants) const {
+			return 0;
+		}
+		
+	};
+	
+	struct integer_encoder{
+	public:
+		typedef nst::u16 count_t;
+	private:
+		
+		
+	public:
+
+		integer_encoder(){
+			
+		}
+		 
+		inline bool encoded(bool multi) const
+		{
+			return true;
+		}
+		
+		/// decoder
+		template<typename _Stored>
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {			
+			size_t bytes = occupants * sizeof(_Stored);
+			nst::u8* dest = (nst::u8*)values;
+			const nst::u8* src = (const nst::u8*)&(*reader);
+			memcpy(dest, src, bytes);
+
+			reader+=bytes;
+		}
+
+		/// encoder
+		template<typename _Stored>
+		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {			
+			size_t bytes = occupants * sizeof(_Stored);
+			nst::u8* dest = &(*writer);
+			const nst::u8* src = (const nst::u8*)values;
+			memcpy(dest, src, bytes);
+
+			writer+=bytes;
+		}
+
+		/// byte size of encoded buffer for given data values
+		template<typename _Stored>
+		size_t encoded_size(const _Stored* values, count_t occupants) {
+			size_t bytes = occupants * sizeof(_Stored);
+			return bytes;
+		}
+		
+	};
 	template<typename _IntType>
 	class IntTypeStored {
 
 	public:
+		typedef integer_encoder list_encoder;
 		typedef _IntType value_type;
 		_IntType value;
 	public:
@@ -144,7 +224,8 @@ namespace stored{
 	template<typename _FType>
 	class FTypeStored {
 	public:
-		typedef _FType value_type;
+		typedef empty_encoder list_encoder;
+		typedef _FType value_type;		
 	protected:
 		_FType value;
 	public:
@@ -205,6 +286,7 @@ namespace stored{
 	template<typename _FType>
 	class VectorTypeStored {
 	public:
+		typedef empty_encoder list_encoder;
 		typedef _FType value_type;
 	protected:
 		_FType value;
@@ -261,7 +343,7 @@ namespace stored{
 	template<bool CHAR_LIKE, int _ConstSize = 16>
 	class Blobule {
 	public:
-
+		typedef empty_encoder list_encoder;
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
 	protected:
 		typedef NS_STORAGE::u8 _size_type;
@@ -288,20 +370,24 @@ namespace stored{
 			}
 			return extract_ptr();
 		}
+		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t nbytes){
+			using namespace NS_STORAGE;
+			nst::add_buffer_use (nbytes);
+			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
+			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
+			if(bytes > _ConstSize){
+				nst::remove_buffer_use  (bytes);
+				delete r;
+			}
+			memcpy(buf, &nbuf, sizeof(u8*));
+			bytes = (u32)nbytes;
+			return nbuf;
+		}
 		NS_STORAGE::u8* _resize_buffer(size_t nbytes){
 			using namespace NS_STORAGE;
 			NS_STORAGE::u8* r = data();
   			if(nbytes > bytes){
-				nst::add_buffer_use (nbytes);
-				NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
-				memcpy(nbuf, r, std::min<size_t>(nbytes, size));
-				if(bytes > _ConstSize){
-					nst::remove_buffer_use  (bytes);
-					delete r;
-				}
-				memcpy(buf, &nbuf, sizeof(u8*));
-				bytes = (u32)nbytes;
-				r = nbuf;
+				r = dyn_resize_buffer(r,nbytes);
 			}
 			return r;
 		}
@@ -535,14 +621,24 @@ namespace stored{
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
 			if(reader != buffer.end()){
-				size = leb128::read_signed(reader);
+				size = leb128::read_signed(reader);			
 				_resize_buffer(size);
-				const u8 * end = data()+size;
-				for(u8 * d = data(); d < end; ++d,++reader){
-					*d = *reader;
+				if(size <= 8){
+					const nst::u8 * d = &(*reader);	
+					*((nst::u64*)data()) = *((const nst::u64*)d);
+					
+				}else{
+					memcpy(data(),&(*reader),size);
 				}
+				//const u8 * end = data()+size;
+				
+				
+				
+				/*for(u8 * d = data(); d < end; ++d,++reader){
+					*d = *reader;
+				}*/
 			}
-			return reader;
+			return reader+size;
 		};
 	};
 
@@ -573,8 +669,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 24> BlobStored;
-	typedef stored::Blobule<true, 24> VarCharStored;
+	typedef stored::Blobule<false, 22> BlobStored;
+	typedef stored::Blobule<true, 14> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -590,18 +686,6 @@ namespace stored{
 
 		};
 
-		typedef unsigned char	uchar;	/* Short for unsigned char */
-		typedef signed char int8;       /* Signed integer >= 8  bits */
-		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
-		typedef short int16;
-		typedef unsigned short uint16;
-		typedef int int32;
-		typedef unsigned int uint32;
-		typedef unsigned long	ulong;		  /* Short for unsigned long */
-		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
-		typedef long long longlong;
-		typedef longlong int64;
-		typedef ulonglong uint64;
 		typedef std::vector<nst::u8> _Data;
 
 		static const size_t MAX_BYTES = 2048;
@@ -1112,18 +1196,7 @@ namespace stored{
 	public:
 		typedef typename _FieldType::value_type _DataType ;
 
-		typedef unsigned char	uchar;	/* Short for unsigned char */
-		typedef signed char int8;       /* Signed integer >= 8  bits */
-		typedef unsigned char uint8;    /* Unsigned integer >= 8  bits */
-		typedef short int16;
-		typedef unsigned short uint16;
-		typedef int int32;
-		typedef unsigned int uint32;
-		typedef unsigned long	ulong;		  /* Short for unsigned long */
-		typedef unsigned long long  ulonglong; /* ulong or unsigned long long */
-		typedef long long longlong;
-		typedef longlong int64;
-		typedef ulonglong uint64;
+		
 		typedef std::vector<nst::u8> _Data;
 
 		static const size_t MAX_BYTES = 2048;
@@ -1611,6 +1684,17 @@ namespace stored{
 					throw UninitializedCodeException();
 				return _null_val;
 			}
+			_IntType& decode(_Rid row) {
+				_CodeType code = 0;
+				if(code_size > 0){
+					code = symbols.get(row);
+					
+					return decodes[code];
+					
+				}else
+					throw UninitializedCodeException();
+				return _null_val;
+			}
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
@@ -1736,6 +1820,21 @@ namespace stored{
 					throw UninitializedCodeException();
 				return _null_val;
 			}
+			_IntType& decode(_Rid row) {
+				_CodeType code = 0;
+				if(code_size > 0){
+					code = symbols.get(row);
+					if(decodes.empty()){
+						unmapped.set_value(code + min_decoded);
+						return unmapped;
+					}
+					
+					return decodes[code];
+					
+				}else
+					throw UninitializedCodeException();
+				return _null_val;
+			}
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
@@ -1821,6 +1920,10 @@ namespace stored{
 
 				return _decoded_val;
 			}
+			_BufType& decode(_Rid row) {
+
+				return _decoded_val;
+			}
 			void optimize(){
 			}
 		};
@@ -1859,6 +1962,9 @@ namespace stored{
 			void optimize(){
 			}
 			const _D& get(_Rid _Rid) const {
+				return empty_Val;
+			}
+			_D& get(_Rid _Rid) {
 				return empty_Val;
 			}
 			nst::u64 get_entropy()  {
@@ -1909,6 +2015,9 @@ namespace stored{
 			const IntStored& get( _Rid row) const {
 				return coder.decode(row);
 			}
+			IntStored& get( _Rid row) {
+				return coder.decode(row);
+			}
 			nst::u64 get_entropy() {
 				return 0; //coder.get_stats().get_entropy();
 			}
@@ -1949,6 +2058,9 @@ namespace stored{
 				coder.encode(row, data);
 			}
 			const UIntStored&  get(_Rid row) const {
+				return coder.decode(row);
+			}
+			UIntStored&  get(_Rid row) {
 				return coder.decode(row);
 			}
 			nst::u64 get_entropy() {
@@ -1992,6 +2104,9 @@ namespace stored{
 			const ShortStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
+			ShortStored& get(_Rid row) {
+				return coder.decode(row);
+			}
 			nst::u64 get_entropy() {
 				return coder.get_stats().get_entropy();
 			}
@@ -2032,6 +2147,9 @@ namespace stored{
 			const UShortStored& get(_Rid row) const {
 				return coder.decode(row);
 			}
+			UShortStored& get(_Rid row) {
+				return coder.decode(row);
+			}
 			nst::u64 get_entropy() {
 				return 0; //coder.get_stats().get_entropy();
 			}
@@ -2070,7 +2188,7 @@ namespace stored{
 			void set(_Rid row, const VarCharStored& data){
 				coder.encode(row, data);
 			}
-			const VarCharStored& get(_Rid row) const {
+			VarCharStored& get(_Rid row) {
 				return coder.decode(row);
 			}
 			nst::u64 get_entropy()  {
@@ -2111,6 +2229,9 @@ namespace stored{
 				coder.encode(row, data);
 			}
 			const BlobStored& get(_Rid row) const {
+				return coder.decode(row);
+			}
+			BlobStored& get(_Rid row) {
 				return coder.decode(row);
 			}
 			nst::u64 get_entropy() {

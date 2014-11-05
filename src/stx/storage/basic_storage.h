@@ -17,7 +17,8 @@ extern long long calc_total_use();
 extern "C"{
 	#include "zlib.h"
 };
-
+#include <fse/fse.h>
+#include <fse/zlibh.h>
 #include "system_timers.h"
 
 namespace stx{
@@ -25,22 +26,97 @@ namespace stx{
 	namespace storage{
 
 		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
-
-		static void inplace_compress_lz4(buffer_type& buff){
+		/// ZLIBH
+		static void inplace_compress_zlibh(buffer_type& buff){
+			typedef char * encode_type_ref;
 			buffer_type t;
-			/// TODO: cannot compress sizes lt 200 mb
-			t.resize(LZ4_compressBound((int)buff.size())+sizeof(int));
-			int cp = buff.empty() ? 0 : LZ4_compress((const char*)&buff[0], (char*)&t[sizeof(int)], (int)buff.size());
-			t.resize(cp + sizeof(int));
-			*((int*)&t[0]) = (int)buff.size();
+			i32 origin = buff.size();
+			t.resize(ZLIBH_compressBound(origin)+sizeof(i32));
+			i32 cp = buff.empty() ? 0 : ZLIBH_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
+			*((i32*)&t[0]) = origin;
+			t.resize(cp+sizeof(i32));
 			buff = t;
+			
 		}
-		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){
-
-			int d = *((int*)&buff[0]) ;
+		
+		static void decompress_zlibh(buffer_type &decoded,const buffer_type& buff){
+			typedef char * encode_type_ref;			
+			i32 d = *((i32*)&buff[0]) ;
 			decoded.reserve(d);
 			decoded.resize(d);
-			LZ4_decompress_fast((const char *)&buff[sizeof(int)],(char *)&decoded[0],d);
+			ZLIBH_decompress((encode_type_ref)&decoded[0],(const encode_type_ref)&buff[sizeof(i32)]);
+		}
+		
+		static void inplace_decompress_zlibh(buffer_type& buff, buffer_type& dt){
+			if(buff.empty()) return;			
+			decompress_zlibh(dt, buff);
+			buff = dt;
+		}
+		
+		static void inplace_decompress_zlibh(buffer_type& buff){
+			if(buff.empty()) return;
+			buffer_type dt;
+			decompress_zlibh(dt, buff);
+			buff = dt;
+		}
+		/// FSE
+		static void inplace_compress_fse(buffer_type& buff){
+			typedef unsigned char * encode_type_ref;
+			buffer_type t;
+			i32 origin = buff.size();
+			t.resize(FSE_compressBound(origin)+sizeof(i32));
+			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
+			*((i32*)&t[0]) = (i32)origin;
+			t.resize(cp+sizeof(i32));
+			buff = t;
+			
+		}
+		
+		static void decompress_fse(buffer_type &decoded,const buffer_type& buff){
+			typedef unsigned char * encode_type_ref;			
+			i32 d = *((i32*)&buff[0]) ;
+			decoded.reserve(d);
+			decoded.resize(d);
+			FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+		}
+		
+		static void inplace_decompress_fse(buffer_type& buff, buffer_type& dt){
+			if(buff.empty()) return;			
+			decompress_fse(dt, buff);
+			buff = dt;
+		}
+		
+		static void inplace_decompress_fse(buffer_type& buff){
+			if(buff.empty()) return;
+			buffer_type dt;
+			decompress_fse(dt, buff);
+			buff = dt;
+		}
+		/// LZ4
+		static void inplace_compress_lz4(buffer_type& buff){
+			typedef char * encode_type_ref;
+			buffer_type t;
+			i32 origin = buff.size();
+			/// TODO: cannot compress sizes lt 200 mb
+			t.resize(LZ4_compressBound((int)buff.size())+sizeof(i32));
+			i32 cp = buff.empty() ? 0 : LZ4_compress((const encode_type_ref)&buff[0], (encode_type_ref)&t[sizeof(i32)], origin);			
+			*((i32*)&t[0]) = origin;			
+			t.resize(cp+sizeof(i32));
+
+			///inplace_compress_zlibh(t);
+
+			buff = t;			
+			
+		}
+		static void decompress_lz4(buffer_type &decoded,const buffer_type& input){			
+			typedef char * encode_type_ref;
+			const buffer_type &buff = input;
+			///decompress_zlibh(buff, input);
+			i32 d = *((i32*)&buff[0]) ;
+			decoded.reserve(d);
+			decoded.resize(d);
+			LZ4_decompress_fast((const encode_type_ref)&buff[sizeof(i32)],(encode_type_ref)&decoded[0],d);
+
 		}
 		static void inplace_decompress_lz4(buffer_type& buff){
 			if(buff.empty()) return;
