@@ -616,7 +616,7 @@ public:
 			stats.data_file_length = tt.table_size;
 			stats.block_size = 4096;
 			stats.records = tt.row_count;
-			stats.mean_rec_length =(ha_rows) stats.data_file_length / stats.records;
+			stats.mean_rec_length =(ha_rows) stats.data_file_length / (stats.records+1);
 
 		}
 		

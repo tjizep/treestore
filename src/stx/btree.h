@@ -222,7 +222,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 512,
+			keys_per_page = 256,
 			caches_per_page = 16,
 			max_release = 8
 		};

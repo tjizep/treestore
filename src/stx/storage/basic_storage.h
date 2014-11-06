@@ -103,15 +103,15 @@ namespace stx{
 			*((i32*)&t[0]) = origin;			
 			t.resize(cp+sizeof(i32));
 
-			///inplace_compress_zlibh(t);
+			inplace_compress_zlibh(t);
 
 			buff = t;			
 			
 		}
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& input){			
 			typedef char * encode_type_ref;
-			const buffer_type &buff = input;
-			///decompress_zlibh(buff, input);
+			buffer_type buff ;
+			decompress_zlibh(buff, input);
 			i32 d = *((i32*)&buff[0]) ;
 			decoded.reserve(d);
 			decoded.resize(d);
