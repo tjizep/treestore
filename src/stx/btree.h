@@ -861,7 +861,11 @@ namespace stx
 			/// used to hide things from compiler optimizers which may inline to aggresively
 			NO_INLINE void load_this(pointer_proxy* p) {//
 				/// this is hidden from the MSVC inline optimizer which seems to be overactive
-				(*p) = (*p).get_context()->load(((super*)p)->w);
+				if(has_context()){
+					(*p) = (*p).get_context()->load(((super*)p)->w);
+				}else{
+					printf("no context supplied\n");
+				}
 
 			}
 			/// used to hide things from compiler optimizers which may inline to aggresively
@@ -2238,8 +2242,8 @@ namespace stx
 
 			/// Current key/data slot referenced
 			unsigned short          current_slot;
-			key_type * _keys;
-			data_type * _data;
+			//key_type * _keys;
+			//data_type * _data;
 			/// Friendly to the const_iterator, so it may access the two data items directly.
 			friend class const_iterator;
 
@@ -2262,31 +2266,31 @@ namespace stx
 
 			/// Default-Constructor of a mutable iterator
 			inline iterator()
-				: currnode(NULL_REF), current_slot(0), _data(NULL_REF), _keys(NULL_REF)
+				: currnode(NULL_REF), current_slot(0)//, _data(NULL_REF), _keys(NULL_REF)
 			{ }
 
 			/// Initializing-Constructor of a mutable iterator
 			inline iterator(typename btree::surface_node::ptr l, unsigned short s)
 				: currnode(l), current_slot(s)
 			{ 
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 			}
 
 			/// Initializing-Constructor-pair of a mutable iterator
 			inline iterator(const initializer_pair& initializer)
-				: currnode(initializer.first), current_slot(initializer.second), _data(NULL_REF), _keys(NULL_REF)
+				: currnode(initializer.first), current_slot(initializer.second) //, _data(NULL_REF), _keys(NULL_REF)
 			{ 
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 			}
 
 			/// Copy-constructor from a reverse iterator
 			inline iterator(const reverse_iterator &it)
-				: currnode(it.currnode), current_slot(it.current_slot), _data(NULL_REF), _keys(NULL_REF)
+				: currnode(it.currnode), current_slot(it.current_slot) //, _data(NULL_REF), _keys(NULL_REF)
 			{ 
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 			}
 
 			/// The next to operators have been comented out since they will cause
@@ -2316,17 +2320,20 @@ namespace stx
 			/// Key of the current slot
 			inline const key_type& key() const
 			{
-				return _keys[current_slot];
+				//return _keys[current_slot];
+				return currnode->keys[current_slot];
 			}
 			inline key_type& key()
 			{
-				return _keys[current_slot];
+				//return _keys[current_slot];
+				return currnode->keys[current_slot];
 			}
 
 			/// Writable reference to the current data object
 			inline data_type& data()
 			{				
-				return _data[current_slot];
+				//return _data[current_slot];
+				return currnode->values[current_slot];
 			}
 
 			/// return true if the iterator is valid
@@ -2345,21 +2352,21 @@ namespace stx
 			inline void from_initializer(_MapType& context, const initializer_pair& init)  {
 				currnode.realize(init.first,&context);
 				current_slot = init.second;
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 			}
 
 			inline void from_initializer(const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());
 				current_slot = init.second;
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 			}
 			inline iterator& operator= (const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());
 				current_slot = init.second;
-				_data = &currnode->values[0];
-				_keys = &currnode->keys[0];
+				//_data = &currnode->values[0];
+				//_keys = &currnode->keys[0];
 				return *this;
 			}
 			/// returns true if the iterator is invalid
@@ -2371,8 +2378,8 @@ namespace stx
 			inline void clear() {
 				current_slot = 0;
 				currnode.set_context(NULL);
-				_data = NULL_REF;
-				_keys = NULL_REF;
+				//_data = NULL_REF;
+				//_keys = NULL_REF;
 			}
 
 			/// returns true if the iterator is valid
@@ -2420,8 +2427,8 @@ namespace stx
 					currnode = currnode->next;
 					currnode.sort();
 					current_slot = 0;
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 				}
 				else
 				{
@@ -2452,8 +2459,8 @@ namespace stx
 					currnode = currnode->next;
 					currnode.sort();
 					current_slot = 0;
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 				}
 				else
 				{
@@ -2485,14 +2492,14 @@ namespace stx
 					currnode = currnode->preceding;
 					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is begin()
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 					current_slot = 0;
 				}
 
@@ -2517,15 +2524,15 @@ namespace stx
 					currnode = currnode->preceding;
 					currnode.sort();
 					current_slot = currnode->get_occupants() - 1;
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 				}
 				else
 				{
 					// this is begin()
 					current_slot = 0;
-					_data = &currnode->values[0];
-					_keys = &currnode->keys[0];
+					//_data = &currnode->values[0];
+					//_keys = &currnode->keys[0];
 				}
 
 				return tmp;
@@ -3549,9 +3556,11 @@ namespace stx
 		typedef std::vector<std::pair<stream_address,surface_node*>> _UnlinkNodes;
 		_UnlinkNodes unlink_nodes;
 		void raw_unlink_nodes_2(){
-			this->headsurface.discard(*this);
-			this->last_surface.discard(*this);			
-			this->root.discard(*this);
+			this->headsurface.unlink();
+			this->last_surface.unlink();			
+			this->headsurface.set_context(this);
+			this->last_surface.set_context(this);			
+			this->root.set_context(this);
 			typedef std::vector<node::ptr> _LinkedList;
 			_AddressedNodes::iterator i ;
 			node::ptr t;
@@ -3579,6 +3588,11 @@ namespace stx
 			this->headsurface.discard(*this);
 			this->last_surface.discard(*this);			
 			this->root.discard(*this);
+
+			this->headsurface.set_context(this);
+			this->last_surface.set_context(this);			
+			this->root.set_context(this);
+			
 			typedef std::vector<node::ptr> _LinkedList;
 		
 			node::ptr t;

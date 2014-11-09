@@ -586,7 +586,7 @@ public:
 		if(which & HA_STATUS_NO_LOCK){// - the handler may use outdated info if it can prevent locking the table shared
 			stats.data_file_length = tt.table_size;
 			stats.block_size = 1;
-			stats.records = std::max<stored::_Rid>(2, tt.row_count);
+			stats.records = tt.row_count;
 		}
 
 		if(which & HA_STATUS_TIME) // - only update of stats->update_time required
@@ -616,7 +616,7 @@ public:
 			stats.data_file_length = tt.table_size;
 			stats.block_size = 4096;
 			stats.records = tt.row_count;
-			stats.mean_rec_length =(ha_rows) stats.data_file_length / (stats.records+1);
+			stats.mean_rec_length =(ha_rows) stats.records ? ( stats.data_file_length / (stats.records+1) ) : 1;
 
 		}
 		
@@ -1893,7 +1893,7 @@ namespace ts_info{
 		void run(){
 			
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(15000);
+				Poco::Thread::sleep(25000);
 				perform_active_stats();
 			}
 		}
