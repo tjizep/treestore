@@ -1582,6 +1582,7 @@ namespace stx
 
 			template< typename key_compare >
 			int sort(tree_stats& stats, key_compare key_less){
+				
 				check_cache(keys);
 				int r = 0;
 				if(sorted < node::get_occupants()){
@@ -4278,7 +4279,10 @@ namespace stx
 		/// invalid slot in the last surface of the B+ tree.
 		inline const_iterator end() const
 		{
-			return const_iterator(last_surface, last_surface != NULL_REF ? last_surface->get_occupants() : 0);
+			node::ptr last ;
+			last.set_context((btree*)this);
+			last = last_surface;
+			return const_iterator(last_surface, last.get_where() != 0 ? last->get_occupants() : 0);
 		}
 
 		/// Constructs a read/data-write reverse iterator that points to the first
