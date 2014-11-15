@@ -34,6 +34,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef CO_STORE_CEP20130823
 #define CO_STORE_CEP20130823
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
+
 #include <stx/storage/basic_storage.h>
 #include <bit_symbols.h>
 #include <stx/btree.h>
@@ -359,18 +363,26 @@ namespace stored{
 			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
 		NS_STORAGE::u8* data(){
+			null_check();
 			if(bytes <= _ConstSize){
 				return buf;
 			}
 			return extract_ptr();
 		}
 		const NS_STORAGE::u8* data() const{
+			null_check();
 			if(bytes <= _ConstSize){
 				return buf;
 			}
 			return extract_ptr();
 		}
+		void null_check() const {
+			if((size_t)(this) < 60000ll){
+				::MessageBox(NULL, "Null check", "error",MB_OK);
+			}
+		}
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t nbytes){
+			null_check();
 			using namespace NS_STORAGE;
 			nst::add_buffer_use (nbytes);
 			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
@@ -384,6 +396,7 @@ namespace stored{
 			return nbuf;
 		}
 		NS_STORAGE::u8* _resize_buffer(size_t nbytes){
+			null_check();
 			using namespace NS_STORAGE;
 			NS_STORAGE::u8* r = data();
   			if(nbytes > bytes){
@@ -392,6 +405,7 @@ namespace stored{
 			return r;
 		}
 		void _add( const void * v, size_t count, bool end_term = false){
+			null_check();
 			_BufferSize extra = end_term ? 1 : 0;
 			_resize_buffer(count + extra);
 			memcpy(data(),v,count);
@@ -399,6 +413,7 @@ namespace stored{
 			size+=(_BufferSize)count + extra;
 		}
 		bool less(const Blobule& right) const {
+			null_check();
 			using namespace NS_STORAGE;
 
 			const u8 * lp = data();
@@ -411,6 +426,7 @@ namespace stored{
 			return (size < right.size);
 		}
 		bool greater(const Blobule& right) const {
+			null_check();
 			using namespace NS_STORAGE;
 
 			const u8 * lp = data();
@@ -423,6 +439,7 @@ namespace stored{
 			return (size > right.size);
 		}
 		bool not_equal(const Blobule& right) const {
+			null_check();
 			using namespace NS_STORAGE;
 			if(size != right.size){
 				return true;
@@ -444,12 +461,15 @@ namespace stored{
 			return sizeof(*this);
 		}
 		char * get_value(){
+			null_check();
 			return chars();
 		}
 		const char * get_value() const {
+			null_check();
 			return chars();
 		}
 		char * chars(){
+			
 			return (char *)data();
 		}
 		const char * chars() const {

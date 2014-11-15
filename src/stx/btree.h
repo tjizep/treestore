@@ -57,6 +57,9 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 
 // *** Required Headers from the STL
+#ifdef _MSC_VER
+#include <Windows.h>
+#endif
 #include <sparsehash/internal/sparseconfig.h>
 #include <algorithm>
 #include <functional>
@@ -222,7 +225,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 256,
+			keys_per_page = 512,
 			caches_per_page = 16,
 			max_release = 8
 		};
@@ -860,6 +863,7 @@ namespace stx
 
 			/// used to hide things from compiler optimizers which may inline to aggresively
 			NO_INLINE void load_this(pointer_proxy* p) {//
+				null_check();
 				/// this is hidden from the MSVC inline optimizer which seems to be overactive
 				if(has_context()){
 					(*p) = (*p).get_context()->load(((super*)p)->w);
@@ -870,14 +874,20 @@ namespace stx
 			}
 			/// used to hide things from compiler optimizers which may inline to aggresively
 			NO_INLINE void load_this(pointer_proxy* p,stream_address loader, nst::u16 slot) {//
+				null_check();
 				/// this is hidden from the MSVC inline optimizer which seems to be overactive
 				(*p) = (*p).get_context()->load(((super*)p)->w,loader,slot);
 
 			}
-
+			void null_check() const {
+				if((size_t)(this) < 60000ll){
+					::MessageBox(NULL,"Debug","Null error",MB_OK);
+				}
+			}
 			/// determines if the page should be loaded loads it and change state to loaded.
 			/// The initial state can be any state
 			void load() {
+				null_check();
 				if((*this).ptr == NULL_REF){
 					if(super::w){
 						/// (*this) = (*this).get_context()->load(super::w);
@@ -889,6 +899,7 @@ namespace stx
 			}
 			/// The initial state can be any state
 			void load(stream_address loader, nst::u16 slot) {
+				null_check();
 				if((*this).ptr == NULL_REF){
 					if(super::w){
 						
@@ -901,6 +912,7 @@ namespace stx
 			/// const version of above function - un-consting it for eveel hackery
 			FORCE_INLINE void load() const
 			{
+				null_check();
 				pointer_proxy* p = const_cast<pointer_proxy*>(this);
 				p->load();
 			}
@@ -909,6 +921,7 @@ namespace stx
 			/// and returning the relinquished resource
 			_Loaded* release()
 			{
+				null_check();
 				_Loaded*r = static_cast<_Loaded*>(super::ptr);
 				super::w = 0;
 				super::ptr = 0;
@@ -4279,6 +4292,7 @@ namespace stx
 		/// invalid slot in the last surface of the B+ tree.
 		inline const_iterator end() const
 		{
+			
 			node::ptr last ;
 			last.set_context((btree*)this);
 			last = last_surface;

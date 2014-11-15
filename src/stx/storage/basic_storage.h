@@ -66,6 +66,11 @@ namespace stx{
 			i32 origin = buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
 			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
+			if(cp < 0){
+				cp = buff.size();
+				origin = -cp;
+				memcpy(&t[sizeof(i32)], &buff[0], buff.size());
+			}
 			*((i32*)&t[0]) = (i32)origin;
 			t.resize(cp+sizeof(i32));
 			buff = t;
@@ -75,9 +80,16 @@ namespace stx{
 		static void decompress_fse(buffer_type &decoded,const buffer_type& buff){
 			typedef unsigned char * encode_type_ref;			
 			i32 d = *((i32*)&buff[0]) ;
-			decoded.reserve(d);
-			decoded.resize(d);
-			FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+			if(d < 0){
+				d = -d;
+				decoded.reserve(d);
+				decoded.resize(d);
+				memcpy(&decoded[0], &buff[sizeof(i32)], d);
+			}else{
+				decoded.reserve(d);
+				decoded.resize(d);
+				FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+			}
 		}
 		
 		static void inplace_decompress_fse(buffer_type& buff, buffer_type& dt){
@@ -103,7 +115,8 @@ namespace stx{
 			*((i32*)&t[0]) = origin;			
 			t.resize(cp+sizeof(i32));
 
-			inplace_compress_zlibh(t);
+			/// inplace_compress_zlibh(t);
+			inplace_compress_fse(t);
 
 			buff = t;			
 			
@@ -111,7 +124,8 @@ namespace stx{
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& input){			
 			typedef char * encode_type_ref;
 			buffer_type buff ;
-			decompress_zlibh(buff, input);
+			/// decompress_zlibh(buff, input);
+			decompress_fse(buff, input);
 			i32 d = *((i32*)&buff[0]) ;
 			decoded.reserve(d);
 			decoded.resize(d);
