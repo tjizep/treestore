@@ -1909,6 +1909,6 @@ namespace ts_info{
 	}
 };
 void start_calculating(){
-	ts_info::start();
+	/// ts_info::start();
 }
 
