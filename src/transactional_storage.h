@@ -507,9 +507,10 @@ namespace storage{
 		Poco::UInt64 selector_address;
 		Poco::UInt64 current_address;
 		Poco::UInt64 max_address;
-		Poco::Data::BLOB current_block;
+		Poco::Data::BLOB encoded_block;
 		Poco::UInt64 current_size;
-
+		block_type current_block;
+		block_type compressed_block;
 		template <typename T> Binding<T>* bind(const T& t)
 			/// Convenience function for a more compact Binding creation.
 		{
@@ -519,10 +520,10 @@ namespace storage{
 		void create_statements(){
 
 				insert_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-				*insert_stmt << "INSERT OR REPLACE INTO " << (*this).table_name << " VALUES(?,?,?) ;", bind(current_address), bind(current_size), bind(current_block);
+				*insert_stmt << "INSERT OR REPLACE INTO " << (*this).table_name << " VALUES(?,?,?) ;", bind(current_address), bind(current_size), bind(encoded_block);
 
 				get_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-				*get_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 = ?;" , into(current_address), into(current_size), into(current_block) , bind(selector_address);
+				*get_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 = ?;" , into(current_address), into(current_size), into(encoded_block) , bind(selector_address);
 
 				max_address = 0;
 
@@ -542,17 +543,18 @@ namespace storage{
 			}
 			return *_session;
 		}
-		void add_buffer(const address_type& w, block_type& block){
+		void add_buffer(const address_type& w, const block_type& block){
 			current_address = w;
 			/// assumes block_type is some form of stl vector container
 			current_size = block.size()*sizeof(typename block_type::value_type);
-			current_block.clear();
+			encoded_block.clear();
 			if(!block.empty()){
 
 				//compress_block
-
-
-				current_block.assignRaw((const char *)&block[0], (size_t)current_size);
+				compressed_block = block;
+				inplace_compress_zlibh(compressed_block);
+				current_size = compressed_block.size()*sizeof(typename block_type::value_type);
+				encoded_block.assignRaw((const char *)&compressed_block[0], (size_t)current_size);
 			}
 
 			insert_stmt->execute();
@@ -568,7 +570,10 @@ namespace storage{
 			selector_address = w;
 			current_address = 0;
 			get_stmt->execute();
-
+			current_block.clear();
+			if(current_address == selector_address){
+				decompress_zlibh(current_block, encoded_block.content());
+			}
 			return (current_address == selector_address); /// returns true if a record was retrieved
 
 		}

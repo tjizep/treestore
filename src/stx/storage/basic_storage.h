@@ -38,8 +38,8 @@ namespace stx{
 			buff = t;
 			
 		}
-		
-		static void decompress_zlibh(buffer_type &decoded,const buffer_type& buff){
+		template<typename _VectorType>
+		static void decompress_zlibh(buffer_type &decoded,const _VectorType& buff){
 			typedef char * encode_type_ref;			
 			i32 d = *((i32*)&buff[0]) ;
 			decoded.reserve(d);
@@ -76,8 +76,8 @@ namespace stx{
 			buff = t;
 			
 		}
-		
-		static void decompress_fse(buffer_type &decoded,const buffer_type& buff){
+		template<typename _VectorType>
+		static void decompress_fse(buffer_type &decoded,const _VectorType& buff){
 			typedef unsigned char * encode_type_ref;			
 			i32 d = *((i32*)&buff[0]) ;
 			if(d < 0){
@@ -116,16 +116,16 @@ namespace stx{
 			t.resize(cp+sizeof(i32));
 
 			/// inplace_compress_zlibh(t);
-			inplace_compress_fse(t);
+			/// inplace_compress_fse(t);
 
 			buff = t;			
 			
 		}
-		static void decompress_lz4(buffer_type &decoded,const buffer_type& input){			
+		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
 			typedef char * encode_type_ref;
-			buffer_type buff ;
+			/// buffer_type buff ;
 			/// decompress_zlibh(buff, input);
-			decompress_fse(buff, input);
+			/// decompress_fse(buff, input);
 			i32 d = *((i32*)&buff[0]) ;
 			decoded.reserve(d);
 			decoded.resize(d);

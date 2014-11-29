@@ -1969,6 +1969,7 @@ namespace tree_stored{
 				//reduce_use();
 			}
 			_row_count++;
+			
 		}
 
 		void erase(stored::_Rid rid, TABLE* table){

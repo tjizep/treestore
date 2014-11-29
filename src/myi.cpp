@@ -189,18 +189,54 @@ namespace tree_stored{
 
 			}
 		}
+		void own_reduce_col_trees(){
+			DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+				if((*t).second)
+					(*t).second->reduce_use_collum_trees();
+				else
+					printf("table entry %s is NULL\n", (*t).first.c_str());
+			}
+		}
+		void own_reduce_index_trees(){
+			DBUG_PRINT("info",("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
+			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+				if((*t).second)
+					(*t).second->reduce_use_indexes();
+				else
+					printf("table entry %s is NULL\n", (*t).first.c_str());
+			}
+		}
+		void own_reduce_col_caches(){
+			DBUG_PRINT("info", ("reducing idle thread collum caches %.4g MiB\n",(double)calc_total_use()/(1024.0*1024.0)));
+			typedef std::multimap<nst::u64, tree_stored::tree_table::ptr> _LastUsedTimes;
+			_LastUsedTimes lru;
+			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
+				if((*t).second){
+					DBUG_PRINT("info",("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time()));
+					lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
+				}else
+					DBUG_PRINT("info", ("table entry %s is NULL\n", (*t).first.c_str()));
+			}
+			size_t pos = 0;
+			size_t factor =(size_t)(lru.size() *0.55);
+			for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end() && pos < factor;++l,++pos){
+				(*l).second->reduce_use_collum_caches();
+
+			}
+		}
 		public:
+		
+		void own_reduce(){
+			own_reduce_col_trees();
+			own_reduce_index_trees();
+			own_reduce_col_caches();
+		}
 
 		void reduce_col_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					if((*t).second)
-						(*t).second->reduce_use_collum_trees();
-					else
-						printf("table entry %s is NULL\n", (*t).first.c_str());
-				}
+				own_reduce_col_trees();
 			}
 
 		}
@@ -227,35 +263,14 @@ namespace tree_stored{
 		void reduce_index_trees(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				DBUG_PRINT("info",("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
-				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					if((*t).second)
-						(*t).second->reduce_use_indexes();
-					else
-						printf("table entry %s is NULL\n", (*t).first.c_str());
-				}
+				own_reduce_index_trees();
 			}
 		}
 
 		void reduce_col_caches(){
 			synchronized _s(p2_lock);
 			if(!locks){
-				DBUG_PRINT("info", ("reducing idle thread collum caches %.4g MiB\n",(double)calc_total_use()/(1024.0*1024.0)));
-				typedef std::multimap<nst::u64, tree_stored::tree_table::ptr> _LastUsedTimes;
-				_LastUsedTimes lru;
-				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
-					if((*t).second){
-						DBUG_PRINT("info",("adding table entry %s to LRU at %lld\n", (*t).first.c_str(), (nst::lld)(*t).second->get_last_lock_time()));
-						lru.insert(std::make_pair((*t).second->get_last_lock_time(), (*t).second));
-					}else
-						DBUG_PRINT("info", ("table entry %s is NULL\n", (*t).first.c_str()));
-				}
-				size_t pos = 0;
-				size_t factor =(size_t)(lru.size() *0.55);
-				for(_LastUsedTimes::iterator l = lru.begin(); l != lru.end() && pos < factor;++l,++pos){
-					(*l).second->reduce_use_collum_caches();
-
-				}
+				own_reduce_col_caches();
 			}
 
 		}
@@ -360,7 +375,7 @@ public:
 				}
 		}
 	}
-private:
+
 	void reduce(){
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
@@ -1040,7 +1055,9 @@ public:
 
 			if(t1 == Item::FIELD_ITEM){
 				switch(t2){
-				case Item::STRING_ITEM: case Item::INT_ITEM: case Item::REAL_ITEM:case Item::VARBIN_ITEM:case Item::DECIMAL_ITEM:{
+				case Item::STRING_ITEM: case Item::INT_ITEM: 
+				case Item::REAL_ITEM:case Item::VARBIN_ITEM:
+				case Item::DECIMAL_ITEM:{
 
 					const Item_field * fi = (const Item_field*)i0;
 
@@ -1195,7 +1212,9 @@ public:
 		if (table->next_number_field && buf == table->record[0])
 			update_auto_increment();
 		get_tree_table()->write((*this).table);
-
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		return 0;
 	}
 
@@ -1238,6 +1257,9 @@ public:
 				}
 			}
 		}
+		if(stx::memory_low_state){
+			st.reduce();
+		}
 		return 0;
 	}
 
@@ -1274,7 +1296,9 @@ public:
 
 		selected = get_tree_table()->create_output_selection(table);
 		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
-
+		if(stx::memory_low_state){
+			st.reduce();
+		}
 		return 0;
 	}
 
@@ -1396,6 +1420,9 @@ public:
 				resolve_selection_from_index(keynr,current_index);
 			//if(HA_READ_KEY_EXACT != find_flag)
 
+		}
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
 		}
 		DBUG_RETURN(r);
 	}
@@ -1789,14 +1816,25 @@ namespace ts_cleanup{
 	public:
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
+			nst::u64 last_check_size = calc_total_use();
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(1000);
-				if(calc_total_use() > treestore_max_mem_use){
-					stx::memory_low_state = true;
-					reduce_thread_usage();
+				Poco::Thread::sleep(100);
+				if(stx::memory_low_state){
+					if(btree_totl_used < (last_check_size * 0.65) ){
+						stx::memory_low_state = false;						
+					}else{
+						reduce_thread_usage();
+					}
 				}else{
-					stx::memory_low_state = false;
+					if(calc_total_use() > treestore_max_mem_use*0.95){						
+						if(btree_totl_used > 0.1 * calc_total_use()){
+							last_check_size = btree_totl_used;
+							stx::memory_low_state = true;
+						}
+						reduce_thread_usage();
+					}
 				}
+
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>2ull)){
 					printf
 					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"

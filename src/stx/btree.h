@@ -225,8 +225,8 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 2048,
-			caches_per_page = 32,
+			keys_per_page = 512,
+			caches_per_page = 16,
 			max_release = 8
 		};
 	};
@@ -607,6 +607,7 @@ namespace stx
 						ptr->refs--;
 					
 					//}
+					
 				}
 			}
 			inline void ref(typename stx::node_ref* ptr){
@@ -658,7 +659,15 @@ namespace stx
 			inline void unref(){
 
 				unref(super::ptr);
-
+				if(ptr!=NULL_REF){
+					if(ptr->refs == 0 && ptr->is_orphaned()){
+						if(has_context()){
+							get_context()->free_node(rget(),get_where());
+						}else{
+							printf("context missing\n");
+						}
+					}
+				}
 			}
 
 			/// called to set the state and members correcly when member ptr is marked as created
@@ -1130,14 +1139,16 @@ namespace stx
 			/// where the occupant count varies over time the size stays the same
 
 			storage::u16  occupants;
-			bool can_interp;
-			/// iterpolator cached keys
-			key_type        int_lower;
-			key_type        int_upper;
+			
 			/// cpu cache keys
 			key_type        cached[cacheslotmax+1];
 
 		protected:
+			/// iterpolator cached keys
+			key_type        int_lower;
+			key_type        int_upper;			
+			bool can_interp;
+
 			/// populate cache
 
 			template<typename key_type>
@@ -1251,6 +1262,7 @@ namespace stx
 			}
 			template<typename key_interpolator>
 			void initialize_interpolator(key_interpolator interp, const key_type* keys){
+				can_interp = false;
 				int o = get_occupants() ;
 				if(o > 0){
 					int_lower = keys[0];
@@ -1383,6 +1395,7 @@ namespace stx
 				return node::find_lower(key_less, interp, keys, key);
 
 			}
+			
 			/// decodes a page from given storage and buffer and puts it in slots
 			/// the buffer type is expected to be some sort of vector although no strict
 			/// checking is performed
@@ -1547,6 +1560,17 @@ namespace stx
 			{
 				return (node::get_occupants() < minsurfaces);
 			}
+			
+			///interpolation update
+
+			template<typename key_interpolator>
+			void initialize_interpolator(key_interpolator interp, const key_type* keys){
+				can_interp = false;
+				int o = get_occupants() ;
+				if(sorted == o && o > 0){
+					node::initialize_interpolator(interp, keys);
+				}
+			}
 
 			template< typename key_compare, typename key_interpolator >
 			inline int find_lower(tree_stats& stats, key_compare key_less, key_interpolator interp, const key_type& key) const
@@ -1556,7 +1580,7 @@ namespace stx
 				return node::find_lower(key_less, interp, keys, key);//a_refs < 4
 
 			}
-
+			
 			/// assignment
 			surface_node& operator=(const surface_node& right){
 				std::copy(right.keys, &right.keys[right.get_occupants()], keys);
@@ -3693,11 +3717,12 @@ namespace stx
 				if((*this).stats.surface_use + (*this).stats.interior_use > 0){
 					if((*this).get_storage()->is_readonly()){
 						unlink_local_nodes_2();			
-						local_reduce_free();
+						//local_reduce_free();
 					}else{
 						unlink_local_nodes();
-						local_free();						
+						//local_free();						
 					}
+					local_reduce_free();
 				}
 				release_shared();
 				if(save_tot > btree_totl_used)
@@ -3987,9 +4012,15 @@ namespace stx
 
 				
 				surface_node * removed = ln;
-				
+				if(removed->is_orphaned()){
+					add_btree_totl_used (-(ptrdiff_t)sizeof(surface_node));
+				}else{
+					change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
+				}
 				liberator.liberate(removed);
-				change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
+				
+				
+				
 				stats.leaves--;
 			}
 
@@ -4043,9 +4074,14 @@ namespace stx
 				}
 				typename interior_node::alloc_type a(interior_node_allocator());
 				interior_node * removed = n;
+				if(removed->is_orphaned()){
+					add_btree_totl_used (-(ptrdiff_t)sizeof(interior_node));
+				}else{
+					change_use(-(ptrdiff_t)sizeof(interior_node),-(ptrdiff_t)sizeof(interior_node),0);
+				}
 				a.destroy(removed);
 				a.deallocate(removed, 1);
-				change_use(-(ptrdiff_t)sizeof(interior_node),-(ptrdiff_t)sizeof(interior_node),0);
+				
 				stats.interiornodes--;
 			}
 
@@ -4277,8 +4313,9 @@ namespace stx
 		inline iterator end()
 		{
 			check_low_memory_state();
-
-			return iterator(last_surface, last_surface != NULL_REF ? last_surface->get_occupants() : 0);
+			surface_node::ptr last = last_surface;
+			last.set_context(this);
+			return iterator(last, last != NULL_REF ? last->get_occupants() : 0);
 		}
 
 		/// Constructs a read-only constant iterator that points to the first slot
@@ -4293,10 +4330,10 @@ namespace stx
 		inline const_iterator end() const
 		{
 			
-			node::ptr last ;
+			node::ptr last = last_surface;
 			last.set_context((btree*)this);
 			last = last_surface;
-			return const_iterator(last_surface, last.get_where() != 0 ? last->get_occupants() : 0);
+			return const_iterator(last, last.get_where() != 0 ? last->get_occupants() : 0);
 		}
 
 		/// Constructs a read/data-write reverse iterator that points to the first
@@ -5022,7 +5059,7 @@ namespace stx
 
 				if
 				(	//surface->sorted==0 &&
-					false && 
+					/// false && 
 					!allow_duplicates &&
 					!surface->isfull()
 				)
