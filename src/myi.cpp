@@ -1826,7 +1826,7 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = 0.4;
+			double tree_factor = treestore_column_cache ? 0.1 : 0.4;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(250);
 				

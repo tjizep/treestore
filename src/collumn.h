@@ -604,7 +604,7 @@ namespace collums{
 					
 					(*cache).clear();
 					if(calc_total_use() + bytes_used > treestore_max_mem_use){
-						//printf("ignoring col cache for %s\n", storage.get_name().c_str());
+						printf("ignoring col cache for %s\n", storage.get_name().c_str());
 						(*cache).unload();
 						return false;
 					}
