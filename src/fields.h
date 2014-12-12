@@ -184,7 +184,7 @@ namespace stored{
 
 		explicit IntTypeStored(_IntType i):value(i){
 		}
-		IntTypeStored():value(0){
+		IntTypeStored():value(0) { 
 		}
 		IntTypeStored (const _IntType& init):value(init){
 		}
@@ -242,7 +242,7 @@ namespace stored{
 		inline void set_value(_FType nv) {
 			value = nv;
 		}
-		FTypeStored() : value((_FType)0.0f){
+		FTypeStored() : value((_FType)0.0f) { 
 		}
 		FTypeStored (const _FType& init):value(init){
 		}
@@ -384,12 +384,11 @@ namespace stored{
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t nbytes){
 			null_check();
 			using namespace NS_STORAGE;
-			nst::add_buffer_use (nbytes);
-			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8[nbytes];
+			
+			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8 *)allocation_pool.allocate(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
 			if(bytes > _ConstSize){
-				nst::remove_buffer_use  (bytes);
-				delete r;
+				allocation_pool.free(r,bytes);				
 			}
 			memcpy(buf, &nbuf, sizeof(u8*));
 			bytes = (u32)nbytes;
@@ -536,11 +535,14 @@ namespace stored{
 			//memset(buf,0,sizeof(buf));
 			buf[0] = 0;
 		}
-		~Blobule(){
-			if(bytes > _ConstSize){
-				nst::remove_buffer_use  (bytes);
-				delete data();
+		inline ~Blobule(){
+			if(bytes > _ConstSize){				
+				allocation_pool.free(data(), bytes)	;	
 			}
+			
+			/// bytes = _ConstSize;
+			/// size = 0;
+			/// buf[0] = 0;
 		}
 
 		Blobule (const Blobule& init)
@@ -640,14 +642,19 @@ namespace stored{
 		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
+			size = 0;
 			if(reader != buffer.end()){
-				size = leb128::read_signed(reader);			
-				_resize_buffer(size);
+				//size = *reader;
+				size = leb128::read_signed(reader);				
 				if(size <= 8){
+					//++reader;
 					const nst::u8 * d = &(*reader);	
 					*((nst::u64*)data()) = *((const nst::u64*)d);
 					
 				}else{
+					
+					_resize_buffer(size);
+				
 					memcpy(data(),&(*reader),size);
 				}
 				//const u8 * end = data()+size;
@@ -690,7 +697,7 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
 	typedef stored::Blobule<false, 22> BlobStored;
-	typedef stored::Blobule<true, 14> VarCharStored;
+	typedef stored::Blobule<true, 16> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -958,9 +965,10 @@ namespace stored{
 		~DynamicKey(){
 			if(bs==sizeof(_Data)){
 				remove_btree_totl_used (get_Data().capacity());
-				get_Data().~_Data();
-				bs = 0;
+				get_Data().~_Data();				
 			}
+			bs = 0;
+			row = 0;
 		}
 
 		DynamicKey():
@@ -1395,7 +1403,8 @@ namespace stored{
 		}
 
 		~PrimitiveDynamicKey(){
-
+			row = 0;
+			data = 0;
 		}
 
 		PrimitiveDynamicKey():

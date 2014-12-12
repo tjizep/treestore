@@ -38,7 +38,7 @@ static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 
 long long calc_total_use(){
-	treestore_current_mem_use =  NS_STORAGE::total_use+btree_totl_used+total_cache_size;
+	treestore_current_mem_use =  NS_STORAGE::total_use+allocation_pool.get_total_allocated()+total_cache_size;
 	return treestore_current_mem_use;
 }
 void print_read_lookups();
@@ -230,7 +230,9 @@ namespace tree_stored{
 		void own_reduce(){
 			own_reduce_col_trees();
 			own_reduce_index_trees();
-			own_reduce_col_caches();
+			if(calc_total_use() > treestore_max_mem_use){
+				own_reduce_col_caches();
+			}
 		}
 
 		void reduce_col_trees(){
@@ -283,7 +285,7 @@ namespace tree_stored{
 		}
 		void check_use_col_caches(){
 
-			if(btree_totl_used < (treestore_max_mem_use*0.1)){				
+			if(calc_total_use() > treestore_max_mem_use){
 				reduce_col_caches();
 			}
 
@@ -357,7 +359,7 @@ public:
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
 		// return;
-		if(calc_total_use() > treestore_max_mem_use){
+		if(stx::memory_low_state){
 			(*this).reduce();
 		}
 
@@ -417,7 +419,7 @@ public:
 static static_threads st;
 
 void reduce_thread_usage(){
-	if(calc_total_use() > treestore_max_mem_use){
+	if(stx::memory_low_state){
 		st.check_use();
 		//reduce_info_tables();	
 		
@@ -435,7 +437,7 @@ void reduce_thread_usage(){
 			st.reduce_all();
 		}
 	}
-	if(nst::buffer_use > treestore_max_mem_use*0.75){			
+	if(calc_total_use()  > treestore_max_mem_use){			
 		/// time to reduce some blocks
 		stored::reduce_all();
 			
@@ -930,26 +932,31 @@ public:
 		}
 		bool writer = false;
 
-
+		bool high_mem = calc_total_use() > treestore_max_mem_use ;
 		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
 		if(total_locks==0){
 			nst::synchronized s(mut_total_locks);
 			if(total_locks==0){
-				bool high_mem = calc_total_use() > treestore_max_mem_use ;
+				
 				
 				if
 				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max			
+				||	high_mem
 				)
 				{					
 					st.check_journal();/// function releases all idle reading transaction locks
-					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage									
+					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage		
+					
+				}
+				if(high_mem){
+					stored::reduce_all();
 				}
 				
 			}
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
 			printf
-			(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+			(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g pool %.4g MB\n"
 			,	lock_type == F_UNLCK ? "-":"+"
 			,	table->s->normalized_path.str
 			,	(double)calc_total_use()/units::MB
@@ -957,6 +964,7 @@ public:
 			,	(double)nst::col_use/units::MB
 			,	(double)btree_totl_used/units::MB
 			,	(double)total_cache_size/units::MB
+			,	(double)allocation_pool.get_total_allocated()/units::MB
 			);
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
 			{
@@ -993,15 +1001,19 @@ public:
 				
 				/// for testing
 				//st.reduce_all();
-
+				if(high_mem){
+					stored::reduce_all();
+				}
+				
 				printf
-				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
+				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g pool %.4g MB\n"
 				,	"transaction complete"
 				,	(double)calc_total_use()/units::MB
 				,	(double)nst::buffer_use/units::MB
 				,	(double)nst::col_use/units::MB
 				,	(double)btree_totl_used/units::MB
 				,	(double)total_cache_size/units::MB
+				,	(double)allocation_pool.get_total_allocated()/units::MB
 				);
 				DBUG_PRINT("info",("transaction finalized : %s\n",table->alias));
 
@@ -1212,9 +1224,6 @@ public:
 		if (table->next_number_field && buf == table->record[0])
 			update_auto_increment();
 		get_tree_table()->write((*this).table);
-		if(stx::memory_low_state){
-			get_thread()->own_reduce();
-		}
 		return 0;
 	}
 
@@ -1817,34 +1826,30 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
+			double tree_factor = 0.4;
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(100);
-				if(stx::memory_low_state){
-					if(btree_totl_used < (last_check_size * 0.65) ){
-						stx::memory_low_state = false;						
-					}else{
-						reduce_thread_usage();
-					}
-				}else{
-					if(calc_total_use() > treestore_max_mem_use*0.95){						
-						if(btree_totl_used > 0.1 * calc_total_use()){
-							last_check_size = btree_totl_used;
-							stx::memory_low_state = true;
-						}
-						reduce_thread_usage();
-					}
+				Poco::Thread::sleep(250);
+				
+				nst::u64 pool_used = allocation_pool.get_used();
+				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
+				stx::memory_low_state = allocation_pool.is_depleted();
+				if(calc_total_use() > treestore_max_mem_use){																	
+					reduce_thread_usage();
+				}else{					
 				}
-
+				
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>2ull)){
 					printf
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g MB\n"
-					,	"oo"
-					,	"global"
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g    pool: %.4g <> %.4g MB\n"
+					,	"o"
+					,	""
 					,	(double)calc_total_use()/units::MB
 					,	(double)nst::buffer_use/units::MB
 					,	(double)nst::col_use/units::MB
 					,	(double)btree_totl_used/units::MB
 					,	(double)total_cache_size/units::MB
+					,	(double)pool_used/units::MB
+					,	(double)allocation_pool.get_allocated()/units::MB
 					);
 					last_print_size = calc_total_use();
 				}
@@ -1950,3 +1955,5 @@ void start_calculating(){
 	/// ts_info::start();
 }
 
+#include "pool.h"
+nst::allocation::pool allocation_pool(2*1024ll*1024ll*1024ll);

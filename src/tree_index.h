@@ -191,7 +191,9 @@ namespace tree_stored{
 					buffer.reserve(MAX_KEY_BUFFER);
 
 				buffer.push_back(k);
-
+				if(buffer.size() > MIN_KEY_BUFFER){
+					if( stx::memory_low_state ) return false;
+				}
 				return buffer.size() < MAX_KEY_BUFFER;
 			}
 
@@ -484,7 +486,7 @@ namespace tree_stored{
 		}
 		void cache_it(stored::index_iterator_interface& io){
 			if(unique){
-				cache.set_hash_size((nst::u32)index.get_size()*2);
+				
 				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 			}
 
@@ -547,6 +549,7 @@ namespace tree_stored{
 
 		void begin(bool read,bool shared){
 			index.begin(read,shared);
+			cache.set_hash_size((nst::u32)index.get_size()*1.5);
 		}
 
 		void commit1_asynch(){

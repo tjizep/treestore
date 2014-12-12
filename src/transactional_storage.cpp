@@ -29,6 +29,7 @@ namespace storage{
 	}
 
 	extern void add_buffer_use(long long added){
+		if(added==0) return;
 		syncronized l(_c_lock);
 		total_use += added;
 		buffer_use += added;

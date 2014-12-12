@@ -330,10 +330,14 @@ namespace collums{
 			nst::i64 users;
 
 			void resize(nst::i64 size){
+				nst::u64 use_begin = calc_use();
+				
 				data.resize(size);
 				flags.resize(size);
 				rows_cached = (stored::_Rid)size;
 				_data = & data[0];
+				NS_STORAGE::remove_col_use(use_begin);
+				NS_STORAGE::add_col_use(calc_use());
 			}
 			void invalidate(_Rid row){
 				nst::u8 & flags = (*this).flags[row];
@@ -344,11 +348,14 @@ namespace collums{
 				_temp.nullify(flags);
 			}
 			void clear(){
+				nst::u64 use_begin = calc_use();
                 _Flags f;
                 _Cache c;
 				data.swap(c);
 				flags.swap(f);
 				encoded.clear();
+				nst::remove_col_use(use_begin);
+				NS_STORAGE::add_col_use(calc_use());
 			}
 			void encode(_Rid row){
 				encoded.set(row, data[row]);
@@ -407,16 +414,11 @@ namespace collums{
 				_Rid prev = 0;
 
 				nst::u64 nulls = 0;
-
+				nst::u64 use_begin = calc_use();
 				for(c = col.begin(); c != e; ++c){
 					kv = c.key().get_value();
 
-					/// nullify the gaps
-					if(stx::memory_low_state){
-						//NS_STORAGE::add_col_use(calc_use());
-						unload();
-						return;						
-					}
+					/// nullify the gaps					
 					if((*this).size() > kv){
 						if(kv > 0){
 							for(_Rid n = prev; n < kv-1; ++n){
@@ -437,23 +439,27 @@ namespace collums{
 						++nulls;
 					}
 				}
+				
 				if(nulls == 0){
-                    _Flags f;
-					nst::remove_col_use(calc_use());
+                    _Flags f;					
 					(*this).flags.swap(f);
-					nst::add_col_use(calc_use());
+					
 				}
+				nst::remove_col_use(use_begin);
+				nst::add_col_use(calc_use());
 			}
 			void finish(_ColMap &col,const std::string &name){
 				const _Rid CKECK = 1000000;
-				NS_STORAGE::remove_col_use(calc_use());
+				
 				rows_cached = get_v_row_count(col);
 				nst::i64 use_before = rows_cached * sizeof(_StoredEntry);
 				nst::u64 used_by_encoding = 0;
 				typename _ColMap::iterator e = col.end();
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
+				nst::u64 use_begin = calc_use();
 				if(treestore_column_encoded){
+					
 					bool ok = true;
 					for(c = col.begin(); c != e; ++c){
 						_Rid r = c.key().get_value();
@@ -461,8 +467,7 @@ namespace collums{
 						encoded.total_bytes_allocated();
 						++ctr;
 
-						if(stx::memory_low_state || (used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/5)){
-							//NS_STORAGE::add_col_use(calc_use());
+						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/2){							
 							unload();
 							return;
 						}
@@ -480,32 +485,31 @@ namespace collums{
 						encoded.set(r, c.data());
 						
 					}
+
 					if(calc_use() < use_before ){
+						
 						encoded.optimize();
+						NS_STORAGE::remove_col_use(use_begin);
+						NS_STORAGE::add_col_use(calc_use());
 						printf("reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
 					}else{
-						printf("did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+						printf("did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);						
 						encoded.clear();
 						resize(rows_cached);
 						load_data(col);
 					}
 
-				}else{
-					encoded.clear();
-					if(stx::memory_low_state){
-						//NS_STORAGE::add_col_use(calc_use());
-						unload();
-						return;
-					}else{
-						resize(rows_cached);
-						load_data(col);
-						if(treestore_column_encoded)
-							printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-						else
-							printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-					}
+				}else{					
+					encoded.clear();					
+					resize(rows_cached);
+					load_data(col);
+					if(treestore_column_encoded)
+						printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					else
+						printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					
 				}
-				NS_STORAGE::add_col_use(calc_use());
+				
 
 			}
 
@@ -527,14 +531,15 @@ namespace collums{
 			void unload(){
 				nst::synchronized _l(lock);
 				//printf("unloading col cache\n");
-				NS_STORAGE::remove_col_use(calc_use());
+				nst::u64 use_begin = calc_use();
+				
 				loaded = false;
 				available = false;
                 _Cache c;
                 _Flags f;
 				data.swap(c);
 				flags.swap(f);
-
+				NS_STORAGE::remove_col_use(use_begin);
 			}
 		};
 
@@ -596,7 +601,7 @@ namespace collums{
 
 					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
 					nst::u64 bytes_used = cached * (sizeof(_StoredEntry) + 1);
-					nst::remove_col_use((*cache).calc_use());
+					
 					(*cache).clear();
 					if(calc_total_use() + bytes_used > treestore_max_mem_use){
 						//printf("ignoring col cache for %s\n", storage.get_name().c_str());

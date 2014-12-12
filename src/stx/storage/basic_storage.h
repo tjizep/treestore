@@ -40,11 +40,16 @@ namespace stx{
 		}
 		template<typename _VectorType>
 		static void decompress_zlibh(buffer_type &decoded,const _VectorType& buff){
-			typedef char * encode_type_ref;			
-			i32 d = *((i32*)&buff[0]) ;
-			decoded.reserve(d);
-			decoded.resize(d);
-			ZLIBH_decompress((encode_type_ref)&decoded[0],(const encode_type_ref)&buff[sizeof(i32)]);
+			if(buff.empty()){
+				decoded.clear();
+				
+			}else{
+				typedef char * encode_type_ref;			
+				i32 d = *((i32*)&buff[0]) ;
+				decoded.reserve(d);
+				decoded.resize(d);
+				ZLIBH_decompress((encode_type_ref)&decoded[0],(const encode_type_ref)&buff[sizeof(i32)]);
+			}
 		}
 		
 		static void inplace_decompress_zlibh(buffer_type& buff, buffer_type& dt){
@@ -78,17 +83,21 @@ namespace stx{
 		}
 		template<typename _VectorType>
 		static void decompress_fse(buffer_type &decoded,const _VectorType& buff){
-			typedef unsigned char * encode_type_ref;			
-			i32 d = *((i32*)&buff[0]) ;
-			if(d < 0){
-				d = -d;
-				decoded.reserve(d);
-				decoded.resize(d);
-				memcpy(&decoded[0], &buff[sizeof(i32)], d);
+			if(buff.empty()){
+				decoded.clear();
 			}else{
-				decoded.reserve(d);
-				decoded.resize(d);
-				FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+				typedef unsigned char * encode_type_ref;			
+				i32 d = *((i32*)&buff[0]) ;
+				if(d < 0){
+					d = -d;
+					decoded.reserve(d);
+					decoded.resize(d);
+					memcpy(&decoded[0], &buff[sizeof(i32)], d);
+				}else{
+					decoded.reserve(d);
+					decoded.resize(d);
+					FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+				}
 			}
 		}
 		
@@ -122,14 +131,18 @@ namespace stx{
 			
 		}
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
-			typedef char * encode_type_ref;
-			/// buffer_type buff ;
-			/// decompress_zlibh(buff, input);
-			/// decompress_fse(buff, input);
-			i32 d = *((i32*)&buff[0]) ;
-			decoded.reserve(d);
-			decoded.resize(d);
-			LZ4_decompress_fast((const encode_type_ref)&buff[sizeof(i32)],(encode_type_ref)&decoded[0],d);
+			if(buff.empty()){
+				decoded.clear();
+			}else{
+				typedef char * encode_type_ref;
+				/// buffer_type buff ;
+				/// decompress_zlibh(buff, input);
+				/// decompress_fse(buff, input);
+				i32 d = *((i32*)&buff[0]) ;
+				decoded.reserve(d);
+				decoded.resize(d);
+				LZ4_decompress_fast((const encode_type_ref)&buff[sizeof(i32)],(encode_type_ref)&decoded[0],d);
+			}
 
 		}
 		static void inplace_decompress_lz4(buffer_type& buff){
