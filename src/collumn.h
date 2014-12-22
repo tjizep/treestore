@@ -48,43 +48,7 @@ namespace nst = NS_STORAGE;
 namespace collums{
 	using namespace iterator;
 	typedef stored::_Rid _Rid;
-	
-	typedef std::vector<nst::u8> _RowData;
-
-	struct _LockedRowData{
-		std::vector<_RowData> rows;
-		Poco::Mutex lock;
-	};
-
-	struct _RowDataCache{
-		typedef std::shared_ptr<_LockedRowData> _SharedRowData;
-		typedef std::unordered_map<std::string,_SharedRowData> _NamedRowData;
-
-		_NamedRowData cache;
-		Poco::Mutex lock;
-
-		_LockedRowData* get_for_table(const std::string& name){
-			nst::synchronized sync(lock);
-			_SharedRowData result;
-			_NamedRowData::iterator n = cache.find(name);
-			if(n != cache.end()){
-				result = (*n).second;
-			}else{
-				result = std::make_shared<_LockedRowData>();
-				cache[name] = result;
-			}
-			return result.get();
-		}
-		void remove(const std::string& name){
-			nst::synchronized sync(lock);
-			_LockedRowData* rows = get_for_table(name);
-			nst::synchronized sync_rows(rows->lock);
-			rows->rows.clear();
-		}
-	};
-
-	extern _LockedRowData* get_locked_rows(const std::string& name);
-
+		
 	extern void set_loading_data(const std::string& name, int loading);
 	extern int get_loading_data(const std::string& name);
 
@@ -303,62 +267,88 @@ namespace collums{
 
 
 		};
-		typedef std::vector<_StoredEntry> _Cache;
+		typedef std::vector<_StoredEntry, sta::col_tracker<_StoredEntry> > _Cache;
 
-		typedef std::vector<nst::u8> _Flags;
-
-		struct _CacheEntry{
+		typedef std::vector<nst::u8, sta::col_tracker<nst::u8> > _Flags;
+		struct _CachePage{
+		public:
 			typedef stored::standard_entropy_coder<_Stored> _Encoded;
-			_CacheEntry() : available(false), loaded(false),_data(nullptr),rows_cached(0),density(1),users(0){};//
-			~_CacheEntry(){
-				NS_STORAGE::remove_col_use(calc_use());
+			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0){} ;//
+			~_CachePage(){
+				
 				rows_cached = 0;
+				rows_start = 0;
 			}
+		
+			
+			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0){				
+
+				(*this) = right;
+			}
+			_CachePage& operator=(const _CachePage& right){
+				encoded = right.encoded;
+				data = right.data;
+				_temp = right._temp;
+				rows_cached = right.rows_cached;
+				rows_start = right.rows_start;
+				density = right.density;
+				users = right.users;
+				available = right.available;
+				loaded = right.loaded;
+				flags = right.flags;
+				
+				_data = data.empty()? nullptr : & data[0];
+				return (*this);
+			}
+		public:
 			bool available;
 			bool loaded;
-
+			Poco::Mutex lock;
 			_Flags flags;
 		private:
+			
 			_Encoded encoded;
 			_Cache data;
 			_StoredEntry * _data;
 			_StoredEntry _temp;
 			_Rid rows_cached;
+			_Rid rows_start;
 		public:
-            Poco::Mutex lock;
+            
 			_Rid density;
 			nst::i64 users;
 
 			void resize(nst::i64 size){
-				nst::u64 use_begin = calc_use();
+				
 				
 				data.resize(size);
 				flags.resize(size);
 				rows_cached = (stored::_Rid)size;
-				_data = & data[0];
-				NS_STORAGE::remove_col_use(use_begin);
-				NS_STORAGE::add_col_use(calc_use());
+				_data = data.empty()? nullptr : & data[0];
+				
 			}
 			void invalidate(_Rid row){
-				nst::u8 & flags = (*this).flags[row];
+				nst::u8 & flags = (*this).flags[row-rows_start];
 				_temp.invalidate(flags);
 			}
 			void nullify(_Rid row){
-				nst::u8 & flags = (*this).flags[row];
+				nst::u8 & flags = (*this).flags[row-rows_start];
 				_temp.nullify(flags);
 			}
 			void clear(){
-				nst::u64 use_begin = calc_use();
-                _Flags f;
+				_Flags f;
                 _Cache c;
 				data.swap(c);
 				flags.swap(f);
 				encoded.clear();
-				nst::remove_col_use(use_begin);
-				NS_STORAGE::add_col_use(calc_use());
+				rows_start = 0;
+				rows_cached = 0;
+				available = true;
+				loaded = false;
+				
 			}
 			void encode(_Rid row){
-				encoded.set(row, data[row]);
+				encoded.set(row-rows_start, data[row]);
 			}
 
 			_Rid size() const {
@@ -368,22 +358,22 @@ namespace collums{
 			_Stored& get(_Rid row)  {
 				if(encoded.good()){
 
-					return encoded.get(row);;
+					return encoded.get(row-rows_start);;
 				}else
-					return _data[row].key;
+					return _data[row-rows_start].key;
 			}
 			const _Stored& get(_Rid row) const {
 				if(encoded.good()){
 
-					return encoded.get(row);;
+					return encoded.get(row-rows_start);
 				}else
-					return _data[row].key;
+					return _data[row-rows_start].key;
 			}
 
 			void set_data(_Rid row, const _StoredEntry& d){
-				if(row < rows_cached){
+				if(row-rows_start < rows_cached){
 					if(_data!=nullptr)
-						_data[row] = d;
+						_data[row-rows_start] = d;
 				}
 			}
 			/// subscript operator
@@ -393,7 +383,6 @@ namespace collums{
 			bool empty() const {
 				return (encoded.empty() && data.empty());
 			}
-
 			_Rid get_v_row_count(_ColMap&col){
 				_Rid r = 0;
 				typename _ColMap::iterator e = col.end();
@@ -405,21 +394,25 @@ namespace collums{
 				}
 				return r;
 			}
-			void load_data(_ColMap &col){
+			void load_data(_ColMap &col,_Rid start, _Rid p_end){
 				const _Rid CKECK = 1000000;
-				typename _ColMap::iterator e = col.end();
+				_Rid end = std::min<_Rid>(p_end, get_v_row_count(col));
+				if(start>=end){					
+					return;
+				}
+				typename _ColMap::iterator e = col.lower_bound(end);
 				typename _ColMap::iterator c = e;
 				_Rid kv = 0;
 				_Rid ctr = 0;
-				_Rid prev = 0;
+				_Rid prev = start;
 
 				nst::u64 nulls = 0;
 				nst::u64 use_begin = calc_use();
-				for(c = col.begin(); c != e; ++c){
+				for(c = col.lower_bound(start); c != e; ++c){
 					kv = c.key().get_value();
 
 					/// nullify the gaps					
-					if((*this).size() > kv){
+					if(end > kv){
 						if(kv > 0){
 							for(_Rid n = prev; n < kv-1; ++n){
 								(*this).nullify(n);
@@ -445,23 +438,31 @@ namespace collums{
 					(*this).flags.swap(f);
 					
 				}
-				nst::remove_col_use(use_begin);
-				nst::add_col_use(calc_use());
-			}
-			void finish(_ColMap &col,const std::string &name){
-				const _Rid CKECK = 1000000;
+				col.reduce_use();
+				loaded = true;
+				available = true;
 				
-				rows_cached = get_v_row_count(col);
+			}
+			void finish(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
+				
+				const _Rid CKECK = 1000000;
+				_Rid end = std::min<_Rid>(p_end, get_v_row_count(col));
+				if(start>=end){					
+					return;
+				}
+				rows_start = start;
+				rows_cached = end-start;
 				nst::i64 use_before = rows_cached * sizeof(_StoredEntry);
 				nst::u64 used_by_encoding = 0;
-				typename _ColMap::iterator e = col.end();
+				
+				typename _ColMap::iterator e = col.lower_bound(end);
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
 				nst::u64 use_begin = calc_use();
 				if(treestore_column_encoded){
 					
 					bool ok = true;
-					for(c = col.begin(); c != e; ++c){
+					for(c = col.lower_bound(start); c != e; ++c){
 						_Rid r = c.key().get_value();
 						encoded.sample(c.data());
 						encoded.total_bytes_allocated();
@@ -480,39 +481,36 @@ namespace collums{
 				}
 				if(treestore_column_encoded && encoded.good()){
 
-					for(c = col.begin(); c != e; ++c){
+					for(c = col.lower_bound(start); c != e; ++c){
 						_Rid r = c.key().get_value();
-						encoded.set(r, c.data());
+						encoded.set(r-start, c.data());
 						
 					}
 
 					if(calc_use() < use_before ){
 						
 						encoded.optimize();
-						NS_STORAGE::remove_col_use(use_begin);
-						NS_STORAGE::add_col_use(calc_use());
-						printf("reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
+						loaded = true;
+						available = true;
+						//printf("page: reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
 					}else{
-						printf("did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);						
+						//printf("page: did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);						
 						encoded.clear();
 						resize(rows_cached);
-						load_data(col);
+						load_data(col,start,p_end);
 					}
 
 				}else{					
 					encoded.clear();					
 					resize(rows_cached);
-					load_data(col);
-					if(treestore_column_encoded)
-						printf("could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-					else
-						printf("column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					load_data(col,start,p_end);
+					//if(treestore_column_encoded)
+						//printf("page: could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
+					//else
+						//printf("page column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
 					
-				}
-				
-
+				}				
 			}
-
 			nst::i64 calc_use(){
 				if(encoded.good()){
 					return encoded.capacity() + flags.capacity();
@@ -523,138 +521,34 @@ namespace collums{
 
 			void make_flags(){
 				if(flags.size() != rows_cached){
-					NS_STORAGE::remove_col_use(flags.capacity());
+					
 					flags.resize(rows_cached);
-					NS_STORAGE::add_col_use(flags.capacity());
+					
 				}
 			}
 			void unload(){
-				nst::synchronized _l(lock);
-				//printf("unloading col cache\n");
-				nst::u64 use_begin = calc_use();
-				
+				clear();
 				loaded = false;
 				available = false;
-                _Cache c;
-                _Flags f;
-				data.swap(c);
-				flags.swap(f);
-				NS_STORAGE::remove_col_use(use_begin);
+                
+			}
+			inline bool has_flags() const {
+				return !flags.empty();
+			}
+			nst::u8 get_flags(_Rid row) const {
+				if(!flags.empty()){
+					return flags[rows_start];
+				}
+				return 0;
 			}
 		};
 
-		class Density{
-		public:
-			Density(){
-			}
-			~Density(){
-			}
-			_Rid density;
-			template<typename _DataType>
-			void measure(_DataType& data){
-				/// get a 5% sample
-				typedef std::set<_Stored> _Uniques;
-				_Uniques uniques;
-				_Rid SAMPLE = (_Rid)data.size()/10;
-				//printf("calc %ld density sample\n",(long)SAMPLE);
-				for(_Rid r = 0;r<SAMPLE ; ++r){
-					_Rid sample = (std::rand()*std::rand()) % data.size();
-					uniques.insert(data[sample]);
-				}
-				density = SAMPLE/std::max<_Rid>(1,(_Rid)uniques.size());
-				if(density >= 2){
-					density /= 2;
-				}
-
-			}
-		};
-
-		class ColLoader : public  asynchronous::AbstractWorker{
-		protected:
-			std::string name;
-
-			_CacheEntry* cache;
-			size_t col_size;
-			bool lazy;
-			void _calc_density(){
-				/// get a 5% sample
-				Density d;
-				d.measure((*cache));
-				(*cache).density = d.density;
-				//printf("measured density sample: %lld\n", (nst::lld)(*cache).density);
-			}
-		protected:
-
-			bool load_into_cache(size_t col_size){
-
-				stored::abstracted_storage storage(name);
-				storage.begin();
-				storage.set_reader();
-				_ColMap col(storage);
-				
-
-				typename _ColMap::iterator e = col.end();
-				typename _ColMap::iterator c = e;
-				nst::u64 cached = 0;
-				if(!col.empty()){
-					--c;
-
-					cached = std::max<size_t>(col_size ,c.key().get_value()+1);
-					nst::u64 bytes_used = cached * (sizeof(_StoredEntry) + 1);
-					
-					(*cache).clear();
-					if(calc_total_use() + bytes_used > treestore_max_mem_use){
-						printf("ignoring col cache for %s\n", storage.get_name().c_str());
-						(*cache).unload();
-						return false;
-					}
-
-				}
-				//printf("load %s start system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
-
-				(*cache).finish(col,storage.get_name());
-				/// _calc_density();
-				storage.rollback();
-
-				col.reduce_use();
-				storage.reduce();
-				cache->available = true;
-				//printf("load %s end system use %.4g MB\n", storage.get_name().c_str(), (double)calc_total_use()/ units::MB);
-
-				return true;
-			}
-		public:
-
-			ColLoader(std::string name,_CacheEntry * cache, bool lax, size_t col_size)
-			:	name(name)
-			,	cache(cache)
-			,	col_size(col_size)
-			,	lazy(false)
-			{
-				cache->available = false;
-				cache->loaded = true;
-				set_loading_data(name, 1);
-			}
-
-			virtual void work(){
-
-				try{
-					(*this).load_into_cache(col_size);
-				}catch(std::exception&){
-					printf("Error during col cache loading/decoding\n");
-				}
-				set_loading_data(name, 0);
-
-
-			}
-			virtual ~ColLoader(){
-
-			}
-
-		};
-		typedef std::vector<char>    _Nulls;
-
-		typedef std::map<std::string, std::shared_ptr<_CacheEntry> > _Caches;
+		
+		
+		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
+		static const _Rid MAX_PAGE_SIZE = 32768*8;
+		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
+		typedef std::map<std::string, std::shared_ptr<_CachePages>, std::less<std::string>, sta::col_tracker<_CachePage> > _Caches; ///
 
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
@@ -666,60 +560,24 @@ namespace collums{
 			return _g_cache;
 		}
 
-		void unload_cache(std::string name){
-			_CacheEntry * entry= 0;
-
-
-			{
-				NS_STORAGE::synchronized ll(get_mutex());
-				if(get_g_cache().count(name)==0){
-
-					return;
-
-				}
-				entry = get_g_cache()[name].get() ;
-				NS_STORAGE::synchronized slock(entry->lock);
-				if(entry != nullptr && entry->available)
-				{
-					if(entry->users == 0){
-						printf("releasing col cache %s\n", storage.get_name().c_str());
-						entry->unload();
-					};
-				}
-			}
-
-		}
-		_CacheEntry* load_cache(std::string name, bool lazy, size_t col_size){
-			_CacheEntry * result = 0;
+		
+		_CachePages* load_cache(std::string name, _Rid last_logical_row){
+			_CachePages * result = 0;
 				
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-				if(calc_total_use() + col_size*sizeof(_Stored) > treestore_max_mem_use){
-					return result;
-				}
+			
 				if(get_g_cache().count(name)==0){
 
-					std::shared_ptr<_CacheEntry> cache = std::make_shared<_CacheEntry>();
-
-					get_g_cache()[name] = cache;
+					std::shared_ptr<_CachePages> pages = std::make_shared<_CachePages>();
+					_Rid p = last_logical_row/MAX_PAGE_SIZE+1;
+					pages->resize(p);
+					get_g_cache()[name] = pages;
 
 				}
 				result = get_g_cache()[name].get() ;
 			}
-
-			NS_STORAGE::synchronized slock(result->lock);
-			if(!result->loaded){
-
-				result->loaded = true;
-				//ColLoader l(name, result, lazy, col.size());
-				//l.doTask();
-
-				using namespace storage_workers;
-
-				get_threads( get_next_counter() ).add(new ColLoader(name, result, lazy, col.size()));
-
-			}
-
+		
 			return result;
 		}
 	private:
@@ -727,10 +585,8 @@ namespace collums{
 		typedef typename _ColMap::iterator _ColIter;
 		typename _ColMap::iterator cend;
 		typename _ColMap::iterator ival;
-		_CacheEntry * _cache;
-		_Nulls * _nulls;
-
-		nst::u8 * cache_f;
+				
+		_CachePages *pages;		
 		_StoredEntry user;
 		_Stored empty;
 		_Rid cache_size;
@@ -740,101 +596,45 @@ namespace collums{
 		bool lazy;
 
 		inline bool has_cache() const {
-			return _cache != nullptr && _cache->available;
+			return pages != nullptr ;
 		}
 
 		void load_cache(){
 			if(treestore_column_cache==FALSE) return;
-
-			if(lazy) return;
-			if(_cache==nullptr || !_cache->loaded){
+			if(pages==nullptr && rows > 0){
 				using namespace stored;
-				if((calc_total_use()+col.size()*sizeof(_StoredEntry)) < treestore_max_mem_use){
-
-					_cache = load_cache(storage.get_name(),lazy,col.size());
-				}
+				pages = load_cache(storage.get_name(),rows);
+				
 			}
 		}
-		inline _CacheEntry& get_cache()  {
+		inline _CachePages& get_cache()  {
 
-			return *_cache;
+			return *pages;
 		}
 
-		const _CacheEntry& get_cache() const {
+		const _CachePages& get_cache() const {
 
-			return *_cache;
+			return *pages;
 		}
 		void reset_cache_locals(){
-			cache_size = 0;
-			cache_f = nullptr;
-			_cache = nullptr;
+			
 			ival = col.end();
 		}
-		void engage_cache(){
-			if(_cache != nullptr)
-			{
-				NS_STORAGE::synchronized slock(_cache->lock);
-				if(_cache != nullptr && _cache->available)
-				{
-					if(!get_cache().empty()){
-						_cache->users++;
-						return;
-					}
-				}
+		
+		_Rid get_v_row_count(){
+			_Rid r = 0;
+			typename _ColMap::iterator e = col.end();
+			typename _ColMap::iterator c = e;
+			if(!col.empty()){
+				--c;
+				r = c.key().get_value() + 1;
+
 			}
-			reset_cache_locals();
+			return r;
 		}
-
-		void release_cache(){
-			if(_cache != nullptr)
-			{
-				NS_STORAGE::synchronized crit(_cache->lock);
-				if(_cache != nullptr && _cache->available)
-				{
-					_cache->users--;
-				}
-			}
-
-		}
-		void unload_cache(){
-			if(_cache != nullptr)
-			{
-				NS_STORAGE::synchronized slock(_cache->lock);
-				if(_cache != nullptr && _cache->available)
-				{
-					if(_cache->users==0){
-						printf("releasing col cache %s\n", storage.get_name().c_str());
-						_cache->unload();
-					};
-				}
-			}else{
-				unload_cache(storage.get_name());
-			}
-		}
-		void check_cache(){
-			if(has_cache()){
-				NS_STORAGE::synchronized slock(_cache->lock);
-				if(_cache->available)
-				{
-
-					cache_size = (_Rid)get_cache().size();
-
-					if(cache_size){
-						if(get_cache().flags.empty()){
-							cache_f = nullptr;
-						}else{
-							cache_f = &(get_cache().flags[0]);
-						}
-					}
-					if(cache_size != col.size())
-					{
-
-						//_cache->unload();
-						//get_loader().add(new ColLoader(storage.get_name(), _cache, col.size()));
-						//reset_cache_locals();
-					}
-				}
-			}
+		void check_page_cache(){
+			rows = get_v_row_count(); //(_Rid)col.size();
+			load_cache();			
 		}
 	public:
 		void set_lazy(bool dl){
@@ -850,22 +650,23 @@ namespace collums{
 		:	storage(name)
 		,	col(storage)
 
-		,	_cache(nullptr)
-		,	_nulls(nullptr)
+		,	pages(nullptr)
 		,	rows_per_key(0)
 		,	modified(false)
 		,	lazy(load)
+			
 		{
-			rows = (_Rid)col.size();
-
+			
+			check_page_cache();
 #ifdef _DEBUG
 
-			int_terpolator t;
-			t.test_encode();
+			//int_terpolator t;
+			//t.test_encode();
 #endif
 		}
 
 		~collumn(){
+			
 		}
 
 		void initialize(bool by_tree){
@@ -873,21 +674,16 @@ namespace collums{
 			cend = col.end();
 			ival = cend;
 			if(!modified){
-				load_cache();
-				check_cache();
-				engage_cache();
+			
 			}
 
-			//check_cache();
+			
 
 
 		}
 		/// returns a sampled rows per key statistic for the collumn
 		nst::u32 get_rows_per_key(){
 			typedef std::set<_Stored> _Uniques;
-			if(has_cache()){
-				//rows_per_key = get_cache().density;
-			}
 			if(rows_per_key == 0){
 
 				_Uniques unique;
@@ -908,31 +704,38 @@ namespace collums{
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
-
-		const _Stored& seek_by_tree(_Rid row) {
-
-			return seek_by_cache(row);
-		}
-
-		inline _Stored& seek_by_cache(_Rid row)  {
-
-
-			if( has_cache() && cache_size > row )
-			{
-				_Stored & se = _cache->get(row);
-
-				if(nullptr != cache_f ){
-					nst::u8 flags = cache_f[row];
-					if(user.valid(flags))
-						return se;
-
-					if(user.null(flags))
-						return empty;
+		_CachePage* load_page(_Rid requested){			
+			_Rid i = (requested % MAX_PAGE_SIZE);
+			_Rid l = requested - i;
+			_Rid p = l/MAX_PAGE_SIZE;
+			_CachePage * page = nullptr;
+			if( has_cache() && p < (*pages).size()){
+				page = &((*pages)[p]);
+				if(page->loaded){
+				
+				}else if(page->available){
+					
+					NS_STORAGE::synchronized synch(page->lock);
+					if(page->available){
+						nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
+						if(treestore_current_mem_use + bytes_used > treestore_max_mem_use){
+							//printf("ignoring col cache for %s\n", storage.get_name().c_str());
+							page->unload();				
+							col.reduce_use();
+							page = nullptr;
+							return page;	
+						}
+						page->finish(col,storage.get_name(),l,l+MAX_PAGE_SIZE);
+					}
+				
 				}else{
-					return se;
+					page = nullptr;
 				}
-
 			}
+			return page;
+		}
+		_Stored& seek_by_tree(_Rid row) {
+
 			if(ival != cend){
 				++ival;
 				if(ival != cend && ival.key().get_value() == row){
@@ -947,6 +750,28 @@ namespace collums{
 				return empty;
 			}
 			return ival.data();
+		}
+
+		inline _Stored& seek_by_cache(_Rid row)  {
+			if(treestore_column_cache && !lazy){
+				_CachePage* page = load_page(row);
+				if(page != nullptr){
+					
+					_Stored & se = page->get(row);
+					if( page->has_flags() ){
+						nst::u8 flags = page->get_flags(row);
+						if(user.valid(flags))
+							return se;
+
+						if(user.null(flags))
+							return empty;
+					}else{
+						return se;
+					}					
+				}
+			}
+			
+			return seek_by_tree(row);
 
 		}
 
@@ -973,7 +798,7 @@ namespace collums{
 				col.reduce_use();
 
 			}
-			release_cache();
+			
 			reset_cache_locals();
 		}
 
@@ -987,7 +812,7 @@ namespace collums{
 
 		void tx_begin(bool read,bool shared= true){
 			stored::abstracted_tx_begin(read,shared, storage, col);
-
+			check_page_cache();
 		}
 
 		void rollback(){
@@ -997,16 +822,12 @@ namespace collums{
 
 			col.reduce_use();
 			modified = false;			
-			release_cache();
-			reset_cache_locals();
+			
 			storage.rollback();
 		}
 
 		void reduce_cache_use(){
 			bool tx = storage.is_transacted();
-			release_cache();
-			unload_cache();
-			reset_cache_locals();
 			if(!tx)
 				storage.rollback();
 		}
@@ -1029,27 +850,28 @@ namespace collums{
 		void erase(_Rid row){
 			col.erase(row);
 			if((*this).rows > 0) --(*this).rows;
+			_CachePage * page = load_page(row);
+			if(page != nullptr){
 
-			if(has_cache()){
+				NS_STORAGE::synchronized synch(page->lock);
+				
+				page->make_flags();
 
-				NS_STORAGE::synchronized synch(get_cache().lock);
-				if(has_cache() && get_cache().size() > row){
-					get_cache().make_flags();
-
-					get_cache().invalidate(row);
-				}
+				page->invalidate(row);
+				
 			}
 		}
 
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
-			if(has_cache()){
+			_CachePage * page = load_page(row);
+			if(page != nullptr){
 
-				NS_STORAGE::synchronized synch(get_cache().lock);
-				if(has_cache() && get_cache().size() > row){
-					get_cache().make_flags();
-					get_cache().invalidate(row);
-				}
+				NS_STORAGE::synchronized synch(page->lock);
+				
+				page->make_flags();
+
+				page->invalidate(row);
 			}
 			col[row] = s;
 			modified = true;

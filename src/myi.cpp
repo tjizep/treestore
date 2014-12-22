@@ -20,7 +20,7 @@ nst::u64 total_cache_size=0;
 nst::u64 ltime = 0;
 static nst::u64 total_locks = 0;
 static Poco::Mutex mut_total_locks;
-
+extern "C" int get_l1_bs_memory_use();
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
 	treestore_journal_size = ns;
@@ -38,7 +38,7 @@ static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 
 long long calc_total_use(){
-	treestore_current_mem_use =  NS_STORAGE::total_use+allocation_pool.get_total_allocated()+total_cache_size;
+	treestore_current_mem_use =  NS_STORAGE::total_use+allocation_pool.get_total_allocated()+total_cache_size + get_l1_bs_memory_use();
 	return treestore_current_mem_use;
 }
 void print_read_lookups();
@@ -55,10 +55,10 @@ Poco::Mutex data_loading_lock;
 tree_stored::tree_table::_SharedData  tree_stored::tree_table::shared;
 _LoadingData loading_data;
 
-collums::_LockedRowData* collums::get_locked_rows(const std::string& name){
-	static collums::_RowDataCache rdata;
-	return rdata.get_for_table(name);
-}
+//collums::_LockedRowData* collums::get_locked_rows(const std::string& name){
+	//static collums::_RowDataCache rdata;
+//	return rdata.get_for_table(name);
+//}
 void collums::set_loading_data(const std::string& name, int loading){
 	nst::synchronized sl(data_loading_lock);
 	loading_data[name] = loading;
@@ -304,7 +304,7 @@ static handlerton *static_treestore_hton = NULL;
 
 class static_threads{
 public:
-	typedef std::vector<tree_stored::tree_thread *> _Threads;
+	typedef std::vector<tree_stored::tree_thread *, sta::tracker<tree_stored::tree_thread*>> _Threads;
 private:
 	_Threads threads;
 	Poco::Mutex tlock;
@@ -956,12 +956,13 @@ public:
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
 			printf
-			(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g pool %.4g MB\n"
+			(	"[%s]l %s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g MB\n"
 			,	lock_type == F_UNLCK ? "-":"+"
 			,	table->s->normalized_path.str
 			,	(double)calc_total_use()/units::MB
 			,	(double)nst::buffer_use/units::MB
 			,	(double)nst::col_use/units::MB
+			,	(double)nst::stl_use/units::MB
 			,	(double)btree_totl_used/units::MB
 			,	(double)total_cache_size/units::MB
 			,	(double)allocation_pool.get_total_allocated()/units::MB
@@ -1004,13 +1005,14 @@ public:
 				if(high_mem){
 					stored::reduce_all();
 				}
-				
+				get_thread()->own_reduce();
 				printf
-				(	"%s m:T%.4g b%.4g c%.4g t%.4g pc%.4g pool %.4g MB\n"
+				(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g MB\n"
 				,	"transaction complete"
 				,	(double)calc_total_use()/units::MB
 				,	(double)nst::buffer_use/units::MB
 				,	(double)nst::col_use/units::MB
+				,	(double)nst::stl_use/units::MB			
 				,	(double)btree_totl_used/units::MB
 				,	(double)total_cache_size/units::MB
 				,	(double)allocation_pool.get_total_allocated()/units::MB
@@ -1224,6 +1226,9 @@ public:
 		if (table->next_number_field && buf == table->record[0])
 			update_auto_increment();
 		get_tree_table()->write((*this).table);
+		//if(stx::memory_low_state)			
+		//	get_thread()->own_reduce();
+		
 		return 0;
 	}
 
@@ -1232,7 +1237,7 @@ public:
                       &LOCK_status);
 		uchar *record_old = table->record[0];
 		uchar *record_new = table->record[1];
-		typedef std::vector<uchar *> _Saved;
+		typedef std::vector<uchar *,  sta::tracker<uchar*> > _Saved;
 		_Saved saved;
 
 		for (Field **field=table->field ; *field ; field++){// offset to old rec
@@ -1826,9 +1831,9 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache ? 0.1 : 0.4;
+			double tree_factor = treestore_column_cache ? 0.1 : 0.15;
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(250);
+				Poco::Thread::sleep(500);
 				
 				nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
@@ -1838,9 +1843,9 @@ namespace ts_cleanup{
 				}else{					
 				}
 				
-				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>2ull)){
+				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g    pool: %.4g <> %.4g MB\n"
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g stl%.4g   pool: %.4g <> %.4g MB\n"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
@@ -1848,6 +1853,7 @@ namespace ts_cleanup{
 					,	(double)nst::col_use/units::MB
 					,	(double)btree_totl_used/units::MB
 					,	(double)total_cache_size/units::MB
+					,	(double)nst::stl_use/units::MB
 					,	(double)pool_used/units::MB
 					,	(double)allocation_pool.get_allocated()/units::MB
 					);
@@ -1878,7 +1884,7 @@ namespace ts_info{
 		}
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
-		typedef std::vector<tree_stored::tree_table*> _Tables;
+		typedef std::vector<tree_stored::tree_table*, sta::tracker<tree_stored::tree_table*> > _Tables;
 		_Tables tables;
 				
 		{
@@ -1909,7 +1915,7 @@ namespace ts_info{
 		}
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
-		typedef std::vector<tree_stored::tree_table*> _Tables;
+		typedef std::vector<tree_stored::tree_table*,sta::tracker<tree_stored::tree_table*> > _Tables;
 		_Tables tables;
 				
 		{
@@ -1955,5 +1961,5 @@ void start_calculating(){
 	/// ts_info::start();
 }
 
-#include "pool.h"
+#include <stx/storage/pool.h>
 nst::allocation::pool allocation_pool(2*1024ll*1024ll*1024ll);

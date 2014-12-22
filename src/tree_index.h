@@ -50,7 +50,7 @@ namespace tree_stored{
 		typedef stx::btree_set< index_key, stored::abstracted_storage> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
 		typedef typename ::iterator::ImplIterator<_IndexMap> IndexIterator;
-		typedef std::vector<index_key> _KeyBuffer;
+		typedef std::vector<index_key, ::sta::stl_tracker<index_key> > _KeyBuffer;
 
 		class index_iterator_impl : public stored::index_iterator_interface{
 		private:
@@ -162,7 +162,7 @@ namespace tree_stored{
 			}
 
 		public:
-			static const int MAX_KEY_BUFFER = 3000000;/// size of the write key buffer
+			static const int MAX_KEY_BUFFER = 300000;/// size of the write key buffer
 			static const int MIN_KEY_BUFFER = 10000;
 			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away)
 			:	loaders_away(loaders_away)
@@ -192,7 +192,7 @@ namespace tree_stored{
 
 				buffer.push_back(k);
 				if(buffer.size() > MIN_KEY_BUFFER){
-					if( stx::memory_low_state ) return false;
+					
 				}
 				return buffer.size() < MAX_KEY_BUFFER;
 			}
@@ -299,15 +299,24 @@ namespace tree_stored{
 
 		void add(const index_key& k, const index_value& v){
 			modified = true;
-			//index.insert(k,'0');
-			if(loader==nullptr){
-				loader = new IndexLoader(index, loaders_away);
+			if( treestore_current_mem_use > treestore_max_mem_use*0.9 ) {
+				while(loaders_away>0){
+					os::zzzz(50);
+				}
 			}
-			if(!loader->add(k,v)){
-				storage_workers::get_threads(wid).add(loader);
-				++loaders_away;
+			if(false){
+				index.insert(k);
+				
+			}else{
+				if(loader==nullptr){
+					loader = new IndexLoader(index, loaders_away);
+				}
+				if(!loader->add(k,v)){
+					storage_workers::get_threads(wid).add(loader);
+					++loaders_away;
 
-				loader = nullptr;
+					loader = nullptr;
+				}
 			}
 		}
 

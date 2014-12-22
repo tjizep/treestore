@@ -17,8 +17,7 @@ namespace stx{
 			typedef long long int lld;
 		/// virtual allocator address type
 			typedef u32 stream_address ;
-
-			typedef std::vector<u8> buffer_type;
+			
 			/// the version type
 			typedef unsigned int version_type;
 	};

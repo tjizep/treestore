@@ -1,7 +1,7 @@
 #include "abstracted_storage.h"
 
 static Poco::Mutex m;
-namespace nst = stx::storage;
+namespace nst = ::stx::storage;
 namespace stored{
 	
 	static _AlocationsMap instances;

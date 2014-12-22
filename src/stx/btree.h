@@ -75,6 +75,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <map>
 #include <unordered_map>
 #include <stx/storage/basic_storage.h>
+#include <stx/storage/pool.h>
+
 #include <Poco/AtomicCounter.h>
 #include <Poco/Mutex.h>
 #include <Poco/Thread.h>
@@ -82,13 +84,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <Poco/TaskManager.h>
 #include <Poco/Task.h>
 #include <Poco/Timestamp.h>
-
+#include <stx/storage/pool.h>
 #include <sparsehash/type_traits.h>
 #include <sparsehash/dense_hash_map>
 #include <sparsehash/sparse_hash_map>
 
 #include "NotificationQueueWorker.h"
-#include "pool.h"
 // *** Debugging Macros
 
 #ifdef BTREE_DEBUG
@@ -152,7 +153,7 @@ namespace stx
 	public:
 		virtual void idle_time() = 0;
 	};
-	typedef std::vector<idle_processor*> _idle_processors;
+	typedef std::vector<idle_processor*, sta::tracker<idle_processor*> > _idle_processors;
 	extern _idle_processors idle_processors;
 	extern bool memory_low_state;
 	static void process_idle_times(){
@@ -1875,10 +1876,13 @@ namespace stx
 		/// be decoupled.
 
 		/// typedef std::unordered_map<stream_address, node*> _AddressedNodes;
+		/// , sta::tracker<stream_address,sta::bt_counter> 
+		
 		typedef ::google::dense_hash_map<stream_address, node*> _AddressedNodes;
-		typedef std::pair<stream_address, stx::storage::version_type> _AddressPair;
-		typedef std::map<_AddressPair, node*> _AddressedVersionNodes;
-		typedef std::vector< std::pair<stream_address, surface_node*> > _AllocatedSurfaceNodes;
+		typedef std::pair<stream_address, ::stx::storage::version_type> _AddressPair;
+		typedef std::map<_AddressPair, node*, ::std::less<_AddressPair>> _AddressedVersionNodes; /// , ::sta::tracker<_AddressPair, ::sta::bt_counter> 
+		typedef std::pair<stream_address, surface_node*> _AllocatedSurfaceNode;
+		typedef std::vector< _AllocatedSurfaceNode, ::sta::tracker<_AllocatedSurfaceNode,::sta::bt_counter> > _AllocatedSurfaceNodes;
 
 		
 		class _Shared{
@@ -1888,7 +1892,7 @@ namespace stx
 				_Addr() : p(NULL){};
 				_AddressedVersionNodes* p;
 			};/// resolves decorated name length warn C4503 in ms vc
-			typedef std::unordered_map<std::string, _Addr> _NamedSharedNodes;
+			typedef std::unordered_map<std::string, _Addr, ::sta::tracker<_Addr,::sta::bt_counter> > _NamedSharedNodes;
 			class _SharedData : public idle_processor{
 			public:
 				_SharedData(){
@@ -1920,7 +1924,7 @@ namespace stx
 						nst::synchronized synched(shared.get_named_mutex());
 						//raw_unlink_nodes();/// only unlinks nodes which are not shared and held by this instance
 						typename _AddressedVersionNodes::iterator h;
-						typedef std::vector<_AddressPair> _ToDelete;
+						typedef std::vector<_AddressPair, ::sta::tracker<_AddressPair,::sta::bt_counter> > _ToDelete;
 						_ToDelete todelete;
 						for(typename _AddressedVersionNodes::iterator n = (*shared.nodes).begin(); n != (*shared.nodes).end(); ++n){
 							if(!(*n).second->issurfacenode()){
@@ -3648,10 +3652,10 @@ namespace stx
 		private:
 		typedef std::pair<stream_address, node*> _NodePair;
 		typedef std::pair<stream_address, surface_node*> _SurfaceNodePair;
-		typedef std::vector<std::pair<stream_address, surface_node*> > _ToDeleteSurface;
-		typedef std::vector<std::pair<stream_address, node*> > _ToDelete;
+		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _ToDeleteSurface;
+		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _ToDelete;
 		/// remove inter node dependencies
-		typedef std::vector<std::pair<stream_address,surface_node*>> _UnlinkNodes;
+		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _UnlinkNodes;
 		_UnlinkNodes unlink_nodes;
 		void unlink_surface_2(surface_node * surface){
 			node::ptr t;
@@ -3675,7 +3679,7 @@ namespace stx
 			this->headsurface.set_context(this);
 			this->last_surface.set_context(this);			
 			this->root.set_context(this);
-			typedef std::vector<node::ptr> _LinkedList;
+			typedef std::vector<node::ptr,::sta::tracker<node::ptr,::sta::bt_counter>> _LinkedList;
 			
 			
 			for(typename _AddressedNodes::iterator n = surfaces_loaded.begin(); n != surfaces_loaded.end(); ++n){
@@ -3695,7 +3699,7 @@ namespace stx
 			this->last_surface.set_context(this);			
 			this->root.set_context(this);
 			
-			typedef std::vector<node::ptr> _LinkedList;
+			typedef std::vector<node::ptr, ::sta::tracker<node::ptr,::sta::bt_counter>> _LinkedList;
 		
 			node::ptr t;
 			for(typename _AddressedNodes::iterator n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
@@ -3774,16 +3778,15 @@ namespace stx
 			flush();
 			if(reduce){				
 				if((*this).stats.surface_use > 0){
-					if((*this).get_storage()->is_readonly()){
-						unlink_local_nodes_2();			
-						//unlink_local_nodes();
-						//local_reduce_free();
-					}else{
-						//unlink_local_nodes_2();	
+					size_t leaves_before = stats.leaves;
+					
+					unlink_local_nodes_2();			
+					local_reduce_free();	
+						
+					if(stats.leaves > leaves_before/4){
 						unlink_local_nodes();
-						//local_free();						
+						local_reduce_free();
 					}
-					local_reduce_free();
 				}
 				release_shared();
 				if(save_tot > btree_totl_used)
@@ -4975,7 +4978,7 @@ namespace stx
 
 				if
 				(	//surface->sorted==0 &&
-					/// false && 
+					false && 
 					!allow_duplicates &&
 					!surface->isfull()
 				)

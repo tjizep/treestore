@@ -9,8 +9,10 @@
 #include <Poco/Timestamp.h>
 #include <lz4.h>
 #include <stdio.h>
+#include <stx/storage/pool.h>
 /// memuse variables
 extern long long treestore_max_mem_use ;
+extern long long treestore_current_mem_use ;
 extern long long  _reported_memory_size();
 extern long long calc_total_use();
 
@@ -24,8 +26,127 @@ extern "C"{
 namespace stx{
 
 	namespace storage{
+		namespace allocation{
+			template <class T>
+			class buffer_tracker : public base_tracker<T>{
+			public:				
+				// rebind allocator to type U
+				template <class U>
+				struct rebind {
+					typedef buffer_tracker<U> other;
+				};
+				buffer_tracker() throw() {
+				}
+				buffer_tracker(const buffer_tracker&) throw() {
+				}
+				template <class U>
+				buffer_tracker (const buffer_tracker<U>&) throw() {
+				}
+				
+				// allocate but don't initialize num elements of type T
+				pointer allocate (size_type num, const void* = 0) {
+					buffer_counter c;
+					c.add(num*sizeof(T)+overhead());
+					return base_tracker::allocate(num);
+				}
+				// deallocate storage p of deleted elements
+				void deallocate (pointer p, size_type num) {
+					base_tracker::deallocate(p, num);
+					buffer_counter c;
+					c.remove(num*sizeof(T)+overhead());
+				}
+			};
 
-		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
+			 // return that all specializations of this allocator are interchangeable
+			template <class T1, class T2>
+			bool operator== (const buffer_tracker<T1>&,const buffer_tracker<T2>&) throw() {
+				return true;
+			}
+			template <class T1, class T2>
+			bool operator!= (const buffer_tracker<T1>&, const buffer_tracker<T2>&) throw() {
+				return false;
+			}
+			template <class T>
+			class col_tracker : public base_tracker<T>{
+			public:				
+				// rebind allocator to type U
+				template <class U>
+				struct rebind {
+					typedef col_tracker<U> other;
+				};
+				col_tracker() throw() {
+				}
+				col_tracker(const col_tracker&) throw() {
+				}
+				template <class U>
+				col_tracker (const col_tracker<U>&) throw() {
+				}
+				
+				// allocate but don't initialize num elements of type T
+				pointer allocate (size_type num, const void* = 0) {
+					col_counter c;
+					c.add(num*sizeof(T)+overhead());
+					return base_tracker::allocate(num);
+				}
+				// deallocate storage p of deleted elements
+				void deallocate (pointer p, size_type num) {
+					base_tracker::deallocate(p, num);
+					col_counter c;
+					c.remove(num*sizeof(T)+overhead());
+				}
+			};
+
+			 // return that all specializations of this allocator are interchangeable
+			template <class T1, class T2>
+			bool operator== (const col_tracker<T1>&,const col_tracker<T2>&) throw() {
+				return true;
+			}
+			template <class T1, class T2>
+			bool operator!= (const col_tracker<T1>&, const col_tracker<T2>&) throw() {
+				return false;
+			}
+			template <class T>
+			class stl_tracker : public base_tracker<T>{
+			public:				
+				// rebind allocator to type U
+				template <class U>
+				struct rebind {
+					typedef stl_tracker<U> other;
+				};
+				stl_tracker() throw() {
+				}
+				stl_tracker(const stl_tracker&) throw() {
+				}
+				template <class U>
+				stl_tracker (const stl_tracker<U>&) throw() {
+				}
+				
+				// allocate but don't initialize num elements of type T
+				pointer allocate (size_type num, const void* = 0) {
+					stl_counter c;
+					c.add(num*sizeof(T)+overhead());
+					return base_tracker::allocate(num);
+				}
+				// deallocate storage p of deleted elements
+				void deallocate (pointer p, size_type num) {
+					base_tracker::deallocate(p, num);
+					stl_counter c;
+					c.remove(num*sizeof(T)+overhead());
+				}
+			};
+
+			 // return that all specializations of this allocator are interchangeable
+			template <class T1, class T2>
+			bool operator== (const stl_tracker<T1>&,const stl_tracker<T2>&) throw() {
+				return true;
+			}
+			template <class T1, class T2>
+			bool operator!= (const stl_tracker<T1>&, const stl_tracker<T2>&) throw() {
+				return false;
+			}
+		}; /// allocations
+		typedef std::vector<u8, sta::buffer_tracker<u8>> buffer_type;
+		
 		/// ZLIBH
 		static void inplace_compress_zlibh(buffer_type& buff){
 			typedef char * encode_type_ref;
@@ -72,7 +193,7 @@ namespace stx{
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
 			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
 			if(cp < 0){
-				cp = buff.size();
+				cp = (i32)buff.size();
 				origin = -cp;
 				memcpy(&t[sizeof(i32)], &buff[0], buff.size());
 			}

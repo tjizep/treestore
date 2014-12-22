@@ -31,13 +31,13 @@ namespace bits{
 	}
 }
 
-template<typename _IntSymBolType>
+template<typename _IntSymBolType, typename _Allocator = sta::tracker<nst::u32, sta::stl_counter> >
 class symbol_vector{
 public:
 	typedef nst::u32 _BucketType;/// use a configurable bucket type for larger code size performance
 	typedef nst::u64 _IndexType; /// type to index bits
 	static const _BucketType BUCKET_BITS = sizeof(_BucketType)<<3;
-	typedef std::vector<_BucketType> _Data;
+	typedef std::vector<_BucketType, _Allocator> _Data;
 protected:
 	_Data data;
 	_BucketType code_size;

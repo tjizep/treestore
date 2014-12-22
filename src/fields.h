@@ -685,7 +685,7 @@ namespace stored{
 	typedef NS_STORAGE::u64 _Rid;
 	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
 
-	typedef std::vector<_Rid> _Parts;
+	typedef std::vector<_Rid,sta::col_tracker<_Rid> > _Parts;
 	typedef stored::FTypeStored<float> FloatStored ;
 	typedef stored::FTypeStored<double> DoubleStored ;
 	typedef stored::IntTypeStored<short> ShortStored;
@@ -713,7 +713,7 @@ namespace stored{
 
 		};
 
-		typedef std::vector<nst::u8> _Data;
+		typedef std::vector<nst::u8, sta::tracker<nst::u8, sta::bt_counter> > _Data;
 
 		static const size_t MAX_BYTES = 2048;
 
@@ -755,8 +755,7 @@ namespace stored{
 			if(bs==sizeof(_Data)){
 				if(get_Data().capacity() < nbytes){
 					nst::i64 d = get_Data().capacity();
-					get_Data().resize(nbytes);
-					add_btree_totl_used (get_Data().capacity()-d);
+					get_Data().resize(nbytes);					
 				}else
 					get_Data().resize(nbytes);
 			}
@@ -963,8 +962,7 @@ namespace stored{
 		}
 
 		~DynamicKey(){
-			if(bs==sizeof(_Data)){
-				remove_btree_totl_used (get_Data().capacity());
+			if(bs==sizeof(_Data)){				
 				get_Data().~_Data();				
 			}
 			bs = 0;
@@ -1526,8 +1524,8 @@ namespace stored{
 		template<typename _IntType>
 		struct entropy_t{
 			typedef _IntType _Sampled;
-			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled> > _UnsortedHistogram;
-			typedef std::map<_Sampled, nst::u64 > _Histogram;
+			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
+			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
 		protected:
 			nst::u64 samples;
 			nst::u64 bytes_allocated;
@@ -1634,7 +1632,7 @@ namespace stored{
 		template<typename _IntType>
 		struct int_fix_encoded_buffer{
 			typedef nst::u32 _CodeType;
-			typedef symbol_vector<_CodeType> _Symbols;
+			typedef symbol_vector<_CodeType, sta::tracker<_CodeType, sta::col_counter> > _Symbols;
 
 			typedef entropy_t<_IntType> _Entropy;
 			struct hash_fixed{
@@ -1642,8 +1640,8 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
-			typedef std::vector<_IntType> _DeCodeMap;
+            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
+			typedef std::vector<_IntType, sta::col_tracker<_IntType> > _DeCodeMap;
 
 			_Entropy stats;
 			_CodeMap codes;
@@ -1727,17 +1725,18 @@ namespace stored{
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
-
-					typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
 					nst::u32 words = 0;
-					decodes.resize((*this).stats.get_sorted_histogram().size());
+					{
+						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
+						
+						decodes.resize((*this).stats.get_sorted_histogram().size());
 
-					for(;h != (*this).stats.get_sorted_histogram().end();++h){
-						codes[(*h).first] = words;						
-						decodes[words] = (*h).first;
-						++words;
+						for(;h != (*this).stats.get_sorted_histogram().end();++h){
+							codes[(*h).first] = words;						
+							decodes[words] = (*h).first;
+							++words;
+						}
 					}
-
 					(*this).stats.clear();
 
 					if(words > 0){
@@ -1764,7 +1763,7 @@ namespace stored{
 		template<typename _IntType>
 		struct int_fix_unmapped_encoded_buffer{
 			typedef nst::u32 _CodeType;
-			typedef symbol_vector<_CodeType> _Symbols;
+			typedef symbol_vector<_CodeType,  sta::tracker<_CodeType, sta::col_counter> > _Symbols;
 
 			typedef int_entropy_t<_IntType> _Entropy;
 			struct hash_fixed{
@@ -1773,8 +1772,8 @@ namespace stored{
 				}
 			};
             //typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
-			typedef std::map<_IntType, _CodeType > _CodeMap;
-			typedef std::vector<_IntType> _DeCodeMap;
+			typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::tracker<_IntType, sta::col_counter> > _CodeMap;
+			typedef std::vector<_IntType, sta::tracker<_IntType, sta::col_counter> > _DeCodeMap;
 
 			_Entropy stats;
 			_CodeMap codes;
@@ -1870,26 +1869,28 @@ namespace stored{
 					nst::u32 bits_in_histogram = bits::bit_log2((nst::u32)(*this).stats.get_entropy())+2;
 					nst::u32 bits_in_abs = bits::bit_log2((nst::u32)(*this).stats.get_abs());
 					/// not sure about negative values yet, although translation i.o. mapping should sort them out
-					if(bits_in_abs <= bits_in_histogram){						
-						decodes.clear();
-						codes.clear();
+					if(bits_in_abs < bits_in_histogram){						
+						decodes.swap(_DeCodeMap());
+						codes.swap(_CodeMap());
 						min_decoded = stats.get_min_val() ;
 						code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)stats.get_abs()));	
 						symbols.set_code_size(code_size);
 						resize(rows);
 						
 					}else{
-
-						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
+						
+						
 						nst::u32 words = 0;
+						{
+							typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
+							for(;h != (*this).stats.get_sorted_histogram().end();++h){
 
-						for(;h != (*this).stats.get_sorted_histogram().end();++h){
+								codes[(*h).first] = words;
+								decodes.resize(words+1);
+								decodes[words] = (*h).first;
+								++words;
 
-							codes[(*h).first] = words;
-							decodes.resize(words+1);
-							decodes[words] = (*h).first;
-							++words;
-
+							}
 						}
 						(*this).stats.clear();
 

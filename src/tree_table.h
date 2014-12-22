@@ -175,13 +175,14 @@ namespace tree_stored{
 		virtual stored::_Rid stored_rows() const = 0;
 		virtual void initialize(bool by_tree) = 0;
 		virtual void compose(CompositeStored& comp)=0;
-		virtual void compose(stored::_Rid r, CompositeStored& comp)=0;
+		virtual void compose_by_cache(stored::_Rid r, CompositeStored& comp)=0;
+		virtual void compose_by_tree(stored::_Rid r, CompositeStored& comp)=0;
 		virtual void compose(CompositeStored & to, Field* f,const uchar * n_ptr, uint flags)=0;
 		virtual bool equal(stored::_Rid row, Field* f)=0;
 		virtual void reduce_cache_use() = 0;
 		virtual void reduce_col_use() = 0;
 		virtual void reduce_tree_use() = 0;
-		virtual void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data ) = 0;
+
 
 		virtual stored::_Rid get_rows_per_key() = 0;
 		virtual void flush() = 0;
@@ -203,7 +204,8 @@ namespace tree_stored{
 	class my_collumn : public abstract_my_collumn{
 	protected:
 		typedef typename collums::collumn<_Fieldt> _Colt;
-		typedef std::vector<std::pair<stored::_Rid,_Fieldt> > _RowBuffer;
+		typedef std::pair<stored::_Rid,_Fieldt> _RowBufferPair;
+		typedef std::vector<_RowBufferPair, ::sta::col_tracker<_RowBufferPair> > _RowBuffer;
 		static const int MAX_BUFFERED_ROWS = 10000;
 		class ColAdder : public asynchronous::AbstractWorker{
 		protected:
@@ -254,7 +256,7 @@ namespace tree_stored{
 		Poco::AtomicCounter workers_away;
 		nst::u32 number;
 		nst::u32 rowsize;
-		collums::_LockedRowData * row_datas;
+		//collums::_LockedRowData * row_datas;
 
 
 
@@ -303,13 +305,13 @@ namespace tree_stored{
 		}
 	public:
 
-		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,collums::_LockedRowData *row_datas, bool do_load)
+		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,bool do_load)
 		:	col(name, do_load)
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
 		,	number(number)
 		,	rowsize(rowsize)
-		,	row_datas(row_datas)
+		//,	row_datas(row_datas)
 		{
 
 		}
@@ -537,9 +539,12 @@ namespace tree_stored{
 		virtual stored::_Rid get_rows_per_key(){
 			return col.get_rows_per_key();
 		}
-
-		virtual void compose(stored::_Rid r, CompositeStored & to){
+		virtual void compose_by_tree(stored::_Rid r, CompositeStored & to){
 			const _Fieldt& field = col.seek_by_tree(r);
+			to.add(field);
+		}
+		virtual void compose_by_cache(stored::_Rid r, CompositeStored & to){
+			const _Fieldt& field = col.seek_by_cache(r);
 			to.add(field);
 		}
 
@@ -688,13 +693,14 @@ namespace tree_stored{
 		_PredictorContext<_Fieldt> predictor;
 		/// seek from
 		private:
+			
+#ifdef _ROW_CACHE_
 			_Fieldt& ft_from_rowdata(std::vector<nst::u8>& row_data, nst::u16 dp){
 				return *((_Fieldt*)&row_data[dp]);
 			}
 			inline nst::u16 * u16from_rd(std::vector<nst::u8>& row_data){
 				return ((nst::u16*)&row_data[0]);
 			}
-#ifdef _ROW_CACHE_
 			void seek_retrieve_from_shared_row_data(Field* f, stored::_Rid row, collums::_RowData& row_data) {
 
 				nst::u16 dpos = u16from_rd(row_data)[number];
@@ -742,14 +748,6 @@ namespace tree_stored{
 #				endif
 				convertor.fset(row, f, t);
 			}
-		}
-		virtual	void seek_retrieve( Field* f, stored::_Rid row, collums::_RowData& row_data) {
-#ifdef _ROW_CACHE_
-			seek_retrieve_from_shared_row_data(f, row, row_data);
-#else
-			printf("Row Cache not implemented\n");
-#endif
-
 		}
 
 		virtual stored::_Rid stored_rows() const {
@@ -896,7 +894,7 @@ namespace tree_stored{
 			for (Field **field=share->field ; *field ; field++){
 				++rowsize;
 			}
-			collums::_LockedRowData * lrd = collums::get_locked_rows(storage.get_name());
+			//collums::_LockedRowData * lrd = collums::get_locked_rows(storage.get_name());
 			for (Field **field=share->field ; *field ; field++){
 				ha_base_keytype bt = (*field)->key_type();
 				nst::u32 fi = (*field)->field_index;
@@ -905,67 +903,67 @@ namespace tree_stored{
 						// ERROR ??
 						break;
 					case HA_KEYTYPE_FLOAT:
-						cols[(*field)->field_index] = new my_collumn<stored::FloatStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::FloatStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_DOUBLE:
-						cols[(*field)->field_index] = new my_collumn<stored::DoubleStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::DoubleStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_SHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::ShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_LONG_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_USHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::UShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::UShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_ULONG_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_LONGLONG:
-						cols[(*field)->field_index] = new my_collumn<stored::LongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::LongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_ULONGLONG:
-						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi, rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi, rowsize,false);
 						break;
 					case HA_KEYTYPE_INT24:
-						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd, false);
+						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize, false);
 						break;
 					case HA_KEYTYPE_UINT24:
-						cols[(*field)->field_index] = new my_collumn<stored::UIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd, false);
+						cols[(*field)->field_index] = new my_collumn<stored::UIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize, false);
 						break;
 					case HA_KEYTYPE_INT8:
-						cols[(*field)->field_index] = new my_collumn<stored::CharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::CharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 						break;
 					case HA_KEYTYPE_BIT:
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,false);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
 
 						break;
 
 					case HA_KEYTYPE_NUM:			/* Not packed num with pre-space */
 					case HA_KEYTYPE_TEXT:			/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
 						break;
 
 					case HA_KEYTYPE_BINARY:			/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
 						break;
 					/* Varchar (0-255 bytes) with length packed with 1 byte */
 					case HA_KEYTYPE_VARTEXT1:               /* Key is sorted as letters */
 					/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARTEXT2:		/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
 						break;
 					case HA_KEYTYPE_VARBINARY1:             /* Key is sorted as unsigned chars length packed with 1 byte*/
 						/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARBINARY2:		/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
 						break;
 
 					default:
 						//TODO: ERROR ??
 						/// default to var bin
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,lrd,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
 
 						break; //do nothing pass
 				}//switch
@@ -1106,7 +1104,7 @@ namespace tree_stored{
 		nst::u64 last_unlock_time;
 		nst::u64 last_density_calc;
 		nst::i64 last_density_tx;
-		collums::_LockedRowData* row_datas;
+
 		bool calculating_statistics;
 		Poco::Mutex tt_info_copy_lock;
 		table_info calculated_densities;
@@ -1131,9 +1129,6 @@ namespace tree_stored{
 		nst::u32 get_col_count() const {
 			return cols.size();
 		}
-		collums::_LockedRowData* get_row_datas(){
-			return row_datas;
-		}
 		tree_table(TABLE *table_arg)
 		:	changed(false)
 		,	_row_count(0)
@@ -1142,9 +1137,7 @@ namespace tree_stored{
 		,	last_unlock_time(os::micros())
 		,	last_density_calc(0)
 		,	last_density_tx(99999999)
-		,	row_datas(nullptr)
 		,	storage(table_arg->s->path.str)
-
 		,	table(nullptr)
 		,	calculating_statistics(false)
 		{
@@ -1228,8 +1221,8 @@ namespace tree_stored{
 				const _Rid ratio = 5;
 				const _Rid page_size = 512;
 				const _Rid sample = std::min<_Rid>(page_size*2048,_row_count > ratio ? _row_count/ratio: _row_count);				
-				typedef std::unordered_set<CompositeStored,hash_composite> _Unique;
-				typedef std::vector<_Unique> _Uniques;				
+				typedef std::unordered_set<CompositeStored,hash_composite, std::equal_to<CompositeStored>, sta::tracker<CompositeStored> > _Unique;
+				typedef std::vector<_Unique,sta::tracker<_Unique> > _Uniques;				
 				_Uniques uniques( index->parts.size() );
 				CompositeStored ir;
 				typedef std::minstd_rand G;
@@ -1244,7 +1237,7 @@ namespace tree_stored{
 						stored::_Parts::iterator pend = index->parts.end();
 						for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
 							int ip = (*p);
-							(*this).cols[ip]->compose(ss, ir);
+							(*this).cols[ip]->compose_by_tree(ss, ir);
 							uniques[u].insert(ir);
 
 							++u;
@@ -1871,7 +1864,7 @@ namespace tree_stored{
 				_row_count = t.key().get_value();
 				++_row_count;				
 			}
-
+#ifdef _ROW_CACHE_
 			if(false){
 				/// row data cache specific stuff - disabled for now
 				(*this).row_datas = collums::get_locked_rows(storage.get_name());
@@ -1880,6 +1873,7 @@ namespace tree_stored{
 					get_row_datas()->rows.resize(_row_count);
 				}
 			}
+#endif
 		}
 
 		/// aquire lock and resources
@@ -1921,7 +1915,7 @@ namespace tree_stored{
 					commit2();
 					if(calc_total_use() > treestore_max_mem_use){
 						stored::reduce_all();
-					}
+					}					
 					changed = false;
 				}else
 				{
@@ -2010,7 +2004,7 @@ namespace tree_stored{
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
-					cols[(*p)]->compose(rid, temp);
+					cols[(*p)]->compose_by_tree(rid, temp);
 				}
 				//temp.add(rid);
 				temp.row = rid;
@@ -2023,7 +2017,7 @@ namespace tree_stored{
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
-					cols[(*p)]->compose(rid, temp);
+					cols[(*p)]->compose_by_cache(rid, temp);
 				}
 				//temp.add(rid);
 				temp.row = rid;

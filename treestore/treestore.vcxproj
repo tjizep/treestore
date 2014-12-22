@@ -42,7 +42,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v110</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -138,7 +138,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <MinimalRebuild>false</MinimalRebuild>
@@ -265,13 +265,13 @@
     <ClInclude Include="..\src\MurmurHash3.h" />
     <ClInclude Include="..\src\myi.h" />
     <ClInclude Include="..\src\NotificationQueueWorker.h" />
-    <ClInclude Include="..\src\pool.h" />
     <ClInclude Include="..\src\PredictiveCache.h" />
     <ClInclude Include="..\src\stx\btree.h" />
     <ClInclude Include="..\src\stx\btree_map.h" />
     <ClInclude Include="..\src\stx\btree_multimap.h" />
     <ClInclude Include="..\src\stx\btree_multiset.h" />
     <ClInclude Include="..\src\stx\btree_set.h" />
+    <ClInclude Include="..\src\stx\storage\pool.h" />
     <ClInclude Include="..\src\suffix_array.h" />
     <ClInclude Include="..\src\system_timers.h" />
     <ClInclude Include="..\src\transactional_storage.h" />
