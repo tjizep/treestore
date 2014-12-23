@@ -201,7 +201,13 @@ namespace tree_stored{
 			if(!load()) return;
 			store_pos = sec_cache.size();
 			if(store_pos >= CIRC_SIZE) return;
+			if(!(*this).hash_size) return;
+			if(cache_index.empty()){
+				clear();
+				return;
+			}
 			size_t h = ((nst::u32)(size_t)iter.key()) % hash_size;
+
 			//if(last_store == 3){
 				size_t s = cache_index[h];
 				if(s == 0){

@@ -367,7 +367,9 @@ namespace tree_stored{
 				//index.flush_buffers();
 
 			}
-			storage.reduce();
+			if(treestore_current_mem_use > treestore_max_mem_use){
+				storage.reduce();
+			}
 		}
 
 		void commit2(){

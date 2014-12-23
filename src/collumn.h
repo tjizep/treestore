@@ -296,7 +296,7 @@ namespace collums{
 				available = right.available;
 				loaded = right.loaded;
 				flags = right.flags;
-				
+				flagged = right.flagged;
 				_data = data.empty()? nullptr : & data[0];
 				return (*this);
 			}
@@ -313,6 +313,7 @@ namespace collums{
 			_StoredEntry _temp;
 			_Rid rows_cached;
 			_Rid rows_start;
+			bool flagged;
 		public:
             
 			_Rid density;
@@ -322,7 +323,7 @@ namespace collums{
 				
 				
 				data.resize(size);
-				flags.resize(size);
+				flags.resize(MAX_PAGE_SIZE);
 				rows_cached = (stored::_Rid)size;
 				_data = data.empty()? nullptr : & data[0];
 				
@@ -345,7 +346,7 @@ namespace collums{
 				rows_cached = 0;
 				available = true;
 				loaded = false;
-				
+				flagged = false;
 			}
 			void encode(_Rid row){
 				encoded.set(row-rows_start, data[row]);
@@ -520,11 +521,10 @@ namespace collums{
 			}
 
 			void make_flags(){
-				if(flags.size() != rows_cached){
-					
-					flags.resize(rows_cached);
+				if(!flagged){
 					
 				}
+				flagged = true;
 			}
 			void unload(){
 				clear();
@@ -533,23 +533,29 @@ namespace collums{
                 
 			}
 			inline bool has_flags() const {
-				return !flags.empty();
+				return flagged;
 			}
 			nst::u8 get_flags(_Rid row) const {
-				if(!flags.empty()){
-					return flags[rows_start];
+				if(flagged){
+					return flags[row - rows_start];
 				}
 				return 0;
 			}
 		};
 
 		
-		
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
 		static const _Rid MAX_PAGE_SIZE = 32768*8;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
-		typedef std::map<std::string, std::shared_ptr<_CachePages>, std::less<std::string>, sta::col_tracker<_CachePage> > _Caches; ///
 
+		struct _CachePagesUser{
+			_CachePagesUser() : users(0){}
+			_Rid users;
+			_CachePages pages;
+		};
+		
+		typedef std::map<std::string, std::shared_ptr<_CachePagesUser>, std::less<std::string>, sta::col_tracker<_CachePage> > _Caches; ///
+		
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
 			return m;
@@ -559,7 +565,28 @@ namespace collums{
 			static _Caches _g_cache;
 			return _g_cache;
 		}
+		void unload_cache(std::string name, _Rid last_logical_row){
+				{
+				_Rid p = last_logical_row/MAX_PAGE_SIZE+1;
+				NS_STORAGE::synchronized ll(get_mutex());
+			
+				if(get_g_cache().count(name)!=0){
 
+					std::shared_ptr<_CachePagesUser> user = get_g_cache()[name];
+					
+					user->users--;	
+					if(!user->users){
+						if(user->pages.size()!=p)
+							printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
+						user->pages.resize(p);
+					}
+					
+
+				}
+				
+				
+			}
+		}
 		
 		_CachePages* load_cache(std::string name, _Rid last_logical_row){
 			_CachePages * result = 0;
@@ -569,13 +596,15 @@ namespace collums{
 			
 				if(get_g_cache().count(name)==0){
 
-					std::shared_ptr<_CachePages> pages = std::make_shared<_CachePages>();
+					std::shared_ptr<_CachePagesUser> user = std::make_shared<_CachePagesUser>();
 					_Rid p = last_logical_row/MAX_PAGE_SIZE+1;
-					pages->resize(p);
-					get_g_cache()[name] = pages;
+					user->pages.resize(p);
+					get_g_cache()[name] = user;
 
 				}
-				result = get_g_cache()[name].get() ;
+				std::shared_ptr<_CachePagesUser> user = get_g_cache()[name];
+				user->users++;
+				result = &(user->pages);
 			}
 		
 			return result;
@@ -627,14 +656,23 @@ namespace collums{
 			typename _ColMap::iterator c = e;
 			if(!col.empty()){
 				--c;
-				r = c.key().get_value() + 1;
-
+				r = c.key().get_value() + 1;				
 			}
 			return r;
 		}
 		void check_page_cache(){
 			rows = get_v_row_count(); //(_Rid)col.size();
 			load_cache();			
+		}
+		void uncheck_page_cache(){
+			if(pages!=nullptr){
+				pages = nullptr;
+
+				unload_cache(storage.get_name(),rows);
+			}
+		}
+		/// no assignments please
+		collumn& operator=(const collumn&){
 		}
 	public:
 		void set_lazy(bool dl){
@@ -649,15 +687,14 @@ namespace collums{
 		collumn(std::string name, bool load = false)
 		:	storage(name)
 		,	col(storage)
-
 		,	pages(nullptr)
+		,	rows(0)
 		,	rows_per_key(0)
 		,	modified(false)
 		,	lazy(load)
-			
+		
 		{
-			
-			check_page_cache();
+						
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -704,7 +741,7 @@ namespace collums{
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
-		_CachePage* load_page(_Rid requested){			
+		_CachePage* load_page(_Rid requested, bool no_load = false){			
 			_Rid i = (requested % MAX_PAGE_SIZE);
 			_Rid l = requested - i;
 			_Rid p = l/MAX_PAGE_SIZE;
@@ -718,10 +755,9 @@ namespace collums{
 					NS_STORAGE::synchronized synch(page->lock);
 					if(page->available){
 						nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-						if(treestore_current_mem_use + bytes_used > treestore_max_mem_use){
+						if(no_load || treestore_current_mem_use + bytes_used > treestore_max_mem_use){
 							//printf("ignoring col cache for %s\n", storage.get_name().c_str());
-							page->unload();				
-							col.reduce_use();
+							page->unload();											
 							page = nullptr;
 							return page;	
 						}
@@ -794,6 +830,7 @@ namespace collums{
 		}
 
 		void commit1(){
+			
 			if(modified){
 				col.reduce_use();
 
@@ -803,11 +840,14 @@ namespace collums{
 		}
 
 		void commit2(){
+			uncheck_page_cache();
+
 			if(modified){
 
 				storage.commit();
 			}
 			modified = false;
+			
 		}
 
 		void tx_begin(bool read,bool shared= true){
@@ -819,7 +859,7 @@ namespace collums{
 			if(modified){
 				col.flush();
 			}
-
+			uncheck_page_cache();
 			col.reduce_use();
 			modified = false;			
 			
@@ -849,13 +889,12 @@ namespace collums{
 
 		void erase(_Rid row){
 			col.erase(row);
-			if((*this).rows > 0) --(*this).rows;
 			_CachePage * page = load_page(row);
 			if(page != nullptr){
 
 				NS_STORAGE::synchronized synch(page->lock);
 				
-				page->make_flags();
+				
 
 				page->invalidate(row);
 				
@@ -864,7 +903,7 @@ namespace collums{
 
 		void add(_Rid row, const _Stored& s){
 			rows = std::max<_Rid>(row+1, rows);
-			_CachePage * page = load_page(row);
+			_CachePage * page = load_page(row,true);
 			if(page != nullptr){
 
 				NS_STORAGE::synchronized synch(page->lock);

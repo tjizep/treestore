@@ -2017,9 +2017,9 @@ namespace storage{
 		/// the version may be merged with dependent previous versions
 
 		void commit(version_storage_type* transaction){
-		
-			stored::reduce_all();
-			
+			if(treestore_current_mem_use > treestore_max_mem_use){
+				stored::reduce_all();
+			}
 		
 			syncronized _sync(*lock);
 

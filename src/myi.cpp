@@ -1436,7 +1436,7 @@ public:
 
 		}
 		if(stx::memory_low_state){
-			get_thread()->own_reduce();
+			//get_thread()->own_reduce();
 		}
 		DBUG_RETURN(r);
 	}
