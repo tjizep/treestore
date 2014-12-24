@@ -273,7 +273,7 @@ namespace collums{
 		struct _CachePage{
 		public:
 			typedef stored::standard_entropy_coder<_Stored> _Encoded;
-			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0){} ;//
+			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),flagged(false){} ;//
 			~_CachePage(){
 				
 				rows_cached = 0;
@@ -281,7 +281,7 @@ namespace collums{
 			}
 		
 			
-			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0){				
+			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),flagged(false){				
 
 				(*this) = right;
 			}
@@ -522,9 +522,13 @@ namespace collums{
 
 			void make_flags(){
 				if(!flagged){
-					
+					NS_STORAGE::synchronized ll(lock);
+					if(!flagged){
+						flags.resize(MAX_PAGE_SIZE);
+						flagged = true;
+					}
 				}
-				flagged = true;
+				
 			}
 			void unload(){
 				clear();
@@ -537,7 +541,8 @@ namespace collums{
 			}
 			nst::u8 get_flags(_Rid row) const {
 				if(flagged){
-					return flags[row - rows_start];
+					if(!flags.empty())
+						return flags[row - rows_start];
 				}
 				return 0;
 			}
