@@ -255,7 +255,7 @@ namespace collums{
 			}
 
 			void invalidate(nst::u8& flags){
-
+				
 				flags |= F_INVALID;
 			}
 
@@ -297,13 +297,18 @@ namespace collums{
 				loaded = right.loaded;
 				flags = right.flags;
 				flagged = right.flagged;
+				modified = right.modified;
 				_data = data.empty()? nullptr : & data[0];
+				access = right.access;
+				modified = right.modified;
 				return (*this);
 			}
 		public:
 			bool available;
 			bool loaded;
 			Poco::Mutex lock;
+			Poco::AtomicCounter modified;
+			Poco::AtomicCounter access;
 			_Flags flags;
 		private:
 			
@@ -329,6 +334,7 @@ namespace collums{
 				
 			}
 			void invalidate(_Rid row){
+				++modified;
 				nst::u8 & flags = (*this).flags[row-rows_start];
 				_temp.invalidate(flags);
 			}
@@ -347,6 +353,8 @@ namespace collums{
 				available = true;
 				loaded = false;
 				flagged = false;
+				modified = 0;
+				access = 0;
 			}
 			void encode(_Rid row){
 				encoded.set(row-rows_start, data[row]);
@@ -578,12 +586,33 @@ namespace collums{
 				if(get_g_cache().count(name)!=0){
 
 					std::shared_ptr<_CachePagesUser> user = get_g_cache()[name];
-					
+					typedef std::pair<_Rid, _CachePage*> _EvictionPair;
+					typedef std::vector<_EvictionPair> _Evicted;
+					_Evicted evicted;
 					user->users--;	
 					if(!user->users){
-						if(user->pages.size()!=p)
+						if(user->pages.size()!=p){
 							printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
-						user->pages.resize(p);
+							user->pages.resize(p);
+						}
+						_Rid loaded = 0;
+						for(_CachePages::iterator p = user->pages.begin(); p != user->pages.end(); ++p){
+							
+							if((*p).modified > MAX_PAGE_SIZE/8 || !((*p).available)){
+								(*p).clear();
+							}
+							if((*p).loaded){
+								++loaded;
+								evicted.push_back(std::make_pair((*p).access, &(*p)));
+							}
+						}
+						std::sort(evicted.begin(),evicted.end());
+						/// evict 5 percent least used or least recently used depending how access is specified
+						_Rid remaining = evicted.size() / 20;
+						for(_Evicted::iterator e = evicted.begin() ; e != evicted.end() && remaining > 0; ++e,--remaining){
+							(*e).second->clear();
+						}
+
 					}
 					
 
@@ -754,7 +783,7 @@ namespace collums{
 			if( has_cache() && p < (*pages).size()){
 				page = &((*pages)[p]);
 				if(page->loaded){
-				
+					++(page->access);
 				}else if(page->available){
 					
 					NS_STORAGE::synchronized synch(page->lock);
