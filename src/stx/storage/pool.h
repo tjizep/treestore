@@ -15,6 +15,7 @@
 #include <sparsehash/dense_hash_map>
 #include <sparsehash/sparse_hash_map>
 #include <typeinfo>
+#include <unordered_map>
 extern void add_btree_totl_used(ptrdiff_t added);
 extern void remove_btree_totl_used(ptrdiff_t added);
 
@@ -313,7 +314,8 @@ namespace stx{
 
 					_Bucket bucket;
 				};
-				typedef ::google::dense_hash_map<size_t, _Clocked> _Buckets;
+				//typedef ::google::dense_hash_map<size_t, _Clocked> _Buckets;
+				typedef std::unordered_map<size_t, _Clocked> _Buckets;
 				typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _CleanupWorkerManager;
 				 
 				class _CleanupWorker : public asynchronous::AbstractWorker{
@@ -347,7 +349,7 @@ namespace stx{
 				u64 max_pool_size;
 				u64 used_period;
 				_Buckets buckets;				
-			
+				
 				
 			protected:	
 				_CleanupWorkerManager& get_cleanup(){
@@ -376,22 +378,38 @@ namespace stx{
 
 				void setup_dh(){
 
-					buckets.set_empty_key(MAX_ALLOCATION_SIZE+1);
-					buckets.set_deleted_key(MAX_ALLOCATION_SIZE+2);					
+					//buckets.set_empty_key(MAX_ALLOCATION_SIZE+1);
+					//buckets.set_deleted_key(MAX_ALLOCATION_SIZE+2);					
 				}
+
+				typedef std::vector<size_t> _Empties;
+				_Empties empties;
+				
 				size_t find_lru_size(){
 					u64 mclock = (*this).clock;
 					size_t msize = MAX_ALLOCATION_SIZE;					
+					size_t row = 0;
+					empties.clear();
 					for(_Buckets::iterator b = (*this).buckets.begin(); b != (*this).buckets.end(); ++b){
 						if((*b).second.bucket.empty()){/// skip empty buckets
+							empties.push_back((*b).first);
 						}else{
 
 							if( (*b).second.clock < mclock){
+								row = 0;
 								mclock = (*b).second.clock;
 								msize = (*b).first;
+							}else{
+								++row;
+							}
+							if(row > 16 && msize < MAX_ALLOCATION_SIZE){ // if theres more than 16 in a row just stop its ok
+								break;
 							}
 						}
 					
+					}
+					for(_Empties::iterator e = empties.begin(); e != empties.end();++e){
+						(*this).buckets.erase((*e));
 					}
 					return msize;
 				}
@@ -475,7 +493,7 @@ namespace stx{
 						
 						return result;
 					}
-					size_t size = requested + (requested % MIN_ALLOCATION_SIZE);
+					size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
 					_Allocated result ;
 					
 					_Bucket &current =  get_bucket(size);
@@ -507,7 +525,7 @@ namespace stx{
 						return;
 					}
 					{
-						size_t size = requested + (requested % MIN_ALLOCATION_SIZE);
+						size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
 						_Bucket &current =  get_bucket(size,false);
 						_Allocated allocated((u8*)data, ti);
 						allocated.is_new = false;

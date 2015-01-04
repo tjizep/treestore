@@ -472,7 +472,7 @@ namespace collums{
 					
 					bool ok = true;
 					for(c = col.lower_bound(start); c != e; ++c){
-						_Rid r = c.key().get_value();
+						/// _Rid r = c.key().get_value();
 						encoded.sample(c.data());
 						encoded.total_bytes_allocated();
 						++ctr;
@@ -654,10 +654,10 @@ namespace collums{
 		_Stored empty;
 		_Rid cache_size;
 		_Rid rows;
-		nst::u32 rows_per_key;
+		_Rid rows_per_key;
 		bool modified;
 		bool lazy;
-
+		nst::u32 sampler;
 		inline bool has_cache() const {
 			return pages != nullptr ;
 		}
@@ -726,7 +726,7 @@ namespace collums{
 		,	rows_per_key(0)
 		,	modified(false)
 		,	lazy(load)
-		
+		,	sampler(0)
 		{
 						
 #ifdef _DEBUG
@@ -753,7 +753,7 @@ namespace collums{
 
 		}
 		/// returns a sampled rows per key statistic for the collumn
-		nst::u32 get_rows_per_key(){
+		_Rid get_rows_per_key(){
 			typedef std::set<_Stored> _Uniques;
 			if(rows_per_key == 0){
 
@@ -780,10 +780,12 @@ namespace collums{
 			_Rid l = requested - i;
 			_Rid p = l/MAX_PAGE_SIZE;
 			_CachePage * page = nullptr;
+			++sampler;
 			if( has_cache() && p < (*pages).size()){
 				page = &((*pages)[p]);
 				if(page->loaded){
-					++(page->access);
+					if(sampler & 16)
+						++(page->access);
 				}else if(page->available){
 					
 					NS_STORAGE::synchronized synch(page->lock);
@@ -823,6 +825,7 @@ namespace collums{
 		}
 
 		inline _Stored& seek_by_cache(_Rid row)  {
+			
 			if(treestore_column_cache && !lazy){
 				_CachePage* page = load_page(row);
 				if(page != nullptr){
@@ -866,7 +869,7 @@ namespace collums{
 		void commit1(){
 			
 			if(modified){
-				col.reduce_use();
+				col.flush_buffers();
 
 			}
 			
@@ -878,7 +881,9 @@ namespace collums{
 
 			if(modified){
 
-				storage.commit();
+				if(!storage.commit()){
+					rollback();
+				}
 			}
 			modified = false;
 			
@@ -912,7 +917,12 @@ namespace collums{
 			if(!tx)
 				storage.rollback();
 		}
-
+		void flush_tree(){
+			bool tx = storage.is_transacted();
+			col.flush_buffers();
+			if(!tx)
+				storage.rollback();
+		}
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));
 		}

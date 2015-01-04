@@ -11,15 +11,15 @@ namespace allocator_test{
 
 		NS_STORAGE::stream_address sa =0;
 		test_the_alloc->allocate(sa,NS_STORAGE::create);
-		mvcc_coordinator_type::version_storage_type* version =  mvcc.begin();
+		mvcc_coordinator_type::version_storage_type* version =  mvcc.begin(false);
 
 		version->allocate(sa,NS_STORAGE::read);
 		mvcc.commit(version);
 
-		mvcc_coordinator_type::version_storage_type* version2 =  mvcc.begin();
+		mvcc_coordinator_type::version_storage_type* version2 =  mvcc.begin(true);
 		mvcc.commit(version2);
 
-		mvcc_coordinator_type::version_storage_type* version3 =  mvcc.begin();
+		mvcc_coordinator_type::version_storage_type* version3 =  mvcc.begin(false);
 		mvcc.discard(version3);
 		//mvcc.commit(version3);
 		printf("allocators tested\n");

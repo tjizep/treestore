@@ -78,8 +78,7 @@ private:
 		writer.write7BitEncoded(buffer.size());
 		if(!buffer.empty())
 			writer.writeRaw((const char*)&buffer[0], buffer.size() );
-		else if(command != nst::JOURNAL_COMMIT)
-			printf("the journal buffer is empty\n");
+		/// else if(!(command == nst::JOURNAL_COMMIT || command == nst::JOURNAL_TEMP_INFO)) 	printf("the journal buffer is empty\n");
 	}
 	void compact()
 	{
@@ -146,7 +145,7 @@ public:
 	}
 
 	void recover(){
-
+		synchronized _s(nst::get_single_writer_lock());
 		typedef std::vector<_Command> _Commands;
 		typedef std::unordered_map<std::string, stored::_Transaction*> _PendingTransactions;
 		std::ifstream journal_istr(journal_name, std::ios::binary);
@@ -188,7 +187,7 @@ public:
 						if(transaction == nullptr){
 
 							if(is_valid_storage_directory(storage_name)){
-								transaction = storage->begin();
+								transaction = storage->begin(true);
 								pending[storage_name] = transaction;
 							}
 						}
@@ -235,7 +234,7 @@ public:
 
 	void synch(bool force)
 	{
-		nst::synchronized s(jlock);
+		synchronized _s(nst::get_single_writer_lock());
 		if(last_synch != sequence){
 			
 			add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary

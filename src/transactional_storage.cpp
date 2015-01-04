@@ -8,6 +8,11 @@ static Poco::Mutex& get_stats_lock(){
 }
 namespace stx{
 namespace storage{
+	Poco::Mutex& get_single_writer_lock(){
+		static Poco::Mutex swl;
+		return swl;
+	}
+	
 	long long total_use = 0;
 	
 	long long buffer_use = 0;

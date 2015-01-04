@@ -47,9 +47,13 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "fields.h"
 
 namespace units{
-	static const double MB = 1024.0*1024.0;
-	static const double GB = 1024.0*1024.0*1024.0;
+	static const double KB = 1024.0;
+	static const double MB = 1024.0*KB;
+	static const double GB = 1024.0*MB;
+	static const double TB = 1024.0*GB;
+	static const double PB = 1024.0*TB;
 }
+
 namespace tree_stored{
 
 
@@ -71,7 +75,7 @@ namespace tree_stored{
 	private:
 
 	public:
-		conversions() : attribute(32768) {
+		conversions() : attribute(units::KB*128) {
 			attribute.set_charset(system_charset_info);
 		}
 
@@ -171,10 +175,14 @@ namespace tree_stored{
 		}
 		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::VarCharStored& b){
-
+			if(b.get_size()==0){
+				printf("WARNING: invalid source varchar buffer supplied\n");
+				return;
+			}
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
-			if(et == MYSQL_TYPE_VARCHAR){
+			bool fast_varchar = false;
+			if(fast_varchar && et == MYSQL_TYPE_VARCHAR){
 				Field_varstring * fv = static_cast< Field_varstring*>(f);
 				uint lb = fv->length_bytes;
 				uint fl = fv->field_length;
@@ -186,7 +194,10 @@ namespace tree_stored{
 					*ptr= (uchar) cl;
 				else
 					int2store(ptr, cl);
-			}else if(et == MYSQL_TYPE_STRING){
+				return;
+			}
+				
+			if(fast_varchar && et == MYSQL_TYPE_STRING){
 				Field_string * fv = static_cast<Field_string*>(f);
 				uint lb = fv->field_length;
 				uint cl = (uint)b.get_size() - 1;
@@ -196,8 +207,13 @@ namespace tree_stored{
 				}else{
 					memcpy(ptr, b.chars(), lb);
 				}
-
-			}else f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
+				return;
+			}
+			if(et == MYSQL_TYPE_BLOB){
+				Field_blob * fb =  static_cast<Field_blob*>(f);
+				fb->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
+			}else 
+				f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
 
 		}
 		/// getters mysql->ts

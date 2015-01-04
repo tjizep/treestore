@@ -60,6 +60,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/BinaryWriter.h"
 #include "Poco/BinaryReader.h"
 #include "Poco/File.h"
+#include "Poco/ThreadLocal.h"
+
 #include <stx/storage/pool.h>
 
 /// TODODONE: initialize 'next' to address of last block available
@@ -75,6 +77,7 @@ namespace storage{
 
 	extern Poco::UInt64 ptime;
 	extern Poco::UInt64 last_flush_time;		/// last time it released memory to disk
+	extern Poco::Mutex& get_single_writer_lock();
 	/// defines a concurrently accessable transactional storage providing ACID properties
 	/// This class should be extended to provide encoding services for a b-tree or other
 	/// storage oriented data structures
@@ -1589,7 +1592,55 @@ namespace storage{
 		}
 
 	};
+	/// list of file names actioned or to action
+	typedef std::vector<std::string> _FileNames;
+	/// remove all related tempfiles for a storage
+	static _FileNames delete_temp_files_of(const std::string& name){
+		using Poco::StringTokenizer;
+		using Poco::Path;
+		using Poco::DirectoryIterator;
+		StringTokenizer components(name, "\\/");
+		std::string path;
+		std::string numbers = "0123456789";
+		size_t e = (components.count()-1);
+			
+		for(size_t s = 0; s < e; ++s){
+			path += components[s] ;
+			if (s < e-1)
+				path += Path::separator();
+		}
 
+		_FileNames files;
+		std::string name_path = path + Path::separator();
+		for(DirectoryIterator d(path); d != DirectoryIterator();++d){				
+			try{
+				if((*d).isFile()){
+					std::string full_name = name_path + d.name();
+					if(full_name.substr(0,name.size())==name 
+						&& full_name.size() > name.size() + 1
+						&& full_name[name.size()] == '.'
+						&& numbers.find_first_of(full_name[name.size()+1]) != std::string::npos
+						){
+						printf("found temp file %s\n",full_name.c_str());
+						
+						try{
+							Poco::File df (full_name);
+							if(df.exists()){
+								df.remove();
+							}
+							files.push_back(full_name);
+						}catch(...){
+						}
+					}
+				}
+			}catch( Poco::PathNotFoundException& ){
+				/// can happen when alter table operation takes place
+			}catch( Poco::FileNotFoundException& ){
+				/// can happen when alter table operation takes place
+			}
+		}
+		return files;
+	}
 	/// coordinates mvcc enabled storages - the mvcc ness of a storage is defined by its
 	///
 	/// set+get_version, add_reader, remove_reader and get_readers, set+get_order  members
@@ -1623,7 +1674,7 @@ namespace storage{
 		typedef typename storage_allocator_type::address_type address_type;
 	private:
 		
-		typedef std::vector<std::string> _FileNames;
+		
 
 		struct version_namer{
 			std::string name;
@@ -1655,7 +1706,11 @@ namespace storage{
 
 		u64 order;							/// transaction order set on commit
 
-		u32 active_transactions;
+		u32 active_transactions;			/// transactions currently underway
+
+		u32 writing_transactions;			/// writing transactions not committed or rolled back
+
+		u32 writing_transaction_thread;		/// thread which started the writing transaction
 
 		version_type next_version;			/// next version generator
 
@@ -1697,46 +1752,7 @@ namespace storage{
 				initial->complete();
 			}
 		}
-		_FileNames delete_temp_files_of(const std::string& name){
-			using Poco::StringTokenizer;
-			using Poco::Path;
-			using Poco::DirectoryIterator;
-			StringTokenizer components(name, "\\/");
-			std::string path;
-			std::string numbers = "0123456789";
-			size_t e = (components.count()-1);
-			
-			for(size_t s = 0; s < e; ++s){
-				path += components[s] ;
-				if (s < e-1)
-					path += Path::separator();
-			}
-
-			_FileNames files;
-			std::string name_path = path + Path::separator();
-			for(DirectoryIterator d(path); d != DirectoryIterator();++d){				
-				if((*d).isFile()){
-					std::string full_name = name_path + d.name();
-					if(full_name.substr(0,name.size())==name 
-						&& full_name.size() > name.size() + 1
-						&& full_name[name.size()] == '.'
-						&& numbers.find_first_of(full_name[name.size()+1]) != std::string::npos
-						){
-						printf("found temp file %s\n",full_name.c_str());
-						
-						try{
-							Poco::File df (full_name);
-							if(df.exists()){
-								df.remove();
-							}
-							files.push_back(full_name);
-						}catch(...){
-						}
-					}
-				}
-			}
-			return files;
-		}
+		
 	public:
 
 		/// merge idle transactions from latest to oldest
@@ -1867,6 +1883,8 @@ namespace storage{
 		)
 		:   order(1)
 		,	active_transactions(0)
+		,	writing_transactions(0)
+		,	writing_transaction_thread(0)
 		,	next_version(1)
 		,	last_address ( initial->last() )
 		,	initial(initial)
@@ -1953,6 +1971,13 @@ namespace storage{
 				}/// else TODO: its an error since the merge should produce only one table on completion in idle state
 			}
 		}
+		
+		/// check if idle for maintenance
+		
+		bool is_idle(){
+			syncronized _sync(*lock);
+			return ( 0 == references && 0 == active_transactions );
+		}
 
 		/// reduces use
 
@@ -1967,21 +1992,40 @@ namespace storage{
 			
 			
 		}
-
+			
+		public:
 		/// start a new version with a dependency on the previously commited version or initial storage
 		/// smart pointers are not thread safe so only use them internally
 
-		version_storage_type* begin(){
+		version_storage_type* begin(bool writer){
+			
+			if(writer){
+				get_single_writer_lock().lock();
+			}
+
+			
 			syncronized _sync(*lock);
 			/// TODODONE: reuse an existing unmerged transaction - possibly share unmerged transactions
 			/// TODODONE: lazy create unmerged transactions only when a write occurs
 			/// TODO: optimize mergeable transactions
 			/// TODODONE: merge unused transactions into single transaction
+			if(writer && writing_transactions){
+				printf("WARNNIG: writing transaction already active\n");
+				throw InvalidWriterOrder();
+			}
+			if(references==0){
+				printf("WARNING: started transaction without active references\n");
+			}
+			
 			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
 			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()));
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
-			
+			if(writer)
+				b->unset_readonly();
+			else
+				b->set_readonly();
+				
 			storage_versions[b->get_version()] = b;
 			if(!storages.empty()){
 				b->set_previous(storages.back());
@@ -1991,11 +2035,15 @@ namespace storage{
 				}
 
 				++active_transactions;
+				if(writer){
+					++writing_transactions;
+					writing_transaction_thread = Poco::Thread::currentTid();
+				}
 			}else{
 
 				throw WriterConsistencyViolation();
 			}
-
+			
 			return b.get();
 		}
 
@@ -2010,93 +2058,129 @@ namespace storage{
 			syncronized _sync(*lock);
 			return active_transactions;
 		}
-
+	
 		/// finish a version and commit it to storage
 		/// the commit is coordinated with other mvcc storages
 		/// via the journal
 		/// the version may be merged with dependent previous versions
-
-		void commit(version_storage_type* transaction){
+		/// returns true if the commit could take place
+		bool commit(version_storage_type* transaction){
 			if(treestore_current_mem_use > treestore_max_mem_use){
 				stored::reduce_all();
 			}
-		
-			syncronized _sync(*lock);
-
-			//printf("[COMMIT MVCC] [%s] %lld at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
-			--active_transactions;
-			if(transaction->modified() && transaction->get_order() < order){
-				discard(transaction);
-				throw InvalidWriterOrder();
+			bool writer = !transaction->is_readonly();
+			if(writer){
+				get_single_writer_lock().unlock();
 			}
 
-			version_storage_type_ptr version = storage_versions.at(transaction->get_version());
+			{
+				syncronized _sync(*lock);
 
-			if(version == nullptr){
-				throw InvalidVersion();
+				if(active_transactions == 0){
+					discard(transaction);
+					printf("WARNNIG: cannot commit: no more active transactions\n");
+					throw InvalidWriterOrder();
+				
+					// return false;
+				}
+				//printf("[COMMIT MVCC] [%s] %lld at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
+			
+				if(writer && transaction->modified() && transaction->get_order() < order){
+					discard(transaction);
+					printf("WARNNIG: invalid writer order\n");
+					throw InvalidWriterOrder();
+				
+					
+				}
+				--active_transactions;
+				if(writer)
+					--writing_transactions;
+				version_storage_type_ptr version = storage_versions.at(transaction->get_version());
+
+				if(version == nullptr){
+					throw InvalidVersion();
+				}
+
+
+				version->set_readonly();
+
+				if (!recovery)		/// dont journal during recovery
+					transaction->journal((*this).initial->get_name());
+
+
+				last_address = std::max<address_type>(last_address, version->last());
+
+				version_storage_type_ptr prev = version->get_previous();
+				if(prev==nullptr)
+					throw WriterConsistencyViolation();
+				if(prev != storages.back()){
+					throw ConcurrentWriterError();
+				}
+				while(prev != nullptr){
+					prev->remove_reader();
+					prev = prev->get_previous();
+				}
+				storages.push_back(version);
+
+				++order;			/// increment transaction count
+
+				merge_down();		/// merge unused transaction versions
+									/// releasing any held resources
 			}
-
-
-			version->set_readonly();
-
-			if (!recovery)		/// dont journal during recovery
-				transaction->journal((*this).initial->get_name());
-
-
-			last_address = std::max<address_type>(last_address, version->last());
-
-			version_storage_type_ptr prev = version->get_previous();
-			if(prev==nullptr)
-				throw WriterConsistencyViolation();
-			if(prev != storages.back()){
-				throw ConcurrentWriterError();
+			if(writer){
+				//get_single_writer_lock().unlock();
 			}
-			while(prev != nullptr){
-				prev->remove_reader();
-				prev = prev->get_previous();
-			}
-			storages.push_back(version);
-
-			++order;			/// increment transaction count
-
-			merge_down();		/// merge unused transaction versions
-								/// releasing any held resources
-
-
+			return true;
 		}
 
 		/// discard a new version similar to rollback
 
 		void discard(version_storage_type* transaction){
 
-			synchronized _sync(*lock);
-			--active_transactions;
-			//printf("[DISCARD MVCC] [%s] at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
+			bool writer = !transaction->is_readonly();			
+			if(writer){
+				get_single_writer_lock().unlock();
+			}
 
-			if(transaction->get_previous() == nullptr)
 			{
-				throw InvalidVersion();
-			}///  an error - there is probably no initial version
+				synchronized _sync(*lock);
+				if(active_transactions==0){
+					printf("WARNNIG: cannot rollback: no active transactions away\n");
 
-			transaction->set_readonly();
-			transaction->set_discard_on_finalize();
-			transaction->set_transient();
-			version_storage_type_ptr version = storage_versions.at(transaction->get_version());
+				}
+				if(writer)
+					--writing_transactions;
+				--active_transactions;
+				//printf("[DISCARD MVCC] [%s] at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
 
-			if(version == nullptr){
-				throw InvalidVersion();
+				if(transaction->get_previous() == nullptr)
+				{
+					throw InvalidVersion();
+				}///  an error - there is probably no initial version
+
+				transaction->set_readonly();
+				transaction->set_discard_on_finalize();
+				transaction->set_transient();
+				version_storage_type_ptr version = storage_versions.at(transaction->get_version());
+
+				if(version == nullptr){
+					throw InvalidVersion();
+				}
+				if(version.get() != transaction){
+					throw InvalidVersion();
+				}
+				version_storage_type_ptr prev = version->get_previous();
+
+				while(prev != nullptr){
+					prev->remove_reader();
+					prev = prev->get_previous();
+				}
+
+				storage_versions.erase(transaction->get_version());
 			}
-			if(version.get() != transaction){
-				throw InvalidVersion();
+			if(writer){
+				//get_single_writer_lock().unlock();
 			}
-			version_storage_type_ptr prev = version->get_previous();
-
-			while(prev != nullptr){
-				prev->remove_reader();
-				prev = prev->get_previous();
-			}
-
-			storage_versions.erase(transaction->get_version());
 			
 		}
 

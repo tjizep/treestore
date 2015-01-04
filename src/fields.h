@@ -350,8 +350,9 @@ namespace stored{
 		typedef empty_encoder list_encoder;
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
 	protected:
-		typedef NS_STORAGE::u8 _size_type;
-		typedef NS_STORAGE::u8 _BufferSize;
+		
+		typedef NS_STORAGE::u16 _BufferSize;
+		static const size_t max_buffersize = 1 << (sizeof(_BufferSize) << 3);
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 		NS_STORAGE::u8 buf[_ConstSize];
@@ -377,14 +378,12 @@ namespace stored{
 			return extract_ptr();
 		}
 		void null_check() const {
-			if((size_t)(this) < 60000ll){
-				::MessageBox(NULL, "Null check", "error",MB_OK);
-			}
+			
 		}
-		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t nbytes){
+		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
 			null_check();
 			using namespace NS_STORAGE;
-			
+			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8 *)allocation_pool.allocate(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
 			if(bytes > _ConstSize){
@@ -394,9 +393,10 @@ namespace stored{
 			bytes = (u32)nbytes;
 			return nbuf;
 		}
-		NS_STORAGE::u8* _resize_buffer(size_t nbytes){
+		NS_STORAGE::u8* _resize_buffer(size_t mnbytes){
 			null_check();
 			using namespace NS_STORAGE;
+			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8* r = data();
   			if(nbytes > bytes){
 				r = dyn_resize_buffer(r,nbytes);
@@ -617,7 +617,7 @@ namespace stored{
 
 			return !not_equal(right);
 		}
-		inline NS_STORAGE::u8  get_size() const {
+		inline size_t  get_size() const {
 			return size;
 		}
 		NS_STORAGE::u32 stored() const {
@@ -630,6 +630,9 @@ namespace stored{
 		}
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
+			if(size > 64000){
+				printf("WARNING: large buffer\n");
+			}
 			buffer_type::iterator writer = w;
 			writer = leb128::write_signed(writer, size);
 			const u8 * end = data()+size;
@@ -644,28 +647,34 @@ namespace stored{
 			buffer_type::const_iterator reader = r;
 			size = 0;
 			if(reader != buffer.end()){
-				//size = *reader;
-				size = leb128::read_signed(reader);				
-				if(size <= 8){
-					//++reader;
-					const nst::u8 * d = &(*reader);	
-					*((nst::u64*)data()) = *((const nst::u64*)d);
-					
+				bool fast = false;
+				
+				if(fast){
+
+					size = *reader;
+
+					if(size <= 8){
+						++reader;
+						const nst::u8 * d = &(*reader);	
+						*((nst::u64*)data()) = *((const nst::u64*)d);					
+					}else{
+						size = leb128::read_signed(reader);				
+						_resize_buffer(size);				
+						memcpy(data(),&(*reader),size);						
+					}
+					reader += size;
 				}else{
-					
+					size = leb128::read_signed(reader);				
+
 					_resize_buffer(size);
+					const u8 * end = data()+size;
 				
-					memcpy(data(),&(*reader),size);
+					for(u8 * d = data(); d < end ; ++d,++reader){
+						*d = *reader;
+					}				
 				}
-				//const u8 * end = data()+size;
-				
-				
-				
-				/*for(u8 * d = data(); d < end; ++d,++reader){
-					*d = *reader;
-				}*/
 			}
-			return reader+size;
+			return reader;
 		};
 	};
 
@@ -713,18 +722,20 @@ namespace stored{
 
 		};
 
-		typedef std::vector<nst::u8, sta::tracker<nst::u8, sta::bt_counter> > _Data;
+		typedef std::vector<nst::u8, sta::pool_alloc_tracker<nst::u8> > _Data;
 
 		static const size_t MAX_BYTES = 2048;
 
 		typedef _Rid row_type ;
 
-		typedef NS_STORAGE::u8 _size_type;
-		typedef NS_STORAGE::u8 _BufferSize;
+		typedef NS_STORAGE::u16 _BufferSize;
 
 	protected:
 
-		nst::u8 buf[sizeof(_Data)];
+		static const size_t static_size = sizeof(_Data)*4;
+		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
+
+		nst::u8 buf[static_size];
 		_BufferSize bs;// bytes used
 
 		inline _Data& get_Data(){
@@ -734,25 +745,25 @@ namespace stored{
 			return *(const _Data*)&buf[0];
 		}
 		inline nst::u8* data(){
-			if(bs==sizeof(_Data))
+			if(bs==static_size)
 				return &(get_Data())[0];
 			return &buf[0];
 		}
 		inline const nst::u8* data() const{
-			if(bs==sizeof(_Data))
+			if(bs==static_size)
 				return &(get_Data())[0];
 			return &buf[0];
 		}
-		inline nst::u8* _resize_buffer(size_t nbytes){
+		inline nst::u8* _resize_buffer(size_t mnbytes){
 
 			using namespace NS_STORAGE;
-
-			if(nbytes >= sizeof(_Data) && bs < nbytes){
-				bs = sizeof(_Data);
+			size_t nbytes = std::min<size_t>(mnbytes, max_buffer_size);
+			if(nbytes >= static_size && bs < nbytes){
+				bs = static_size;
 				new (&get_Data()) _Data();
 			}else
 				bs = (_BufferSize)nbytes;
-			if(bs==sizeof(_Data)){
+			if(bs==static_size){
 				if(get_Data().capacity() < nbytes){
 					nst::i64 d = get_Data().capacity();
 					get_Data().resize(nbytes);					
@@ -763,7 +774,7 @@ namespace stored{
 			return data();
 		}
 		NS_STORAGE::u8* _append( size_t count ){
-			size_t os = size();
+			size_t os = size();			
 			NS_STORAGE::u8* r = _resize_buffer( os + count ) + os;
 
 			return r;
@@ -823,12 +834,12 @@ namespace stored{
 		row_type row;
 	public:
 		size_t total_bytes_allocated() const {
-			if(bs==sizeof(_Data))
+			if(bs==static_size)
 				return sizeof(*this) + get_Data().capacity();
 			return sizeof(*this);
 		}
 		int size() const {
-			if(bs==sizeof(_Data))
+			if(bs==static_size)
 				return (int)get_Data().size();
 			return bs;
 		}
@@ -943,7 +954,7 @@ namespace stored{
 
 		void add(const stored::VarCharStored& v){
 
-			add(v.get_value(),v.get_size()-1);
+			add(v.get_value(),v.get_size());
 		}
 
 		void addTerm(const char* k, size_t s){
@@ -953,7 +964,7 @@ namespace stored{
 		void clear(){
 
 			row = 0;
-			if(bs==sizeof(_Data)){
+			if(bs==static_size){
 				get_Data().clear();
 			}else{
 				bs = 0;
@@ -962,7 +973,7 @@ namespace stored{
 		}
 
 		~DynamicKey(){
-			if(bs==sizeof(_Data)){				
+			if(bs==static_size){				
 				get_Data().~_Data();				
 			}
 			bs = 0;
@@ -1000,8 +1011,14 @@ namespace stored{
 		}
 
 		DynamicKey& operator=(const DynamicKey& right){
-			_resize_buffer(right.size());
-			memcpy(data(), right.data(), right.size());
+			if(right.bs < static_size){
+				bs = right.bs;
+				memcpy(buf, right.buf, bs);
+			}else{
+				_resize_buffer(right.size());
+				memcpy(data(), right.data(), right.size());
+			
+			}
 			row = right.row;
 			return *this;
 		}
@@ -1192,10 +1209,13 @@ namespace stored{
 			writer = leb128::write_signed(writer, row);
 			writer = leb128::write_signed(writer, size());
 
-			const u8 * end = data()+size();
-			for(const u8 * d = data(); d < end; ++d,++writer){
+			
+			memcpy(&(*writer),data(),size());
+			writer += size();
+			//const u8 * end = data()+size();
+			/*for(const u8 * d = data(); d < end; ++d,++writer){
 				*writer = *d;
-			}
+			}*/
 			return writer;
 		};
 
@@ -1205,9 +1225,8 @@ namespace stored{
 			if(reader != buffer.end()){
 				row = leb128::read_signed(reader);
 				size_t s = leb128::read_signed(reader);
-				if(s > MAX_BYTES){
-					s = MAX_BYTES;
-				}
+				//memcpy(_resize_buffer(s), &(*reader), s);
+				//reader += s;
 				u8 * end = _resize_buffer(s)+s;
 				for(u8 * d = data(); d < end; ++d,++reader){
 					*d = *reader;
@@ -1388,7 +1407,7 @@ namespace stored{
 
 		void add(const stored::VarCharStored& v){
 
-			add(v.get_value(),v.get_size()-1);
+			add(v.get_value(),v.get_size());
 		}
 
 		void addTerm(const char* k, size_t s){
@@ -1525,6 +1544,8 @@ namespace stored{
 		struct entropy_t{
 			typedef _IntType _Sampled;
 			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
+			/// typedef ::google::dense_hash_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>> _UnsortedHistogram;
+			/// typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
 		protected:
 			nst::u64 samples;
@@ -1549,7 +1570,12 @@ namespace stored{
 				}
 				return sorted_histogram;
 			}
-			
+			const _UnsortedHistogram& get_unsorted_histogram() const {
+				return histogram;
+			}
+			_UnsortedHistogram& get_unsorted_histogram() {
+				return histogram;
+			}
 			const _Histogram& get_sorted_histogram() const {				
 				return sorted_histogram;
 			}
@@ -1641,6 +1667,9 @@ namespace stored{
 				}
 			};
             typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
+			/// typedef ::google::dense_hash_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
+			
+			/// typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
 			typedef std::vector<_IntType, sta::col_tracker<_IntType> > _DeCodeMap;
 
 			_Entropy stats;
@@ -1652,6 +1681,7 @@ namespace stored{
 			_CodeType code_size;
 
 			int_fix_encoded_buffer() : code_size(0){
+
 			}
 
 			size_t capacity() const {
@@ -1727,11 +1757,11 @@ namespace stored{
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
 					nst::u32 words = 0;
 					{
-						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
+						typename _Entropy::_UnsortedHistogram::iterator h = (*this).stats.get_unsorted_histogram().begin();
 						
-						decodes.resize((*this).stats.get_sorted_histogram().size());
+						decodes.resize((*this).stats.get_unsorted_histogram().size());
 
-						for(;h != (*this).stats.get_sorted_histogram().end();++h){
+						for(;h != (*this).stats.get_unsorted_histogram().end();++h){
 							codes[(*h).first] = words;						
 							decodes[words] = (*h).first;
 							++words;
@@ -2010,7 +2040,7 @@ namespace stored{
 		struct standard_entropy_coder<IntStored >{
 			typedef IntStored _DataType;
 			int_fix_unmapped_encoded_buffer<_DataType> coder;
-			
+			///int_fix_encoded_buffer<_DataType> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -2060,6 +2090,7 @@ namespace stored{
 		struct standard_entropy_coder<UIntStored >{
 			typedef UIntStored _DataType;
 			int_fix_unmapped_encoded_buffer<_DataType> coder;
+			/// int_fix_encoded_buffer<_DataType> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -2104,6 +2135,7 @@ namespace stored{
 		template<>
 		struct standard_entropy_coder<ShortStored >{
 			int_fix_unmapped_encoded_buffer<ShortStored> coder;
+			/// int_fix_encoded_buffer<ShortStored> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -2147,6 +2179,7 @@ namespace stored{
 		template<>
 		struct standard_entropy_coder<UShortStored >{
 			int_fix_unmapped_encoded_buffer<UShortStored> coder;
+			/// int_fix_encoded_buffer<UShortStored> coder;
 			bool empty() const {
 				return coder.empty();
 			}
@@ -2296,6 +2329,8 @@ namespace stored{
 	};
 
 	class index_interface{
+	private:
+		bool destroyed;
 	public:
 		int ix;
 		int fields_indexed;
@@ -2303,7 +2338,13 @@ namespace stored{
 		stored::_Parts density;
 		
 		std::string name;
-
+		index_interface() : destroyed(false){
+		}
+		virtual ~index_interface(){
+			if(destroyed)
+				printf("destroyed index already\n");
+			destroyed = true;
+		};
 		virtual const DynamicKey *predict(index_iterator_interface& io, DynamicKey& q)=0;
 		virtual void cache_it(index_iterator_interface& io)=0;
 		virtual bool is_unique() const = 0;

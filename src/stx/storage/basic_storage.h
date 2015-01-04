@@ -15,7 +15,8 @@ extern long long treestore_max_mem_use ;
 extern long long treestore_current_mem_use ;
 extern long long  _reported_memory_size();
 extern long long calc_total_use();
-
+/// the allocation pool
+extern stx::storage::allocation::pool allocation_pool;
 extern "C"{
 	#include "zlib.h"
 };
@@ -27,6 +28,38 @@ namespace stx{
 
 	namespace storage{
 		namespace allocation{
+			template <class T>
+			class pool_alloc_tracker : public base_tracker<T>{
+			public:				
+				// rebind allocator to type U
+				template <class U>
+				struct rebind {
+					typedef pool_alloc_tracker<U> other;
+				};
+				pool_alloc_tracker() throw() {
+				}
+				pool_alloc_tracker(const pool_alloc_tracker&) throw() {
+				}
+				template <class U>
+				pool_alloc_tracker (const pool_alloc_tracker<U>&) throw() {
+				}
+				
+				// allocate but don't initialize num elements of type T
+				pointer allocate (size_type num, const void* = 0) {
+					bt_counter c;
+					c.add(num*sizeof(T)+overhead());
+					return (pointer)allocation_pool.allocate(num);
+				}
+				// deallocate storage p of deleted elements
+				void deallocate (pointer p, size_type num) {
+					
+					allocation_pool.free((void*)p,num);				
+			
+					bt_counter c;
+					c.remove(num*sizeof(T)+overhead());
+				}
+			};
+
 			template <class T>
 			class buffer_tracker : public base_tracker<T>{
 			public:				
@@ -235,9 +268,9 @@ namespace stx{
 			buff = dt;
 		}
 		/// LZ4
-		static void inplace_compress_lz4(buffer_type& buff){
+		static void inplace_compress_lz4(buffer_type& buff, buffer_type& t){
 			typedef char * encode_type_ref;
-			buffer_type t;
+			
 			i32 origin = buff.size();
 			/// TODO: cannot compress sizes lt 200 mb
 			t.resize(LZ4_compressBound((int)buff.size())+sizeof(i32));
@@ -250,6 +283,11 @@ namespace stx{
 
 			buff = t;			
 			
+		}
+		static void inplace_compress_lz4(buffer_type& buff){
+			
+			buffer_type t;
+			inplace_compress_lz4(buff, t);
 		}
 		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
 			if(buff.empty()){

@@ -53,6 +53,7 @@ namespace stored{
 
 	typedef _Allocations::version_storage_type _Transaction;
 	extern _Allocations* get_abstracted_storage(std::string name);
+	extern bool erase_abstracted_storage(std::string name);
 	extern void reduce_all();
 	class AbstractStored{
 	public:
@@ -92,20 +93,30 @@ namespace stored{
 			}
 			return *_allocations;
 		}
-		_Transaction& get_transaction(){
-			if(_transaction == NULL){
-				_transaction = get_allocations().begin();/// resource aquisition on initialization
-			}
-			return *_transaction;
-		}
-
 		_Transaction& get_transaction() const {
 			if(_transaction == NULL){
-				throw TransactionNotStartedException();
+				throw NullPointerException();
 			}
 			return *_transaction;
 		}
+		_Transaction& get_transaction(bool writer){
+			if(_transaction == NULL){
+				if(_allocations == NULL){
+					begin(writer);
+				}else
+					_transaction = get_allocations().begin(writer);/// resource aquisition on initialization
+				if(_transaction == NULL){
+					throw NullPointerException();
+				}
+			}
+			return *_transaction;
+		}
+		_Transaction& get_transaction(){
+			return get_transaction((*this).writer);
+		}
+		
 		NS_STORAGE::stream_address boot;
+		bool writer;
 	public:
 
 		std::string get_name() const {
@@ -121,6 +132,7 @@ namespace stored{
 		,	_allocations( NULL)
 		,	_transaction(NULL)
 		,	boot(1)
+		,	writer (false)
 		{
 
 			get_allocations().get_initial()->set_limit(1024ll*1024ll*1024ll*3ll);
@@ -134,6 +146,7 @@ namespace stored{
 				close();
 			}catch(const std::exception& ){
 				/// nothing todo in destructor
+				printf("error closing transaction\n");
 			}
 		}
 
@@ -182,10 +195,11 @@ namespace stored{
 			get_transaction().complete();
 		}
 		/// begin a transaction at this very moment
-		void begin(){
+		void begin(bool writer){
 			rollback();
 			get_allocations();
-			get_transaction();
+			(*this).writer = writer;
+			get_transaction(writer);
 		}
 
 		NS_STORAGE::i64 current_transaction_order() const{
@@ -195,21 +209,12 @@ namespace stored{
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
 		}
+		
 		bool is_transacted() const {
 			return (_transaction!=nullptr);
 		}
-		void set_reader(){
-			set_transaction_r(true);
-		}
-
-		void set_transaction_r(bool read){
-			if(_transaction==nullptr)
-				throw TransactionNotStartedException();
-			if(read)
-				get_transaction().set_readonly();
-			else
-				get_transaction().unset_readonly();
-		}
+		
+		
 		bool is_readonly() const {
 			if(_transaction == NULL) return true;
 			return get_transaction().is_readonly();
@@ -217,17 +222,20 @@ namespace stored{
 
 		/// a kind of auto commit - by starting the transaction immediately after initialization
 
-		void commit(){
+		bool commit(){
+			bool r = false;
 			if(_transaction != NULL){
-				get_allocations().commit(_transaction);
+				r = get_allocations().commit(_transaction);
 				_transaction = NULL;
 			}
+			(*this).writer = false;
+			return r;
 		}
 
 		/// return the version of the current transaction
 
 		NS_STORAGE::version_type get_version(){
-			return get_transaction().get_version();
+			return get_transaction((*this).writer).get_version();
 		}
 
 		/// releases whatever version locks may be used
@@ -236,6 +244,7 @@ namespace stored{
 			if(_transaction != NULL){
 				get_allocations().discard(_transaction);
 				_transaction = NULL;
+				(*this).writer = false;
 			}
 		}
 
@@ -251,6 +260,7 @@ namespace stored{
 				get_allocations().release();
 				_allocations = NULL;
 			}
+			(*this).writer = false;
 		}
 
 		/// returns true if the buffer passed marks the end of storage
@@ -304,33 +314,37 @@ namespace stored{
 		}
 
 	};
-	template<typename _Storage, typename _Map>
-	void abstracted_tx_begin(bool read,bool shared, _Storage& storage, _Map& map){
-		if(!read){
+	/// returns true if the map should reload
+	template<typename _Storage>
+	bool abstracted_tx_begin_1(bool read, _Storage& storage){
+		bool write = !read;
+		if(write){			
 			storage.rollback();
-			storage.begin();
-			storage.set_transaction_r(read);
-			map.unshare();
-			map.reload();
+			storage.begin(write);			
+			
+			return true;
 		}
 		else
 		{
 
 			if(storage.stale()){
 				storage.rollback();
-				storage.begin();
-				storage.set_transaction_r(read);
-				if(shared)
-					map.share(storage.get_name());
-				else map.unshare();
-				map.reload();
-			}else{
-				if(shared)
-					map.share(storage.get_name());
-				else map.unshare();
-				storage.set_transaction_r(read);
+				storage.begin(write);				
+				return true;
 			}
 		}
+		return false;
+	}
+	template<typename _Storage, typename _Map>
+	void abstracted_tx_begin(bool read,bool shared, _Storage& storage, _Map& map){
+		bool write = !read;
+		bool reload = abstracted_tx_begin_1(read,storage);
+		//if(write || !shared){
+			map.unshare();
+		//}else
+		//	map.share();
+		if(reload)
+			map.reload();		
 	}
 	/// definitions for registry functions
 	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;

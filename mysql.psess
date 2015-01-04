@@ -67,7 +67,22 @@
   </Binaries>
   <Reports>
     <Report>
-      <Path>mysql141225.vspx</Path>
+      <Path>mysql150102.vspx</Path>
+    </Report>
+    <Report>
+      <Path>mysql150103.vspx</Path>
+    </Report>
+    <Report>
+      <Path>mysql150103(1).vspx</Path>
+    </Report>
+    <Report>
+      <Path>mysql150103(2).vspx</Path>
+    </Report>
+    <Report>
+      <Path>mysql150103(3).vspx</Path>
+    </Report>
+    <Report>
+      <Path>mysql150103(4).vspx</Path>
     </Report>
   </Reports>
   <Launches>

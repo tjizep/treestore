@@ -26,10 +26,10 @@ void delete_info_table(const char* name){
 	nst::synchronized synch2(tt_info_delete_lock);
 	tree_stored::tree_table * result = info_tables[name];
 	if(NULL != result){
-		delete result ;
-		info_tables.erase(name);
+		result -> rollback();		
+		delete result;		
 	}
-	
+	info_tables.erase(name);
 }
 tree_stored::tree_table * get_info_table(TABLE* table){
 	nst::synchronized synch(tt_info_lock);

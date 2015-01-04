@@ -5,6 +5,6 @@
     <LocalDebuggerCommandArguments>--standalone --console </LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>C:\dev\bin\mysql-5.6.20-winx64</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerAttach>false</LocalDebuggerAttach>
+    <LocalDebuggerAttach>true</LocalDebuggerAttach>
   </PropertyGroup>
 </Project>

@@ -162,7 +162,7 @@ namespace tree_stored{
 			}
 
 		public:
-			static const int MAX_KEY_BUFFER = 300000;/// size of the write key buffer
+			static const int MAX_KEY_BUFFER = 120000;/// size of the write key buffer
 			static const int MIN_KEY_BUFFER = 10000;
 			IndexLoader(_IndexMap& index,Poco::AtomicCounter &loaders_away)
 			:	loaders_away(loaders_away)
@@ -364,7 +364,7 @@ namespace tree_stored{
 
 				wait_for_loaders();
 
-				//index.flush_buffers();
+				index.flush_buffers();
 
 			}
 			if(treestore_current_mem_use > treestore_max_mem_use){
@@ -373,8 +373,11 @@ namespace tree_stored{
 		}
 
 		void commit2(){
-			if(modified)
-				storage.commit();
+			if(modified){
+				if(!storage.commit()){
+					
+				}
+			}
 			modified = false;
 
 		}
@@ -489,6 +492,7 @@ namespace tree_stored{
 		}
 		virtual ~tree_index(){
 			unregister_eraser(name, &cache);
+			/// index.get_storage().release();
 		}
 
 		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){

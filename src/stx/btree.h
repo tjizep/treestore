@@ -227,7 +227,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 3,
 			interior_mul = 1,
-			keys_per_page = 256,
+			keys_per_page = 512,
 			caches_per_page = 16,
 			max_release = 8
 		};
@@ -696,7 +696,7 @@ namespace stx
 				{
 					if(context->get_storage()->is_readonly()){
 
-						printf("allocating new page in readonly mode\n");
+						printf("ERROR: allocating new page in readonly mode\n");
 						throw std::exception();
 					}
 					context->get_storage()->allocate(super::w, stx::storage::create);
@@ -1792,8 +1792,11 @@ namespace stx
 				if(interp.encoded_values(btree::allow_duplicates)){
 					interp.decode_values(buffer, reader, values, (*this).get_occupants());
 				}else{
+					size_t sd = 0;
 					for(u16 k = 0; k < (*this).get_occupants();++k){
+						sd = reader - buffer.begin();
 						storage.retrieve(buffer, reader, values[k]);
+						
 					}
 				}
 
@@ -2058,7 +2061,7 @@ namespace stx
 				buffer_type &buffer = get_storage()->allocate(w, stx::storage::create);
 				n->save(*get_storage(), buffer);
 				if(lz4){
-					inplace_compress_lz4(buffer);
+					inplace_compress_lz4(buffer,temp_compress);
 				}else{
 					inplace_compress_zlib(buffer);
 				}
@@ -2083,7 +2086,7 @@ namespace stx
 
 		/// called to direct the saving of a surface node to storage through instance
 		/// management routines in the b-tree
-
+		buffer_type temp_compress;
 		void save(surface_node* n, stream_address& w){
 			if(shared.nodes) return;
 			if(get_storage()->is_readonly()){
@@ -2097,7 +2100,7 @@ namespace stx
 				n->sort(stats, key_less);
 				n->save(key_interpolator(), *get_storage(), buffer);
 				if(lz4){
-					inplace_compress_lz4(buffer);
+					inplace_compress_lz4(buffer,temp_compress);
 				}else{
 					inplace_compress_zlib(buffer);
 				}

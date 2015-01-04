@@ -15,6 +15,28 @@ namespace stored{
 
 		return r;
 	}
+	bool erase_abstracted_storage(std::string name){
+		
+		nst::synchronized ll(m);
+		_Allocations* r = NULL;
+		_AlocationsMap::iterator s = instances.find(name);
+		if(s == instances.end()) return true;
+		r = (*s).second;
+		if(r == nullptr) return true;
+
+		if(r->is_idle()){
+			
+			r->set_recovery(false);
+			delete r;
+			instances.erase(name);
+
+			return true;
+		}else{
+			printf("the storage '%s' is not idle and could not be erased\n",name.c_str());
+		}				
+		
+		return false;
+	}
 	_Allocations* get_abstracted_storage(std::string name){
 		_Allocations* r = NULL;
 		{
