@@ -181,7 +181,7 @@ namespace tree_stored{
 			}
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
-			bool fast_varchar = false;
+			bool fast_varchar = true;
 			if(fast_varchar && et == MYSQL_TYPE_VARCHAR){
 				Field_varstring * fv = static_cast< Field_varstring*>(f);
 				uint lb = fv->length_bytes;

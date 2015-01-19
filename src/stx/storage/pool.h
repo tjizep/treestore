@@ -328,7 +328,7 @@ namespace stx{
 
 					virtual void work(){
 						for(_Bucket::iterator b = todo.bucket.begin(); b != todo.bucket.end(); ++b){
-							delete [] (*b).data;
+							delete (*b).data; ///[] ???
 						}
 					}
 				
@@ -394,7 +394,7 @@ namespace stx{
 						if((*b).second.bucket.empty()){/// skip empty buckets
 							empties.push_back((*b).first);
 						}else{
-
+							
 							if( (*b).second.clock < mclock){
 								row = 0;
 								mclock = (*b).second.clock;
@@ -419,19 +419,26 @@ namespace stx{
 						size_t lru_size = find_lru_size();
 						if(lru_size < MAX_ALLOCATION_SIZE){
 							_Clocked &clocked = (*this).buckets[lru_size];
-							if(clocked.size == lru_size){
-								while((allocated + used) > max_pool_size){
-									_Allocated allocated = clocked.bucket.back();
-									delete allocated.data;
-									used -= lru_size + overhead();
-									clocked.bucket.pop_back();
-									if(clocked.bucket.empty())
-										break;
-								}								
-								/// printf("removed lru pool buckets %lld from size %lld\n",(long long)required,(long long)lru_size);
+							bool treestore_mm_thread = true;
+							if(treestore_mm_thread){
+								get_cleanup().add(new _CleanupWorker(clocked));
+								used -= ( clocked.bucket.size() * ( lru_size + overhead() ) );
+								clocked.bucket.clear();
 							}else{
-								printf("Error in lru pool buckets %lld\n",(long long)lru_size);
-								return;
+								if(clocked.size == lru_size){
+									while((allocated + used) > max_pool_size){
+										_Allocated allocated = clocked.bucket.back();
+										delete allocated.data;
+										used -= lru_size + overhead();
+										clocked.bucket.pop_back();
+										if(clocked.bucket.empty())
+											break;
+									}								
+									/// printf("removed lru pool buckets %lld from size %lld\n",(long long)required,(long long)lru_size);
+								}else{
+									printf("Error in lru pool buckets %lld\n",(long long)lru_size);
+									return;
+								}
 							}
 						}else{							
 							return;
@@ -486,7 +493,7 @@ namespace stx{
 					
 					synchronized scoped(lock);
 					
-					if(heap_for_small_data && requested < MAX_SMALL_ALLOCATION_SIZE){
+					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
 						allocated += requested + overhead() ;
 						_Allocated result(new u8[requested],ti);
 						result.is_new = true;
@@ -519,7 +526,7 @@ namespace stx{
 					
 					check_lru();
 
-					if(heap_for_small_data && requested < MAX_SMALL_ALLOCATION_SIZE){
+					if(heap_for_small_data){// && requested < MAX_SMALL_ALLOCATION_SIZE){
 						allocated -= requested + overhead();
 						delete data;
 						return;
@@ -540,6 +547,10 @@ namespace stx{
 				bool is_depleted(){
 					synchronized scoped(lock);
 					return ( allocated >= max_pool_size );
+				}
+				bool is_full(){
+					synchronized scoped(lock);
+					return ( ( used + allocated )  >= max_pool_size );
 				}
 
 				/// returns true if the pool is nearing depletion

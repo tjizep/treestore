@@ -19,7 +19,7 @@ namespace stx{
 			typedef u32 stream_address ;
 			
 			/// the version type
-			typedef unsigned int version_type;
+			typedef u32 version_type;
 	};
 };
 

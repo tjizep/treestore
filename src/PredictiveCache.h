@@ -62,7 +62,7 @@ namespace tree_stored{
 	struct predictive_cache : public eraser_interface{
 	private:
 		static const NS_STORAGE::u64 CIRC_SIZE = 20000000;/// about 128 MB shared - the cachedrow is 32 bytes
-
+		typedef typename BasicIterator::key_type key_type;
 		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
 		typedef cached_row<typename BasicIterator::key_type> CachedRow;
 		typedef std::vector<CompositeStored> _Erased;
@@ -86,6 +86,9 @@ namespace tree_stored{
 				(*this).clear();
 				(*this).hash_size = hash_size;
 			}
+			hash_hits = 0;
+			hash_predictions = 0;
+			misses = 0;
 		}
 
 		~predictive_cache(){
@@ -128,7 +131,7 @@ namespace tree_stored{
 			using namespace NS_STORAGE;
 			if(predictor){
 				predictor++;
-				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 8);
+				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
 
 				while(predictor < stop){ /// this loop finds the hash item based on store history or order
 
@@ -149,17 +152,21 @@ namespace tree_stored{
 				return NULL;
 			}
 			typename BasicIterator::key_type kin = input;
-			_Rid h = ((nst::u32)(size_t)kin) % hash_size;
+			_Rid h = (((size_t)kin) % hash_size);
 			predictor = cache_index[h];
+			if(predictor < sec_cache.size()){
+				const key_type& k = sec_cache[predictor].k;
+				if(predictor && k.left_equal_key(kin) ){
 
-			if(predictor && sec_cache[predictor].k.left_equal_key(kin) ){
+					++hash_hits; // neither hit nor miss
+					return &sec_cache[predictor].k.return_or_copy(rval);
 
-				++hash_hits; // neither hit nor miss
-				return &sec_cache[predictor].k.return_or_copy(rval);
-
+				}
+				predictor = 0;
+				++misses;
+			}else{
+				printf("invalid h(2)\n");
 			}
-			predictor = 0;
-			++misses;
 			return NULL;
 
 		}
@@ -200,13 +207,13 @@ namespace tree_stored{
 
 			if(!load()) return;
 			store_pos = sec_cache.size();
-			if(store_pos >= CIRC_SIZE) return;
+			//if(store_pos >= CIRC_SIZE) return;
 			if(!(*this).hash_size) return;
 			if(cache_index.empty()){
 				clear();
 				return;
 			}
-			size_t h = ((nst::u32)(size_t)iter.key()) % hash_size;
+			size_t h = ((size_t)iter.key()) % hash_size;
 
 			if(cache_index[h] == 0){
 				cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
@@ -214,7 +221,19 @@ namespace tree_stored{
 				cr.k = iter.key();
 				total_cache_size-=(sizeof(CachedRow)*sec_cache.capacity());
 				sec_cache.push_back(cr);
-				total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity());
+				total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity());	
+			}else{
+				size_t at = cache_index[h];
+				const key_type& k = sec_cache[at].k;
+				size_t h2 = ((size_t)sec_cache[at].k) % hash_size;
+				if(h2 != h){
+					printf("hash does not match position\n");
+				}
+				if(k.left_equal_key(iter.key())){
+					printf("k already exists\n");						
+				}else{
+					sec_cache[at].k = iter.key();
+				}
 			}
 			
 			

@@ -71,14 +71,7 @@ extern	char treestore_column_cache ;
 extern  char treestore_column_encoded ;
 extern  char treestore_predictive_hash ;
 extern  char treestore_reduce_tree_use_on_unlock;
-namespace storage_workers{
-	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
 
-
-	extern unsigned int get_next_counter();
-	extern const int MAX_WORKER_MANAGERS;
-	extern _WorkerManager & get_threads(unsigned int id);
-};
 
 namespace NS_STORAGE = stx::storage;
 namespace nst = stx::storage;
@@ -148,11 +141,14 @@ namespace stored{
 		template<typename _Stored>
 		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {			
 			size_t bytes = occupants * sizeof(_Stored);
-			nst::u8* dest = &(*writer);
+			//nst::u8* dest = &(buffer[0]);
 			const nst::u8* src = (const nst::u8*)values;
-			memcpy(dest, src, bytes);
-
-			writer+=bytes;
+			//memcpy(dest, src, bytes);
+			for(size_t b = 0; b < bytes; ++b){
+				(*writer) = src[b];
+				++writer;
+			}
+			//writer+=bytes;
 		}
 
 		/// byte size of encoded buffer for given data values
@@ -344,8 +340,10 @@ namespace stored{
 			return (size_t)value;
 		}
 	};
-	template<bool CHAR_LIKE, int _ConstSize = 16>
+	template<bool CHAR_LIKE, int _MConstSize = 16>
 	class Blobule {
+	protected:
+		static const int _ConstSize = _MConstSize;
 	public:
 		typedef empty_encoder list_encoder;
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
@@ -383,6 +381,9 @@ namespace stored{
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
 			null_check();
 			using namespace NS_STORAGE;
+			if(mnbytes > 32768){
+				printf("WARNING: large buffer\n");
+			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8 *)allocation_pool.allocate(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
@@ -630,8 +631,8 @@ namespace stored{
 		}
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
-			if(size > 64000){
-				printf("WARNING: large buffer\n");
+			if(size > 32768){
+				printf("WARNING: large buffer %lld\n",(long long)size);
 			}
 			buffer_type::iterator writer = w;
 			writer = leb128::write_signed(writer, size);
@@ -645,7 +646,7 @@ namespace stored{
 		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			size = 0;
+			
 			if(reader != buffer.end()){
 				bool fast = false;
 				
@@ -664,14 +665,15 @@ namespace stored{
 					}
 					reader += size;
 				}else{
-					size = leb128::read_signed(reader);				
+					size_t s = leb128::read_signed(reader);				
 
-					_resize_buffer(size);
-					const u8 * end = data()+size;
+					_resize_buffer(s);
+					const u8 * end = data()+s;
 				
 					for(u8 * d = data(); d < end ; ++d,++reader){
 						*d = *reader;
 					}				
+					size = s;
 				}
 			}
 			return reader;
@@ -705,8 +707,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 22> BlobStored;
-	typedef stored::Blobule<true, 16> VarCharStored;
+	typedef stored::Blobule<false, 24> BlobStored;
+	typedef stored::Blobule<true, 22> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -732,7 +734,7 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data)*4;
+		static const size_t static_size = sizeof(_Data)*8;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];
@@ -968,7 +970,7 @@ namespace stored{
 				get_Data().clear();
 			}else{
 				bs = 0;
-				memset(buf, 0,sizeof(buf));
+				//memset(buf, 0,sizeof(buf));
 			}
 		}
 
@@ -976,22 +978,22 @@ namespace stored{
 			if(bs==static_size){				
 				get_Data().~_Data();				
 			}
-			bs = 0;
-			row = 0;
+			//bs = 0;
+			//row = 0;
 		}
 
 		DynamicKey():
 			bs(0),
 			row(0)
 		{
-			memset(buf, 0,sizeof(buf));
+			//memset(buf, 0,sizeof(buf));
 		}
 
 		DynamicKey(const DynamicKey& right):
 			bs(0),
 			row(0)
 		{
-			memset(buf, 0,sizeof(buf));
+			//memset(buf, 0,sizeof(buf));
 			*this = right;
 		}
 
@@ -1547,20 +1549,33 @@ namespace stored{
 			/// typedef ::google::dense_hash_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>> _UnsortedHistogram;
 			/// typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
+			typedef std::vector<_Sampled, ::sta::col_tracker<_Sampled> > _UniqueSamples; //
 		protected:
 			nst::u64 samples;
 			nst::u64 bytes_allocated;
 			_UnsortedHistogram histogram;
 			_Histogram sorted_histogram;
+			_UniqueSamples unique;
 			void clear_sorted(){
 				_Histogram sorted_histogram;
 				(*this).sorted_histogram.swap(sorted_histogram);
+				_UniqueSamples u;
+				(*this).unique.swap(u);
 			}
 			void clear_unsorted(){
 				_UnsortedHistogram h;
+				
 				(*this).histogram.swap(h);
+				_UniqueSamples u;
+				(*this).unique.swap(u);
 			}
 		public:
+			_UniqueSamples& get_unique_samples(){
+				return unique;
+			}
+			const _UniqueSamples& get_unique_samples() const {
+				return unique;
+			}
 			_Histogram& get_sorted_histogram(){
 				if(sorted_histogram.empty()){
 					for(_UnsortedHistogram::iterator u = histogram.begin(); u!=histogram.end();++u){
@@ -1589,6 +1604,7 @@ namespace stored{
 			void clear(){
 				samples = 0;
 				bytes_allocated = sizeof(*this);
+				
 				clear_unsorted();
 				clear_sorted();
 			}
@@ -1597,7 +1613,14 @@ namespace stored{
 					clear_sorted();
 				}
 				size_t before = histogram.size();
-				histogram[data]++;
+				_UnsortedHistogram::iterator u = histogram.find(data);
+				if(u == histogram.end()){
+					++histogram[data];
+					(*this).unique.push_back(data.get_value());
+				}else{
+					++((*u).second);
+				}
+				
 				++samples;
 				if(before < histogram.size()){
 					bytes_allocated += data.total_bytes_allocated();
@@ -1618,29 +1641,64 @@ namespace stored{
 		struct int_entropy_t : public entropy_t<_IntType>{
 			
 			
-			typename _IntType::value_type get_max_val()  {
+			typename _IntType::value_type get_max_val()  const {
 				if(histogram.empty())
 					return 0;
-				
-				_Histogram::const_iterator i = get_sorted_histogram().end();
-				return (*(--i)).first.get_value();
+				size_t l = get_unique_samples().size();
+				nst::i64 high =get_at(0);
+				for (size_t i = 1; i < l; i++) {
+					if(high < get_at(i)){
+						high = get_at(i);
+					}
+				}
+				return (_IntType::value_type) high;
 
 			}
 			
-			typename _IntType::value_type get_min_val()  {
+			typename _IntType::value_type get_min_val()  const {
 				if(histogram.empty())
 					return 0;
-				_Histogram::const_iterator i = get_sorted_histogram().begin();
-				
-				return (*i).first.get_value();
+				size_t l = get_unique_samples().size();
+				nst::i64 low =get_at(0);
+				for (size_t i = 1; i < l; i++) {
+					if( get_at(i) < low ){
+						low = get_at(i);
+					}
+				}
+				return (_IntType::value_type)low;
 
 			}
-			
-			typename nst::u32 get_abs()  {
-				if(histogram.empty())
+			nst::i64 get_at(size_t at)const{
+				return get_unique_samples()[at].get_value();
+			}
+			typename nst::u64 get_abs()  {
+				if(get_unique_samples().empty())
 					return 0;
+				size_t l = get_unique_samples().size();
+				nst::i64 low  = get_at(0),high = get_at(0);
+ 
+				size_t start = (l & 1) ? 1 : 0;
 				
-				return ( nst::u32 ) labs(get_max_val()-get_min_val());
+ 
+				for (size_t i = start; i < l; i+=2) {
+ 
+					if (get_at(i) < get_at(i+1)) {
+						if (low > get_at(i)) {
+							low = get_at(i);
+						}
+						if (high < get_at(i+1)) {
+							high = get_at(i+1);
+						}
+					} else {
+						if (low > get_at(i+1)) {
+							low = get_at(i+1);
+						}
+						if (high < get_at(i)) {
+							high = get_at(i);
+						}
+					}
+				}								
+				return labs(high-low);
 			}
 		};
 
@@ -1757,11 +1815,11 @@ namespace stored{
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
 					nst::u32 words = 0;
 					{
-						typename _Entropy::_UnsortedHistogram::iterator h = (*this).stats.get_unsorted_histogram().begin();
+						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
 						
-						decodes.resize((*this).stats.get_unsorted_histogram().size());
+						decodes.resize((*this).stats.get_sorted_histogram().size());
 
-						for(;h != (*this).stats.get_unsorted_histogram().end();++h){
+						for(;h != (*this).stats.get_sorted_histogram().end();++h){
 							codes[(*h).first] = words;						
 							decodes[words] = (*h).first;
 							++words;
@@ -1851,7 +1909,7 @@ namespace stored{
 
 			void encode(_Rid row, const _IntType &val){
 				if(codes.empty()){
-					_CodeType code = val.get_value() - min_decoded;
+					_CodeType code = (_CodeType)val.get_value() -(_CodeType)min_decoded;
 					symbols.set(row, code);
 					return;
 				}
@@ -1896,8 +1954,11 @@ namespace stored{
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
-					nst::u32 bits_in_histogram = bits::bit_log2((nst::u32)(*this).stats.get_entropy())+2;
-					nst::u32 bits_in_abs = bits::bit_log2((nst::u32)(*this).stats.get_abs());
+					size_t instances = (*this).stats.get_unique_samples().size();
+					/// bits per symbol in mapped encoding
+					nst::u32 bits_in_histogram = bits::bit_log2((nst::u32)(*this).stats.get_entropy()) * rows + 8 * sizeof(_IntType) * stats.get_entropy();
+					/// bits per symbol in abs encoding
+					nst::u32 bits_in_abs = bits::bit_log2((nst::u32)(*this).stats.get_abs()) * rows;
 					/// not sure about negative values yet, although translation i.o. mapping should sort them out
 					if(bits_in_abs < bits_in_histogram){						
 						decodes.swap(_DeCodeMap());
@@ -1912,12 +1973,12 @@ namespace stored{
 						
 						nst::u32 words = 0;
 						{
-							typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
-							for(;h != (*this).stats.get_sorted_histogram().end();++h){
+							decodes.resize((*this).stats.get_unique_samples().size());
+							typename _Entropy::_UniqueSamples::iterator h = (*this).stats.get_unique_samples().begin();
+							for(;h != (*this).stats.get_unique_samples().end();++h){
 
-								codes[(*h).first] = words;
-								decodes.resize(words+1);
-								decodes[words] = (*h).first;
+								codes[(*h)] = words;
+								decodes[words] = (*h);
 								++words;
 
 							}
@@ -2036,6 +2097,106 @@ namespace stored{
 		};
 #define _ENTROPY_CODING_
 #ifdef _ENTROPY_CODING_
+		
+		template<>
+		struct standard_entropy_coder<LongIntStored >{
+			typedef LongIntStored _DataType;
+			int_fix_unmapped_encoded_buffer<_DataType> coder;
+			///int_fix_encoded_buffer<_DataType> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			
+			bool applicable() const {
+				return true;
+			}
+			
+			void sample(const _DataType &data){
+				coder.get_stats().sample(data);
+			}
+			
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
+			}
+
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const _DataType& data){
+				coder.encode(row, data);
+			}
+			const _DataType& get( _Rid row) const {
+				return coder.decode(row);
+			}
+			_DataType& get( _Rid row) {
+				return coder.decode(row);
+			}
+			nst::u64 get_entropy() {
+				return 0; //coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
+		
+		template<>
+		struct standard_entropy_coder<ULongIntStored >{
+			typedef ULongIntStored _DataType;
+			int_fix_unmapped_encoded_buffer<_DataType> coder;
+			///int_fix_encoded_buffer<_DataType> coder;
+			bool empty() const {
+				return coder.empty();
+			}
+			
+			bool applicable() const {
+				return true;
+			}
+			
+			void sample(const _DataType &data){
+				coder.get_stats().sample(data);
+			}
+			
+			size_t total_bytes_allocated() const {
+				return coder.get_stats().total_bytes_allocated();
+			}
+
+			void finish(_Rid rows){
+				coder.initialize(rows);
+			}
+			void clear(){
+				coder.clear();
+			}
+			bool good() const {
+				return !coder.empty();
+			}
+			void optimize(){
+				coder.optimize();
+			}
+			void set(_Rid row, const _DataType& data){
+				coder.encode(row, data);
+			}
+			const _DataType& get( _Rid row) const {
+				return coder.decode(row);
+			}
+			_DataType& get( _Rid row) {
+				return coder.decode(row);
+			}
+			nst::u64 get_entropy() {
+				return 0; //coder.get_stats().get_entropy();
+			}
+			size_t capacity() const {
+				return coder.capacity();
+			}
+		};
 		template<>
 		struct standard_entropy_coder<IntStored >{
 			typedef IntStored _DataType;

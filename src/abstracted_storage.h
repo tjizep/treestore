@@ -161,6 +161,7 @@ namespace stored{
 			get_transaction().complete();
 			return !ba.empty();
 		}
+	
 		bool get_boot_value(NS_STORAGE::i64 &r, NS_STORAGE::stream_address boot){
 			r = 0;
 			const NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
@@ -247,7 +248,14 @@ namespace stored{
 				(*this).writer = false;
 			}
 		}
+		
+		/// get versions
 
+		void get_greater_version_diff(const nst::_VersionRequests& request, nst::_VersionRequests& response){
+			if(_transaction != NULL){
+				get_allocations().get_greater_version_diff(request, response);
+			}
+		}
 		/// close the named storage so that files may be removed
 
 		void close(){
@@ -319,10 +327,13 @@ namespace stored{
 	bool abstracted_tx_begin_1(bool read, _Storage& storage){
 		bool write = !read;
 		if(write){			
-			storage.rollback();
+			bool r = storage.stale();
+			
+			if(r)
+				storage.rollback();			
 			storage.begin(write);			
 			
-			return true;
+			return !r;
 		}
 		else
 		{

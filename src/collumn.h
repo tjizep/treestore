@@ -51,7 +51,7 @@ namespace collums{
 		
 	extern void set_loading_data(const std::string& name, int loading);
 	extern int get_loading_data(const std::string& name);
-
+	extern long long col_page_use;
 	template<typename _Stored>
 	class collumn {
 	public:
@@ -256,7 +256,7 @@ namespace collums{
 
 			void invalidate(nst::u8& flags){
 				
-				flags |= F_INVALID;
+				flags |= (F_NOT_NULL|F_INVALID);
 			}
 
 			void _D_validate(nst::u8& flags){
@@ -355,6 +355,7 @@ namespace collums{
 				flagged = false;
 				modified = 0;
 				access = 0;
+				
 			}
 			void encode(_Rid row){
 				encoded.set(row-rows_start, data[row]);
@@ -452,6 +453,21 @@ namespace collums{
 				available = true;
 				
 			}
+			void finish_decoded(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
+				const bool treestore_only_encoded = false;
+				//printf("page: did not reduce %s from %.4g MB col pu: %.4g MB\n", name.c_str(), (double)calc_use() / units::MB, (double)col_page_use / units::MB);						
+				if(treestore_only_encoded){
+					encoded.clear();					
+					clear();
+					available = false;
+				}else{
+					resize(rows_cached);
+					load_data(col,start,p_end);
+					col_page_use += calc_use() ;
+					//if(treestore_column_encoded)
+					//	printf("page: could not reduce %s from %.4g MB\n", name.c_str(), (double)calc_use() / units::MB);
+				};
+			}
 			void finish(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
 				
 				const _Rid CKECK = 1000000;
@@ -468,13 +484,13 @@ namespace collums{
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
 				nst::u64 use_begin = calc_use();
-				if(treestore_column_encoded){
+				if(treestore_column_encoded && encoded.applicable()){
 					
 					bool ok = true;
 					for(c = col.lower_bound(start); c != e; ++c){
 						/// _Rid r = c.key().get_value();
 						encoded.sample(c.data());
-						encoded.total_bytes_allocated();
+						
 						++ctr;
 
 						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/2){							
@@ -495,29 +511,22 @@ namespace collums{
 						encoded.set(r-start, c.data());
 						
 					}
+					
+					encoded.optimize();
 
 					if(calc_use() < use_before ){
 						
-						encoded.optimize();
+						
 						loaded = true;
 						available = true;
-						//printf("page: reduced %s from %.4g to %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB);
+						//printf("page: reduced %s from %.4g to %.4g MB col pu: %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB, (double)col_page_use / units::MB);
+						col_page_use += calc_use() ;
 					}else{
-						//printf("page: did not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);						
-						encoded.clear();
-						resize(rows_cached);
-						load_data(col,start,p_end);
+						finish_decoded(col,name,start,p_end);
 					}
 
-				}else{					
-					encoded.clear();					
-					resize(rows_cached);
-					load_data(col,start,p_end);
-					//if(treestore_column_encoded)
-						//printf("page: could not reduce %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-					//else
-						//printf("page column use %s from %.4g MB\n", name.c_str(), (double)use_before / units::MB);
-					
+				}else{	
+					finish_decoded(col,name,start,p_end);
 				}				
 			}
 			nst::i64 calc_use(){
@@ -558,7 +567,7 @@ namespace collums{
 
 		
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 32768*8;
+		static const _Rid MAX_PAGE_SIZE = 32768*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{
@@ -899,7 +908,7 @@ namespace collums{
 				col.flush();
 			}
 			uncheck_page_cache();
-			col.reduce_use();
+			///col.reduce_use();
 			modified = false;			
 			
 			storage.rollback();
@@ -938,7 +947,7 @@ namespace collums{
 
 				NS_STORAGE::synchronized synch(page->lock);
 				
-				
+				page->make_flags();
 
 				page->invalidate(row);
 				

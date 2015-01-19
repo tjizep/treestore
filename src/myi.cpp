@@ -85,16 +85,16 @@ namespace tree_stored{
 	class tree_thread{
 	protected:
 		int locks;
-		int write_locks;
+		
 		bool changed;
 		Poco::Thread::TID created_tid;
-		bool writing;
+		
 
 	public:
 		int get_locks() const {
 			return locks;
 		}
-		tree_thread() : locks(0),write_locks(0),changed(false),writing(false){
+		tree_thread() : locks(0),changed(false){
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
 			DBUG_PRINT("info",(" *** Tree Store (eyore) mem use configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
@@ -155,26 +155,9 @@ namespace tree_stored{
 
 		tree_table * lock(TABLE *table_arg, bool writer){
 			tree_table * result = NULL;
-			if(locks && !writer && writing){
-				printf("WARNING: changing lock from write to read\n");
-			}
-			if(locks && writer && !writing){
-				printf("WARNING: changing lock from read to write\n");
-			}
-			if(locks){
-				printf("WARNING: thread already locked\n");
-			}
 			
 			if(writer){
-				
-				//if(0 == write_locks)
-					
-				++write_locks;
-				if(writers!=0){
-					//printf("WARNING: there are writers active\n");
-				}
-				++writers;
-				writing = true;
+				changed = true;
 			}
 
 			//synchronized _s(p2_lock);
@@ -202,20 +185,12 @@ namespace tree_stored{
 
 			print_read_lookups();
 
-			changed = false;
-				
-			
 			--locks;
-
-			if(writing){
-				--write_locks;
-				writing = false;
-				--writers;
-				//if(0 == write_locks)
-				
-					
+			if(!locks){
+				changed = false;
 			}
-			//single_writer_lock.unlock();				
+
+			
 		}
 		void own_reduce_col_trees(){
 			DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
@@ -337,7 +312,21 @@ public:
 private:
 	_Threads threads;
 	Poco::Mutex tlock;
+	
+	tree_stored::tree_thread writer;
 public:
+	tree_stored::tree_thread *get_writer(){
+		nst::get_single_writer_lock().lock();
+		writer.modify();
+		return &writer;
+	}
+	bool release_writer(tree_stored::tree_thread * w){
+		if(w == &writer && w->get_locks()==0){
+			nst::get_single_writer_lock().unlock();
+			return true;
+		}
+		return false;
+	}
 	void remove_table(const std::string &name){
 		NS_STORAGE::syncronized ul(tlock);
 
@@ -406,8 +395,9 @@ public:
 				}
 		}
 	}
-
 	void reduce(){
+	}
+	void _reduce(){
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if((*t)->get_locks()==0)/// this should ignore busy threads
@@ -438,7 +428,7 @@ public:
 	}
 public:
 	void check_journal(){
-		nst::synchronized ss(tlock);
+		nst::synchronized ss(nst::get_single_writer_lock());
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 			(*t)->check_journal();
 		}
@@ -515,10 +505,15 @@ tree_stored::tree_thread * thread_from_thd(THD* thd){
 	return *stpp;
 }
 
-tree_stored::tree_thread * new_thread_from_thd(THD* thd){
+tree_stored::tree_thread * new_thread_from_thd(THD* thd,bool writer){
 	tree_stored::tree_thread** stpp = thd_to_tree_thread(thd);
+	
 	if((*stpp) == NULL){
-		*stpp = st.reuse_thread();
+		if(writer){
+			*stpp = st.get_writer();
+		}else{
+			*stpp = st.reuse_thread();
+		}
 	}
 	if(*stpp == NULL){
 		printf("the thread thd is NULL\n");
@@ -539,7 +534,7 @@ tree_stored::tree_thread * old_thread_from_thd(THD* thd,THD* thd_old){
 }
 
 tree_stored::tree_thread* updated_thread_from_thd(THD* thd){
-	tree_stored::tree_thread* r = new_thread_from_thd(thd);
+	tree_stored::tree_thread* r = new_thread_from_thd(thd,false);
 	return r;
 }
 
@@ -563,10 +558,10 @@ public:
 	}
 
 	tree_stored::tree_thread* get_thread(THD* thd){
-		return new_thread_from_thd(thd);
+		return new_thread_from_thd(thd,false);
 	}
 	tree_stored::tree_thread* get_thread(){
-		return new_thread_from_thd(ha_thd());
+		return new_thread_from_thd(ha_thd(),false);
 	}
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
@@ -1004,9 +999,11 @@ public:
 			return 0;
 		}
 		bool writer = false;
-
+		if(lock_type == F_WRLCK){
+			writer = true;
+		}
 		bool high_mem = calc_total_use() > treestore_max_mem_use ;
-		tree_stored::tree_thread * thread = new_thread_from_thd(thd);
+		tree_stored::tree_thread * thread = new_thread_from_thd(thd,writer);
 		if(total_locks==0){
 			nst::synchronized s(mut_total_locks);
 			if(total_locks==0){
@@ -1048,14 +1045,12 @@ public:
 				++total_locks;
 			}
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
-
-				return HA_ERR_LOCK_TABLE_FULL;
+				NS_STORAGE::journal::get_instance().synch(true);
+				if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max)
+					return HA_ERR_LOCK_TABLE_FULL;
 			}
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));
-			if(lock_type == F_WRLCK){
-				writer = true;
-				thread->modify();
-			}
+			
 			(*this).tt = thread->lock(table, writer);
 			
 			
@@ -1073,8 +1068,11 @@ public:
 				clear_selection(selected);
 
 				clear_thread(thd);
-
-				st.release_thread(thread);
+				if(thread->is_writing()){
+					st.release_writer(thread);
+				}else{
+					st.release_thread(thread);
+				}
 				/// (*this).tt = 0;
 				
 				/// for testing
@@ -1334,6 +1332,7 @@ public:
 	int update_row(const byte *old_data, byte *new_data) {
 		 statistic_increment(table->in_use->status_var.ha_read_rnd_next_count,
                       &LOCK_status);
+		 return 0;
 		uchar *record_old = table->record[0];
 		uchar *record_new = table->record[1];
 		typedef std::vector<uchar *,  sta::tracker<uchar*> > _Saved;
@@ -1925,7 +1924,7 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache ? 0.5 : 0.45;
+			double tree_factor = treestore_column_cache ? 0.3 : 0.55;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
 				
@@ -1991,12 +1990,12 @@ namespace ts_info{
 		}
 		for(_Tables::iterator i = tables.begin();i!=tables.end();++i){
 					
-			//if((*i)->should_calc()){
+			if((*i)->should_calc()){
 				(*i)->begin(true,false);
 				(*i)->calc_density();
 				(*i)->reduce_use_collum_trees();
 				(*i)->rollback();
-			//}
+			}
 					
 		}	
 		{

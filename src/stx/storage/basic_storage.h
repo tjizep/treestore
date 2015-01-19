@@ -184,7 +184,7 @@ namespace stx{
 		static void inplace_compress_zlibh(buffer_type& buff){
 			typedef char * encode_type_ref;
 			buffer_type t;
-			i32 origin = buff.size();
+			i32 origin = (i32) buff.size();
 			t.resize(ZLIBH_compressBound(origin)+sizeof(i32));
 			i32 cp = buff.empty() ? 0 : ZLIBH_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
 			*((i32*)&t[0]) = origin;
@@ -304,6 +304,24 @@ namespace stx{
 			}
 
 		}
+		static size_t r_decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
+			if(buff.empty()){
+				decoded.clear();
+			}else{
+				typedef char * encode_type_ref;
+				/// buffer_type buff ;
+				/// decompress_zlibh(buff, input);
+				/// decompress_fse(buff, input);
+				i32 d = *((i32*)&buff[0]) ;
+				if(decoded.size() < d){
+					decoded.reserve(d);
+					decoded.resize(d);
+				}
+				LZ4_decompress_fast((const encode_type_ref)&buff[sizeof(i32)],(encode_type_ref)&decoded[0],d);
+				return d;
+			}
+			return 0;
+		}
 		static void inplace_decompress_lz4(buffer_type& buff){
 			if(buff.empty()) return;
 			buffer_type dt;
@@ -409,6 +427,12 @@ namespace stx{
 				return v-some;
 			}
 		};
+		/// versions for all
+
+		typedef std::pair<u64, u64> _VersionRequest;
+
+		typedef std::vector<_VersionRequest> _VersionRequests;
+
 	};
 };
 #endif

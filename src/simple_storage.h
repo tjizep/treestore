@@ -92,7 +92,13 @@ public:
 		NS_STORAGE::leb128::write_signed(writer, r);
 
 	}
-
+	void get_greater_version_diff(const nst::_VersionRequests& request, nst::_VersionRequests& response){
+		//if(_transaction != NULL){
+			///get_allocations().get_greater_version_diff(request, response);
+		//}
+		response.clear();
+		response.push_back(std::make_pair(0,0));
+	}
 	/// a kind of auto commit - by starting the transaction immediately after commit
 	void commit(){
 		allocations.commit();
@@ -195,6 +201,7 @@ public:
 			/// nothing todo in destructor
 		}
     }
+
 
 	bool get_boot_value(NS_STORAGE::stream_address &r){
 		r = 0;

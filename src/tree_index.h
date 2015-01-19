@@ -304,7 +304,7 @@ namespace tree_stored{
 					os::zzzz(50);
 				}
 			}
-			if(false){
+			if(true){
 				index.insert(k);
 				
 			}else{
@@ -349,7 +349,7 @@ namespace tree_stored{
 			storage.reduce();
 		}
 		void commit1_asynch(){
-			if(loader){
+			if(loader!=nullptr){
 				if(loaders_away==0 && loader->is_minimal()){
 					delete loader;
 				}else{
@@ -392,7 +392,11 @@ namespace tree_stored{
 		//CachedRow empty;
 		Poco::Mutex plock;
 	private:
+		typedef typename ColIndex::iterator_type _BasicIterator;
 		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
+
+
+
 		typedef std::vector<eraser_interface*> _ErasorList;
 		typedef std::shared_ptr<_ErasorList> _ErasorListPtr;
 		typedef std::unordered_map<std::string, std::shared_ptr<_ErasorList>> _ECaches;
@@ -458,6 +462,7 @@ namespace tree_stored{
 
 		}
 		_PredictiveCache cache;
+		
 		ColIndex index;
 		typename ColIndex::index_iterator_impl cur;
 		typename ColIndex::index_iterator_impl _1st;
@@ -487,15 +492,16 @@ namespace tree_stored{
 		:	index(name)	, predictor(0), unique(unique)
 		{
 			//cache = get_pcache(name);
-			register_eraser(name, &cache);
+			//register_eraser(name, &cache);
 			(*this).name = name;
 		}
 		virtual ~tree_index(){
-			unregister_eraser(name, &cache);
+			//unregister_eraser(name, &cache);
 			/// index.get_storage().release();
 		}
 
 		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){
+			
 			return cache.predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
 
 		}

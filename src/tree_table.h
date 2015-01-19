@@ -852,6 +852,7 @@ namespace tree_stored{
 			Poco::Mutex lock;
 			nst::u64 last_write_lock_time;
 			_Rid auto_incr;
+			_Rid row_count;
 		};
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
@@ -1078,7 +1079,7 @@ namespace tree_stored{
 	protected:
 		_FileNames file_names;
 		
-		nst::u64 _row_count;
+		
 		int locks;
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
@@ -1103,7 +1104,7 @@ namespace tree_stored{
 	public:
 		void get_calculated_info(table_info& calc){
 			nst::synchronized _s(tt_info_copy_lock);			
-			(*this).calculated_info.row_count = _row_count;
+			(*this).calculated_info.row_count = share->row_count;
 			if(share!=nullptr)
 				(*this).calculated_info.max_row_id = share->auto_incr;			
 			calc = (*this).calculated_info;
@@ -1115,8 +1116,7 @@ namespace tree_stored{
 			return this->storage.get_name();
 		}
 		tree_table(TABLE *table_arg)
-		:	changed(false)		
-		,	_row_count(0)
+		:	changed(false)				
 		,	locks(0)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
@@ -1174,10 +1174,7 @@ namespace tree_stored{
 		};
 		void init_share_auto_incr(){
 			if(share->auto_incr == 0){
-				nst::synchronized shared(share->lock);
-				if(share->auto_incr == 0){
-					share->auto_incr = get_max_row_id_from_table();
-				}
+				get_max_row_id_from_table();				
 			}
 		}
 		_Rid get_auto_incr() const {
@@ -1197,6 +1194,7 @@ namespace tree_stored{
 			if(share != nullptr){
 				nst::synchronized shared(share->lock);
 				share->auto_incr = initial;
+				
 			}
 		}
 		void incr_auto_incr(){
@@ -1219,8 +1217,8 @@ namespace tree_stored{
 					printf("WARNING: share auto incr not initalize\n");
 				}
 				(*this).calculated_info.table_size = (*this).table_size();
-				(*this).calculated_info.row_count = (*this)._row_count;
-				(*this).calculated_info.max_row_id = (*this).share->auto_incr;
+				(*this).calculated_info.row_count = (*this).share->row_count;
+				(*this).calculated_info.max_row_id = (*this).get_auto_incr();
 			}else{
 				printf("share not set\n");
 			}
@@ -1228,7 +1226,19 @@ namespace tree_stored{
 		bool is_calculating() const{
 			return calculating_statistics;
 		}
-		
+		bool should_calc(){
+			if(last_density_tx == storage.current_transaction_order()){
+				last_density_calc = os::millis();				
+			}
+
+			if(os::millis() - last_density_calc < 3000000){
+
+				return false;
+			}
+
+			
+			return true;
+		}
 		void calc_density(){
 
 			if(os::millis() - last_density_calc < 3000000){
@@ -1243,7 +1253,7 @@ namespace tree_stored{
 			uint i;
 			//std::string path = share->path.str;
 			
-			if(!(*this)._row_count){
+			if(!(*this).share->auto_incr){
 				return;
 			}
 			if(!(*this).is_transacted()){
@@ -1285,7 +1295,7 @@ namespace tree_stored{
 				}
 				nst::u32 partx = 1;
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
-					_Rid d = sample / (*u).size();/// accurate to the nearest page
+					_Rid d = sample / ((*u).size() == 0 ? 1 : (*u).size());/// accurate to the nearest page
 					index->push_density(d);
 					partx++;
 				}
@@ -1299,7 +1309,7 @@ namespace tree_stored{
 				fill_density_info((*this).calculated_info.calculated);
 			
 				(*this).calculated_info.table_size = (*this).table_size();
-				(*this).calculated_info.row_count = get_row_count();
+				(*this).calculated_info.row_count = share->row_count;
 				(*this).calculated_info.max_row_id = share->auto_incr;
 			}
 			calculating_statistics = false;
@@ -1308,7 +1318,7 @@ namespace tree_stored{
 			
 			stored::abstracted_tx_begin(!changed,shared, storage, get_table());
 			init_share_auto_incr();
-			(*this)._row_count = get_row_count();
+			
 		}
 
 		void rollback_table(){
@@ -1902,16 +1912,27 @@ namespace tree_stored{
 			return get_table().size();
 		}
 		_Rid get_max_row_id_from_table(){
-			_TableMap::iterator t = get_table().end();
+			_Rid r = 0;
 			
-			_Rid max_row_id = 0;
-			if(!get_table().empty()){
-				
-				--t;
-				max_row_id = t.key().get_value();				
+			
+			if(share->row_count == 0){
+				_TableMap::iterator t = get_table().end();			
+				if(!get_table().empty()){				
+					--t;
+					r = t.key().get_value();				
+				}
+			
+				nst::synchronized shared(share->lock);
+				if(share->row_count == 0){
+					share->row_count = (*this).get_row_count();
+					share->auto_incr = ++r;				
+				}
+			
 			}
-			++max_row_id;
-			return max_row_id;
+			r = share->auto_incr;
+			
+
+			return r;
 		}
 
 		/// aquire lock and resources
@@ -1927,7 +1948,7 @@ namespace tree_stored{
 
 		}
 
-		static const nst::u64 READER_ROLLBACK_THRESHHOLD = 10000ll;/// in millis
+		static const nst::u64 READER_ROLLBACK_THRESHHOLD = 300ll;/// in millis
 
 		private:
 
@@ -1982,12 +2003,12 @@ namespace tree_stored{
 				if(bitmap_is_set(table->write_set, (*field)->field_index)){
 					if(!(*field)->is_null() && cols[(*field)->field_index]){
 						/// TODO: set read set
-						bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
-						if(flip)
-							bitmap_set_bit(table->read_set, (*field)->field_index);
+						//bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
+						//if(flip)
+						//	bitmap_set_bit(table->read_set, (*field)->field_index);
 						cols[(*field)->field_index]->add_row(get_auto_incr() , *field);
-						if(flip)
-							bitmap_flip_bit(table->read_set, (*field)->field_index);
+						//if(flip)
+						//	bitmap_flip_bit(table->read_set, (*field)->field_index);
 					}
 				}
 			}
@@ -2001,12 +2022,16 @@ namespace tree_stored{
 			}
 
 			(*this).get_table().insert(get_auto_incr(), '0');
-			if(_row_count % 300000 == 0){
+			if(get_auto_incr() % 300000 == 0){
 				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , table->s->table_name.str);
 				//reduce_col_use();
 				//reduce_use();
 			}			
-			_row_count++;
+			
+			nst::synchronized shared((*this).share->lock);
+			(*this).share->auto_incr++;
+			share->row_count = (*this).get_row_count();
+			
 		}
 
 		void erase(stored::_Rid rid, TABLE* table){
@@ -2040,12 +2065,12 @@ namespace tree_stored{
 			for (Field **field=table->field ; *field ; field++){
 				if(bitmap_is_set(table->write_set, (*field)->field_index)){
 					if(!(*field)->is_null() && cols[(*field)->field_index]){
-						bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
-						if(flip)
-							bitmap_set_bit(table->read_set, (*field)->field_index);
+						//bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
+						//if(flip)
+						//	bitmap_set_bit(table->read_set, (*field)->field_index);
 						cols[(*field)->field_index]->add_row(rid, *field);
-						if(flip)
-							bitmap_flip_bit(table->read_set, (*field)->field_index);
+						//if(flip)
+						//	bitmap_flip_bit(table->read_set, (*field)->field_index);
 					}
 				}
 			}

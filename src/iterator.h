@@ -98,9 +98,9 @@ namespace iterator{
 			check();
 		}
 
-		void lower(const key_type &k){
-			
+		void lower(const key_type &k){			
 			i = get_map().lower_bound(k);
+			iend = get_map().end();
 			check();
 		}
 		void find(const key_type &k){

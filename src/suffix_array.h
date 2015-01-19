@@ -167,7 +167,13 @@ namespace suffix_array{
 			allocations.commit();
 			allocations.begin();
 		}
-
+		void get_greater_version_diff(const nst::_VersionRequests& request, nst::_VersionRequests& response){
+			//if(_transaction != NULL){
+				///get_allocations().get_greater_version_diff(request, response);
+			//}
+			response.clear();
+			response.push_back(std::make_pair(0,0));
+		}
 
 		/// Storage functions called by b-tree
 		/// allocate a new or existing buffer, new denoted by what == 0 else an existing
