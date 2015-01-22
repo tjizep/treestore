@@ -144,7 +144,7 @@ namespace tree_stored{
 
 		void check_journal(){
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
-				synchronized _s(nst::get_single_writer_lock());
+				
 				if(!locks){
 					for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 						(*t).second->rollback();
@@ -178,16 +178,18 @@ namespace tree_stored{
 				return;
 			}
 			
+			
 			compose_table(table_arg)->unlock(&p2_lock);
-
+			
 			if(	changed	)
 				NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage
+			
 
 			print_read_lookups();
 
 			--locks;
 			if(!locks){
-				changed = false;
+		
 			}
 
 			
@@ -239,14 +241,13 @@ namespace tree_stored{
 		}
 
 		void reduce_col_trees(){
-			synchronized _s(nst::get_single_writer_lock());
 			if(!locks){
 				own_reduce_col_trees();
 			}
 
 		}
 		void reduce_col_trees_only(){
-			synchronized _s(nst::get_single_writer_lock());
+			
 			if(!locks){
 				DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
@@ -259,7 +260,7 @@ namespace tree_stored{
 
 		}
 		void remove_table(const std::string name){
-			synchronized _s(nst::get_single_writer_lock());
+			
 			if(tables.count(name)){
 				tables[name]->reset_shared();
 				delete tables[name];
@@ -267,14 +268,14 @@ namespace tree_stored{
 			}
 		}
 		void reduce_index_trees(){
-			synchronized _s(nst::get_single_writer_lock());
+			
 			if(!locks){
 				own_reduce_index_trees();
 			}
 		}
 
 		void reduce_col_caches(){
-			synchronized _s(nst::get_single_writer_lock());
+			
 			if(!locks){
 				own_reduce_col_caches();
 			}
@@ -316,13 +317,16 @@ private:
 	tree_stored::tree_thread writer;
 public:
 	tree_stored::tree_thread *get_writer(){
+		
 		nst::get_single_writer_lock().lock();
-		writer.modify();
+		if(writer.get_locks()==0)
+			writer.modify();
 		return &writer;
 	}
 	bool release_writer(tree_stored::tree_thread * w){
-		if(w == &writer && w->get_locks()==0){
-			nst::get_single_writer_lock().unlock();
+		
+		if(w == &writer){
+			nst::get_single_writer_lock().unlock();	
 			return true;
 		}
 		return false;
@@ -428,7 +432,7 @@ public:
 	}
 public:
 	void check_journal(){
-		nst::synchronized ss(nst::get_single_writer_lock());
+		
 		for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
 			(*t)->check_journal();
 		}
@@ -507,11 +511,11 @@ tree_stored::tree_thread * thread_from_thd(THD* thd){
 
 tree_stored::tree_thread * new_thread_from_thd(THD* thd,bool writer){
 	tree_stored::tree_thread** stpp = thd_to_tree_thread(thd);
-	
-	if((*stpp) == NULL){
-		if(writer){
-			*stpp = st.get_writer();
-		}else{
+	if(writer){
+		*stpp = st.get_writer();
+	}else{
+		if((*stpp) == NULL){
+		
 			*stpp = st.reuse_thread();
 		}
 	}
@@ -1324,7 +1328,7 @@ public:
 		if(auto_increment_update_required){
 			get_tree_table()->reset_auto_incr(table->next_number_field->val_int());	
 		}else{
-			get_tree_table()->incr_auto_incr();
+			///get_tree_table()->incr_auto_incr();
 		}
 		return 0;
 	}
@@ -1924,7 +1928,7 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache ? 0.3 : 0.55;
+			double tree_factor = treestore_column_cache ? 0.2 : 0.2;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
 				

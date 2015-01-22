@@ -138,7 +138,9 @@ public:
 	}
 
 
-
+	nst::u64 current_transaction_order() const {
+		return 0;
+	}
 
 };
 template<int _Size = 16>

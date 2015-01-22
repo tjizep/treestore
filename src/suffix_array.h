@@ -184,6 +184,9 @@ namespace suffix_array{
 			return allocations.allocate(what,how);
 		}
 
+		nst::u64 current_transaction_order() const {
+			return 0;
+		}
 
 		/// function returning the stored size in bytes of a value
 		nst::u32 store_size(const _BuffType& k) const {

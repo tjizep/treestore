@@ -847,7 +847,7 @@ namespace tree_stored{
 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
 		struct shared_data{
-			shared_data() : auto_incr(0){
+			shared_data() : auto_incr(0),row_count(0){
 			}
 			Poco::Mutex lock;
 			nst::u64 last_write_lock_time;
@@ -1142,7 +1142,7 @@ namespace tree_stored{
 		}
 		void reset_shared(){
 			nst::synchronized shared((*this).share->lock);
-			(*this).share->auto_incr = 0;
+			(*this).share->auto_incr = 1;
 		}
 		
 		~tree_table(){

@@ -626,7 +626,7 @@ namespace stored{
 		};
 		size_t get_hash() const{
 			nst::u32 h = 0;
-			MurmurHash3_x86_32(data(), get_size(), 0, &h);
+			MurmurHash3_x86_32(data(), (nst::u32)get_size(), 0, &h);
 			return h;
 		}
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {

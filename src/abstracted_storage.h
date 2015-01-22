@@ -80,7 +80,7 @@ namespace stored{
 		std::string name;
 		_Allocations *_allocations;
 		_Transaction *_transaction;
-
+		nst::u64 order;
 		_Allocations& get_allocations(){
 			if(_allocations == NULL){
 				_allocations = get_abstracted_storage(   (*this).name  );
@@ -133,6 +133,7 @@ namespace stored{
 		,	_transaction(NULL)
 		,	boot(1)
 		,	writer (false)
+		,	order (0)
 		{
 
 			get_allocations().get_initial()->set_limit(1024ll*1024ll*1024ll*3ll);
@@ -201,10 +202,12 @@ namespace stored{
 			get_allocations();
 			(*this).writer = writer;
 			get_transaction(writer);
-		}
+			order = get_allocations().get_order();
 
-		NS_STORAGE::i64 current_transaction_order() const{
-			return get_allocations().get_order();
+		}
+		
+		NS_STORAGE::u64 current_transaction_order() const{
+			return order;
 		}
 		bool stale() const {
 			if(_transaction==nullptr) return true;
@@ -228,6 +231,7 @@ namespace stored{
 			if(_transaction != NULL){
 				r = get_allocations().commit(_transaction);
 				_transaction = NULL;
+				(*this).order = 0;
 			}
 			(*this).writer = false;
 			return r;
@@ -246,6 +250,7 @@ namespace stored{
 				get_allocations().discard(_transaction);
 				_transaction = NULL;
 				(*this).writer = false;
+				(*this).order = 0;
 			}
 		}
 		

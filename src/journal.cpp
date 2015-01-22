@@ -147,7 +147,7 @@ public:
 	}
 
 	void recover(){
-		synchronized _s(nst::get_single_writer_lock());
+		nst::synchronized _llock(llock);
 		typedef std::vector<_Command> _Commands;
 		typedef std::unordered_map<std::string, stored::_Transaction*> _PendingTransactions;
 		std::ifstream journal_istr(journal_name, std::ios::binary);
@@ -236,7 +236,7 @@ public:
 
 	void synch(bool force)
 	{
-		synchronized _s(nst::get_single_writer_lock());
+		nst::synchronized _llock(llock);
 		if(last_synch != sequence){
 			
 			add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary

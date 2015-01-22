@@ -2202,6 +2202,7 @@ namespace storage{
 			/// not returned
 		/// template<typename _VersionRequests>
 		void get_greater_version_diff(const _VersionRequests& request, _VersionRequests& response){
+			syncronized _sync(*lock);
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
 				(*c)->get_greater_version_diff(request,response);
@@ -2214,7 +2215,7 @@ namespace storage{
 		version_storage_type* begin(bool writer){
 			
 			if(writer){
-				get_single_writer_lock().lock();
+				//get_single_writer_lock().lock();
 			}
 
 			
@@ -2264,7 +2265,7 @@ namespace storage{
 		/// return the transaction order of this coordinator
 
 		u64 get_order() const {
-			syncronized _sync(*lock);
+			///syncronized _sync(*lock);
 			return (*this).order;
 		}
 
@@ -2339,7 +2340,7 @@ namespace storage{
 									/// releasing any held resources
 			}
 			if(writer){
-				get_single_writer_lock().unlock();
+				//get_single_writer_lock().unlock();
 			}
 			return true;
 		}
@@ -2390,7 +2391,7 @@ namespace storage{
 			}
 
 			if(writer){
-				get_single_writer_lock().unlock();
+				//get_single_writer_lock().unlock();
 			}
 			
 		}
