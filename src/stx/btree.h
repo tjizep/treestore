@@ -229,7 +229,8 @@ namespace stx
 			interior_mul = 1,
 			keys_per_page = 256,
 			caches_per_page = 8,
-			max_release = 8
+			max_release = 8,
+			version_reload
 		};
 	};
 
@@ -700,7 +701,7 @@ namespace stx
 
 			}
 			void change(){
-				if(ptr != NULL_REF && (*this).is_invalid()){					
+				if(version_reload && ptr != NULL_REF && (*this).is_invalid()){					
 					printf("WARNING: Change should be called without an invalid member as this could mean that the operation preceding it is undone\n");
 				}
 				change_before();
@@ -844,7 +845,11 @@ namespace stx
 			{
 				(*this).context = &b;
 				if((*this).ptr != NULL_REF && (*this).get_state() == loaded) {
+					if((*this).is_invalid()){
+						refresh_this(this);
+					}
 					update_links(static_cast<_Loaded*>(rget()));
+					
 					unload_only();
 					
 				}
@@ -885,6 +890,7 @@ namespace stx
 			}
 			/// used to hide things from compiler optimizers which may inline to aggresively
 			NO_INLINE void refresh_this(pointer_proxy* p) {//
+				if(!version_reload) return;
 				null_check();
 				/// this is hidden from the MSVC inline optimizer which seems to be overactive
 				if(has_context()){
@@ -1215,7 +1221,11 @@ namespace stx
 			void check_cache(const key_type* keys) const {
 				((node*)this)->check_cache(keys);
 			}
-
+			void check_node() const {
+				if(occupants > interiorslotmax+1){
+					printf("ERROR: page is probably corrupt\n");
+				}
+			}
 		public:
 			node(){
 				is_deleted = false;				
@@ -1232,55 +1242,63 @@ namespace stx
 			void inc_occupants(){
 				++occupants;
 				set_cache_occupants(0);
+				check_node();
 			}
 			/// set transaction checked
 
 			nst::u64 get_transaction() const {
+				check_node();
 				return (*this).transaction;
 			}
 			
 			void set_transaction(nst::u64 transaction) {
+				check_node();
 				(*this).transaction = transaction;
 			}
 			/// get version
 			
 			nst::version_type get_version() const {
+				check_node();
 				return (*this).version;
 			}
 
 			/// set version
 
 			void set_version(nst::version_type version){
+				check_node();
 				(*this).version = version;
 			}
 			void dec_occupants(){
-				--occupants;
+				check_node();
+				if(occupants > 0)
+					--occupants;
 				set_cache_occupants(0);
 			}
 			/// return the cache key count
 
 			storage::u16 get_cache_occupants() const {
+				check_node();
 				return cache_occupants;
 			}
 
 			/// return the key value pair count
 
 			storage::u16 get_occupants() const {
-				if(occupants > interiorslotmax+2){
-					printf("invalid occupants\n");
-				}
+				check_node();			
 				return occupants;
 			}
 
 			/// set the key value pair count
 
 			void set_occupants(storage::u16 o) {
+				check_node();
 				occupants = o;
 				set_cache_occupants(0);
 			}
 
 			/// set cache size
 			void set_cache_occupants(storage::u16 o){
+				check_node();
 				cache_occupants = o;
 			}
 			/// Level in the b-tree, if level == 0 -> surface node
@@ -1306,6 +1324,7 @@ namespace stx
 
 			}
 			bool is_modified() const {
+				check_node();
 				return s != loaded;
 			}
 
@@ -1313,6 +1332,7 @@ namespace stx
 
 			inline bool issurfacenode() const
 			{
+				check_node();
 				return (level == 0);
 			}
 
@@ -1331,6 +1351,7 @@ namespace stx
 			}
 			template<typename key_interpolator>
 			void initialize_interpolator(key_interpolator interp, const key_type* keys){
+				check_node();
 				can_interp = false;
 				int o = get_occupants() ;
 				if(o > 0){
@@ -1345,6 +1366,7 @@ namespace stx
 
 			template<typename key_compare, typename key_interpolator >
 			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key) const {
+				check_node();
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
 				check_cache(keys);
@@ -1397,6 +1419,7 @@ namespace stx
 			/// simple search type lower bound template function
 			template<typename key_compare>
 			inline unsigned int min_find_lower(key_compare key_less,const key_type* keys, int o, const key_type& key) const {
+				check_node();
 				if (o  == 0) return 0;
 				register unsigned int l = 0, h = o;
 				/// truncated binary search
@@ -1486,8 +1509,11 @@ namespace stx
 					childid[k].set_context(context);
 					childid[k].set_where(sa);
 				}
+				for(u16 k = (*this).get_occupants()+1; k <= interiorslotmax;++k){
+					childid[k] = NULL_REF;
+				}
 				(*this).check_cache(keys);
-				
+				check_node();
 				node::initialize_interpolator(interp, keys);
 			}
 
@@ -1496,6 +1522,7 @@ namespace stx
 			/// and throw an exception
 
 			void save(storage_type &storage, buffer_type& buffer) const{
+				check_node();
 				using namespace stx::storage;
 				u32 storage_use = leb128::signed_size((*this).get_occupants())+leb128::signed_size((*this).level);
 				for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -1522,6 +1549,7 @@ namespace stx
 				buffer.resize(d); /// TODO: use swap
 			}
 			void clear_references(){
+				check_node();
 				using namespace stx::storage;
 				/// removes any remaining references
 				for(u16 c = get_occupants()+1; c <= interiorslotmax;++c){
@@ -2119,19 +2147,27 @@ namespace stx
 			return load(w, nullptr, loader, slot) ;
 		}
 		bool is_valid(const node* page, stream_address w) const {
+			if (selfverify){
+				if(get_storage()->current_transaction_order() < page->get_transaction()){
+					printf("ERROR: page is probably corrupt\n");
+				}
+			}
+			
+			if(!version_reload) return true;
 			if(page != NULL_REF)
 				return get_storage()->current_transaction_order() == page->get_transaction();
-			return false;
-			//return valid_nodes.count(w) > 0;
-			//if(get_storage()->is_readonly())
-			//return true;
+			return false;		
 		}
 		bool is_invalid(const node* page, stream_address w) const {
+			if (selfverify){
+				if(get_storage()->current_transaction_order() < page->get_transaction()){
+					printf("ERROR: page is probably corrupt\n");
+				}
+			}
+			if(!version_reload) return false;
 			if(page != NULL_REF)
 				return get_storage()->current_transaction_order() != page->get_transaction();
-			return true;
-			//if(get_storage()->is_readonly())			
-			//return false;
+			return true;			
 		}
 		typename node::ptr load(stream_address w, node* preallocated,stream_address loader=0, nst::u16 slot=0) {
 			using namespace stx::storage;
@@ -3374,8 +3410,13 @@ namespace stx
 
 		static const bool lz4 = true;
 		
+		/// do a delete check
+
 		static const bool delete_check = true;
 
+		/// reload versions
+
+		static const bool version_reload = true;
 		
 		/// Key comparison object. More comparison functions are generated from
 		/// this < relation.
@@ -3983,12 +4024,12 @@ namespace stx
 
 		void reload()
 		{
-				bool do_reload = true;
+				bool do_reload = version_reload;
 				stx::storage::i64 sa = 0;
 				stx::storage::i64 b = 0;
 				if(do_reload){
 					if(get_storage()->get_boot_value(b)){
-						if(b == root.get_where() && surfaces_loaded.size() < 6000){
+						if(b == root.get_where() && surfaces_loaded.size() < 200){
 							get_storage()->get_boot_value(stats.tree_size,2);
 							get_storage()->get_boot_value(sa,3);
 							if(headsurface.get_where() != sa){
@@ -4178,9 +4219,8 @@ namespace stx
 			check_low_memory_state();
 			surface_node::ptr last = last_surface;
 			last.set_context(this);
-			if(!stats.last_surface_size){
-				stats.last_surface_size = last != NULL_REF ? last->get_occupants() : 0;
-			}	
+			stats.last_surface_size = last != NULL_REF ? last->get_occupants() : 0;
+				
 			return iterator(last, stats.last_surface_size);/// avoids loading the whole page
 			
 		}
@@ -4200,9 +4240,7 @@ namespace stx
 			node::ptr last = last_surface;
 			last.set_context((btree*)this);
 			last = last_surface;
-			if(stats.last_surface_size){				
-				return const_iterator(last, stats.last_surface_size);
-			}	
+			
 			return const_iterator(last, last.get_where() != 0 ? last->get_occupants() : 0);
 		}
 
@@ -5455,6 +5493,7 @@ namespace stx
 						BTREE_PRINT("Fixing lastkeyupdate: key " << result.lastkey << " into parent " << parent << " at parentslot " << parentslot << std::endl);
 
 						BTREE_ASSERT(parent->childid[parentslot] == curr);
+						parent.change_before();
 						parent->keys[parentslot] = result.lastkey;
 					}
 					else
@@ -5469,7 +5508,7 @@ namespace stx
 					// either the current node or the next is empty and should be removed
 					if (interior->childid[slot]->get_occupants() != 0)
 						slot++;
-
+					interior.change_before();
 					// this is the child slot invalidated by the merge
 					BTREE_ASSERT(interior->childid[slot]->get_occupants() == 0);
 
@@ -5498,7 +5537,7 @@ namespace stx
 					{
 						BTREE_ASSERT(interior == root);
 						BTREE_ASSERT(interior->get_occupants() == 0);
-
+						interior.change_before();
 						root = interior->childid[0];
 
 						interior->set_occupants(0);
@@ -5787,7 +5826,9 @@ namespace stx
 
 					// this is the child slot invalidated by the merge
 					BTREE_ASSERT(interior->childid[slot]->get_occupants() == 0);
-
+					
+					interior.change_before();
+			
 					free_node(interior->childid[slot]);
 
 					for(int i = slot; i < interior->get_occupants(); i++)
@@ -5941,7 +5982,8 @@ namespace stx
 
 				BTREE_ASSERT(parentslot == leftslot);
 			}
-
+			left.change_before();
+			right.change_before();
 			// retrieve the decision key from parent
 			left->keys[left->get_occupants()] = parent->keys[parentslot];
 			left->inc_occupants();

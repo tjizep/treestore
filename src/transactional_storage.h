@@ -874,7 +874,7 @@ namespace storage{
 					if(get_use() > 1024*1024*2){
 						//ptrdiff_t before = get_use();
 						get_session() << "PRAGMA shrink_memory;", now;
-						flush_back(0.55,true);
+						flush_back(0.85,true);
 						last_flush_time = ::os::millis();
 						//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 					}
@@ -1367,7 +1367,7 @@ namespace storage{
 		void commit(){
 			syncronized ul(lock);
 			if(transacted){
-				flush_back(0.0, true, true); /// write all changes to disk or pigeons etc.
+				flush_back(0.8, true, true); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1395,7 +1395,7 @@ namespace storage{
 		}
 		void flush(){
 			syncronized ul(lock);
-			flush_back(0.50, false); /// write all changes to disk or pigeons etc.
+			flush_back(0.85, false); /// write all changes to disk or pigeons etc.
 			get_session() << "PRAGMA shrink_memory;", now;
 		}
 		/// reverse any changes made by the current transaction
@@ -1413,7 +1413,7 @@ namespace storage{
 			get_session() << "PRAGMA shrink_memory;", now;
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.55,true,modified());
+				flush_back(0.85,true,modified());
 		}
 	};
 

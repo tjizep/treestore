@@ -1902,7 +1902,7 @@ mysql_declare_plugin(treestore)
 	MYSQL_STORAGE_ENGINE_PLUGIN,
 		&treestore_storage_engine,
 		"TREESTORE",
-		"Christiaan Pretorius (c) 2013,2014",
+		"Christiaan Pretorius (c) 2013,2014,2015",
 		"TuReeStore MySQL storage engine",
 		PLUGIN_LICENSE_GPL,
 		treestore_db_init, /* Plugin Init */
@@ -1928,7 +1928,7 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache ? 0.2 : 0.2;
+			double tree_factor = treestore_column_cache ? 0.1: 0.1;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
 				
