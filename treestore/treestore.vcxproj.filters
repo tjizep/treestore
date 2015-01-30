@@ -108,6 +108,9 @@
     <ClInclude Include="..\src\stx\storage\basic_storage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\simple_storage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="treestore.cpp">

@@ -322,6 +322,12 @@ namespace storage{
 		InvalidWriterOrder() throw() {
 		}
 	};
+	// this is an exception thrown when a non writing transaction is trying to commit
+	class InvalidTransactionType : public std::exception{
+		public: /// The reading transaction should not commit
+		InvalidTransactionType() throw() {
+		}
+	};
 
 	class InvalidReaderCount : public std::exception{
 		public: /// version released != engaged
@@ -973,7 +979,7 @@ namespace storage{
 			if(result && currently_active) {
 				update_versions(currently_active) = version;
 				result->version = version;
-			}else{
+			}else if(currently_active){
 				printf("[WARNING] version not set\n");
 			}
 		}
@@ -997,16 +1003,26 @@ namespace storage{
 		
 		/// return a list of versions for the request of pairs only if larger one could be found
 		template<typename _VersionRequests>
-		void get_greater_version_diff(const _VersionRequests& request, _VersionRequests& response){
+		nst::u64 get_greater_version_diff(_VersionRequests& request){
+			nst::u64 responses = 0;
 			syncronized ul(lock);
-			for(_VersionRequests::const_iterator v = request.begin(); v != request.end(); ++v){
+			for(_VersionRequests::iterator v = request.begin(); v != request.end(); ++v){
+				address_type ver = 0;
 				if((*v).first < versions.size() ){					
-					address_type ver = update_versions((*v).first);
-					if((*v).second < ver ){
-						response.push_back(std::make_pair((*v).first,ver));
-					}					
+					ver = update_versions((*v).first);
 				}
+				
+				finder = allocations.find((*v).first);
+				if(finder != allocations.end()){
+					ver = std::max<version_type>(ver, (*finder).second->version );
+				}
+				if((*v).second < ver ){
+					(*v).second = ver;
+					++responses;
+				}				
 			}
+			return responses;
+			
 			
 		}
 		/// gets a version
@@ -1289,6 +1305,7 @@ namespace storage{
 		/// (it changes busy to false only once unless allocate is called)
 		void complete(){
 			NS_STORAGE::synchronized s(lock);
+			
 			allocated_version = 0;
 			if(busy){
 				if(nullptr != result){
@@ -1485,10 +1502,12 @@ namespace storage{
 		
 		/// return a list of versions for the request of pairs
 		template<typename _VersionRequests>
-		void get_greater_version_diff(const _VersionRequests& request, _VersionRequests& response){
+		nst::u64  get_greater_version_diff(_VersionRequests& request){
+			nst::u64 responses = 0;
 			if((*this).allocations != nullptr){
-				(*this).allocations->get_greater_version_diff(request,response);
+				responses += (*this).allocations->get_greater_version_diff(request);
 			}
+			return responses;
 		}
 		
 		void set_transient(){
@@ -2201,12 +2220,14 @@ namespace storage{
 			/// return a list of greater versions for the request of pairs less or same versions are
 			/// not returned
 		/// template<typename _VersionRequests>
-		void get_greater_version_diff(const _VersionRequests& request, _VersionRequests& response){
+		nst::u64 get_greater_version_diff(_VersionRequests& request){
+			nst::u64 responses = 0;
 			syncronized _sync(*lock);
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				(*c)->get_greater_version_diff(request,response);
+				responses += (*c)->get_greater_version_diff(request);
 			}
+			return responses;
 			
 		}
 		/// start a new version with a dependency on the previously commited version or initial storage
@@ -2284,7 +2305,10 @@ namespace storage{
 				stored::reduce_all();
 			}
 			bool writer = !transaction->is_readonly();
-			
+			if(!writer){
+				printf("WARNNIG: cannot commit: this is not a writing transaction\n");
+				throw InvalidTransactionType();
+			}
 			{
 				syncronized _sync(*lock);
 
@@ -2334,7 +2358,7 @@ namespace storage{
 				}
 				storages.push_back(version);
 
-				++order;			/// increment transaction count
+				++order;			/// increment committed transaction count
 
 				merge_down();		/// merge unused transaction versions
 									/// releasing any held resources

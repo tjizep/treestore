@@ -332,12 +332,16 @@ namespace stx
 	typedef short states;
 	struct node_ref{
 		/// references for eviction
-		short refs;
-		short s;
+		short					refs;
+		short					s;
 		
-		bool orphaned;
-		
-		node_ref() : refs(0), s(initial), orphaned(false) /// , a_refs(0)
+		bool					orphaned;
+		/// the storage address for reference
+		nst::stream_address		address;
+		void set_address(nst::stream_address address){
+			(*this).address = address;
+		}
+		node_ref() : refs(0), s(initial), orphaned(false), address(0) /// , a_refs(0)
 		{
 		}
 		
@@ -503,7 +507,10 @@ namespace stx
 			}
 			inline void set_where(stream_address w){
 
-				(*this).w = w;
+				(*this).w = w;	
+				if((*this).ptr != NULL_REF){
+					(*this).ptr->set_address(w);
+				}
 
 			}
 			inline stream_address get_where() const {
@@ -818,28 +825,42 @@ namespace stx
 				void update_links(typename btree::surface_node* l){
 					if(rget()->issurfacenode()){
 						if(l->preceding.is_loaded()){
-							surface_node * p = static_cast<surface_node*>(l->preceding.rget()->next.rget());
+							
+							surface_node * p = static_cast<surface_node*>(l->preceding.rget()->get_next().rget());
 							if(p && p != l){
 								BTREE_PRINT("invalid link or version\n");
 							}
-							l->preceding.rget()->next.unload();
+							l->preceding.rget()->get_next().unload();
 							l->preceding.unload();
 						}
-						if(l->next.is_loaded()){
-							surface_node * n = static_cast<surface_node*>(l->next.rget()->preceding.rget());
+						if(l->get_next().is_loaded()){
+							
+							surface_node * n = static_cast<surface_node*>(l->get_next().rget()->preceding.rget());
 							if(n && n != l){
 								BTREE_PRINT("invalid link or version\n");
 							}
-							l->next.rget()->preceding.unload();
-							l->next.unload();
+							l->get_next().rget()->preceding.unload();
+							l->get_next().unload();
 						}
 					}else{
 						BTREE_PRINT("surface node reports its not a surface node\n");
 					}
 				}
-			
+				
+				
 			
 			public:			
+			typename btree::surface_node* rget_surface(){
+				return reinterpret_cast<surface_node*>(rget());
+			}
+
+			const typename btree::surface_node* rget_surface() const {
+				return reinterpret_cast<const surface_node*>(rget());
+			}
+			void refresh()
+			{
+				reload_this(this);
+			}
 			
 			void discard(btree & b,bool release = true)
 			{
@@ -900,6 +921,19 @@ namespace stx
 				}
 
 			}
+			NO_INLINE void reload_this(pointer_proxy* p) {//
+				if(!version_reload) return;
+				null_check();
+				/// this is hidden from the MSVC inline optimizer which seems to be overactive
+				if(has_context()){
+					rget()->set_force_refresh(true);
+					(*p).get_context()->load(((super*)p)->w,rget());
+					rget()->set_force_refresh(false);
+				}else{
+					printf("WARNING: no context supplied\n");
+				}
+
+			}
 			/// used to hide things from compiler optimizers which may inline to aggresively
 			NO_INLINE void load_this(pointer_proxy* p,stream_address loader, nst::u16 slot) {//
 				null_check();
@@ -907,7 +941,35 @@ namespace stx
 				(*p) = (*p).get_context()->load(((super*)p)->w,loader,slot);
 
 			}
+			
+			void validate_surface_links(){
+				null_check();
+				if(selfverify){
+					if(ptr != NULL && (*this).rget()->issurfacenode()){
+						surface_node * c = rget_surface();
+						if(c->get_next().ptr != NULL_REF){
+						
+							surface_node * n = c->get_next().rget_surface();
+							if(n->preceding.get_where() != (*this).get_where()){
+								printf("The node has invalid preceding pointer\n");
+							}
+						}
+						if(c->preceding.ptr != NULL_REF){
+							surface_node * p = c->preceding.rget_surface();
+							if(p->get_next().get_where() != (*this).get_where()){
+								printf("The node has invalid next pointer\n");
+							}
+						}
+					}				
+				}
+			}
 			void null_check() const {
+				if(selfverify){
+					if(get_where()==0 && (*this).ptr != NULL_REF){
+						printf("invalid where\n");				
+					}
+				}
+
 				///if((size_t)(this) < 60000ll){
 					//// ::MessageBox(NULL,"Debug","Null error",MB_OK);
 				///}
@@ -924,7 +986,11 @@ namespace stx
 
 					}
 				}else if((*this).is_invalid()){
+					validate_surface_links();
 					refresh_this(this);
+					validate_surface_links();
+				}else{
+					validate_surface_links();
 				}
 			}
 			/// The initial state can be any state
@@ -1109,7 +1175,8 @@ namespace stx
 				if((*this).ptr != NULL_REF && (*this).is_invalid()){
 					refresh_this(this);
 				}
-				if((*this).ptr != NULL_REF){					
+				if((*this).ptr != NULL_REF){	
+					validate_surface_links();
 					return (_Loaded*)(super::ptr);
 				}
 				load();
@@ -1183,7 +1250,7 @@ namespace stx
 			/// cpu cache keys
 			key_type        cached[cacheslotmax+1];
 
-			
+
 		protected:
 			/// the pages last transaction that it was checked on
 			storage::u64	transaction ;
@@ -1192,6 +1259,7 @@ namespace stx
 			key_type        int_lower;
 			key_type        int_upper;			
 			bool can_interp;
+			bool force_refresh;
 			/// the transaction version of this node
 			nst::version_type version; 
 			/// populate cache
@@ -1238,7 +1306,8 @@ namespace stx
 			void reset_cache_occupants(){
 				set_cache_occupants(0);
 			}
-
+			
+			
 			void inc_occupants(){
 				++occupants;
 				set_cache_occupants(0);
@@ -1254,6 +1323,14 @@ namespace stx
 			void set_transaction(nst::u64 transaction) {
 				check_node();
 				(*this).transaction = transaction;
+			}
+			/// force refresh
+
+			void set_force_refresh (bool force_refresh ){
+				(*this).force_refresh = force_refresh ;
+			}
+			bool is_force_refresh () const{
+				return (*this).force_refresh ;
 			}
 			/// get version
 			
@@ -1317,7 +1394,7 @@ namespace stx
 				occupants = 0;
 				
 				can_interp = false;
-
+				force_refresh = false;
 				version = 0;
 				transaction = 0;
 				cache_occupants = 0;
@@ -1492,10 +1569,11 @@ namespace stx
 			/// the buffer type is expected to be some sort of vector although no strict
 			/// checking is performed
 			template<typename key_interpolator >
-			void load(btree * context, nst::version_type version, storage_type & storage, const buffer_type& buffer, key_interpolator interp)
+			void load(btree * context, stream_address address, nst::version_type version, storage_type & storage, const buffer_type& buffer, key_interpolator interp)
 			{
 			    using namespace stx::storage;
 				buffer_type::const_iterator reader = buffer.begin();
+				(*this).address = address;
 				(*this).set_cache_occupants (0);
 				(*this).set_occupants (leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
@@ -1571,31 +1649,32 @@ namespace stx
 
 			/// Define a related allocator for the surface_node structs.
 			typedef typename _Alloc::template rebind<surface_node>::other alloc_type;
-
 			/// Double linked list pointers to traverse the leaves
+
 			typename surface_node::ptr      preceding;
 
+			
+		protected:
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
 
-			/// the allocation policy for quick destruction
-
-			struct allocation_policy{
-				bool is_idempotent_destructor() const {
-					return false;
-				};
-				void construct(btree* context, surface_node* n){
-					n->node_ref::refs = 0;
-					n->node_ref::s = initial;
+		public:
+			
+			void set_next(ptr next){
 					
-					n->node_ref::orphaned = false;
-					new (&n->next) ptr();
-					new (&n->preceding) ptr();
-					n->preceding.set_context(context);
-					n->next.set_context(context);
-				}
-			};
+				(*this).next = next;
+			}
 
+			ptr get_next(){
+				return (*this).next ;
+			}
+			ptr get_next() const {
+				return (*this).next ;
+			}
+			void change_next(){
+				(*this).next.change_before();
+			}
+			
 			/// Keys of children or data pointers
 			key_type        keys[surfaceslotmax];
 
@@ -1809,10 +1888,10 @@ namespace stx
 			/// decodes a page into a exterior node using the provided buffer and storage instance/context
 			/// TODO: throw an exception if checks fail
 
-			void load(btree* context,nst::version_type version, storage_type & storage,const buffer_type& buffer,size_t bsize, key_interpolator interp){
+			void load(btree* context, stream_address address,nst::version_type version, storage_type & storage,const buffer_type& buffer,size_t bsize, key_interpolator interp){
 
 			    using namespace stx::storage;
-
+				(*this).address = address;
 				/// size_t bs = buffer.size();
 				buffer_type::const_iterator reader = buffer.begin();
 				(*this).set_cache_occupants (0);
@@ -1826,6 +1905,7 @@ namespace stx
 				sa = leb128::read_signed(reader);
 				next.set_context(context);
 				next.set_where(sa);
+				
 				if(interp.encoded(btree::allow_duplicates)){
 					interp.decode(buffer, reader, keys, (*this).get_occupants());
 				}else{
@@ -1909,7 +1989,7 @@ namespace stx
 					BTREE_ASSERT(d <= storage_use);
 				}
 				buffer.resize(d);
-
+				
 			}
 		};
 
@@ -2065,8 +2145,8 @@ namespace stx
 			if(n->is_modified()){
 				//printf("[B-TREE SAVE] s-node %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version());
 				using namespace stx::storage;
-				buffer_type &buffer = get_storage()->allocate(w,stx::storage::create);
 				n->sort(stats, key_less);
+				buffer_type &buffer = get_storage()->allocate(w,stx::storage::create);				
 				n->save(key_interpolator(), *get_storage(), buffer);
 				if(lz4){
 					inplace_compress_lz4(buffer,temp_compress);
@@ -2151,11 +2231,13 @@ namespace stx
 				if(get_storage()->current_transaction_order() < page->get_transaction()){
 					printf("ERROR: page is probably corrupt\n");
 				}
-			}
-			
+			}			
 			if(!version_reload) return true;
-			if(page != NULL_REF)
+			
+			if(page != NULL_REF){
+				if(page->get_version() == 0) return true;
 				return get_storage()->current_transaction_order() == page->get_transaction();
+			}
 			return false;		
 		}
 		bool is_invalid(const node* page, stream_address w) const {
@@ -2165,31 +2247,41 @@ namespace stx
 				}
 			}
 			if(!version_reload) return false;
-			if(page != NULL_REF)
+			
+			if(page != NULL_REF){
+				if(page->get_version() == 0) return false;
 				return get_storage()->current_transaction_order() != page->get_transaction();
+			}
 			return true;			
 		}
 		typename node::ptr load(stream_address w, node* preallocated,stream_address loader=0, nst::u16 slot=0) {
 			using namespace stx::storage;
 			size_t refs = 0;
+			
 			if(preallocated!=nullptr){
 				/// printf("restoring preallocated version on %lld\n",(long long)w);
-				
 				refs = preallocated->refs;
-				
-				request.clear();
-				response.clear();
-				request.push_back(std::make_pair(w,preallocated->get_version()));
-							
-			
-				get_storage()->get_greater_version_diff(request, response);
-				if(response.empty()){
+				if(preallocated->is_force_refresh()){
+					nst::u64 to = get_storage()->current_transaction_order();
+					preallocated->set_force_refresh(false);
+					request.clear();					
+					request.push_back(std::make_pair(w,preallocated->get_version()));
+					nst::u64 response = get_storage()->get_greater_version_diff(request);
+					if(!response){
+					}
+
+				}else{
+
+					request.clear();
 					
-					preallocated->set_transaction (get_storage()->current_transaction_order() );
-					typename node::ptr n = preallocated ;
-					return n;
+					request.push_back(std::make_pair(w,preallocated->get_version()));
+					nst::u64 response = get_storage()->get_greater_version_diff(request);
+					if(!response){
+						preallocated->set_transaction ( get_storage()->current_transaction_order() );
+						typename node::ptr n = preallocated ;
+						return n;
+					}
 				}
-				
 			}
 			i32 level = 0;
 			/// TODO: NB! double mutex
@@ -2222,8 +2314,8 @@ namespace stx
 					s = allocate_surface(w, loader, slot);
 				}
 				
-				
-				s->load(this, version, *(get_storage()), load_buffer, load_size, key_interpolator());
+				s.set_where(w);
+				s->load(this, w, version, *(get_storage()), load_buffer, load_size, key_interpolator());
 				s.set_state(loaded);
 				s.set_where(w);
 				if(!is_preallocated){
@@ -2242,7 +2334,8 @@ namespace stx
 				}else{
 					s = allocate_interior(level, w);
 				}
-				s->load(this, version, *(get_storage()), load_buffer, key_interpolator());
+				s.set_where(w);
+				s->load(this, w, version, *(get_storage()), load_buffer, key_interpolator());
 				
 				s.set_state(loaded);
 				s.set_where(w);
@@ -2253,7 +2346,6 @@ namespace stx
 				s.rget()->set_transaction (get_storage()->current_transaction_order() );
 				return s;
 			}
-			printf("WARNING: returning an empty node\n");
 			
 			typename interior_node::ptr s;
 			return s;
@@ -2462,6 +2554,14 @@ namespace stx
 				currnode.make_mini(m);
 				return std::make_pair(m,current_slot);
 			}
+			
+			/// refresh finction to load the latest version of the current node
+			/// usually only used for debugging
+			void refresh(){
+				if(currnode != NULL_REF){					
+					currnode.refresh();
+				}
+			}
 
 			/// iterator constructing pair
 			template<typename _MapType>
@@ -2512,7 +2612,7 @@ namespace stx
 				{
 					first_node.sort();
 					total += first_node->get_occupants();
-					first_node = first_node->next;
+					first_node = first_node->get_next();
 					if(first_node.has_context())
 						first_node.get_context()->check_low_memory_state();
 				}
@@ -2531,13 +2631,15 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
 					if(currnode.has_context())
 						currnode.get_context()->check_low_memory_state();
-					
-					currnode = currnode->next;
+					else
+						printf("WARNING: iterator has no context\n");
+					currnode = currnode->get_next();
 					currnode.sort();
+					currnode.validate_surface_links();
 					current_slot = 0;
 					assign_pointers();
 				}
@@ -2552,7 +2654,7 @@ namespace stx
 			}
 
 			
-			/// Postfix++ advance the iterator to the next slot
+			/// Postfix++ advance the iterator to the get_next() slot
 			inline self operator++(int)
 			{
 				self tmp = *this;   // copy ourselves
@@ -2562,12 +2664,12 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
 					if(currnode.has_context())
 						currnode.get_context()->check_low_memory_state();
 
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					currnode.sort();
 					current_slot = 0;
 					assign_pointers();
@@ -2775,12 +2877,12 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
 					if(currnode.has_context())
 						currnode.get_context()->check_low_memory_state();
 
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 0;
 				}
 				else
@@ -2802,12 +2904,12 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
 					if(currnode.has_context())
 						currnode.get_context()->check_low_memory_state();
 
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 0;
 				}
 				else
@@ -2986,7 +3088,13 @@ namespace stx
 				BTREE_ASSERT(current_slot > 0);
 				return currnode->keys[current_slot - 1];
 			}
-
+			/// refresh finction to load the latest version of the current node
+			/// usually only used for debugging
+			void refesh(){
+				if(currenode!=NULL_REF){
+					currnode.refresh();
+				}
+			}
 			/// Writable reference to the current data object
 			/// TODO: mark node as changed for update correctness
 			inline data_type& data() const
@@ -3046,9 +3154,9 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 1;
 				}
 				else
@@ -3069,9 +3177,9 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 1;
 				}
 				else
@@ -3262,9 +3370,9 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 1;
 				}
 				else
@@ -3285,9 +3393,9 @@ namespace stx
 				{
 					++current_slot;
 				}
-				else if (currnode->next != NULL_REF)
+				else if (currnode->get_next() != NULL_REF)
 				{
-					currnode = currnode->next;
+					currnode = currnode->get_next();
 					current_slot = 1;
 				}
 				else
@@ -3418,6 +3526,7 @@ namespace stx
 
 		static const bool version_reload = true;
 		
+		static const nst::version_type reset_version = 1999999999;
 		/// Key comparison object. More comparison functions are generated from
 		/// this < relation.
 		key_compare key_less;
@@ -3756,6 +3865,7 @@ namespace stx
 			if(::stx::memory_low_state){				
 				reduce_use();
 			}
+			last_surface.validate_surface_links();
 		}
 		
 		/// writes all modified pages to storage and frees all surface nodes
@@ -3768,7 +3878,7 @@ namespace stx
 			/// size_t nodes_before = nodes_loaded.size();
 			ptrdiff_t save_tot = btree_totl_used;			
 			flush();
-			if(reduce){				
+ 			if(reduce){				
 				if((*this).stats.surface_use > 0){
 					size_t leaves_before = stats.leaves;
 					
@@ -3828,12 +3938,15 @@ namespace stx
 			pn->set_slot_loader(loader, slot);
 			typename surface_node::ptr n = pn;			
 			n.create(this,w);
-			n->next.set_context(this);
+			n->get_next().set_context(this);
 			n->preceding.set_context(this);
-
+			
 			if(n.get_where()){
+				n->set_address(w);
 				nodes_loaded[n.get_where()] = pn;
 				surfaces_loaded[n.get_where()] = pn;
+			}else{
+				printf("no address supplied\n");
 			}
 			report_nodes_loaded_mem();
 			return n;
@@ -4029,7 +4142,7 @@ namespace stx
 				stx::storage::i64 b = 0;
 				if(do_reload){
 					if(get_storage()->get_boot_value(b)){
-						if(b == root.get_where() && surfaces_loaded.size() < 200){
+						if(b == root.get_where() && surfaces_loaded.size() < 100){
 							get_storage()->get_boot_value(stats.tree_size,2);
 							get_storage()->get_boot_value(sa,3);
 							if(headsurface.get_where() != sa){
@@ -4505,7 +4618,7 @@ namespace stx
 				++num;
 				if (++slot >= surface->get_occupants())
 				{
-					surface = surface->next;
+					surface = surface->get_next();
 					slot = 0;
 				}
 			}
@@ -4721,12 +4834,14 @@ namespace stx
 				if (headsurface == NULL_REF)
 				{
 					headsurface = last_surface = newsurface;
-					newsurface->preceding = newsurface->next = NULL_REF;
+					newsurface->set_next(NULL_REF);
+					newsurface->preceding = newsurface->get_next();
 				}
 				else
 				{
 					newsurface->preceding = last_surface;
-					last_surface->next = newsurface;
+					last_surface.change_before();
+					last_surface->set_next (newsurface);
 					last_surface = newsurface;
 				}
 
@@ -5073,16 +5188,16 @@ namespace stx
 			
 			newsurface->set_occupants(surface->get_occupants() - mid);
 
-			newsurface->next = surface->next;
-			if (newsurface->next == NULL_REF)
+			newsurface->set_next (surface->get_next());
+			if (newsurface->get_next() == NULL_REF)
 			{
 				BTREE_ASSERT(surface == last_surface);
 				last_surface = newsurface;
 			}
 			else
 			{
-				newsurface->next.change_before();
-				newsurface->next->preceding = newsurface;
+				newsurface->change_next();
+				newsurface->get_next()->preceding = newsurface;
 				
 			}
 			surface->sort(((btree&)(*this)).stats, key_less);
@@ -5096,7 +5211,7 @@ namespace stx
 			
 			surface->set_occupants(mid);
 			surface->sorted = mid;
-			surface->next = newsurface;
+			surface->set_next (newsurface);
 
 			newsurface->preceding = surface;
 			newsurface->sorted = newsurface->get_occupants();
@@ -5939,12 +6054,13 @@ namespace stx
 			}
 			left->set_occupants(left->get_occupants() + right->get_occupants());
 
-			left->next = right->next;
-			if (left->next != NULL_REF)
-				left->next->preceding = left;
-			else
+			left->set_next(right->get_next());
+			if (left->get_next() != NULL_REF){
+				left->change_next();
+				left->get_next()->preceding = left;
+			}else{
 				last_surface = left;
-
+			}
 			right->set_occupants(0);
 
 			return btree_fixmerge;
@@ -6016,7 +6132,7 @@ namespace stx
 			BTREE_ASSERT(left->issurfacenode() && right->issurfacenode());
 			BTREE_ASSERT(parent->level == 1);
 
-			BTREE_ASSERT(left->next == right);
+			BTREE_ASSERT(left->get_next() == right);
 			BTREE_ASSERT(left == right->preceding);
 
 			BTREE_ASSERT(left->get_occupants() < right->get_occupants());
@@ -6148,7 +6264,7 @@ namespace stx
 			BTREE_ASSERT(left->issurfacenode() && right->issurfacenode());
 			BTREE_ASSERT(parent->level == 1);
 
-			BTREE_ASSERT(left->next == right);
+			BTREE_ASSERT(left->get_next() == right);
 			BTREE_ASSERT(left == right->preceding);
 			BTREE_ASSERT(parent->childid[parentslot] == left);
 
@@ -6294,7 +6410,7 @@ namespace stx
 			{
 				os << "  " << n << std::endl;
 
-				n = n->next;
+				n = n->get_next();
 			}
 		}
 
@@ -6312,7 +6428,7 @@ namespace stx
 				const surface_node *surfacenode = static_cast<const surface_node*>(node);
 
 				for(unsigned int i = 0; i < depth; i++) os << "  ";
-				os << "  surface prev " << surfacenode->preceding << " next " << surfacenode->next << std::endl;
+				os << "  surface prev " << surfacenode->preceding << " next " << surfacenode->get_next() << std::endl;
 
 				for(unsigned int i = 0; i < depth; i++) os << "  ";
 
@@ -6443,7 +6559,7 @@ namespace stx
 						const typename surface_node::ptr surfacea = interior->childid[slot];
 						const typename surface_node::ptr surfaceb = interior->childid[slot + 1];
 
-						assert(surfacea->next == surfaceb);
+						assert(surfacea->get_next() == surfaceb);
 						assert(surfacea == surfaceb->preceding);
 						(void)surfacea;
 						(void)surfaceb;
@@ -6457,7 +6573,7 @@ namespace stx
 						const typename surface_node::ptr surfacea = parenta->childid[parenta->get_occupants()];
 						const typename surface_node::ptr surfaceb = parentb->childid[0];
 
-						assert(surfacea->next == surfaceb);
+						assert(surfacea->get_next() == surfaceb);
 						assert(surfacea == surfaceb->preceding);
 						(void)surfacea;
 						(void)surfaceb;
@@ -6488,18 +6604,18 @@ namespace stx
 
 				testcount += n->get_occupants();
 
-				if (n->next!=NULL_REF)
+				if (n->get_next()!=NULL_REF)
 				{
-					assert(key_lessequal(n->keys[n->get_occupants()-1], n->next->keys[0]));
+					assert(key_lessequal(n->keys[n->get_occupants()-1], n->get_next()->keys[0]));
 
-					assert(n == n->next->preceding);
+					assert(n == n->get_next()->preceding);
 				}
 				else
 				{
 					assert(last_surface == n);
 				}
 
-				n = n->next;
+				n = n->get_next();
 			}
 
 			assert(testcount == size());

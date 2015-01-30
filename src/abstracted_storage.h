@@ -256,10 +256,12 @@ namespace stored{
 		
 		/// get versions
 
-		void get_greater_version_diff(const nst::_VersionRequests& request, nst::_VersionRequests& response){
+		nst::u64 get_greater_version_diff(nst::_VersionRequests& request){
+			nst::u64 response = 0;
 			if(_transaction != NULL){
-				get_allocations().get_greater_version_diff(request, response);
+				response += get_allocations().get_greater_version_diff(request);
 			}
+			return response;
 		}
 		/// close the named storage so that files may be removed
 

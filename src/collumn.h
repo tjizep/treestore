@@ -546,14 +546,21 @@ namespace collums{
 						(*this).encoded.finish(rows_cached);
 					}
 				}
+				
 				if(treestore_column_encoded && encoded.good()){
+					_Rid test = 0;
 					_Rid last = p_end - start;
 					_Rid ctr = 0;
+					
 					for(c = col.lower_bound(start); c != e; ++c){
 						if(ctr >= last){
 							break;
 						}
 						_Rid r = c.key().get_value();
+						if(r <= test){
+							printf("WARNING: bad order in table detected\n");
+						}
+						test = r;
 						(*this).encoded.set(r-start, c.data());
 						++ctr;
 					}
@@ -611,7 +618,7 @@ namespace collums{
 
 		
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 4096;///32768*32;
+		static const _Rid MAX_PAGE_SIZE = 16384;///32768*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{

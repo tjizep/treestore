@@ -266,6 +266,7 @@
     <ClInclude Include="..\src\myi.h" />
     <ClInclude Include="..\src\NotificationQueueWorker.h" />
     <ClInclude Include="..\src\PredictiveCache.h" />
+    <ClInclude Include="..\src\simple_storage.h" />
     <ClInclude Include="..\src\stx\btree.h" />
     <ClInclude Include="..\src\stx\btree_map.h" />
     <ClInclude Include="..\src\stx\btree_multimap.h" />

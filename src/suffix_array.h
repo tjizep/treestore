@@ -167,12 +167,11 @@ namespace suffix_array{
 			allocations.commit();
 			allocations.begin();
 		}
-		void get_greater_version_diff(const nst::_VersionRequests& request, nst::_VersionRequests& response){
+		nst::u64 get_greater_version_diff(nst::_VersionRequests& request){
 			//if(_transaction != NULL){
 				///get_allocations().get_greater_version_diff(request, response);
 			//}
-			response.clear();
-			response.push_back(std::make_pair(0,0));
+			return 0;
 		}
 
 		/// Storage functions called by b-tree
