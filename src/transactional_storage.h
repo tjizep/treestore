@@ -622,10 +622,11 @@ namespace storage{
 			if(!block.empty()){
 
 				//compress_block
-				compressed_block = block;
-				inplace_compress_zlibh(compressed_block);
-				current_size = compressed_block.size()*sizeof(typename block_type::value_type);
-				encoded_block.assignRaw((const char *)&compressed_block[0], (size_t)current_size);
+				//compressed_block = block;
+				//inplace_compress_zlibh(compressed_block);
+				///current_size = compressed_block.size()*sizeof(typename block_type::value_type);
+				current_size = block.size();
+				encoded_block.assignRaw((const char *)&block[0], (size_t)current_size);
 			}
 
 			insert_stmt->execute();
@@ -647,7 +648,9 @@ namespace storage{
 			current_block.clear();
 
 			if(current_address == selector_address){
-				decompress_zlibh(current_block, encoded_block.content());			
+				//decompress_zlibh(current_block, encoded_block.content());			
+				current_block.resize(encoded_block.size());
+				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());
 			}
 			return (current_address == selector_address); /// returns true if a record was retrieved
 
@@ -2175,8 +2178,7 @@ namespace storage{
 			syncronized _sync(*lock);
 			if(references==0)
 				initial->engage();
-			++references;
-
+			++references;			
 		}
 
 		/// releases a reference to this coordinatron

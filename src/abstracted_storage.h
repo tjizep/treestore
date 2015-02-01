@@ -136,8 +136,6 @@ namespace stored{
 		,	order (0)
 		{
 
-			get_allocations().get_initial()->set_limit(1024ll*1024ll*1024ll*3ll);
-
 		}
 
 		~abstracted_storage() {

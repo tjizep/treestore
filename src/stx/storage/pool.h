@@ -23,7 +23,7 @@ namespace stx{
 	namespace storage{
 		
 		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
-
+		typedef Poco::ScopedTryLock<Poco::Mutex> synchronizing;
 		extern void add_buffer_use(long long added);
 		extern void remove_buffer_use(long long removed);
 	

@@ -490,7 +490,7 @@ namespace collums{
 			}
 			void finish_decoded(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
 				const bool treestore_only_encoded = false;
-				//printf("page: did not reduce %s from %.4g MB col pu: %.4g MB\n", name.c_str(), (double)calc_use() / units::MB, (double)col_page_use / units::MB);						
+				/// printf("page: did not reduce %s from %.4g MB col pu: %.4g MB\n", name.c_str(), (double)calc_use() / units::MB, (double)col_page_use / units::MB);						
 				if(treestore_only_encoded){
 					encoded.clear();					
 					clear();
@@ -618,7 +618,7 @@ namespace collums{
 
 		
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 16384;///32768*32;
+		static const _Rid MAX_PAGE_SIZE = 64*1024;///32768*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{
@@ -663,7 +663,7 @@ namespace collums{
 							}
 							if((*p).loaded){
 								++loaded;
-								evicted.push_back(std::make_pair((*p).access, &(*p)));
+								//evicted.push_back(std::make_pair((*p).access, &(*p)));
 							}
 						}
 						std::sort(evicted.begin(),evicted.end());
@@ -857,14 +857,22 @@ namespace collums{
 					return nullptr;
 				}
 
-				NS_STORAGE::synchronized synch(page->lock);
+				NS_STORAGE::synchronizing synch(page->lock);
+				if(!synch.isLocked()) return nullptr;
 				if(page->loaded){					
 					return nullptr;
 				}				
 				if(page->available){					
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-					if(treestore_current_mem_use + bytes_used > treestore_max_mem_use){
+					if(	(	
+							nst::col_use + bytes_used > treestore_max_mem_use/2 
+						)
+						||	
+						(
+							treestore_current_mem_use + bytes_used > treestore_max_mem_use
+						)
+						){
 						page->unload();							
 						page->loading = false;					
 						

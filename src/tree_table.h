@@ -1817,7 +1817,7 @@ namespace tree_stored{
 
 		public:
 		/// release locks and resources
-		void unlock(Poco::Mutex* p2_lock)
+		void unlock(Poco::Mutex* p2_lock = NULL)
 		{
 			if(locks==0){
 				printf("too many unlocks \n");
@@ -1839,7 +1839,7 @@ namespace tree_stored{
 					changed = false;
 				}else
 				{
-					bool rolling = false; //treestore_reduce_tree_use_on_unlock;
+					bool rolling = true; //treestore_reduce_tree_use_on_unlock;
 					if
 					(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
 						||	calc_total_use() > treestore_max_mem_use*0.7f

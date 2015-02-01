@@ -76,6 +76,7 @@ extern  char treestore_reduce_tree_use_on_unlock;
 namespace NS_STORAGE = stx::storage;
 namespace nst = stx::storage;
 typedef NS_STORAGE::synchronized synchronized;
+typedef NS_STORAGE::synchronizing synchronizing;
 namespace stored{
 
 	static const double	MB = 1024.0f*1024.0f;

@@ -77,6 +77,36 @@ private:
 	ScopedLock(const ScopedLock&);
 	ScopedLock& operator = (const ScopedLock&);
 };
+template <class M>
+class ScopedTryLock
+	/// A class that simplifies thread synchronization
+	/// with a mutex.
+	/// The constructor accepts a Mutex (and optionally
+	/// a timeout value in milliseconds) and locks it.
+	/// The destructor unlocks the mutex.
+{
+public:
+	explicit ScopedTryLock(M& mutex): _mutex(mutex)
+	{
+		locked = _mutex.tryLock();
+	}
+	bool isLocked() const {
+		return (*this).locked;
+	}
+		
+	~ScopedTryLock()
+	{
+		if(isLocked())
+			_mutex.unlock();
+	}
+
+private:
+	M& _mutex;
+	bool locked;
+	ScopedTryLock();
+	ScopedTryLock(const ScopedTryLock&);
+	ScopedTryLock& operator = (const ScopedTryLock&);
+};
 
 
 template <class M>

@@ -174,7 +174,7 @@ namespace tree_stored{
 		void release(TABLE *table_arg){
 			bool writer = changed;
 			if(!locks){
-				printf("ERROR: no locks to release\n");
+				printf("ERROR: no locks to release\n");				
 				return;
 			}
 			
@@ -316,13 +316,13 @@ private:
 	
 	tree_stored::tree_thread writer;
 public:
-	tree_stored::tree_thread *get_writer(){
-		
+	tree_stored::tree_thread *get_writer(){		
 		nst::get_single_writer_lock().lock();
 		if(writer.get_locks()==0)
 			writer.modify();
 		return &writer;
 	}
+
 	bool release_writer(tree_stored::tree_thread * w){
 		
 		if(w == &writer){
@@ -332,12 +332,19 @@ public:
 		return false;
 	}
 	void remove_table(const std::string &name){
+		{
+			NS_STORAGE::syncronized ul(tlock);
+			tree_stored::tree_thread * w = get_writer();
+			w->remove_table(name);
+			release_writer(w);
+		}
 		NS_STORAGE::syncronized ul(tlock);
 
 		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
 			(*t)->remove_table(name);
 
 		}
+
 	}
 	void release_thread(tree_stored::tree_thread * tt){
 		if(tt==NULL){
@@ -351,7 +358,8 @@ public:
 				return;
 			}
 		}
-		threads.push_back(tt);
+		//threads.push_back(tt);
+		printf("WARNING: thread returned which is not registered\n");
 		DBUG_PRINT("info",("added {%lld} t resources\n", (NS_STORAGE::u64)threads.size()));
 	}
 
@@ -373,6 +381,7 @@ public:
 
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
+			threads.push_back(r);
 		}
 		DBUG_PRINT("info",("{%lld} t resources \n", (NS_STORAGE::u64)threads.size()));
 		return r;
@@ -770,7 +779,7 @@ public:
 
 		THD* thd = ha_thd();
 		
-		tt = get_thread()->compose_table(t);
+		
 		if 
 		(	
 			(
@@ -782,7 +791,10 @@ public:
 			)
 		&&	create_info->auto_increment_value > 0
 		){
+			tt = get_thread()->compose_table(t);
+			tt->begin(false);
 			tt->reset_auto_incr(create_info->auto_increment_value);
+			tt->rollback();		
 		}
 		
 		
@@ -795,6 +807,7 @@ public:
 		tt->check_load(table);
 		path = table->s->path.str;
 		printf("open tt %s\n", table->alias);
+		tt->rollback();
 		return 0;
 	}
 
@@ -842,8 +855,8 @@ public:
 	int rename_table(const char *_from, const char *_to){
 		
 		DBUG_PRINT("info",("renaming files %s\n", name));
+		nst::synchronized swl(single_writer_lock);
 		
-
 		int r = 0;
 		std::string from = _from;
 		std::string to = _to;
@@ -876,6 +889,8 @@ public:
 						std::string renamed = to + &next[from.length()];
 						df.moveTo(renamed);
 					}
+				}else{
+					r = HA_ERR_TABLE_EXIST;
 				}
 			}catch(std::exception& ){
 				printf("could not rename table file %s\n", name.c_str());
@@ -887,20 +902,25 @@ public:
 			using Poco::File;
 			using Poco::Path;
 			std::string nxt = from + extenstion;
+			if(stored::erase_abstracted_storage(nxt)){	
 			
-			File df (nxt);
-			if(df.exists()){
-				std::string renamed = to + &nxt[from.length()];
-				printf("renaming %s to %s\n",nxt.c_str(),renamed.c_str());
-				df.moveTo(renamed);
+				File df (nxt);
+				if(df.exists()){
+					std::string renamed = to + &nxt[from.length()];
+					printf("renaming %s to %s\n",nxt.c_str(),renamed.c_str());
+					df.moveTo(renamed);
+				}
+			}else{
+				r = HA_ERR_TABLE_EXIST;
 			}
 		}catch(std::exception& ){
 			printf("could not rename table file %s\n", from.c_str());
-			r = HA_ERR_NO_SUCH_TABLE;
+			r = HA_ERR_TABLE_EXIST;
 
 		}
 
 
+		
 		return r;
 	}
 	int delete_table (const char * name){
@@ -935,7 +955,7 @@ public:
 				}
 			}catch(std::exception& ){
 				printf("could not delete table file %s\n", name.c_str());
-				r = HA_ERR_NO_SUCH_TABLE;
+				r = HA_ERR_TABLE_EXIST;
 
 			}
 			///
@@ -944,14 +964,18 @@ public:
 			using Poco::File;
 			using Poco::Path;
 			std::string nxt = name + extenstion;
-			printf("deleting %s\n",nxt.c_str());
-			File df (nxt);
-			if(df.exists()){
-				df.remove();
+			if(stored::erase_abstracted_storage(nxt)){	
+				printf("deleting %s\n",nxt.c_str());
+				File df (nxt);
+				if(df.exists()){
+					df.remove();
+				}
+			}else{			
+				r = HA_ERR_TABLE_EXIST;
 			}
 		}catch(std::exception& ){
 			printf("could not delete table file %s\n", name);
-			r = HA_ERR_NO_SUCH_TABLE;
+			r = HA_ERR_TABLE_EXIST;
 
 		}
 
