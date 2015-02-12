@@ -146,6 +146,35 @@ public:
     malformed_page_exception() throw(){};
 };
 
+struct _D_has_attached_page_data {
+    template <typename T, void (T::*)() = &T::_D_attached_page_data>
+    struct get {};
+};
+
+template <typename T>
+struct attached_flag{
+	
+	bool attached_page_data(){
+		return false;
+	};
+};
+template <typename T>
+struct has_typedef_attached_values {
+    // Types "yes" and "no" are guaranteed to have different sizes,
+    // specifically sizeof(yes) == 1 and sizeof(no) == 2.
+    typedef char yes[1];
+    typedef char no[2];
+ 
+    template <typename C>
+    static yes& test(typename C::attached_values*);
+ 
+    template <typename>
+    static no& test(...);
+ 
+    // If the "sizeof" of the result of calling test<T>(0) would be equal to sizeof(yes),
+    // the first overload worked and T has a nested type named foobar.
+    static const bool value = sizeof(test<T>(nullptr)) == sizeof(yes);
+};
 namespace nst = stx::storage;
 namespace stx
 {
@@ -169,7 +198,7 @@ namespace stx
 
 	/// an iterator intializer pair
 	typedef std::pair<mini_pointer, unsigned short> initializer_pair;
-
+	
 	template<typename _KeyType>
 	struct interpolator{
 
@@ -179,7 +208,9 @@ namespace stx
 		inline bool encoded_values( bool ) const {
 			return false;
 		}
-
+		inline bool attached_values( ) const {
+			return false;
+		}
 		inline void encode(nst::buffer_type::iterator&, const _KeyType*, nst::u16) const {
 
 		}
@@ -209,7 +240,7 @@ namespace stx
 		}
 	};
 
-
+	
 
 	struct def_p_traits /// persist traits
 	{
@@ -227,7 +258,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 0,
 			interior_mul = 1,
-			keys_per_page = 256,
+			keys_per_page = 128,
 			caches_per_page = 16,
 			max_release = 8,
 			version_reload
@@ -490,7 +521,8 @@ namespace stx
 		/// proxy and interceptor class for reference counted pointers
 		/// and automatic loading
 
-
+		
+		
 		class base_proxy
 		{
 		protected:
@@ -1265,9 +1297,10 @@ namespace stx
 			}
 			template<typename key_type>
 			void check_cache(const key_type* keys){
-
-				if(get_cache_occupants() == 0){
-					set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
+				if(!can_interp){
+					if(get_cache_occupants() == 0){
+						///set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
+					}
 				}
 			}
 
@@ -1643,9 +1676,18 @@ namespace stx
 		protected:
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
+			buffer_type						attached;
 
 		public:
-			
+			buffer_type	&get_attached(){
+				return (*this).attached;
+			}
+			const buffer_type &get_attached() const {
+				return (*this).attached;
+			}
+			void transfer_attached(buffer_type& attached){
+				(*this).attached.swap(attached);
+			}
 			void set_next(const ptr& next){
 					
 				(*this).next = next;
@@ -1703,7 +1745,7 @@ namespace stx
 				loaded_slot = 0;
 				transaction = 0;
 				preceding = next = NULL_REF;
-
+				
 			}
 			bool unshare(){
 				
@@ -1874,7 +1916,13 @@ namespace stx
 			/// decodes a page into a exterior node using the provided buffer and storage instance/context
 			/// TODO: throw an exception if checks fail
 
-			void load(btree* context, stream_address address,nst::version_type version, storage_type & storage,const buffer_type& buffer,size_t bsize, key_interpolator interp){
+			void load(btree* context, 
+				stream_address address,
+				nst::version_type version, 
+				storage_type & storage,
+				buffer_type& buffer,
+				size_t bsize, 
+				key_interpolator interp){
 
 			    using namespace stx::storage;
 				(*this).address = address;
@@ -1920,7 +1968,13 @@ namespace stx
 				(*this).check_cache(keys);
 
 				node::initialize_interpolator(interp, keys);
-
+				if
+				(	
+					has_typedef_attached_values<key_type>::value
+				||	has_typedef_attached_values<data_type>::value
+				){
+					transfer_attached(buffer);
+				}
 			}
 
 			/// Encode a stored page from input buffer to node instance
@@ -1993,6 +2047,8 @@ namespace stx
 		/// , sta::tracker<stream_address,sta::bt_counter> 
 		
 		typedef ::google::dense_hash_map<stream_address, node*> _AddressedNodes;
+		///typedef nst::imperfect_hash<stream_address, node*> _AddressedNodes;
+		
 		
 		typedef std::pair<stream_address, ::stx::storage::version_type> _AddressPair;
 		typedef std::map<_AddressPair, node*, ::std::less<_AddressPair>> _AddressedVersionNodes; /// , ::sta::tracker<_AddressPair, ::sta::bt_counter> 
@@ -3907,7 +3963,7 @@ namespace stx
             stats.use += used;
 			stats.interior_use += inode;
 			stats.surface_use += snode;
-			add_btree_totl_used (used);
+			/// add_btree_totl_used (used);
             /// stats.report_use();
         };
 
@@ -4329,7 +4385,7 @@ namespace stx
 			last.set_context(this);
 			stats.last_surface_size = last != NULL_REF ? last->get_occupants() : 0;
 				
-			return iterator(last, stats.last_surface_size);/// avoids loading the whole page
+			return iterator(last, (short)stats.last_surface_size);/// avoids loading the whole page
 			
 		}
 

@@ -3,7 +3,7 @@ long long treestore_current_mem_use = 0;
 long long treestore_journal_lower_max = 0;
 long long treestore_journal_upper_max = 0;
 long long treestore_journal_size = 0;
-
+double	treestore_column_cache_factor = 0.5;
 my_bool treestore_efficient_text = FALSE;
 
 char treestore_column_cache = TRUE;
@@ -51,6 +51,12 @@ static MYSQL_SYSVAR_BOOL(column_cache, treestore_column_cache,
   "enables or disables collumn cache"
   "Default is true (enabled)",
   NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_DOUBLE(column_cache_factor, treestore_column_cache_factor,
+  PLUGIN_VAR_RQCMDARG,
+  "The size the journal reaches before the journal export is attempted",
+  NULL, NULL, 0.5, 0.01, 0.99, 0.4);
+
 
 static MYSQL_SYSVAR_BOOL(predictive_hash, treestore_predictive_hash,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,

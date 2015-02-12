@@ -618,7 +618,7 @@ namespace collums{
 
 		
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 64*1024;///32768*32;
+		static const _Rid MAX_PAGE_SIZE = 32768*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{

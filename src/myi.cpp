@@ -478,7 +478,7 @@ void reduce_thread_usage(){
 }
 
 void print_read_lookups(){
-	
+	return;
 	if(os::millis()-ltime > 1000){
 		
 		stx::storage::syncronized ul(plock);
@@ -1891,6 +1891,7 @@ int treestore_db_init(void *p)
 	start_cleaning();
 	start_calculating();
 	test_run();
+	
 	DBUG_RETURN(FALSE);
 }
 
@@ -1910,6 +1911,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(efficient_text),
   MYSQL_SYSVAR(column_cache),
   MYSQL_SYSVAR(column_encoded),
+  MYSQL_SYSVAR(column_cache_factor),
   MYSQL_SYSVAR(predictive_hash),
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
@@ -1952,7 +1954,7 @@ namespace ts_cleanup{
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
 			nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache ? 0.1: 0.1;
+			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
 				

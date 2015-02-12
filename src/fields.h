@@ -341,6 +341,7 @@ namespace stored{
 			return (size_t)value;
 		}
 	};
+	
 	template<bool CHAR_LIKE, int _MConstSize = 16>
 	class Blobule {
 	protected:
@@ -348,6 +349,7 @@ namespace stored{
 	public:
 		typedef empty_encoder list_encoder;
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
+		typedef bool attached_values;
 	protected:
 		
 		typedef NS_STORAGE::u16 _BufferSize;
@@ -355,26 +357,39 @@ namespace stored{
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 		NS_STORAGE::u8 buf[_ConstSize];
-
+		const NS_STORAGE::u8* attached;
 		inline NS_STORAGE::u8 *extract_ptr(){
 			return (NS_STORAGE::u8*)(*(size_t*)(buf));
 		}
 		inline const NS_STORAGE::u8 *extract_ptr() const {
 			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
+		inline bool is_static() const {
+			if(attached!=nullptr) return false;
+			return (bytes <= _ConstSize);
+		}
 		NS_STORAGE::u8* data(){
 			null_check();
-			if(bytes <= _ConstSize){
+			
+			if(is_static()){
 				return buf;
 			}
 			return extract_ptr();
 		}
 		const NS_STORAGE::u8* data() const{
-			null_check();
-			if(bytes <= _ConstSize){
+			null_check();			
+			if(is_static()){
 				return buf;
 			}
 			return extract_ptr();
+		}
+		void set_ptr(const NS_STORAGE::u8* nbuf){
+			NS_STORAGE::u8* d = const_cast<NS_STORAGE::u8*>(nbuf);
+			memcpy(buf, &d, sizeof(NS_STORAGE::u8*));
+		}
+		void set_ptr(const NS_STORAGE::i8* nbuf){
+			NS_STORAGE::i8* d = const_cast<NS_STORAGE::i8*>(nbuf);
+			memcpy(buf, &d, sizeof(NS_STORAGE::i8*));
 		}
 		void null_check() const {
 			
@@ -386,18 +401,23 @@ namespace stored{
 				printf("WARNING: large buffer\n");
 			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
-			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8 *)allocation_pool.allocate(nbytes);
+			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8 [nbytes]; //allocation_pool.allocate(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
-			if(bytes > _ConstSize){
-				allocation_pool.free(r,bytes);				
+			if(!is_static()){
+				if(attached!=nullptr){
+					attached = nullptr;
+				}else{
+					/// allocation_pool.free(r,bytes);				
+					delete [] r;
+				}
 			}
-			memcpy(buf, &nbuf, sizeof(u8*));
+			set_ptr(nbuf);
 			bytes = (u32)nbytes;
 			return nbuf;
 		}
 		NS_STORAGE::u8* _resize_buffer(size_t mnbytes){
 			null_check();
-			using namespace NS_STORAGE;
+			using namespace NS_STORAGE;			
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8* r = data();
   			if(nbytes > bytes){
@@ -407,6 +427,7 @@ namespace stored{
 		}
 		void _add( const void * v, size_t count, bool end_term = false){
 			null_check();
+			
 			_BufferSize extra = end_term ? 1 : 0;
 			_resize_buffer(count + extra);
 			memcpy(data(),v,count);
@@ -455,9 +476,17 @@ namespace stored{
 			return size != right.size;
 
 		}
+		void free_ptr(){
+			if(attached==nullptr && bytes > _ConstSize){				
+				///allocation_pool.free(data(), bytes)	;	
+				delete [] data();
+			}
+			
+		}
+		
 	public:
 		size_t total_bytes_allocated() const {
-			if(bytes > _ConstSize)
+			if(!is_static())
 				return sizeof(*this) + bytes;
 			return sizeof(*this);
 		}
@@ -533,29 +562,34 @@ namespace stored{
 		Blobule ()
 		:	bytes(_ConstSize)
 		,	size(0)
+		,	attached(nullptr)
 		{
 			//memset(buf,0,sizeof(buf));
 			buf[0] = 0;
 		}
+		void clear(){
+			free_ptr();
+			attached = nullptr;
+			bytes = _ConstSize;
+			size = 0;
+			buf[0] = 0;
+		}
+		
 		inline ~Blobule(){
-			if(bytes > _ConstSize){				
-				allocation_pool.free(data(), bytes)	;	
-			}
-			
-			/// bytes = _ConstSize;
-			/// size = 0;
-			/// buf[0] = 0;
+			free_ptr();			
 		}
 
 		Blobule (const Blobule& init)
 		:	bytes(_ConstSize)
 		,	size(0)
+		,	attached(nullptr)
 		{
 			*this = init;
 		}
 		Blobule(const char *right)
 		:	bytes(_ConstSize)
 		,	size(0)
+		,	attached(nullptr)
 		{
 			*this = right;
 		}
@@ -563,6 +597,7 @@ namespace stored{
 		Blobule(const NS_STORAGE::i64& right)
 		:	bytes(_ConstSize)
 		,	size(0)
+		,	attached(nullptr)
 		{
 			set(right);
 
@@ -570,6 +605,7 @@ namespace stored{
 		Blobule(const double& right)
 		:	bytes(_ConstSize)
 		,	size(0)
+		,	attached(nullptr)
 		{
 			set(right);
 
@@ -578,12 +614,21 @@ namespace stored{
 		inline Blobule& operator=(const Blobule& right)
 		{
 			using namespace NS_STORAGE;
-			if(right.size > _ConstSize){
-				u8 * d = _resize_buffer(right.size);
-				size = right.size;
-				memcpy(d,right.data(),size);//right.size+1
+			if(!right.is_static()){
+				if(attached!=nullptr && attached==right.attached){
+					attached = right.attached;
+					size = right.size;
+					bytes = right.bytes;
+					set_ptr(right.data());
+				}else{
+					u8 * d = _resize_buffer(right.size);
+					size = right.size;
+					memcpy(d,right.data(),size);//right.size+1
+				}
 			}else{
+				
 				size = right.size;
+
 				if(size)
 					memcpy(data(), right.data(), _ConstSize);//right.size+1
 			}
@@ -666,14 +711,12 @@ namespace stored{
 					}
 					reader += size;
 				}else{
-					size_t s = leb128::read_signed(reader);				
-
-					_resize_buffer(s);
-					const u8 * end = data()+s;
-				
-					for(u8 * d = data(); d < end ; ++d,++reader){
-						*d = *reader;
-					}				
+					free_ptr();
+					size_t s = leb128::read_signed(reader);									
+					set_ptr(&buffer[reader - buffer.begin()]);
+					attached = &buffer[0];
+					reader += s;
+					bytes = s;
 					size = s;
 				}
 			}
@@ -708,8 +751,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 24> BlobStored;
-	typedef stored::Blobule<true, 22> VarCharStored;
+	typedef stored::Blobule<false, 12> BlobStored;
+	typedef stored::Blobule<true, 10> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -1014,7 +1057,7 @@ namespace stored{
 		}
 
 		DynamicKey& operator=(const DynamicKey& right){
-			if(right.bs < static_size){
+			if(!right.bs < static_size){
 				bs = right.bs;
 				memcpy(buf, right.buf, bs);
 			}else{
@@ -2552,5 +2595,10 @@ namespace stored{
 		typedef index_interface * ptr;
 	};
 
+};
+//typedef stored::Blobule<false, 48> BlobStored;
+//typedef stored::Blobule<true, 48> VarCharStored;
+
+namespace stx{
 };
 #endif

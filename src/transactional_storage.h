@@ -415,8 +415,10 @@ namespace storage{
 
 		typedef block_descriptor* ref_block_descriptor;
 		typedef std::vector<block_descriptor*> _Descriptors;
-		/// typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
-		typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;
+		////typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
+		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;
+		/// typedef address_table<address_type, ref_block_descriptor> _Allocations;
+		typedef imperfect_hash<address_type, ref_block_descriptor> _Allocations;
 		
 
 		typedef std::unordered_set<address_type> _Changed;
@@ -559,7 +561,9 @@ namespace storage{
 				
 				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
 					block_descriptor* result = new block_descriptor(0);				
-					decompress_zlibh(result->block, (*b).content());
+					///decompress_zlibh(result->block, (*b).content());
+					result->block.resize((*b).size());
+					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());
 					remove_buffer_use((*b).content().capacity());
 					(*b).swap(Poco::Data::BLOB());
 					decoded.push_back(result);
@@ -701,6 +705,7 @@ namespace storage{
 			if(allocations.count(which)==0){
 				up_use(reflect_block_use(descriptor));
 				descriptor->version = version_off(which);
+				descriptor->set_storage_action(read);
 				allocations[which] = descriptor;
 				return true;
 			}
@@ -861,7 +866,7 @@ namespace storage{
 				}
 			}
 			if(write_all){
-				(*this).changed.clear();
+				//(*this).changed.clear();
 				(*this).changes = 0;
 			}
 		}
@@ -883,7 +888,7 @@ namespace storage{
 					if(get_use() > 1024*1024*2){
 						//ptrdiff_t before = get_use();
 						get_session() << "PRAGMA shrink_memory;", now;
-						flush_back(0.85,true);
+						flush_back(0.25,true);
 						last_flush_time = ::os::millis();
 						//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 					}
@@ -913,8 +918,8 @@ namespace storage{
 			currently_active = 0;
 			result = nullptr;
 			if(which){
-				finder = allocations.find(which);
-				if(finder == allocations.end()){
+				bool finder = allocations.get(which,result);
+				if(!finder){
 					/// load from storage
 					if((*this).get_buffer(which))
 					{
@@ -950,7 +955,7 @@ namespace storage{
 					}
 
 				}else{
-					result = (*finder).second; /// allocations[which];
+					///result = (*finder).second; /// allocations[which];
 				}
 				result->set_storage_action(how);
 			}else{
@@ -964,10 +969,10 @@ namespace storage{
 				result->set_storage_action(create);
 
 			}
-			if(result->get_storage_action() != read){
-				changed.insert(which); /// this action flags a change
-				
-			}
+			//if(result->get_storage_action() != read){
+			//	changed.insert(which); /// this action flags a change
+			//	
+			//}
 
 			up_use(reflect_block_use(result));
 
@@ -1053,7 +1058,46 @@ namespace storage{
 			}
 			/// out contains a unique list of addresses in this allocator
 		}
-
+		/// read all the blocks into cache or until memory limit is reached
+		void read_ahead(){
+			get_session();
+			address_type start = 0;
+			size_t ts = os::millis();
+			size_t tst = os::millis();
+			printf("start readahead %s\n", get_name().c_str());
+			while(true){
+				if(treestore_current_mem_use > treestore_max_mem_use/2){
+					break;
+				}
+				block_request_ptr block = std::make_shared<block_request>();
+				block->start = start;
+				/// to retrieve a page of blocks
+				/// to retrieve a range of blocks
+		
+				std::shared_ptr<Poco::Data::Statement> block_stmt;
+				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
+				u64 ts = os::millis();
+				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 > ?;", 
+					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(20000,false,false);		
+				block_stmt->execute();	
+				if(block->addresses.empty())
+					break;
+				
+				block->init_use();
+				block->decode_all();
+				for(size_t a = 0; a < block->decoded.size(); ++a){
+					if(!inject(block->addresses[a],block->decoded[a])){
+						delete block->decoded[a];
+					}					
+				}
+				start = block->addresses.back();
+				if(os::millis() - ts > 1000){
+					printf("read %s %lld\n ", get_name().c_str(), (long long)start);
+					ts = os::millis();
+				}
+			}		
+			printf("readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
+		}
 		/// copy all data to dest wether it exists or not
 
 		void copy(sqlite_allocator& dest){
@@ -1123,8 +1167,8 @@ namespace storage{
 					/// if true the data files are deleted on destruction
 
 		{
-			allocations.set_empty_key(0xFFFFFFFFll);
-			allocations.set_deleted_key(0xFFFFFFFFll-1);
+			//allocations.set_empty_key(0xFFFFFFFFll);
+			//allocations.set_deleted_key(0xFFFFFFFFll-1);
 			using Poco::File;
 			if(!is_new){
 				File df (get_storage_path() + name + extension );
@@ -1136,6 +1180,8 @@ namespace storage{
 				
 				}
 			}else (*this).is_new = true;
+			//if(!is_new)
+			//	read_ahead();
 		}
 		virtual std::string get_name() const {
 			return (*this).name;
@@ -1241,7 +1287,7 @@ namespace storage{
 				ref_block_descriptor result = new block_descriptor(0);
 				result->set_storage_action(create);
 				allocations[which] = result;
-				changed.insert(which);
+				//changed.insert(which);
 				++changes;
 			}
 		}
@@ -1307,7 +1353,7 @@ namespace storage{
 		/// can effectively change it
 		/// (it changes busy to false only once unless allocate is called)
 		void complete(){
-			NS_STORAGE::synchronized s(lock);
+			///NS_STORAGE::synchronized s(lock);
 			
 			allocated_version = 0;
 			if(busy){
@@ -1387,7 +1433,7 @@ namespace storage{
 		void commit(){
 			syncronized ul(lock);
 			if(transacted){
-				flush_back(0.8, true, true); /// write all changes to disk or pigeons etc.
+				flush_back(0.8, false, false); /// write all changes to disk or pigeons etc.
 			}
 			commit_storage();
 
@@ -1433,7 +1479,7 @@ namespace storage{
 			get_session() << "PRAGMA shrink_memory;", now;
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.85,true,modified());
+				flush_back(0.25,true,!modified());
 		}
 	};
 
