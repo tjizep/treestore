@@ -368,7 +368,8 @@ namespace storage{
 		 /// std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> >
 		/// ::google::dense_hash_map
 		///typedef std::vector<version_type> _Versions;
-		typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
+		/// typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
+		typedef nst::imperfect_hash<address_type, version_type> _Versions;
 
 		
 	private: /// private types
@@ -484,7 +485,7 @@ namespace storage{
 
 		bool is_new;				/// flag set when storage file exists used to suppress file creation if there is nothing in it
 
-		
+		bool is_readahead;			/// flag set to enable read ahead
 
 		typename _Allocations::iterator finder;
 
@@ -656,6 +657,7 @@ namespace storage{
 				current_block.resize(encoded_block.size());
 				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());
 			}
+			
 			return (current_address == selector_address); /// returns true if a record was retrieved
 
 		}
@@ -919,8 +921,14 @@ namespace storage{
 			result = nullptr;
 			if(which){
 				bool finder = allocations.get(which,result);
+				if(!finder && is_readahead){
+					read_ahead(which,32);
+					finder = allocations.get(which,result);
+				}
+				
 				if(!finder){
 					/// load from storage
+					
 					if((*this).get_buffer(which))
 					{
 
@@ -992,18 +1000,15 @@ namespace storage{
 			}
 		}
 		version_type has_version(address_type which){
-			//return (which < versions.size()) ? versions[which] : 0;
+			
 			_Versions::iterator v = versions.find(which);
 			if(v != versions.end()){
 				return (*v).second;
 			}
 			return 0;
-			///versions.count(which) == 0 ? :
+			
 		}
 		nst::version_type& update_versions(nst::version_type v){
-			//if(versions.size() <= v){
-			//	versions.resize(v + v/3);
-			//}
 			return versions[v];
 		}
 		
@@ -1016,9 +1021,8 @@ namespace storage{
 			syncronized ul(lock);
 			for(_VersionRequests::iterator v = request.begin(); v != request.end(); ++v){
 				address_type ver = 0;
-				if((*v).first < versions.size() ){					
-					ver = update_versions((*v).first);
-				}
+				
+				versions.get((*v).first,ver);					
 				
 				finder = allocations.find((*v).first);
 				if(finder != allocations.end()){
@@ -1059,16 +1063,14 @@ namespace storage{
 			/// out contains a unique list of addresses in this allocator
 		}
 		/// read all the blocks into cache or until memory limit is reached
-		void read_ahead(){
+		void read_ahead(address_type start_address, u64 count){
 			get_session();
-			address_type start = 0;
+			address_type start = start_address;
+			u64 blocks = 0;
 			size_t ts = os::millis();
 			size_t tst = os::millis();
-			printf("start readahead %s\n", get_name().c_str());
-			while(true){
-				if(treestore_current_mem_use > treestore_max_mem_use/2){
-					break;
-				}
+			//printf("start readahead %s\n", get_name().c_str());
+			//while(blocks < count){
 				block_request_ptr block = std::make_shared<block_request>();
 				block->start = start;
 				/// to retrieve a page of blocks
@@ -1076,12 +1078,15 @@ namespace storage{
 		
 				std::shared_ptr<Poco::Data::Statement> block_stmt;
 				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-				u64 ts = os::millis();
-				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 > ?;", 
-					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(20000,false,false);		
+				//u64 ts = os::millis();
+				u64 end = start + count;
+				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;", 
+					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(count,false,false);		
 				block_stmt->execute();	
-				if(block->addresses.empty())
-					break;
+				if(block->addresses.empty()){
+					return;
+				}
+				blocks += block->addresses.size();
 				
 				block->init_use();
 				block->decode_all();
@@ -1095,8 +1100,8 @@ namespace storage{
 					printf("read %s %lld\n ", get_name().c_str(), (long long)start);
 					ts = os::millis();
 				}
-			}		
-			printf("readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
+			//}		
+			//printf("readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
 		}
 		/// copy all data to dest wether it exists or not
 
@@ -1144,7 +1149,7 @@ namespace storage{
 		template<typename _NameFactory >
 		sqlite_allocator
 		(	_NameFactory namer			/// storage name
-		,	bool is_new = false			/// basically a temporary transaction
+		,	bool is_new = false			/// basically a temporary transaction3
 		,	address_type ma = 32		/// minimum address	
 		)
 		:	transient(false)			/// the path should contain the trailing delimeter
@@ -1162,6 +1167,7 @@ namespace storage{
 		,	limit(128 * 1024 * 1024)	/// default memory limit
 		,	_use(0)						/// current memory use in bytes
 		,	decoders_away(0)			/// worker units busy decoding
+		,	is_readahead(false)			/// disables read ahead
 		,	result(nullptr)				///	save the last result after allocate is called to improve safety
 		
 					/// if true the data files are deleted on destruction
@@ -1185,6 +1191,12 @@ namespace storage{
 		}
 		virtual std::string get_name() const {
 			return (*this).name;
+		}
+		void set_readahead(bool is_readahead){
+			this->is_readahead = is_readahead;
+		}
+		bool get_readahead() const {
+			return this->is_readahead;
 		}
 		/// change the allocation offset only if the new one is larger
 		void set_allocation_start(address_type start){
@@ -2329,6 +2341,13 @@ namespace storage{
 			}
 			
 			return b.get();
+		}
+		/// get readahead
+		bool is_readahead() const {
+			return (*this).initial->get_readahead();
+		}
+		void set_readahead(bool is_readahead){
+			(*this).initial->set_readahead(is_readahead);
 		}
 
 		/// return the transaction order of this coordinator

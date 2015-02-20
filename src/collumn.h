@@ -790,7 +790,7 @@ namespace collums{
 		,	lazy(load)
 		,	sampler(0)
 		{
-						
+			
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -866,7 +866,7 @@ namespace collums{
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
 					if(	(	
-							nst::col_use + bytes_used > treestore_max_mem_use/2 
+							nst::col_use + bytes_used > treestore_max_mem_use / 2
 						)
 						||	
 						(
@@ -915,16 +915,16 @@ namespace collums{
 				if(page != nullptr){
 					
 					_Stored & se = page->get(row);
-					//if( page->has_flags() ){
-					//	nst::u8 flags = page->get_flags(row);
-					//	if(user.valid(flags))
-					//		return se;
-//
-//						if(user.null(flags))
-//							return empty;
-//					}else{
+					if( page->has_flags() ){
+						nst::u8 flags = page->get_flags(row);
+						if(user.valid(flags))
+							return se;
+
+						if(user.null(flags))
+							return empty;
+					}else{
 						return se;
-//					}					
+					}					
 				}
 			}
 			
@@ -975,6 +975,7 @@ namespace collums{
 
 		void tx_begin(bool read,bool shared= true){
 			stored::abstracted_tx_begin(read,shared, storage, col);
+			storage.set_readahead(false);
 			check_page_cache();
 		}
 

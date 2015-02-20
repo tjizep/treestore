@@ -214,8 +214,9 @@ namespace stx{
 						return _data[pos].second;
 					}
 					if(!_exists[pos]){
-						_exists[pos] = true;
+						_exists[pos] = 1;
 						_data[pos].first = k;
+						_data[pos].second = _V();
 						++elements;
 						return _data[pos].second;
 					}
@@ -228,8 +229,9 @@ namespace stx{
 						}
 					};
 					if(pos < get_data_size()){
-						_exists[pos] = true;
+						_exists[pos] = 1;
 						_data[pos].first = k;
+						_data[pos].second = _V();
 						++elements;
 						return _data[pos].second;
 					}
@@ -240,7 +242,7 @@ namespace stx{
 			bool erase(const _K& k){
 				size_t pos = key2pos(k);
 				if(_exists[pos] && _data[pos].first == k){
-					_exists[pos] = false;
+					_exists[pos] = 0;
 					--elements;
 					return true;
 				}
@@ -258,7 +260,7 @@ namespace stx{
 							_data[j] = _data[j+1];
 							
 						}
-						_exists[j] = false;
+						_exists[j] = 0;
 						--elements;						
 						return true;
 					}

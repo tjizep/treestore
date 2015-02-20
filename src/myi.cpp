@@ -1456,12 +1456,12 @@ public:
 
 		for(; s != selected.end(); ++s){
 			tree_stored::selection_tuple & sel = (*s);
-			bool flip = !bitmap_is_set(table->write_set,  sel.field->field_index);
-			if(flip)
-				bitmap_set_bit(table->write_set,  sel.field->field_index);
+			//bool flip = !bitmap_is_set(table->write_set,  sel.field->field_index);
+			//if(flip)
+			//	bitmap_set_bit(table->write_set,  sel.field->field_index);
 			sel.col->seek_retrieve(row,sel.field);
-			if(flip)
-				bitmap_flip_bit(table->write_set,  sel.field->field_index);
+			//if(flip)
+			//	bitmap_flip_bit(table->write_set,  sel.field->field_index);
 			
 		}
 
@@ -1957,7 +1957,7 @@ namespace ts_cleanup{
 			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
-				
+				int j = int();
 				nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
 				stx::memory_low_state = allocation_pool.is_depleted();
@@ -1968,7 +1968,7 @@ namespace ts_cleanup{
 				
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g stl%.4g   pool: %.4g <> %.4g MB\n"
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g stl%.4g   pool: %.4g MB\n"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
@@ -1977,8 +1977,8 @@ namespace ts_cleanup{
 					,	(double)btree_totl_used/units::MB
 					,	(double)total_cache_size/units::MB
 					,	(double)nst::stl_use/units::MB
-					,	(double)pool_used/units::MB
-					,	(double)allocation_pool.get_allocated()/units::MB
+					,	(double)allocation_pool.get_total_allocated()/units::MB
+					//,	(double)allocation_pool.get_allocated()/units::MB
 					);
 					last_print_size = calc_total_use();
 				}

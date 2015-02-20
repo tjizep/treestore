@@ -81,6 +81,9 @@ namespace stored{
 		_Allocations *_allocations;
 		_Transaction *_transaction;
 		nst::u64 order;
+		bool has_allocations() const {
+			return (_allocations != NULL);
+		}
 		_Allocations& get_allocations(){
 			if(_allocations == NULL){
 				_allocations = get_abstracted_storage(   (*this).name  );
@@ -148,7 +151,17 @@ namespace stored{
 				printf("error closing transaction\n");
 			}
 		}
-
+		bool is_readahead() const {
+			if(has_allocations()){
+				return get_allocations().is_readahead();
+			}
+			return false;
+		}
+		void set_readahead(bool is_readahead){
+			if(has_allocations()){
+				return get_allocations().set_readahead(is_readahead);
+			}
+		}
 		bool get_boot_value(NS_STORAGE::i64 &r){
 			r = 0;
 			const NS_STORAGE::buffer_type &ba = get_transaction().allocate((*this).boot, NS_STORAGE::read); /// read it

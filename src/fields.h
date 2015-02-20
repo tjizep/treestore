@@ -402,6 +402,7 @@ namespace stored{
 			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8 [nbytes]; //allocation_pool.allocate(nbytes);
+			add_col_use(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
 			if(!is_static()){
 				if(attached!=nullptr){
@@ -409,6 +410,7 @@ namespace stored{
 				}else{
 					/// allocation_pool.free(r,bytes);				
 					delete [] r;
+					remove_col_use(bytes);
 				}
 			}
 			set_ptr(nbuf);
@@ -478,8 +480,10 @@ namespace stored{
 		}
 		void free_ptr(){
 			if(attached==nullptr && bytes > _ConstSize){				
+				using namespace NS_STORAGE;
 				///allocation_pool.free(data(), bytes)	;	
 				delete [] data();
+				remove_col_use(bytes);
 			}
 			
 		}

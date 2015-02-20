@@ -1085,24 +1085,27 @@ namespace stx
 
 			pointer_proxy& operator=(const base_proxy &left)
 			{
-				/// dont back propagate a context
-				if(!has_context()){
-					set_context(left.get_context());
+				
+				if(this != &left){
+					/// dont back propagate a context
+					if(!has_context()){
+						set_context(left.get_context());
+					}
+					if(super::ptr != left.ptr)
+					{
+						unref();
+						super::ptr = left.ptr;
+						ref();
+					}
+					super::w = left.w;
 				}
-				if(super::ptr != left.ptr)
-				{
-					unref();
-					super::ptr = left.ptr;
-					ref();
-				}
-				super::w = left.w;
 				return *this;
 			}
 
 			pointer_proxy& operator=(const pointer_proxy &left)
 			{
-
-				(*this) = static_cast<const base_proxy&>(left);
+				if(this != &left)
+					(*this) = static_cast<const base_proxy&>(left);
 				return *this;
 			}
 			/// reference counted assingment of raw pointers used usually at creation time
@@ -2674,9 +2677,15 @@ namespace stx
 				{
 					first_node.sort();
 					total += first_node->get_occupants();
+					auto w = first_node.get_where();
+					auto context = first_node.get_context();
 					first_node = first_node->get_next();
-					if(first_node.has_context())
-						first_node.get_context()->check_low_memory_state();
+					if(context){
+						context->free_single_surface(w);
+					}
+					
+					//if(first_node.has_context())
+					//	first_node.get_context()->check_low_memory_state();
 				}
 
 				total += to.current_slot;
@@ -2695,11 +2704,20 @@ namespace stx
 				}
 				else if (currnode->get_next() != NULL_REF)
 				{
-					if(currnode.has_context())
-						currnode.get_context()->check_low_memory_state();
-					else
-						printf("WARNING: iterator has no context\n");
+					/// TODO:
+					/// add a iterator only function here to immediately let go of iterated pages
+					/// when memory is at a premium (which it usually is)
+					///
+					
+					auto w = currnode.get_where();
+					auto context = currnode.get_context();
 					currnode = currnode->get_next();
+					if(context){
+						context->free_single_surface(w);
+					}else{
+						printf("WARNING: iterator has no context\n");
+					}
+					
 					currnode.sort();
 					currnode.validate_surface_links();
 					current_slot = 0;
@@ -3877,6 +3895,16 @@ namespace stx
 			}
 
 		}
+		void free_single_surface(stream_address a){
+			
+			auto n = this->surfaces_loaded.find(a);
+			if(n!=surfaces_loaded.end()){
+				surface_node* surface = (surface_node*)(*n).second;																
+				this->unlink_surface_2(surface);
+				this->free_node((*n).second,(*n).first);
+			}
+			
+		}
 		void raw_unlink_nodes(){
 			
 			this->headsurface.discard(*this);
@@ -3946,7 +3974,7 @@ namespace stx
 					unlink_local_nodes_2();			
 					local_reduce_free();	
 						
-					if(stats.leaves > leaves_before/4){
+					if(stats.leaves > leaves_before/8){
 						unlink_local_nodes();
 						local_reduce_free();
 					}
@@ -4202,7 +4230,7 @@ namespace stx
 				stx::storage::i64 sa = 0;
 				stx::storage::i64 b = 0;
 				if(do_reload){
-					if(get_storage()->get_boot_value(b) && surfaces_loaded.size() < 300){
+					if(get_storage()->get_boot_value(b) && surfaces_loaded.size() < 300 ){ ///&& surfaces_loaded.size() < 300
 						if(b == root.get_where()){
 							get_storage()->get_boot_value(stats.tree_size,2);
 							get_storage()->get_boot_value(sa,3);
