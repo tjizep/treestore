@@ -94,12 +94,12 @@ namespace stored{
 		typedef nst::u16 count_t;
 		/// empty value decoder
 		template<typename _Stored>
-		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) const {			
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) const {
 		}
 
 		/// empty value encoder
 		template<typename _Stored>
-		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {			
+		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
 		}
 
 		/// byte size of encoded buffer for given data values
@@ -107,29 +107,29 @@ namespace stored{
 		size_t encoded_size(const _Stored* values, count_t occupants) const {
 			return 0;
 		}
-		
+
 	};
-	
+
 	struct integer_encoder{
 	public:
 		typedef nst::u16 count_t;
 	private:
-		
-		
+
+
 	public:
 
 		integer_encoder(){
-			
+
 		}
-		 
+
 		inline bool encoded(bool multi) const
 		{
 			return true;
 		}
-		
+
 		/// decoder
 		template<typename _Stored>
-		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {			
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
 			size_t bytes = occupants * sizeof(_Stored);
 			nst::u8* dest = (nst::u8*)values;
 			const nst::u8* src = (const nst::u8*)&(*reader);
@@ -140,7 +140,7 @@ namespace stored{
 
 		/// encoder
 		template<typename _Stored>
-		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {			
+		void encode(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
 			size_t bytes = occupants * sizeof(_Stored);
 			//nst::u8* dest = &(buffer[0]);
 			const nst::u8* src = (const nst::u8*)values;
@@ -158,7 +158,7 @@ namespace stored{
 			size_t bytes = occupants * sizeof(_Stored);
 			return bytes;
 		}
-		
+
 	};
 	template<typename _IntType>
 	class IntTypeStored {
@@ -181,7 +181,7 @@ namespace stored{
 
 		explicit IntTypeStored(_IntType i):value(i){
 		}
-		IntTypeStored():value(0) { 
+		IntTypeStored():value(0) {
 		}
 		IntTypeStored (const _IntType& init):value(init){
 		}
@@ -219,14 +219,14 @@ namespace stored{
 			return (size_t)value;
 		}
 	};
-	
-	
-	
+
+
+
 	template<typename _FType>
 	class FTypeStored {
 	public:
 		typedef empty_encoder list_encoder;
-		typedef _FType value_type;		
+		typedef _FType value_type;
 	protected:
 		_FType value;
 	public:
@@ -239,7 +239,7 @@ namespace stored{
 		inline void set_value(_FType nv) {
 			value = nv;
 		}
-		FTypeStored() : value((_FType)0.0f) { 
+		FTypeStored() : value((_FType)0.0f) {
 		}
 		FTypeStored (const _FType& init):value(init){
 		}
@@ -271,7 +271,7 @@ namespace stored{
 			return writer;
 		};
 		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer,NS_STORAGE::buffer_type::const_iterator r) {
-			
+
 			NS_STORAGE::buffer_type::const_iterator reader = r;
 			if(reader != buffer.end()){
 				memcpy(&value, (const NS_STORAGE::u8*)&(*reader), sizeof(value));
@@ -341,7 +341,7 @@ namespace stored{
 			return (size_t)value;
 		}
 	};
-	
+
 	template<bool CHAR_LIKE, int _MConstSize = 16>
 	class Blobule {
 	protected:
@@ -351,7 +351,7 @@ namespace stored{
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
 		typedef bool attached_values;
 	protected:
-		
+
 		typedef NS_STORAGE::u16 _BufferSize;
 		static const size_t max_buffersize = 1 << (sizeof(_BufferSize) << 3);
 		_BufferSize bytes;// bytes within dyn or static buffer
@@ -370,14 +370,14 @@ namespace stored{
 		}
 		NS_STORAGE::u8* data(){
 			null_check();
-			
+
 			if(is_static()){
 				return buf;
 			}
 			return extract_ptr();
 		}
 		const NS_STORAGE::u8* data() const{
-			null_check();			
+			null_check();
 			if(is_static()){
 				return buf;
 			}
@@ -392,7 +392,7 @@ namespace stored{
 			memcpy(buf, &d, sizeof(NS_STORAGE::i8*));
 		}
 		void null_check() const {
-			
+
 		}
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
 			null_check();
@@ -408,7 +408,7 @@ namespace stored{
 				if(attached!=nullptr){
 					attached = nullptr;
 				}else{
-					/// allocation_pool.free(r,bytes);				
+					/// allocation_pool.free(r,bytes);
 					delete [] r;
 					remove_col_use(bytes);
 				}
@@ -419,7 +419,7 @@ namespace stored{
 		}
 		NS_STORAGE::u8* _resize_buffer(size_t mnbytes){
 			null_check();
-			using namespace NS_STORAGE;			
+			using namespace NS_STORAGE;
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8* r = data();
   			if(nbytes > bytes){
@@ -429,7 +429,7 @@ namespace stored{
 		}
 		void _add( const void * v, size_t count, bool end_term = false){
 			null_check();
-			
+
 			_BufferSize extra = end_term ? 1 : 0;
 			_resize_buffer(count + extra);
 			memcpy(data(),v,count);
@@ -479,15 +479,15 @@ namespace stored{
 
 		}
 		void free_ptr(){
-			if(attached==nullptr && bytes > _ConstSize){				
+			if(attached==nullptr && bytes > _ConstSize){
 				using namespace NS_STORAGE;
-				///allocation_pool.free(data(), bytes)	;	
+				///allocation_pool.free(data(), bytes)	;
 				delete [] data();
 				remove_col_use(bytes);
 			}
-			
+
 		}
-		
+
 	public:
 		size_t total_bytes_allocated() const {
 			if(!is_static())
@@ -503,7 +503,7 @@ namespace stored{
 			return chars();
 		}
 		char * chars(){
-			
+
 			return (char *)data();
 		}
 		const char * chars() const {
@@ -526,10 +526,10 @@ namespace stored{
 		}
 
 		void add(const char * nt,size_t n){
-			_add(nt,(_size_type)n);
+			_add(nt,n);
 		}
 		void addterm(const char * nt,size_t n){
-			_add(nt,(_size_type)n,true);
+			_add(nt,n,true);
 		}
 		void add(const char * nt){
 			_add(nt,strlen(nt)+1);
@@ -578,9 +578,9 @@ namespace stored{
 			size = 0;
 			buf[0] = 0;
 		}
-		
+
 		inline ~Blobule(){
-			free_ptr();			
+			free_ptr();
 		}
 
 		Blobule (const Blobule& init)
@@ -630,7 +630,7 @@ namespace stored{
 					memcpy(d,right.data(),size);//right.size+1
 				}
 			}else{
-				
+
 				size = right.size;
 
 				if(size)
@@ -696,27 +696,27 @@ namespace stored{
 		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			
+
 			if(reader != buffer.end()){
 				bool fast = false;
-				
+
 				if(fast){
 
 					size = *reader;
 
 					if(size <= 8){
 						++reader;
-						const nst::u8 * d = &(*reader);	
-						*((nst::u64*)data()) = *((const nst::u64*)d);					
+						const nst::u8 * d = &(*reader);
+						*((nst::u64*)data()) = *((const nst::u64*)d);
 					}else{
-						size = leb128::read_signed(reader);				
-						_resize_buffer(size);				
-						memcpy(data(),&(*reader),size);						
+						size = leb128::read_signed(reader);
+						_resize_buffer(size);
+						memcpy(data(),&(*reader),size);
 					}
 					reader += size;
 				}else{
 					free_ptr();
-					size_t s = leb128::read_signed(reader);									
+					size_t s = leb128::read_signed(reader);
 					set_ptr(&buffer[reader - buffer.begin()]);
 					attached = &buffer[0];
 					reader += s;
@@ -731,7 +731,7 @@ namespace stored{
 	template <typename _Hashed>
 	struct fields_hash
 	{
-		size_t operator()(_Hashed const & x) const 
+		size_t operator()(_Hashed const & x) const
 		{
 			return x.get_hash();
 		}
@@ -814,17 +814,13 @@ namespace stored{
 			}else
 				bs = (_BufferSize)nbytes;
 			if(bs==static_size){
-				if(get_Data().capacity() < nbytes){
-					nst::i64 d = get_Data().capacity();
-					get_Data().resize(nbytes);					
-				}else
-					get_Data().resize(nbytes);
+				get_Data().resize(nbytes);
 			}
 
 			return data();
 		}
 		NS_STORAGE::u8* _append( size_t count ){
-			size_t os = size();			
+			size_t os = size();
 			NS_STORAGE::u8* r = _resize_buffer( os + count ) + os;
 
 			return r;
@@ -1023,8 +1019,8 @@ namespace stored{
 		}
 
 		~DynamicKey(){
-			if(bs==static_size){				
-				get_Data().~_Data();				
+			if(bs==static_size){
+				get_Data().~_Data();
 			}
 			//bs = 0;
 			//row = 0;
@@ -1067,7 +1063,7 @@ namespace stored{
 			}else{
 				_resize_buffer(right.size());
 				memcpy(data(), right.data(), right.size());
-			
+
 			}
 			row = right.row;
 			return *this;
@@ -1259,7 +1255,7 @@ namespace stored{
 			writer = leb128::write_signed(writer, row);
 			writer = leb128::write_signed(writer, size());
 
-			
+
 			memcpy(&(*writer),data(),size());
 			writer += size();
 			//const u8 * end = data()+size();
@@ -1291,7 +1287,7 @@ namespace stored{
 	public:
 		typedef typename _FieldType::value_type _DataType ;
 
-		
+
 		typedef std::vector<nst::u8> _Data;
 
 		static const size_t MAX_BYTES = 2048;
@@ -1588,12 +1584,13 @@ namespace stored{
 
 	static const nst::u32 MAX_HIST = 1 << 31;
 	static const nst::u32 MAX_ENTROPY = 1 << 31;
-	
+
 
 		template<typename _IntType>
 		struct entropy_t{
 			typedef _IntType _Sampled;
-			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
+			/// , ::sta::col_tracker<_Sampled>
+			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled> > _UnsortedHistogram;
 			/// typedef ::google::dense_hash_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>> _UnsortedHistogram;
 			/// typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
@@ -1612,7 +1609,7 @@ namespace stored{
 			}
 			void clear_unsorted(){
 				_UnsortedHistogram h;
-				
+
 				(*this).histogram.swap(h);
 				_UniqueSamples u;
 				(*this).unique.swap(u);
@@ -1626,7 +1623,7 @@ namespace stored{
 			}
 			_Histogram& get_sorted_histogram(){
 				if(sorted_histogram.empty()){
-					for(_UnsortedHistogram::iterator u = histogram.begin(); u!=histogram.end();++u){
+					for(typename _UnsortedHistogram::iterator u = histogram.begin(); u!=histogram.end();++u){
 						sorted_histogram[(*u).first] = (*u).second;
 					}
 					//clear_unsorted();
@@ -1639,7 +1636,7 @@ namespace stored{
 			_UnsortedHistogram& get_unsorted_histogram() {
 				return histogram;
 			}
-			const _Histogram& get_sorted_histogram() const {				
+			const _Histogram& get_sorted_histogram() const {
 				return sorted_histogram;
 			}
 
@@ -1652,7 +1649,7 @@ namespace stored{
 			void clear(){
 				samples = 0;
 				bytes_allocated = sizeof(*this);
-				
+
 				clear_unsorted();
 				clear_sorted();
 			}
@@ -1661,14 +1658,14 @@ namespace stored{
 					clear_sorted();
 				}
 				size_t before = histogram.size();
-				_UnsortedHistogram::iterator u = histogram.find(data);
+				typename _UnsortedHistogram::iterator u = histogram.find(data);
 				if(u == histogram.end()){
 					++histogram[data];
 					(*this).unique.push_back(data.get_value());
 				}else{
 					++((*u).second);
 				}
-				
+
 				++samples;
 				if(before < histogram.size()){
 					bytes_allocated += data.total_bytes_allocated();
@@ -1682,54 +1679,54 @@ namespace stored{
 			nst::u64 get_entropy(){
 				return histogram.size();
 			}
-					
+
 		};
 
 		template<typename _IntType>
 		struct int_entropy_t : public entropy_t<_IntType>{
-			
-			
+
+
 			typename _IntType::value_type get_max_val()  const {
-				if(histogram.empty())
+				if((*this).histogram.empty())
 					return 0;
-				size_t l = get_unique_samples().size();
+				size_t l = (*this).get_unique_samples().size();
 				nst::i64 high =get_at(0);
 				for (size_t i = 1; i < l; i++) {
 					if(high < get_at(i)){
 						high = get_at(i);
 					}
 				}
-				return (_IntType::value_type) high;
+				return (typename _IntType::value_type) high;
 
 			}
-			
+
 			typename _IntType::value_type get_min_val()  const {
-				if(histogram.empty())
+				if((*this).histogram.empty())
 					return 0;
-				size_t l = get_unique_samples().size();
+				size_t l = (*this).get_unique_samples().size();
 				nst::i64 low =get_at(0);
 				for (size_t i = 1; i < l; i++) {
 					if( get_at(i) < low ){
 						low = get_at(i);
 					}
 				}
-				return (_IntType::value_type)low;
+				return (typename _IntType::value_type)low;
 
 			}
 			nst::i64 get_at(size_t at)const{
-				return get_unique_samples()[at].get_value();
+				return this->get_unique_samples()[at].get_value();
 			}
 			typename nst::u64 get_abs()  {
-				if(get_unique_samples().empty())
+				if(this->get_unique_samples().empty())
 					return 0;
-				size_t l = get_unique_samples().size();
+				size_t l = this->get_unique_samples().size();
 				nst::i64 low  = get_at(0),high = get_at(0);
- 
+
 				size_t start = (l & 1) ? 1 : 0;
-				
- 
+
+
 				for (size_t i = start; i < l; i+=2) {
- 
+
 					if (get_at(i) < get_at(i+1)) {
 						if (low > get_at(i)) {
 							low = get_at(i);
@@ -1745,7 +1742,7 @@ namespace stored{
 							high = get_at(i);
 						}
 					}
-				}								
+				}
 				return labs(high-low);
 			}
 		};
@@ -1772,9 +1769,10 @@ namespace stored{
 					return i.get_hash();
 				}
 			};
-            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
+			/// , sta::col_tracker<_IntType>
+            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
 			/// typedef ::google::dense_hash_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
-			
+
 			/// typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
 			typedef std::vector<_IntType, sta::col_tracker<_IntType> > _DeCodeMap;
 
@@ -1814,7 +1812,7 @@ namespace stored{
 			}
 
 			/// Find smallest X in 2^X >= value
-			
+
 
 			bool empty() const {
 				return code_size == 0;
@@ -1840,9 +1838,9 @@ namespace stored{
 				_CodeType code = 0;
 				if(code_size > 0){
 					code = symbols.get(row);
-					
+
 					return decodes[code];
-					
+
 				}else
 					throw UninitializedCodeException();
 				return _null_val;
@@ -1851,9 +1849,9 @@ namespace stored{
 				_CodeType code = 0;
 				if(code_size > 0){
 					code = symbols.get(row);
-					
+
 					return decodes[code];
-					
+
 				}else
 					throw UninitializedCodeException();
 				return _null_val;
@@ -1864,11 +1862,11 @@ namespace stored{
 					nst::u32 words = 0;
 					{
 						typename _Entropy::_Histogram::iterator h = (*this).stats.get_sorted_histogram().begin();
-						
+
 						decodes.resize((*this).stats.get_sorted_histogram().size());
 
 						for(;h != (*this).stats.get_sorted_histogram().end();++h){
-							codes[(*h).first] = words;						
+							codes[(*h).first] = words;
 							decodes[words] = (*h).first;
 							++words;
 						}
@@ -1921,7 +1919,7 @@ namespace stored{
 			typename _IntType::value_type min_decoded;
 			mutable _IntType unmapped;
 			int_fix_unmapped_encoded_buffer() : code_size(0){
-				
+
 			}
 
 			size_t capacity() const {
@@ -1977,9 +1975,9 @@ namespace stored{
 						unmapped.set_value(code + min_decoded);
 						return unmapped;
 					}
-					
+
 					return decodes[code];
-					
+
 				}else
 					throw UninitializedCodeException();
 				return _null_val;
@@ -1992,9 +1990,9 @@ namespace stored{
 						unmapped.set_value(code + min_decoded);
 						return unmapped;
 					}
-					
+
 					return decodes[code];
-					
+
 				}else
 					throw UninitializedCodeException();
 				return _null_val;
@@ -2002,23 +2000,25 @@ namespace stored{
 			bool initialize(_Rid rows){
 
 				if( ( (double)stats.get_samples() / (double)stats.get_entropy() ) > 1 && stats.get_entropy() < MAX_ENTROPY){
-					size_t instances = (*this).stats.get_unique_samples().size();
+					/// size_t instances = (*this).stats.get_unique_samples().size();
 					/// bits per symbol in mapped encoding
 					nst::u32 bits_in_histogram = bits::bit_log2((nst::u32)(*this).stats.get_entropy()) * rows + 8 * sizeof(_IntType) * stats.get_entropy();
 					/// bits per symbol in abs encoding
 					nst::u32 bits_in_abs = bits::bit_log2((nst::u32)(*this).stats.get_abs()) * rows;
 					/// not sure about negative values yet, although translation i.o. mapping should sort them out
-					if(bits_in_abs < bits_in_histogram){						
-						decodes.swap(_DeCodeMap());
-						codes.swap(_CodeMap());
+					if(bits_in_abs < bits_in_histogram){
+                        _DeCodeMap ed;
+                        _CodeMap ec;
+						decodes.swap(ed);
+						codes.swap(ec);
 						min_decoded = stats.get_min_val() ;
-						code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)stats.get_abs()));	
+						code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)stats.get_abs()));
 						symbols.set_code_size(code_size);
 						resize(rows);
-						
+
 					}else{
-						
-						
+
+
 						nst::u32 words = 0;
 						{
 							decodes.resize((*this).stats.get_unique_samples().size());
@@ -2145,7 +2145,7 @@ namespace stored{
 		};
 #define _ENTROPY_CODING_
 #ifdef _ENTROPY_CODING_
-		
+
 		template<>
 		struct standard_entropy_coder<LongIntStored >{
 			typedef LongIntStored _DataType;
@@ -2154,15 +2154,15 @@ namespace stored{
 			bool empty() const {
 				return coder.empty();
 			}
-			
+
 			bool applicable() const {
 				return true;
 			}
-			
+
 			void sample(const _DataType &data){
 				coder.get_stats().sample(data);
 			}
-			
+
 			size_t total_bytes_allocated() const {
 				return coder.get_stats().total_bytes_allocated();
 			}
@@ -2195,7 +2195,7 @@ namespace stored{
 				return coder.capacity();
 			}
 		};
-		
+
 		template<>
 		struct standard_entropy_coder<ULongIntStored >{
 			typedef ULongIntStored _DataType;
@@ -2204,15 +2204,15 @@ namespace stored{
 			bool empty() const {
 				return coder.empty();
 			}
-			
+
 			bool applicable() const {
 				return true;
 			}
-			
+
 			void sample(const _DataType &data){
 				coder.get_stats().sample(data);
 			}
-			
+
 			size_t total_bytes_allocated() const {
 				return coder.get_stats().total_bytes_allocated();
 			}
@@ -2253,15 +2253,15 @@ namespace stored{
 			bool empty() const {
 				return coder.empty();
 			}
-			
+
 			bool applicable() const {
 				return true;
 			}
-			
+
 			void sample(const IntStored &data){
 				coder.get_stats().sample(data);
 			}
-			
+
 			size_t total_bytes_allocated() const {
 				return coder.get_stats().total_bytes_allocated();
 			}
@@ -2545,7 +2545,7 @@ namespace stored{
 		int fields_indexed;
 		stored::_Parts parts;
 		stored::_Parts density;
-		
+
 		std::string name;
 		index_interface() : destroyed(false){
 		}

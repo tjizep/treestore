@@ -48,7 +48,7 @@
 				</Linker>
 			</Target>
 			<Environment>
-				<Variable name="MYSQL_REPO" value="/usr/src/mysql/mysql-5.6.20" />
+				<Variable name="MYSQL_REPO" value="/home/test/mysql-community-5.6.20" />
 			</Environment>
 		</Build>
 		<Compiler>
@@ -175,6 +175,7 @@
 		<Unit filename="../../src/stx/btree_set.h" />
 		<Unit filename="../../src/stx/storage/basic_storage.h" />
 		<Unit filename="../../src/stx/storage/leb128.h" />
+		<Unit filename="../../src/stx/storage/pool.h" />
 		<Unit filename="../../src/stx/storage/types.h" />
 		<Unit filename="../../src/system_timers.h" />
 		<Unit filename="../../src/transactional_storage.cpp" />

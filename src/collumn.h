@@ -34,7 +34,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #ifndef _COLLUM_DEF_CEP_20130801_
 #define _COLLUM_DEF_CEP_20130801_
-#include <stdlib.h> 
+#include <stdlib.h>
 #include "fields.h"
 #include "Poco/Mutex.h"
 #include "Poco/Thread.h"
@@ -48,7 +48,7 @@ namespace nst = NS_STORAGE;
 namespace collums{
 	using namespace iterator;
 	typedef stored::_Rid _Rid;
-		
+
 	extern void set_loading_data(const std::string& name, int loading);
 	extern int get_loading_data(const std::string& name);
 	extern long long col_page_use;
@@ -75,21 +75,21 @@ namespace collums{
 			typedef nst::u16 count_t;
 			/// delegate value decoder
 			void decode_values(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
-				
+
 				encoder.decode(buffer, reader, values, occupants);
 			}
 			/// delegate value encoder
 			void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
-				
+
 				encoder.encode(buffer, writer, values, occupants);
 			}
 			/// delegate value encoder
 			size_t encoded_values_size(const _Stored* values, count_t occupants) {
-				
+
 				return encoder.encoded_size(values, occupants);
 			}
 
-			 
+
 			/// decode mixed run length and delta for simple sequences
 			void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
 				count_t k = 0, m = occupants - 1;
@@ -163,7 +163,7 @@ namespace collums{
 				}
 			}
 			inline bool can(const _StoredRowId &first , const _StoredRowId &last, int size) const
-			{				
+			{
 				return ::abs((long long)size - (long long)::abs( (long long)last.get_value() - (long long)first.get_value() )) > 0 ;
 			}
 			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
@@ -255,7 +255,7 @@ namespace collums{
 			}
 
 			void invalidate(nst::u8& flags){
-				
+
 				flags |= (F_NOT_NULL|F_INVALID);
 			}
 
@@ -273,15 +273,15 @@ namespace collums{
 		struct _CachePage{
 		public:
 			typedef stored::standard_entropy_coder<_Stored> _Encoded;
-			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),flagged(false),loading(false){} ;//
+			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),loading(false),flagged(false){} ;//
 			~_CachePage(){
-				
+
 				rows_cached = 0;
 				rows_start = 0;
 			}
-		
-			
-			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),flagged(false),loading(false),data_size(0){				
+
+
+			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),loading(false),flagged(false),data_size(0){
 
 				(*this) = right;
 			}
@@ -316,29 +316,29 @@ namespace collums{
 			_Flags flags;
 
 		private:
-			
+
 			_Encoded encoded;
 			_Cache data;
 			_StoredEntry * _data;
 			_StoredEntry _temp;
 			_Rid rows_cached;
-			_Rid rows_start;			
+			_Rid rows_start;
 			bool flagged;
 			_Rid data_size;
 		public:
-            
+
 			_Rid density;
 			nst::i64 users;
 
 			void resize(nst::i64 size){
-				
-				
+
+
 				data.resize(size);
 				flags.resize(MAX_PAGE_SIZE);
 				rows_cached = (stored::_Rid)size;
 				_data = data.empty()? nullptr : & data[0];
 				(*this).data_size = data.size();
-				
+
 			}
 			void invalidate(_Rid row){
 				++modified;
@@ -363,11 +363,11 @@ namespace collums{
 				rows_cached = 0;
 				_data = nullptr;
 				available = true;
-				/// loaded = false;				
+				/// loaded = false;
 				flagged = false;
 				modified = 0;
 				access = 0;
-				
+
 			}
 			void encode(_Rid row){
 				encoded.set(row-rows_start, data[row]);
@@ -380,7 +380,7 @@ namespace collums{
 				_Rid at = row - rows_start;
 				return (at < data_size);
 			}
-			_Stored& get(_Rid row)  {				
+			_Stored& get(_Rid row)  {
 				_Rid at = row - rows_start;
 				if(data_size <= at){
 					printf("ERROR invalid data size or row\n");
@@ -392,7 +392,7 @@ namespace collums{
 					return _data[at].key;
 			}
 			const _Stored& get(_Rid row) const {
-				
+
 				_Rid at = row - rows_start;
 				if(data_size <= at){
 					printf("ERROR invalid data size or row\n");
@@ -431,7 +431,7 @@ namespace collums{
 			void load_data(_ColMap &col,_Rid start, _Rid p_end){
 				const _Rid CKECK = 1000000;
 				_Rid end = std::min<_Rid>(p_end, get_v_row_count(col));
-				if(start>=end){					
+				if(start>=end){
 					return;
 				}
 				typename _ColMap::iterator e = col.lower_bound(end);
@@ -442,7 +442,7 @@ namespace collums{
 				_Rid last = p_end - start;
 				nst::u64 nulls = 0;
 				nst::u64 use_begin = calc_use();
-				
+
 				for(c = col.lower_bound(start); c != e; ++c){
 					if(ctr >= last){
 						break;
@@ -453,7 +453,7 @@ namespace collums{
 						c = col.lower_bound(start);
 						kv = c.key().get_value();
 					}
-					/// nullify the gaps					
+					/// nullify the gaps
 					if(end > kv){
 						if(kv > 0){
 							for(_Rid n = prev; n < kv-1; ++n){
@@ -477,54 +477,54 @@ namespace collums{
 						++nulls;
 					}
 				}
-				
+
 				if(nulls == 0){
-                    _Flags f;					
+                    _Flags f;
 					(*this).flags.swap(f);
-					
+
 				}
 				col.reduce_use();
-				
+
 				available = true;
-				
+
 			}
 			void finish_decoded(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
 				const bool treestore_only_encoded = false;
-				/// printf("page: did not reduce %s from %.4g MB col pu: %.4g MB\n", name.c_str(), (double)calc_use() / units::MB, (double)col_page_use / units::MB);						
+				/// printf("page: did not reduce %s from %.4g MB col pu: %.4g MB\n", name.c_str(), (double)calc_use() / units::MB, (double)col_page_use / units::MB);
 				if(treestore_only_encoded){
-					encoded.clear();					
+					encoded.clear();
 					clear();
 					available = false;
 				}else{
 					resize(rows_cached);
 					load_data(col,start,p_end);
 					col_page_use += calc_use() ;
-					
+
 					//if(treestore_column_encoded)
 					//	printf("page: could not reduce %s from %.4g MB\n", name.c_str(), (double)calc_use() / units::MB);
 					available = true;
 				};
-				
+
 			}
 			void finish(_ColMap &col,const std::string &name,_Rid start, _Rid p_end){
-				
+
 				(*this).available = false;
-				const _Rid CKECK = 1000000;
+				/// const _Rid CKECK = 1000000;
 				_Rid end = std::min<_Rid>(p_end, get_v_row_count(col)+1);
-				if(start>=end){					
+				if(start>=end){
 					return;
 				}
 				(*this).rows_start = start;
 				(*this).rows_cached = end-start;
 				nst::i64 use_before = rows_cached * sizeof(_StoredEntry);
 				nst::u64 used_by_encoding = 0;
-				
+
 				typename _ColMap::iterator e = col.lower_bound(end);
 				typename _ColMap::iterator c = e;
 				_Rid ctr = 0;
-				nst::u64 use_begin = calc_use();
+				/// nst::u64 use_begin = calc_use();
 				if(treestore_column_encoded && encoded.applicable()){
-					
+
 					bool ok = true;
 					for(c = col.lower_bound(start); c != e; ++c){
 						if(ctr >= rows_cached){
@@ -532,26 +532,26 @@ namespace collums{
 						}
 						/// _Rid r = c.key().get_value();
 						(*this).encoded.sample(c.data());
-						
+
 						++ctr;
 
-						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/2){							
+						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/2){
 							unload();
 							return;
 						}
-					
+
 					}
 					col.reduce_use();
-					if(ok){					
+					if(ok){
 						(*this).encoded.finish(rows_cached);
 					}
 				}
-				
+
 				if(treestore_column_encoded && encoded.good()){
 					_Rid test = 0;
 					_Rid last = p_end - start;
 					_Rid ctr = 0;
-					
+
 					for(c = col.lower_bound(start); c != e; ++c){
 						if(ctr >= last){
 							break;
@@ -564,11 +564,11 @@ namespace collums{
 						(*this).encoded.set(r-start, c.data());
 						++ctr;
 					}
-					
+
 					(*this).encoded.optimize();
 
 					if(calc_use() < use_before ){
-						
+
 						(*this).available = true;
 						//printf("page: reduced %s from %.4g to %.4g MB col pu: %.4g MB\n", name.c_str(), (double)use_before / units::MB,  (double)calc_use()/ units::MB, (double)col_page_use / units::MB);
 						col_page_use += calc_use() ;
@@ -576,10 +576,10 @@ namespace collums{
 						finish_decoded(col,name,start,p_end);
 					}
 
-				}else{	
+				}else{
 					finish_decoded(col,name,start,p_end);
-				}				
-				
+				}
+
 			}
 			nst::i64 calc_use(){
 				if(encoded.good()){
@@ -597,12 +597,12 @@ namespace collums{
 						flagged = true;
 					}
 				}
-				
+
 			}
 			void unload(){
 				clear();
 				available = false;
-                
+
 			}
 			inline bool has_flags() const {
 				return flagged;
@@ -616,7 +616,7 @@ namespace collums{
 			}
 		};
 
-		
+
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
 		static const _Rid MAX_PAGE_SIZE = 32768*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
@@ -626,9 +626,9 @@ namespace collums{
 			_Rid users;
 			_CachePages pages;
 		};
-		
+
 		typedef std::map<std::string, std::shared_ptr<_CachePagesUser>, std::less<std::string>, sta::col_tracker<_CachePage> > _Caches; ///
-		
+
 		Poco::Mutex &get_mutex(){
 			static Poco::Mutex m;
 			return m;
@@ -642,22 +642,22 @@ namespace collums{
 				{
 				_Rid p = last_logical_row/MAX_PAGE_SIZE+1;
 				NS_STORAGE::synchronized ll(get_mutex());
-			
+
 				if(get_g_cache().count(name)!=0){
 
 					std::shared_ptr<_CachePagesUser> user = get_g_cache()[name];
 					typedef std::pair<_Rid, _CachePage*> _EvictionPair;
 					typedef std::vector<_EvictionPair> _Evicted;
 					_Evicted evicted;
-					user->users--;	
+					user->users--;
 					if(false && !user->users){
 						if(user->pages.size()!=p){
 							printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
 							user->pages.resize(p);
 						}
 						_Rid loaded = 0;
-						for(_CachePages::iterator p = user->pages.begin(); p != user->pages.end(); ++p){
-							
+						for(typename _CachePages::iterator p = user->pages.begin(); p != user->pages.end(); ++p){
+
 							if((*p).modified > MAX_PAGE_SIZE/8 || !((*p).available)){
 								(*p).clear();
 							}
@@ -669,25 +669,25 @@ namespace collums{
 						std::sort(evicted.begin(),evicted.end());
 						/// evict 5 percent least used or least recently used depending how access is specified
 						_Rid remaining = evicted.size() / 20;
-						for(_Evicted::iterator e = evicted.begin() ; e != evicted.end() && remaining > 0; ++e,--remaining){
+						for(typename _Evicted::iterator e = evicted.begin() ; e != evicted.end() && remaining > 0; ++e,--remaining){
 							(*e).second->clear();
 						}
 
 					}
-					
+
 
 				}
-				
-				
+
+
 			}
 		}
-		
+
 		_CachePages* load_cache(std::string name, _Rid last_logical_row){
 			_CachePages * result = nullptr;
-				
+
 			{
 				NS_STORAGE::synchronized ll(get_mutex());
-			
+
 				if(get_g_cache().count(name)==0){
 
 					std::shared_ptr<_CachePagesUser> user = std::make_shared<_CachePagesUser>();
@@ -700,7 +700,7 @@ namespace collums{
 				user->users++;
 				result = &(user->pages);
 			}
-		
+
 			return result;
 		}
 	private:
@@ -708,8 +708,8 @@ namespace collums{
 		typedef typename _ColMap::iterator _ColIter;
 		typename _ColMap::iterator cend;
 		typename _ColMap::iterator ival;
-				
-		_CachePages *pages;		
+
+		_CachePages *pages;
 		_StoredEntry user;
 		_Stored empty;
 		_Rid cache_size;
@@ -729,7 +729,7 @@ namespace collums{
 				pages = load_cache(storage.get_name(),rows); ///= new _CachePages(); ///
 				//_Rid p = rows/MAX_PAGE_SIZE+1;
 				//pages->resize(p);
-				
+
 			}
 		}
 		inline _CachePages& get_cache()  {
@@ -742,27 +742,27 @@ namespace collums{
 			return *pages;
 		}
 		void reset_cache_locals(){
-			
+
 			ival = col.end();
 		}
-		
+
 		_Rid get_v_row_count(){
 			_Rid r = 0;
 			typename _ColMap::iterator e = col.end();
 			typename _ColMap::iterator c = e;
 			if(!col.empty()){
 				--c;
-				r = c.key().get_value() + 1;				
+				r = c.key().get_value() + 1;
 			}
 			return r;
 		}
 		void check_page_cache(){
 			rows = get_v_row_count(); //(_Rid)col.size();
-			load_cache();			
+			load_cache();
 		}
 		void uncheck_page_cache(){
 			if(pages!=nullptr){
-				//delete pages;				
+				//delete pages;
 				unload_cache(storage.get_name(),rows);
 				pages = nullptr;
 			}
@@ -790,7 +790,7 @@ namespace collums{
 		,	lazy(load)
 		,	sampler(0)
 		{
-			
+
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -799,7 +799,7 @@ namespace collums{
 		}
 
 		~collumn(){
-			
+
 		}
 
 		void initialize(bool by_tree){
@@ -807,10 +807,10 @@ namespace collums{
 			cend = col.end();
 			ival = cend;
 			if(!modified){
-			
+
 			}
 
-			
+
 
 
 		}
@@ -837,7 +837,7 @@ namespace collums{
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
-		_CachePage* load_page(_Rid requested, bool no_load = false){			
+		_CachePage* load_page(_Rid requested, bool no_load = false){
 			_Rid i = (requested % MAX_PAGE_SIZE);
 			_Rid l = requested - i;
 			_Rid p = l/MAX_PAGE_SIZE;
@@ -845,7 +845,7 @@ namespace collums{
 			++sampler;
 			if( has_cache() && p < (*pages).size()){
 				page = &((*pages)[p]);
-				if(page->loaded){					
+				if(page->loaded){
 					if(page->included(requested))
 						return page;
 					return nullptr;
@@ -859,34 +859,34 @@ namespace collums{
 
 				NS_STORAGE::synchronizing synch(page->lock);
 				if(!synch.isLocked()) return nullptr;
-				if(page->loaded){					
+				if(page->loaded){
 					return nullptr;
-				}				
-				if(page->available){					
+				}
+				if(page->available){
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-					if(	(	
+					if(	(
 							nst::col_use + bytes_used > treestore_max_mem_use / 2
 						)
-						||	
+						||
 						(
 							treestore_current_mem_use + bytes_used > treestore_max_mem_use
 						)
 						){
-						page->unload();							
-						page->loading = false;					
-						
+						page->unload();
+						page->loading = false;
+
 					}else{
 						page->finish(col,storage.get_name(),l,l+MAX_PAGE_SIZE);
 						page->loaded = true;
-						page->loading = false;					
+						page->loading = false;
 					}
 					return nullptr;
-					
+
 				}else{
 					page->loading = false;
 				}
-				
+
 			}
 			return nullptr;
 		}
@@ -909,11 +909,11 @@ namespace collums{
 		}
 
 		inline _Stored& seek_by_cache(_Rid row)  {
-			
+
 			if(treestore_column_cache && !lazy){
 				_CachePage* page = load_page(row);
 				if(page != nullptr){
-					
+
 					_Stored & se = page->get(row);
 					if( page->has_flags() ){
 						nst::u8 flags = page->get_flags(row);
@@ -924,10 +924,10 @@ namespace collums{
 							return empty;
 					}else{
 						return se;
-					}					
+					}
 				}
 			}
-			
+
 			return seek_by_tree(row);
 
 		}
@@ -951,12 +951,12 @@ namespace collums{
 		}
 
 		void commit1(){
-			
+
 			if(modified){
 				col.flush_buffers();
 
 			}
-			
+
 			reset_cache_locals();
 		}
 
@@ -970,7 +970,7 @@ namespace collums{
 				}
 			}
 			modified = false;
-			
+
 		}
 
 		void tx_begin(bool read,bool shared= true){
@@ -985,8 +985,8 @@ namespace collums{
 			}
 			uncheck_page_cache();
 			///col.reduce_use();
-			modified = false;			
-			
+			modified = false;
+
 			storage.rollback();
 		}
 
@@ -1022,11 +1022,11 @@ namespace collums{
 			if(page != nullptr){
 
 				NS_STORAGE::synchronized synch(page->lock);
-				
+
 				page->make_flags();
 
 				page->invalidate(row);
-				
+
 			}
 		}
 
@@ -1036,7 +1036,7 @@ namespace collums{
 			if(page != nullptr){
 
 				NS_STORAGE::synchronized synch(page->lock);
-				
+
 				page->make_flags();
 
 				page->invalidate(row);
@@ -1088,7 +1088,7 @@ namespace collums{
 		}
 		printf("passed the test\n");
 	}
-	
-	
+
+
 };
 #endif

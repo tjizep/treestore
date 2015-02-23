@@ -44,6 +44,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <conio.h>
 #endif
 namespace NS_STORAGE = stx::storage;
+namespace nst = stx::storage;
 typedef std::set<std::string> _LockList;
 extern _LockList& get_locklist();
 namespace stored{
@@ -117,7 +118,7 @@ namespace stored{
 		_Transaction& get_transaction(){
 			return get_transaction((*this).writer);
 		}
-		
+
 		NS_STORAGE::stream_address boot;
 		bool writer;
 	public:
@@ -173,7 +174,7 @@ namespace stored{
 			get_transaction().complete();
 			return !ba.empty();
 		}
-	
+
 		bool get_boot_value(NS_STORAGE::i64 &r, NS_STORAGE::stream_address boot){
 			r = 0;
 			const NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
@@ -216,7 +217,7 @@ namespace stored{
 			order = get_allocations().get_order();
 
 		}
-		
+
 		NS_STORAGE::u64 current_transaction_order() const{
 			return order;
 		}
@@ -224,12 +225,12 @@ namespace stored{
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
 		}
-		
+
 		bool is_transacted() const {
 			return (_transaction!=nullptr);
 		}
-		
-		
+
+
 		bool is_readonly() const {
 			if(_transaction == NULL) return true;
 			return get_transaction().is_readonly();
@@ -264,7 +265,7 @@ namespace stored{
 				(*this).order = 0;
 			}
 		}
-		
+
 		/// get versions
 
 		nst::u64 get_greater_version_diff(nst::_VersionRequests& request){
@@ -334,8 +335,8 @@ namespace stored{
 
 		/// reads a key from a vector::iterator like reader
 
-		template<typename _BufferType,typename _Stored>
-		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, _Stored &value) const {
+		template<typename _Stored>
+		void retrieve(const nst::buffer_type& buffer, typename nst::buffer_type::const_iterator& reader, _Stored &value) const {
 			reader = value.read(buffer, reader);
 		}
 
@@ -344,13 +345,13 @@ namespace stored{
 	template<typename _Storage>
 	bool abstracted_tx_begin_1(bool read, _Storage& storage){
 		bool write = !read;
-		if(write){			
+		if(write){
 			bool r = storage.stale();
-			
+
 			if(r)
-				storage.rollback();			
-			storage.begin(write);			
-			
+				storage.rollback();
+			storage.begin(write);
+
 			return !r;
 		}
 		else
@@ -358,7 +359,7 @@ namespace stored{
 
 			if(storage.stale()){
 				storage.rollback();
-				storage.begin(write);				
+				storage.begin(write);
 				return true;
 			}
 		}
@@ -366,14 +367,14 @@ namespace stored{
 	}
 	template<typename _Storage, typename _Map>
 	void abstracted_tx_begin(bool read,bool shared, _Storage& storage, _Map& map){
-		bool write = !read;
+		////bool write = !read;
 		bool reload = abstracted_tx_begin_1(read,storage);
 		//if(write || !shared){
 			map.unshare();
 		//}else
 		//	map.share();
 		if(reload)
-			map.reload();		
+			map.reload();
 	}
 	/// definitions for registry functions
 	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;

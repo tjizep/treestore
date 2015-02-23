@@ -93,51 +93,6 @@ namespace tree_stored{
 
 		};
 
-		class IndexScanner : public asynchronous::AbstractWorker
-		{
-		protected:
-			std::string name;
-		protected:
-			bool scan_index()
-			{
-				stored::abstracted_storage storage(name);
-				storage.begin();
-				storage.set_transaction_r(true);
-
-				_IndexMap index(storage);
-				//index.share(storage.get_name());
-
-				iterator_type s = index.begin();
-				iterator_type e = index.end();
-				nst::i64 ctr= 0;
-				for(;s!=e;++s){
-					ctr++;
-					if(ctr % 100000ull == 0ull){
-						//printf(" %lld items in index %s\n",ctr,storage.get_name().c_str());
-					}
-				}
-				printf(" %lld items in index %s\n",(nst::lld)ctr,storage.get_name().c_str());
-				storage.rollback();
-				return true;
-			}
-
-
-		public:
-			IndexScanner(std::string name)
-			:	name(name)
-			{
-			}
-
-			virtual void work()
-			{
-				scan_index();
-			}
-
-			virtual ~IndexScanner()
-			{
-			}
-
-		};
 
 		class IndexLoader : public asynchronous::AbstractWorker
 		{
@@ -192,7 +147,7 @@ namespace tree_stored{
 
 				buffer.push_back(k);
 				if(buffer.size() > MIN_KEY_BUFFER){
-					
+
 				}
 				return buffer.size() < MAX_KEY_BUFFER;
 			}
@@ -306,7 +261,7 @@ namespace tree_stored{
 			}
 			if(true){
 				index.insert(k);
-				
+
 			}else{
 				if(loader==nullptr){
 					loader = new IndexLoader(index, loaders_away);
@@ -375,7 +330,7 @@ namespace tree_stored{
 		void commit2(){
 			if(modified){
 				if(!storage.commit()){
-					
+
 				}
 			}
 			modified = false;
@@ -462,7 +417,7 @@ namespace tree_stored{
 
 		}
 		_PredictiveCache cache;
-		
+
 		ColIndex index;
 		typename ColIndex::index_iterator_impl cur;
 		typename ColIndex::index_iterator_impl _1st;
@@ -501,13 +456,13 @@ namespace tree_stored{
 		}
 
 		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){
-			
+
 			return cache.predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
 
 		}
 		void cache_it(stored::index_iterator_interface& io){
 			if(unique){
-				
+
 				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
 			}
 

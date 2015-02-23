@@ -12,10 +12,10 @@ namespace suffix_array{
 	struct suffix{
 
 		nst::u8 data[suffix_size];
-		
+
 		suffix& operator=(const suffix& r){
 			memcpy(data,r.data,suffix_size);
-		
+
 			return *this;
 		}
 		suffix() {
@@ -30,26 +30,26 @@ namespace suffix_array{
 		void assign(const nst::i8 * s, nst::u32 l){
 			memset(data,0, suffix_size);
 			memcpy((*this).data, s, suffix_size);
-		
+
 		}
 		void assign(const nst::u8 * s, nst::u32 l){
 			memset(data,0, suffix_size);
-			memcpy((*this).data, s, suffix_size);			
+			memcpy((*this).data, s, suffix_size);
 		}
 		bool operator==(const suffix& r) const {
-			
+
 			return memcmp(data, r.data, suffix_size) == 0;
 		}
 		bool operator!=(const suffix& r) const {
-			
+
 			return memcmp(data, r.data, suffix_size) != 0;
 		}
-		
+
 		bool operator<(const suffix& r) const {
-			return memcmp(data, r.data, suffix_size) < 0;			
+			return memcmp(data, r.data, suffix_size) < 0;
 		}
-		
-		operator size_t() const{			
+
+		operator size_t() const{
 			return (size_t)get_hash();
 		}
 
@@ -58,14 +58,14 @@ namespace suffix_array{
 			MurmurHash3_x86_32((*this).data, suffix_size, r, &r);
 			return r;
 		}
-		
+
 		nst::u32 store_size() const {
 			return suffix_size;
 		}
 		nst::buffer_type::iterator store(nst::buffer_type::iterator w) const {
 			using namespace nst;
 			buffer_type::iterator writer = w;
-			
+
 			const u8 * end = data+suffix_size;
 			for(const u8 * d = data; d < end; ++d,++writer){
 				*writer = *d;
@@ -85,7 +85,7 @@ namespace suffix_array{
 	};
 
 	/// very fast ;-) capable of holding large ammounts in compressed ram and disc
-	
+
 	template<typename _BuffType,typename _IntType>
 	class suffix_storage : public nst::basic_storage{
 	public:
@@ -202,29 +202,29 @@ namespace suffix_array{
 
 
 		/// reads a key from a vector::iterator like reader
-		template<typename _BufferType>
-		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, _BuffType &value) const {
+
+		void retrieve(const nst::buffer_type& buffer, typename nst::buffer_type::const_iterator& reader, _BuffType &value) const {
 			reader = value.read(reader);
-			
+
 		}
 
 		/// function returning the stored size in bytes of a value
-		nst::u32 store_size(const typename _IntType& k) const {
+		nst::u32 store_size(const _IntType& k) const {
 			return nst::leb128::signed_size(k);
 		}
 
 
 		/// writes a key to a vector::iterator like writer
 		template<typename _Iterator>
-		void store(_Iterator& writer, typename _IntType value) const {
+		void store(_Iterator& writer, _IntType value) const {
 
 			writer = nst::leb128::write_signed(writer, value);
 		}
 
 
 		/// reads a key from a vector::iterator like reader
-		template<typename _BufferType>
-		void retrieve(typename const _BufferType& buffer, typename _BufferType::const_iterator& reader, typename _IntType &value) const {
+
+		void retrieve(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader, _IntType &value) const {
 
 			value = nst::leb128::read_signed64(reader,buffer.end());
 		}
@@ -234,7 +234,7 @@ namespace suffix_array{
 	typedef suffix_storage<suffix, nst::u64> _SuffixStorage;
 	typedef stx::btree_map<suffix, nst::u64, _SuffixStorage > _SuffixArray;
 	typedef std::map<suffix, nst::u64 > _StdSuffixArray;
-	
+
 	template<typename _MapType>
 	class fe_hash_map{
 	public:
@@ -281,11 +281,11 @@ namespace suffix_array{
 			hashed = 0;
 			(*this).backing = &backing;
 		}
-		typename _MapType& get_backing(){
+		_MapType& get_backing(){
 			return *((*this).backing);
 		}
 
-		typename const _MapType& get_backing() const {
+		const _MapType& get_backing() const {
 			return *((*this).backing);
 		}
 		inline size_t size() const {
@@ -295,14 +295,14 @@ namespace suffix_array{
 		bool find(data_type& data, const key_type & k) const {
 			nst::u32 pos = calc_pos(k);
 
-			if(flags[pos] == 1){				
+			if(flags[pos] == 1){
 				const _MapPair& r = (*this).data[pos];
 				if(r.first == k){
-					data = r.second;	
+					data = r.second;
 					return true;
 				}
 			}
-			_MapType::const_iterator f = get_backing().find(k);
+			typename _MapType::const_iterator f = get_backing().find(k);
 			if(f!=get_backing().end()){
 				data = (*f).second;
 				return true;
@@ -327,7 +327,7 @@ namespace suffix_array{
 	};
 };
 ///
-/// provides a block size mapped suffix array entropy encoded 
+/// provides a block size mapped suffix array entropy encoded
 /// (compressed) buffer for random access queries on compressed
 /// data
 /// i.e. const char * get(address,l) where l is < the initial block_size
@@ -335,7 +335,7 @@ namespace suffix_array{
 class suffix_array_encoder{
 public:
 
-private:	
+private:
 	nst::u32 block_size;
 	/// dependant key type conversion
 	inline suffix_array::_SuffixArray::key_type get_key(suffix_array::_SuffixArray::iterator& in){
@@ -352,7 +352,7 @@ private:
 		return (*in).second;
 	}
 private:
-	
+
 	typedef std::pair<nst::u64, suffix_array::suffix> _FreqPair;
 	typedef std::vector<_FreqPair> _Inverted;
 	typedef std::vector<nst::u8> _Bytes;
@@ -360,7 +360,7 @@ private:
 	typedef std::pair<nst::u64, nst::u8> _CharFrequency;
 	typedef std::vector<_CharFrequency> _CharFrequencies;
 	typedef nst::u32 _CodeType;
-	typedef symbol_vector<_CodeType> _Encoded;		
+	typedef symbol_vector<_CodeType> _Encoded;
 	typedef std::vector<nst::u64> _Codes;
 	typedef std::vector<suffix_array::suffix> _Suffixes;
 
@@ -369,21 +369,21 @@ public:
 	}
 	~suffix_array_encoder(){
 	}
-	
+
 	nst::u32 find_good_bucket_size(const char * buffer, nst::u64 length){
 		using namespace suffix_array;
 		typedef _StdSuffixArray _SuffixArrayType ;
-		typedef fe_hash_map<_SuffixArrayType> _HashFe;		
-		
+		typedef fe_hash_map<_SuffixArrayType> _HashFe;
+
 		_HashFe suffix_hasher;
 		_SuffixArrayType reduced_array;
-		
-		
+
+
 		size_t t = ::os::millis();
 		suffix_hasher.set_backing(reduced_array);
-		
+
 		nst::u32 bucket_size = suffix_size;
-		
+
 		nst::u32 min_bucket_size = 0;
 		nst::u64 min_compressed = length;
 		while(bucket_size > 1){
@@ -393,16 +393,16 @@ public:
 			for(; p < length/16 ; ){
 				suffix s;
 				nst::u64 skip = 1;
-				nst::u64 length = std::min<nst::u64>(remaining, bucket_size);				
+				nst::u64 length = std::min<nst::u64>(remaining, bucket_size);
 				s.assign(&buffer[p], (nst::u32)length);
-				suffix_hasher[s]++;			
+				suffix_hasher[s]++;
 				skip = length;
 				remaining -= skip;
-				p += skip;				
+				p += skip;
 				++buckets;
-			}			
+			}
 			suffix_hasher.flush();
-			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)reduced_array.size()));	
+			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)reduced_array.size()));
 			printf("array size %lld\n",reduced_array.size());
 			nst::u64 compressed = ( (buckets * code_size)>>3) + reduced_array.size()*suffix_size;
 			if(compressed < min_compressed ){
@@ -420,7 +420,7 @@ public:
 		nst::u32 max_history;
 		nst::u32 bucket_size;
 		nst::u32 code_size;
-		nst::u64 length;		
+		nst::u64 length;
 		_Encoded encoded;
 		_Encoded mapped;
 		_Encoded short_codes;
@@ -429,7 +429,7 @@ public:
 		nst::u64 capacity() const {
 			return sizeof(*this) + encoded.capacity() + mapped.capacity() + suffixes.capacity() + short_codes.capacity();
 		}
-		
+
 		bool validate() const {
 			if(bucket_size < 1 || bucket_size > 16){
 				return false;
@@ -447,7 +447,7 @@ public:
 		}
 	};
 	template<typename _VectorType>
-	void decode(typename _VectorType &outbuffer, nst::u64 start, nst::u64 length,const coding_parameters& param){
+	void decode(_VectorType &outbuffer, nst::u64 start, nst::u64 length,const coding_parameters& param){
 
 		if(!param.validate()){
 			printf("invalid coding parameters\n");
@@ -469,19 +469,19 @@ public:
 
 		}
 	}
-	/// encodes and create internal map 
+	/// encodes and create internal map
 	template<typename _SuffixArrayType>
 	void encode_internal(_SuffixArrayType& reduced_array, const char * buffer, nst::u64 length){
 		using namespace suffix_array;
-		
+
 		{
-			
-			typedef fe_hash_map<_SuffixArrayType> _HashFe;		
-		
+
+			typedef fe_hash_map<_SuffixArrayType> _HashFe;
+
 			coding_parameters parameters;
 			_HashFe suffix_hasher;
 			nst::u64 remaining = length;
-			nst::u64 factor = remaining/100;
+			/// nst::u64 factor = remaining/100;
 			size_t t = ::os::millis();
 			suffix_hasher.set_backing(reduced_array);
 			parameters.length = length;
@@ -490,9 +490,9 @@ public:
 			for(nst::u64 p = 0; p < length ; ){
 				suffix s;
 				nst::u64 skip = 1;
-				nst::u64 length = std::min<nst::u64>(remaining, parameters.bucket_size);				
+				nst::u64 length = std::min<nst::u64>(remaining, parameters.bucket_size);
 				s.assign(&buffer[p], (nst::u32)length);
-				suffix_hasher[s]++;			
+				suffix_hasher[s]++;
 				skip = length;
 				remaining -= skip;
 				p += skip;
@@ -500,12 +500,12 @@ public:
 			}
 
 			suffix_hasher.flush();
-			
+
 
 			const size_t MAX_SHORT_CODES = 1024;
 			_Codes history(MAX_SHORT_CODES);
 			_Inverted frequencies ;//= succinct;
-			for(_SuffixArrayType::iterator s = reduced_array.begin(); s != reduced_array.end(); ++s){
+			for(typename _SuffixArrayType::iterator s = reduced_array.begin(); s != reduced_array.end(); ++s){
 				frequencies.push_back(std::make_pair(get_data(s),get_key(s)));
 			}
 			std::sort(frequencies.begin(),frequencies.end());
@@ -514,20 +514,20 @@ public:
 			suffix_hasher.set_backing(reduced_array);
 			parameters.suffixes.resize(code+1);
 			parameters.max_history = MAX_SHORT_CODES;
-			for(_Inverted::iterator i = frequencies.begin(); i != frequencies.end(); ++i){								
+			for(_Inverted::iterator i = frequencies.begin(); i != frequencies.end(); ++i){
 				suffix_hasher[(*i).second] = code;
 				parameters.suffixes[code] = (*i).second;
 				--code;
 			}
 			suffix_hasher.flush();
 			printf("there are %lld codes\n",(nst::u64)frequencies.size());
-			
+
 			/// encoding phase
-						
-			
+
+
 			remaining = length;
-			/// TODO: if code size > 
-			parameters.code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)frequencies.size()));	
+			/// TODO: if code size >
+			parameters.code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)frequencies.size()));
 			nst::u64 coded = 0;
 			nst::u64 noncoded = 0;
 			nst::u64 out_pos = 0;
@@ -536,33 +536,33 @@ public:
 
 			parameters.encoded.set_code_size(parameters.code_size);
 			parameters.encoded.resize(length);
-			
+
 			parameters.mapped.set_code_size(1);
 			parameters.mapped.resize(buckets);
 
 			parameters.short_codes.set_code_size(bits::bit_log2(MAX_SHORT_CODES));
 			parameters.short_codes.resize(buckets);
 
-			_SuffixArrayType::iterator closest;
-			_SuffixArrayType::iterator ends = reduced_array.end();
+			typename _SuffixArrayType::iterator closest;
+			typename _SuffixArrayType::iterator ends = reduced_array.end();
 			parameters.encoded.resize(1+buckets);
 			nst::u64 shrtened = 0;
 			for(nst::u64 p = 0; p < length ; ){
 				suffix s;
 				nst::u64 skip = std::min<nst::u64>(remaining, parameters.bucket_size);
 				s.assign(&buffer[p], (nst::u32)skip);
-				
+
 				nst::u64 code = 0;
-				
+
 				if(suffix_hasher.find(code, s)){
 					++coded;
 					nst::u64 short_code = MAX_SHORT_CODES;
-					
+
 					if(history[code % history.size()]==code){
 						short_code = code % history.size();
 					}
-						
-					if(!parameters.mapped.empty() && short_code < MAX_SHORT_CODES){ /// 
+
+					if(!parameters.mapped.empty() && short_code < MAX_SHORT_CODES){ ///
 						shrtened++;
 						if(!parameters.mapped.empty())
 							parameters.mapped.set(coded-1,1);
@@ -572,7 +572,7 @@ public:
 							parameters.mapped.set(coded-1,0);
 						history[code % history.size()] = code;
 						++history_pos;
-						parameters.encoded.set(out_pos++, (nst::u32)code);						
+						parameters.encoded.set(out_pos++, (nst::u32)code);
 					}
 				}else
 					++noncoded;
@@ -594,15 +594,15 @@ public:
 					printf("decode errors: %lld\n",errc);
 				}
 			}
-			printf("code size %ld %lld codes written to %lld bytes\n",parameters.code_size,out_pos,parameters.capacity());			
+			printf("code size %ld %lld codes written to %lld bytes\n",parameters.code_size,out_pos,parameters.capacity());
 		}
 
 	}
 	void encode(const char * buffer, nst::u64 length){
 		bool use_std = true;
 		using namespace suffix_array;
-		
-		::getch();
+
+
 		if(use_std){
 			typedef _StdSuffixArray _SuffixArrayType;
 			_SuffixArrayType reduced_array;
@@ -614,11 +614,11 @@ public:
 		}else{
 			typedef _SuffixArray _SuffixArrayType;
 			std::string storage_name = "suffix_temp.dat";
-			_SuffixStorage storage(storage_name); /// a file to place the storage in		
+			_SuffixStorage storage(storage_name); /// a file to place the storage in
 			_SuffixArrayType reduced_array(storage);
 			encode_internal(reduced_array, buffer, length);
 		}
-		getch();
+
 
 	}
 };

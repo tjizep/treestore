@@ -19,6 +19,7 @@
 ///
 /// TODO: the example storage cannot be exchanged between threads
 namespace NS_STORAGE = stx::storage;
+namespace nst = stx::storage;
 template<typename _KeyType,typename _ValueType>
 class simple_storage : public NS_STORAGE::basic_storage{
 public:
@@ -130,8 +131,8 @@ public:
 
 
 	/// reads a key from a vector::iterator like reader
-	template<typename _BufferType>
-	void retrieve(typename const _BufferType& ,typename _BufferType::const_iterator reader, _KeyType &value) const {
+
+	void retrieve(const nst::buffer_type& ,typename nst::buffer_type::const_iterator reader, _KeyType &value) const {
 
 		value = NS_STORAGE::leb128::read_signed(reader);
 	}

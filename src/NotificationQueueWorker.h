@@ -132,9 +132,9 @@ namespace asynchronous{
 				for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
 					queue.enqueueNotification(new QuitNotification());
 				}
-				printf("workers stopping...\n");
-				os::zzzz(50);
-				printf("workers stopped\n");
+				/// printf("workers stopping...\n");
+				/// os::zzzz(50);
+				/// printf("workers stopped\n");
 				for (typename _Workers::iterator w = workers.begin(); w != workers.end(); ++w){
 					//delete (*w);
 				}

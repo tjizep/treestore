@@ -9,6 +9,7 @@
 #include <Poco/Timestamp.h>
 #include <lz4.h>
 #include <stdio.h>
+#include <string.h>
 #include <stx/storage/pool.h>
 /// memuse variables
 extern long long treestore_max_mem_use ;
@@ -30,7 +31,15 @@ namespace stx{
 		namespace allocation{
 			template <class T>
 			class pool_alloc_tracker : public base_tracker<T>{
-			public:				
+			public:
+
+                typedef T        value_type;
+				typedef T*       pointer;
+				typedef const T* const_pointer;
+				typedef T&       reference;
+				typedef const T& const_reference;
+				typedef std::size_t    size_type;
+				typedef std::ptrdiff_t difference_type;
 				// rebind allocator to type U
 				template <class U>
 				struct rebind {
@@ -43,27 +52,36 @@ namespace stx{
 				template <class U>
 				pool_alloc_tracker (const pool_alloc_tracker<U>&) throw() {
 				}
-				
+
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
 					bt_counter c;
-					c.add(num*sizeof(T)+overhead());
+					c.add(num*sizeof(T)+this->overhead());
 					return (pointer)allocation_pool.allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					
-					allocation_pool.free((void*)p,num);				
-			
+
+					allocation_pool.free((void*)p,num);
+
 					bt_counter c;
-					c.remove(num*sizeof(T)+overhead());
+					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
 			template <class T>
 			class buffer_tracker : public base_tracker<T>{
-			public:				
+			public:
 				// rebind allocator to type U
+				typedef base_tracker<T> base_class;
+				typedef T        value_type;
+				typedef T*       pointer;
+				typedef const T* const_pointer;
+				typedef T&       reference;
+				typedef const T& const_reference;
+				typedef std::size_t    size_type;
+				typedef std::ptrdiff_t difference_type;
+
 				template <class U>
 				struct rebind {
 					typedef buffer_tracker<U> other;
@@ -75,18 +93,18 @@ namespace stx{
 				template <class U>
 				buffer_tracker (const buffer_tracker<U>&) throw() {
 				}
-				
+
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
 					buffer_counter c;
-					c.add(num*sizeof(T)+overhead());
-					return base_tracker::allocate(num);
+					c.add(num*sizeof(T)+this->overhead());
+					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					base_tracker::deallocate(p, num);
+					base_class::deallocate(p, num);
 					buffer_counter c;
-					c.remove(num*sizeof(T)+overhead());
+					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
@@ -101,7 +119,15 @@ namespace stx{
 			}
 			template <class T>
 			class col_tracker : public base_tracker<T>{
-			public:				
+			public:
+                typedef base_tracker<T> base_class;
+				typedef T        value_type;
+				typedef T*       pointer;
+				typedef const T* const_pointer;
+				typedef T&       reference;
+				typedef const T& const_reference;
+				typedef std::size_t    size_type;
+				typedef std::ptrdiff_t difference_type;
 				// rebind allocator to type U
 				template <class U>
 				struct rebind {
@@ -114,18 +140,18 @@ namespace stx{
 				template <class U>
 				col_tracker (const col_tracker<U>&) throw() {
 				}
-				
+
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
 					col_counter c;
-					c.add(num*sizeof(T)+overhead());
-					return base_tracker::allocate(num);
+					c.add(num*sizeof(T)+this->overhead());
+					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					base_tracker::deallocate(p, num);
+					base_class::deallocate(p, num);
 					col_counter c;
-					c.remove(num*sizeof(T)+overhead());
+					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
@@ -140,7 +166,15 @@ namespace stx{
 			}
 			template <class T>
 			class stl_tracker : public base_tracker<T>{
-			public:				
+			public:
+				typedef base_tracker<T> base_class;
+				typedef T        value_type;
+				typedef T*       pointer;
+				typedef const T* const_pointer;
+				typedef T&       reference;
+				typedef const T& const_reference;
+				typedef std::size_t    size_type;
+				typedef std::ptrdiff_t difference_type;
 				// rebind allocator to type U
 				template <class U>
 				struct rebind {
@@ -153,18 +187,18 @@ namespace stx{
 				template <class U>
 				stl_tracker (const stl_tracker<U>&) throw() {
 				}
-				
+
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
 					stl_counter c;
-					c.add(num*sizeof(T)+overhead());
-					return base_tracker::allocate(num);
+					c.add(num*sizeof(T)+this->overhead());
+					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					base_tracker::deallocate(p, num);
+					base_class::deallocate(p, num);
 					stl_counter c;
-					c.remove(num*sizeof(T)+overhead());
+					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
@@ -179,39 +213,39 @@ namespace stx{
 			}
 		}; /// allocations
 		typedef std::vector<u8, sta::buffer_tracker<u8>> buffer_type;
-		
+
 		/// ZLIBH
 		static void inplace_compress_zlibh(buffer_type& buff){
 			typedef char * encode_type_ref;
 			buffer_type t;
 			i32 origin = (i32) buff.size();
 			t.resize(ZLIBH_compressBound(origin)+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : ZLIBH_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
+			i32 cp = buff.empty() ? 0 : ZLIBH_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);
 			*((i32*)&t[0]) = origin;
 			t.resize(cp+sizeof(i32));
 			buff = t;
-			
+
 		}
 		template<typename _VectorType>
 		static void decompress_zlibh(buffer_type &decoded,const _VectorType& buff){
 			if(buff.empty()){
 				decoded.clear();
-				
+
 			}else{
-				typedef char * encode_type_ref;			
+				typedef char * encode_type_ref;
 				i32 d = *((i32*)&buff[0]) ;
 				decoded.reserve(d);
 				decoded.resize(d);
 				ZLIBH_decompress((encode_type_ref)&decoded[0],(const encode_type_ref)&buff[sizeof(i32)]);
 			}
 		}
-		
+
 		static void inplace_decompress_zlibh(buffer_type& buff, buffer_type& dt){
-			if(buff.empty()) return;			
+			if(buff.empty()) return;
 			decompress_zlibh(dt, buff);
 			buff = dt;
 		}
-		
+
 		static void inplace_decompress_zlibh(buffer_type& buff){
 			if(buff.empty()) return;
 			buffer_type dt;
@@ -224,7 +258,7 @@ namespace stx{
 			buffer_type t;
 			i32 origin = buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);			
+			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);
 			if(cp < 0){
 				cp = (i32)buff.size();
 				origin = -cp;
@@ -233,14 +267,14 @@ namespace stx{
 			*((i32*)&t[0]) = (i32)origin;
 			t.resize(cp+sizeof(i32));
 			buff = t;
-			
+
 		}
 		template<typename _VectorType>
 		static void decompress_fse(buffer_type &decoded,const _VectorType& buff){
 			if(buff.empty()){
 				decoded.clear();
 			}else{
-				typedef unsigned char * encode_type_ref;			
+				typedef unsigned char * encode_type_ref;
 				i32 d = *((i32*)&buff[0]) ;
 				if(d < 0){
 					d = -d;
@@ -254,13 +288,13 @@ namespace stx{
 				}
 			}
 		}
-		
+
 		static void inplace_decompress_fse(buffer_type& buff, buffer_type& dt){
-			if(buff.empty()) return;			
+			if(buff.empty()) return;
 			decompress_fse(dt, buff);
 			buff = dt;
 		}
-		
+
 		static void inplace_decompress_fse(buffer_type& buff){
 			if(buff.empty()) return;
 			buffer_type dt;
@@ -270,26 +304,26 @@ namespace stx{
 		/// LZ4
 		static void inplace_compress_lz4(buffer_type& buff, buffer_type& t){
 			typedef char * encode_type_ref;
-			
+
 			i32 origin = buff.size();
 			/// TODO: cannot compress sizes lt 200 mb
 			t.resize(LZ4_compressBound((int)buff.size())+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : LZ4_compress((const encode_type_ref)&buff[0], (encode_type_ref)&t[sizeof(i32)], origin);			
-			*((i32*)&t[0]) = origin;			
+			i32 cp = buff.empty() ? 0 : LZ4_compress((const encode_type_ref)&buff[0], (encode_type_ref)&t[sizeof(i32)], origin);
+			*((i32*)&t[0]) = origin;
 			t.resize(cp+sizeof(i32));
 
 			/// inplace_compress_zlibh(t);
 			/// inplace_compress_fse(t);
 
-			buff = t;			
-			
+			buff = t;
+
 		}
 		static void inplace_compress_lz4(buffer_type& buff){
-			
+
 			buffer_type t;
 			inplace_compress_lz4(buff, t);
 		}
-		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
+		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){
 			if(buff.empty()){
 				decoded.clear();
 			}else{
@@ -304,7 +338,7 @@ namespace stx{
 			}
 
 		}
-		static size_t r_decompress_lz4(buffer_type &decoded,const buffer_type& buff){			
+		static size_t r_decompress_lz4(buffer_type &decoded,const buffer_type& buff){
 			if(buff.empty()){
 				decoded.clear();
 			}else{
@@ -329,7 +363,7 @@ namespace stx{
 			buff = dt;
 		}
 		static void inplace_decompress_lz4(buffer_type& buff, buffer_type& dt){
-			if(buff.empty()) return;			
+			if(buff.empty()) return;
 			decompress_lz4(dt, buff);
 			buff = dt;
 		}
@@ -433,8 +467,8 @@ namespace stx{
 
 		typedef std::vector<_VersionRequest> _VersionRequests;
 
-		
-		
+
+
 	};
 };
 #endif
