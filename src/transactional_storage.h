@@ -39,6 +39,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <sparsehash/dense_hash_map>
 #include <sparsehash/sparse_hash_map>
 #endif
+#include <rabbit/unordered_map>
 #include <stx/storage/types.h>
 #include <stx/storage/basic_storage.h>
 #include "Poco/NumberFormatter.h"
@@ -218,7 +219,7 @@ namespace storage{
 
 		block_type empty_block;
 	private:
-		typedef std::map<address_type, block_reference> _Allocations;
+		typedef rabbit::unordered_map<address_type, block_reference> _Allocations;
 		_Allocations allocations;
 		address_type next;
 	public:
@@ -373,7 +374,7 @@ namespace storage{
 		/// ::google::dense_hash_map
 		///typedef std::vector<version_type> _Versions;
 		/// typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
-		typedef nst::imperfect_hash<address_type, version_type> _Versions;
+		typedef rabbit::unordered_map<address_type, version_type> _Versions;
 
 
 	private: /// private types
@@ -423,7 +424,8 @@ namespace storage{
 		////typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
 		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;
 		/// typedef address_table<address_type, ref_block_descriptor> _Allocations;
-		typedef imperfect_hash<address_type, ref_block_descriptor> _Allocations;
+		// typedef imperfect_hash<address_type, ref_block_descriptor> _Allocations;
+		typedef rabbit::unordered_map<address_type, ref_block_descriptor> _Allocations;
 
 
 		typedef std::unordered_set<address_type> _Changed;
