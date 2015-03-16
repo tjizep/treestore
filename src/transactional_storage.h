@@ -563,7 +563,7 @@ namespace storage{
 				}
 			}
 			void decode_all(){
-				size_t ts = os::millis();
+
 				decoded.clear();
 
 				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
@@ -1075,7 +1075,7 @@ namespace storage{
 			address_type start = start_address;
 			u64 blocks = 0;
 			size_t ts = os::millis();
-			size_t tst = os::millis();
+
 			//printf("start readahead %s\n", get_name().c_str());
 			//while(blocks < count){
 				block_request_ptr block = std::make_shared<block_request>();
@@ -1086,7 +1086,6 @@ namespace storage{
 				std::shared_ptr<Poco::Data::Statement> block_stmt;
 				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
 				//u64 ts = os::millis();
-				u64 end = start + count;
 				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;",
 					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(count,false,false);
 				block_stmt->execute();

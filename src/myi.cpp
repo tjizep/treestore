@@ -95,6 +95,7 @@ namespace tree_stored{
 			return locks;
 		}
 		tree_thread() : locks(0),changed(false){
+		    printf("create tree thread\n");
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
 			DBUG_PRINT("info",(" *** Tree Store (eyore) mem use configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
@@ -172,7 +173,7 @@ namespace tree_stored{
 		}
 
 		void release(TABLE *table_arg){
-			bool writer = changed;
+
 			if(!locks){
 				printf("ERROR: no locks to release\n");
 				return;
@@ -188,10 +189,6 @@ namespace tree_stored{
 			print_read_lookups();
 
 			--locks;
-			if(!locks){
-
-			}
-
 
 		}
 		void own_reduce_col_trees(){
@@ -1954,12 +1951,12 @@ namespace ts_cleanup{
 	public:
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
-			nst::u64 last_check_size = calc_total_use();
+			/// DEBUG: nst::u64 last_check_size = calc_total_use();
 			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
 			while(Poco::Thread::current()->isRunning()){
 				Poco::Thread::sleep(500);
 				/// int j = int();
-				nst::u64 pool_used = allocation_pool.get_used();
+				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
 				stx::memory_low_state = allocation_pool.is_depleted();
 				if(calc_total_use() > treestore_max_mem_use){

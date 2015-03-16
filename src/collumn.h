@@ -273,7 +273,17 @@ namespace collums{
 		struct _CachePage{
 		public:
 			typedef stored::standard_entropy_coder<_Stored> _Encoded;
-			_CachePage() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),loading(false),flagged(false){} ;//
+			_CachePage()
+			:   available(true)
+			,   loaded(false)
+			,   loading(false)
+			,   _data(nullptr)
+			,   rows_cached(0)
+			,   rows_start(0)
+			,   flagged(false)
+			,   density(1)
+			,   users(0)
+			{} ;//
 			~_CachePage(){
 
 				rows_cached = 0;
@@ -281,7 +291,19 @@ namespace collums{
 			}
 
 
-			_CachePage(const _CachePage& right) throw() : available(true), loaded(false),_data(nullptr),rows_cached(0),rows_start(0),density(1),users(0),loading(false),flagged(false),data_size(0){
+			_CachePage(const _CachePage& right) throw()
+			:   available(true)
+			,   loaded(false)
+			,   loading(false)
+			,   _data(nullptr)
+			,   rows_cached(0)
+			,   rows_start(0)
+			,   flagged(false)
+			,   data_size(0)
+			,   density(1)
+			,   users(0)
+
+			{
 
 				(*this) = right;
 			}
@@ -429,7 +451,7 @@ namespace collums{
 				return r;
 			}
 			void load_data(_ColMap &col,_Rid start, _Rid p_end){
-				const _Rid CKECK = 1000000;
+				/// DEBUG: const _Rid CKECK = 1000000;
 				_Rid end = std::min<_Rid>(p_end, get_v_row_count(col));
 				if(start>=end){
 					return;

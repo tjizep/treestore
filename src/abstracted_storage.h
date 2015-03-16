@@ -118,9 +118,8 @@ namespace stored{
 		_Transaction& get_transaction(){
 			return get_transaction((*this).writer);
 		}
-
+        bool writer;
 		NS_STORAGE::stream_address boot;
-		bool writer;
 	public:
 
 		std::string get_name() const {
@@ -135,9 +134,9 @@ namespace stored{
 		:	name(name)
 		,	_allocations( NULL)
 		,	_transaction(NULL)
-		,	boot(1)
-		,	writer (false)
 		,	order (0)
+		,	writer (false)
+		,	boot(1)
 		{
 
 		}

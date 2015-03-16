@@ -48,7 +48,7 @@
 				</Linker>
 			</Target>
 			<Environment>
-				<Variable name="MYSQL_REPO" value="/home/test/mysql-community-5.6.20" />
+				<Variable name="MYSQL_REPO" value="/home/test/Desktop/mysql-5.6.23" />
 			</Environment>
 		</Build>
 		<Compiler>
@@ -69,6 +69,12 @@
 			<Add directory="$(MYSQL_REPO)/bld/include" />
 			<Add directory="$(MYSQL_REPO)/bld/sql" />
 		</Compiler>
+		<Unit filename="../../repo/fse/fse.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="../../repo/fse/zlibh.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="../../repo/lz4-r101/lz4.c">
 			<Option compilerVar="CC" />
 		</Unit>
@@ -78,7 +84,6 @@
 		<Unit filename="../../src/PredictiveCache.h" />
 		<Unit filename="../../src/abstracted_storage.cpp" />
 		<Unit filename="../../src/abstracted_storage.h" />
-		<Unit filename="../../src/allocator_test.cpp" />
 		<Unit filename="../../src/collumn.cpp" />
 		<Unit filename="../../src/collumn.h" />
 		<Unit filename="../../src/conversions.h" />
@@ -164,6 +169,7 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="../../src/stx/btree" />
+		<Unit filename="../../src/stx/btree.cpp" />
 		<Unit filename="../../src/stx/btree.h" />
 		<Unit filename="../../src/stx/btree_map" />
 		<Unit filename="../../src/stx/btree_map.h" />

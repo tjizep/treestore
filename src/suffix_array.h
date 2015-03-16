@@ -379,7 +379,6 @@ public:
 		_SuffixArrayType reduced_array;
 
 
-		size_t t = ::os::millis();
 		suffix_hasher.set_backing(reduced_array);
 
 		nst::u32 bucket_size = suffix_size;
@@ -403,12 +402,12 @@ public:
 			}
 			suffix_hasher.flush();
 			nst::u32 code_size = std::max<_CodeType>(1, bits::bit_log2((_CodeType)reduced_array.size()));
-			printf("array size %lld\n",reduced_array.size());
+			printf("array size %zd\n",reduced_array.size());
 			nst::u64 compressed = ( (buckets * code_size)>>3) + reduced_array.size()*suffix_size;
 			if(compressed < min_compressed ){
 				min_bucket_size = bucket_size;
 				min_compressed = compressed;
-				printf("min compressed %lld, min bucket size %lld\n",compressed,bucket_size);
+				printf("min compressed %lu, min bucket size %lu\n",compressed,(nst::u64)bucket_size);
 			}
 			reduced_array.clear();
 			bucket_size -= 1;
@@ -482,7 +481,7 @@ public:
 			_HashFe suffix_hasher;
 			nst::u64 remaining = length;
 			/// nst::u64 factor = remaining/100;
-			size_t t = ::os::millis();
+
 			suffix_hasher.set_backing(reduced_array);
 			parameters.length = length;
 			nst::u64 buckets = 0;
@@ -520,7 +519,7 @@ public:
 				--code;
 			}
 			suffix_hasher.flush();
-			printf("there are %lld codes\n",(nst::u64)frequencies.size());
+			printf("there are %lu codes\n",(nst::u64)frequencies.size());
 
 			/// encoding phase
 
@@ -591,10 +590,10 @@ public:
 							++errc;
 						}
 					}
-					printf("decode errors: %lld\n",errc);
+					printf("decode errors: %lu\n",errc);
 				}
 			}
-			printf("code size %ld %lld codes written to %lld bytes\n",parameters.code_size,out_pos,parameters.capacity());
+			printf("code size %iu %lu codes written to %lu bytes\n",parameters.code_size,out_pos,parameters.capacity());
 		}
 
 	}
@@ -609,7 +608,7 @@ public:
 			size_t t = ::os::millis();
 			nst::buffer_type dest(length);
 			nst::u64 dsize = FSE_compress(dest.data(),(const unsigned char *)buffer, length);
-			printf("Compressed %lld bytes to %lld in %lld ms.\n",length, dsize, ::os::millis()-t);
+			printf("Compressed %lu bytes to %lu in %lu ms.\n",length, dsize, ::os::millis()-t);
 			/// encode_internal(reduced_array, buffer, length);
 		}else{
 			typedef _SuffixArray _SuffixArrayType;

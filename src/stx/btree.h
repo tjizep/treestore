@@ -542,7 +542,7 @@ namespace stx
 			inline void set_where(stream_address w){
 
 				(*this).w = w;
-				
+
 
 			}
 			inline stream_address get_where() const {
@@ -862,21 +862,21 @@ namespace stx
 						}
 						if(l->get_next().is_loaded()){
 							surface_node * n = const_cast<surface_node*>(l->get_next().rget());
-							n->preceding.unload(true,false);						
+							n->preceding.unload(true,false);
 							n->unload_next();
 						}
 					}else{
 						BTREE_PRINT("surface node reports its not a surface node\n");
 					}
-					
+
 				}
 
 				bool next_check(const typename btree::surface_node* s) const {
 					if(selfverify){
 						if
-						(	s!=nullptr 
-						&&	s->get_address()  > 0 
-						&&	get_where() > 0 
+						(	s!=nullptr
+						&&	s->get_address()  > 0
+						&&	(*this).get_where() > 0
 						){
 							if
 							(	s->get_address() == s->get_next().get_where()
@@ -885,7 +885,7 @@ namespace stx
 								return false;
 							}
 							if
-							(	s==ptr && s->get_address() != get_where()
+							(	s==(*this).ptr && s->get_address() != (*this).get_where()
 							){
 								printf("self address check failed\n");
 								return false;
@@ -899,13 +899,13 @@ namespace stx
 			}
 
 			bool next_check(const typename btree::node* n) const {
-				
+
 				if(n!=nullptr){
 					if(n->level == 0){
 						return next_check(static_cast<const surface_node*>(n));
 					}
 				}
-				
+
 				return false;
 			}
 
@@ -917,7 +917,7 @@ namespace stx
 				return reinterpret_cast<surface_node*>(rget());
 			}
 
-			
+
 			void refresh()
 			{
 				reload_this(this);
@@ -985,9 +985,9 @@ namespace stx
 				null_check();
 				/// this is hidden from the MSVC inline optimizer which seems to be overactive
 				if(has_context()){
-					
+
 					(*p).get_context()->load(((super*)p)->w,rget());
-					
+
 				}else{
 					printf("WARNING: no context supplied\n");
 				}
@@ -1000,14 +1000,14 @@ namespace stx
 				(*p) = (*p).get_context()->load(((super*)p)->w,loader,slot);
 
 			}
-			
-			
+
+
 			bool next_check() const {
-				
+
 				return next_check(rget());
 			}
-			
-			
+
+
 			void validate_surface_links(){
 				null_check();
 				if(selfverify){
@@ -1049,14 +1049,14 @@ namespace stx
 						/// (*this) = (*this).get_context()->load(super::w);
 						/// replaced by
 						load_this(this);
-						
+
 					}
 				}
 				if((*this).is_invalid()){
 					refresh_this(this);
 				}
-				
-				
+
+
 			}
 			/// The initial state can be any state
 			void load(stream_address loader, nst::u16 slot) {
@@ -1134,7 +1134,7 @@ namespace stx
 			{
 
 				if(this != &left){
-					
+
 					/// dont back propagate a context
 					if(!has_context()){
 						set_context(left.get_context());
@@ -1146,8 +1146,8 @@ namespace stx
 						ref();
 					}
 					super::w = left.w;
-					
-					
+
+
 				}
 				return *this;
 			}
@@ -1161,7 +1161,7 @@ namespace stx
 			/// reference counted assingment of raw pointers used usually at creation time
 			pointer_proxy& operator=(_Loaded* left)
 			{
-				
+
 				if(super::ptr != left)
 				{
 					unref();
@@ -1173,7 +1173,7 @@ namespace stx
 					(*this).ptr = NULL_REF;
 					super::w = 0;
 				}
-				
+
 				return *this;
 			}
 
@@ -1187,7 +1187,7 @@ namespace stx
 
 			inline bool operator!=(const super& left) const
 			{
-				
+
 				return super::not_equal(left);
 			}
 
@@ -1195,14 +1195,14 @@ namespace stx
 
 			inline bool operator==(const super& left) const
 			{
-				
+
 				return super::equals(left);
 			}
 
 			/// just return the refount
 
 			int get_refs() const {
-				
+
 				if((*this).ptr != NULL_REF){
 					return (*this).ptr->refs;
 				}
@@ -1210,7 +1210,7 @@ namespace stx
 			}
 			/// return true if the member is not set
 			bool empty() const {
-				
+
 				return (*this).ptr == NULL_REF;
 			}
 			/// return the raw member ptr without loading
@@ -1220,7 +1220,7 @@ namespace stx
 			{
 
 				_Loaded * r = static_cast<_Loaded*>(super::ptr);
-				
+
 				return r;
 			}
 
@@ -1229,7 +1229,7 @@ namespace stx
 			inline const _Loaded * rget() const
 			{
 				const _Loaded * r = static_cast<const _Loaded*>(super::ptr);
-				
+
 				return r;
 			}
 
@@ -1339,7 +1339,7 @@ namespace stx
 		protected:
 			/// the pages last transaction that it was checked on
 			storage::u64	transaction ;
-			
+
 			/// iterpolator cached keys
 			key_type        int_lower;
 			key_type        int_upper;
@@ -1410,7 +1410,7 @@ namespace stx
 				check_node();
 				(*this).transaction = transaction;
 			}
-			
+
 			/// force refresh
 
 			void set_force_refresh (bool force_refresh ){
@@ -1749,7 +1749,7 @@ namespace stx
 			/// Double linked list pointers to traverse the leaves
 			typename surface_node::ptr		next;
 			buffer_type						attached;
-			
+
 		public:
 			void check_next() const {
 				return;
@@ -1786,7 +1786,7 @@ namespace stx
 				check_next();
 			}
 			void set_address(stream_address address){
-				
+
 				node_ref::set_address_(address);
 				check_next();
 			}
@@ -1798,7 +1798,7 @@ namespace stx
 				check_next();
 				return (*this).next ;
 			}
-			
+
 			void change_next(){
 				(*this).next.change_before();
 				check_next();
@@ -2055,9 +2055,9 @@ namespace stx
 				if(interp.encoded_values(btree::allow_duplicates)){
 					interp.decode_values(buffer, reader, values, (*this).get_occupants());
 				}else{
-					size_t sd = 0;
+
 					for(u16 k = 0; k < (*this).get_occupants();++k){
-						sd = reader - buffer.begin();
+
 						storage.retrieve(buffer, reader, values[k]);
 
 					}
@@ -2242,7 +2242,7 @@ namespace stx
 				//printf("[B-TREE SAVE] i-node  %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version());
 				using namespace stx::storage;
 				buffer_type &buffer = get_storage()->allocate(w, stx::storage::create);
-				
+
 				n->save(*get_storage(), buffer);
 
 				if(lz4){
@@ -2393,7 +2393,7 @@ namespace stx
 			return false;
 		}
 		bool is_invalid(const node* page, stream_address w) const {
-			
+
 			return !is_valid(page, w);
 		}
 
@@ -2420,7 +2420,7 @@ namespace stx
 
 				refs = preallocated->refs;
 				if(preallocated->is_force_refresh()){
-					nst::u64 to = this->get_storage()->current_transaction_order();
+					/// JUST FOR DEBUGGING: nst::u64 to = this->get_storage()->current_transaction_order();
 					preallocated->set_force_refresh(false);
 					request.clear();
 					request.push_back(std::make_pair(w,preallocated->get_version()));
@@ -2485,7 +2485,7 @@ namespace stx
 					nodes_loaded[w] = s.rget();
 					surfaces_loaded[w] = s.rget();
 				}
-				
+
 				s.rget()->set_transaction (get_storage()->current_transaction_order() );
 				return s;
 			}else{
@@ -2779,7 +2779,7 @@ namespace stx
 					first_node.sort();
 					total += first_node->get_occupants();
 					auto w = first_node.get_where();
-					
+
 					first_node = first_node->get_next();
 					if(context){
 						//context->free_single_surface(w);
@@ -3754,7 +3754,7 @@ namespace stx
 		,	storage(&storage)
 		{
 
-			
+
 			++btree_totl_instances;
 			initialize_contexts();
 		}
@@ -3773,7 +3773,7 @@ namespace stx
 		,	allocator(alloc)
 		,	storage(&storage)
 		{
-			
+
 			++btree_totl_instances;
 			initialize_contexts();
 		}
@@ -3792,7 +3792,7 @@ namespace stx
 		,	allocator(alloc)
 		,	storage(&storage)
 		{
-			
+
 			++btree_totl_instances;
 			insert(first, last);
 		}
@@ -3814,7 +3814,7 @@ namespace stx
 		,	allocator(alloc)
 		,	storage(&storage)
 		{
-			
+
 			++btree_totl_instances;
 			insert(first, last);
 		}
@@ -4133,7 +4133,7 @@ namespace stx
 			pn->initialize();
 			pn->set_slot_loader(loader, slot);
 			typename surface_node::ptr n = pn;
-			n.create(this,w);			
+			n.create(this,w);
 			n->set_next_context(this);
 			n->preceding.set_context(this);
 

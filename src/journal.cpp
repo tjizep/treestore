@@ -153,7 +153,6 @@ public:
 		std::ifstream journal_istr(journal_name, std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
 		nst::u64 sequence = 0;
-		nst::u64 last_synch = 0;
 		_PendingTransactions pending;
 		_Commands commands;
 		const double MB = 1024.0*1024.0;
@@ -238,7 +237,7 @@ public:
 	{
 		nst::synchronized _llock(llock);
 		if(last_synch != sequence){
-			
+
 			add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary
 
 			writer.flush();
