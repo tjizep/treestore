@@ -182,22 +182,39 @@ These instructions are for ubuntu 14.04 in desktop mode
 6. extract zip file to /home/[current user]/Desktop/treestore-master (root of zip contents)
 7. create folder /home/[current user]/Desktop/mysql
 8. mysql instructions:
-	+shell> cd ~/Desktop
-	+shell> tar zxvf mysql-VERSION.tar.gz
-	+shell> cd mysql-VERSION
-	+shell> mkdir bld
-	+shell> cd bld
-	+shell> ccmake ..  
-	 NB!: ccmake ..
-	 NB!: set CMAKE_INSTALL_PREFIX=/home/[current user]/Desktop/mysql
-	 NB!: set CMAKE_DATADIR=/home/[current user]/Desktop/mysql/data
-	 NB!: press C for configure
-	 NB!: press g for generate and exit
-	+shell> make 
-	+shell> make install
-	+shell> cd /home/[current user]/Desktop/mysql
-	+shell> scripts/mysql_install_db --user=[current user]
-	+shell> scripts/mysql_install_db --user=[current user]
+
+	shell> cd ~/Desktop
+	
+	shell> tar zxvf mysql-VERSION.tar.gz
+	
+	shell> cd mysql-VERSION
+	
+	shell> mkdir bld
+	
+	shell> cd bld
+	
+	shell> ccmake ..  
+	
+	*NB!: ccmake ..*
+	
+	*NB!: set CMAKE_INSTALL_PREFIX=/home/[current user]/Desktop/mysql*
+	
+	*NB!: set CMAKE_DATADIR=/home/[current user]/Desktop/mysql/data*
+	
+	*NB!: press C for configure*
+	
+	*NB!: press g for generate and exit*
+	
+	shell> make 
+	
+	shell> make install
+	
+	shell> cd /home/[current user]/Desktop/mysql
+	
+	shell> scripts/mysql_install_db --user=[current user]
+	
+	shell> scripts/mysql_install_db --user=[current user]
+
 9. This should give you a valid directory to install from
 10. Open CodeBlocks ide
 11. Open /home/[current user]/Desktop/treestore-master/codeblocks/treestore/treestore.cbp
@@ -206,30 +223,55 @@ These instructions are for ubuntu 14.04 in desktop mode
 14. the libtreestore.so will be built to /home/[current user]/Desktop/treestore-master/treestore/codeblocks/treestore/bin/Release
 15. copy libtreestore.so to /home/[current user]/Desktop/mysql/lib/plugin
 16. open new terminal
-17. +shell> cd ~/Desktop/mysql
-	+shell> gedit my.cnf
-	+ paste to the bottom of the file
+17. 
+
+	shell> cd ~/Desktop/mysql
+	
+	shell> gedit my.cnf
+	
+	paste to the bottom of the file
+	
 	treestore_max_mem_use = 8G
+	
 	treestore_efficient_text = false
+	
 	treestore_journal_lower_max = 12G
+	
 	treestore_journal_upper_max = 24G
+	
 	treestore_column_cache = false
+	
 	treestore_column_cache_factor = 0.7
+	
 	treestore_reduce_storage_use_on_unlock = false
+	
 	treestore_reduce_tree_use_on_unlock = false
+	
 	treestore_reduce_index_tree_use_on_unlock = false
+	
 	treestore_predictive_hash = false
+	
 	treestore_column_encoded = false
+	
 	treestore_use_primitive_indexes=true
-    +save
-    +exit
-	+shell> ./bin/mysql -u root
-	+mysql> install plugin treestore soname 'libtreestore.so'
-	+mysql> create database 'test_t'
-	+mysql> set default_storage_engine='treestore';
-	+mysql> use 'test_t';
-	+mysql> create table t1(c1 int);
-	+mysql> {etc...}
+	
+	save
+	
+	exit
+	
+	shell> ./bin/mysql -u root
+	
+	mysql> install plugin treestore soname 'libtreestore.so'
+	
+	mysql> create database 'test_t'
+	
+	mysql> set default_storage_engine='treestore';
+	
+	mysql> use 'test_t';
+	
+	mysql> create table t1(c1 int);
+	
+	mysql> {etc...}
 
 
 TODO FOR GA 0.3x
