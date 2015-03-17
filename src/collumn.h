@@ -735,7 +735,7 @@ namespace collums{
 		_StoredEntry user;
 		_Stored empty;
 		_Rid cache_size;
-		_Rid rows;
+		_Rid max_row_id;
 		_Rid rows_per_key;
 		bool modified;
 		bool lazy;
@@ -746,10 +746,10 @@ namespace collums{
 
 		void load_cache(){
 			if(treestore_column_cache==FALSE || lazy) return;
-			if(pages==nullptr && rows > 0){
+			if(pages==nullptr && max_row_id > 0){
 				using namespace stored;
-				pages = load_cache(storage.get_name(),rows); ///= new _CachePages(); ///
-				//_Rid p = rows/MAX_PAGE_SIZE+1;
+				pages = load_cache(storage.get_name(),max_row_id); ///= new _CachePages(); ///
+				//_Rid p = max_row_id/MAX_PAGE_SIZE+1;
 				//pages->resize(p);
 
 			}
@@ -779,13 +779,14 @@ namespace collums{
 			return r;
 		}
 		void check_page_cache(){
-			rows = get_v_row_count(); //(_Rid)col.size();
+			max_row_id = get_v_row_count(); //(_Rid)col.size();
 			load_cache();
 		}
+		
 		void uncheck_page_cache(){
 			if(pages!=nullptr){
 				//delete pages;
-				unload_cache(storage.get_name(),rows);
+				unload_cache(storage.get_name(),max_row_id);
 				pages = nullptr;
 			}
 		}
@@ -806,7 +807,7 @@ namespace collums{
 		:	storage(name)
 		,	col(storage)
 		,	pages(nullptr)
-		,	rows(0)
+		,	max_row_id(0)
 		,	rows_per_key(0)
 		,	modified(false)
 		,	lazy(load)
@@ -1000,7 +1001,9 @@ namespace collums{
 			storage.set_readahead(false);
 			check_page_cache();
 		}
-
+		_Rid get_max_row_id() const {
+			return max_row_id;
+		}
 		void rollback(){
 			if(modified){
 				col.flush();
@@ -1053,7 +1056,7 @@ namespace collums{
 		}
 
 		void add(_Rid row, const _Stored& s){
-			rows = std::max<_Rid>(row+1, rows);
+			max_row_id = std::max<_Rid>(row+1, max_row_id);
 			_CachePage * page = load_page(row,true);
 			if(page != nullptr){
 

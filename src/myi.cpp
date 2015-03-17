@@ -1357,7 +1357,7 @@ public:
 	int update_row(const byte *old_data, byte *new_data) {
 		 statistic_increment(table->in_use->status_var.ha_read_rnd_next_count,
                       &LOCK_status);
-		 return 0;
+		 
 		uchar *record_old = table->record[0];
 		uchar *record_new = table->record[1];
 		typedef std::vector<uchar *,  sta::tracker<uchar*> > _Saved;

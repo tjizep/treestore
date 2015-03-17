@@ -1154,7 +1154,7 @@ table index bits.  It will differ if the request is greater than the
 longest code or if it is less than the shortest code.
 */
 int inflate_table_zh(type, lens, codes, table, bits, work)
-_declspec(noinline)
+
     codetype type;
 unsigned short *lens;
 unsigned codes;

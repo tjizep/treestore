@@ -390,12 +390,12 @@ namespace tree_stored{
 			}
 			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid start) {
-				if(start >= col->get_rows()){
+				if(start >= col->get_max_row_id()){
 					return NoRecord;
 				}
 				while(!condition.is_true(col->seek_by_cache(start), value)){
 					++start;
-					if(start >= col->get_rows()){
+					if(start >= col->get_max_row_id()){
 						return NoRecord;
 					}
 				}
@@ -403,7 +403,7 @@ namespace tree_stored{
 			}
 			virtual _Rid evaluate(_Rid start) {
 
-				if(start >= col->get_rows()){
+				if(start >= col->get_max_row_id()){
 					return NoRecord;
 				}
 
@@ -430,13 +430,13 @@ namespace tree_stored{
 			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid start) {
 
-				if(start >= col->get_rows()){
+				if(start >= col->get_max_row_id()){
 					return NoRecord;
 				}
 				while(!condition.is_true(col->seek_by_cache(start), value)){
 					++start;
 
-					if(start >= col->get_rows()){
+					if(start >= col->get_max_row_id()){
 						return NoRecord;
 					}
 				}
@@ -444,7 +444,7 @@ namespace tree_stored{
 			}
 			virtual _Rid evaluate(_Rid start) {
 
-				if(start >= col->get_rows()){
+				if(start >= col->get_max_row_id()){
 					return NoRecord;
 				}
 
