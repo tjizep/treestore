@@ -2152,7 +2152,7 @@ namespace stx
 
 
 		typedef rabbit::unordered_map<stream_address, node*> _AddressedNodes;
-		/// typedef std::unordered_map<stream_address, node*> _AddressedNodes;
+		///typedef std::unordered_map<stream_address, node*> _AddressedNodes;
 
 
 
@@ -4080,7 +4080,7 @@ namespace stx
 					unlink_local_nodes_2();
 					local_reduce_free();
 					check_special_node();
-					if(stats.leaves > leaves_before/8){
+					if(stats.leaves > 32 && stats.leaves > leaves_before/8){
 						unlink_local_nodes();
 						local_reduce_free();
 						check_special_node();

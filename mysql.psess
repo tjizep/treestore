@@ -72,6 +72,9 @@
     <Report>
       <Path>mysql150317.vspx</Path>
     </Report>
+    <Report>
+      <Path>mysql150318.vspx</Path>
+    </Report>
   </Reports>
   <Launches>
     <Binary>
