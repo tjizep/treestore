@@ -1075,7 +1075,8 @@ public:
 					return HA_ERR_LOCK_TABLE_FULL;
 			}
 			DBUG_PRINT("info", (" *locking %s \n", table->s->normalized_path.str));
-
+			if(stx::memory_low_state)
+				thread->own_reduce();
 			(*this).tt = thread->lock(table, writer);
 
 
@@ -1329,6 +1330,9 @@ public:
 		return 0;
 	}
 	int write_row(byte * buff){
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
 		/// TODO: auto timestamps
 
@@ -1344,8 +1348,7 @@ public:
 
 		get_tree_table()->write((*this).table);
 
-		//if(stx::memory_low_state)
-		//	get_thread()->own_reduce();
+		
 		if(auto_increment_update_required){
 			get_tree_table()->reset_auto_incr(table->next_number_field->val_int());
 		}else{

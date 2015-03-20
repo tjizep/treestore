@@ -107,7 +107,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define BTREE_PRINT(x,...)          do { } while(0)
 
 /// Assertion only if BTREE_DEBUG is defined. This is not used in verify().
-#define BTREE_ASSERT(x)         do { } while(0)
+#define BTREE_ASSERT(x)         do {  } while(0)
 
 #endif
 
@@ -4080,7 +4080,7 @@ namespace stx
 					unlink_local_nodes_2();
 					local_reduce_free();
 					check_special_node();
-					if(stats.leaves > 32 && stats.leaves > leaves_before/8){
+					if(stats.leaves > leaves_before/8){
 						unlink_local_nodes();
 						local_reduce_free();
 						check_special_node();
@@ -5813,8 +5813,10 @@ namespace stx
 				if (result.has(btree_fixmerge))
 				{
 					// either the current node or the next is empty and should be removed
+					const interior_node * cinterior = interior.rget();
 					if (interior->childid[slot]->get_occupants() != 0)
 						slot++;
+
 					interior.change_before();
 					// this is the child slot invalidated by the merge
 					BTREE_ASSERT(interior->childid[slot]->get_occupants() == 0);
@@ -5830,7 +5832,8 @@ namespace stx
 
 					if (interior->level == 1)
 					{
-						// fix split key for children leaves
+						BTREE_ASSERT(slot > 0);
+						// fix split key for leaves
 						slot--;
 						typename surface_node::ptr child = interior->childid[slot];
 						interior->keys[slot] = child->keys[ child->get_occupants()-1 ];

@@ -67,13 +67,13 @@
   </Binaries>
   <Reports>
     <Report>
-      <Path>mysql150314.vspx</Path>
+      <Path>mysql150319.vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150317.vspx</Path>
+      <Path>mysql150320.vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150318.vspx</Path>
+      <Path>mysql150320(1).vspx</Path>
     </Report>
   </Reports>
   <Launches>
