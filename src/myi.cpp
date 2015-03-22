@@ -1110,7 +1110,7 @@ public:
 					get_thread()->own_reduce();
 				if(treestore_print_lox){
 					printf
-					(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g MB\n"
+					(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g / %.4g MB\n"
 					,	"transaction complete"
 					,	(double)calc_total_use()/units::MB
 					,	(double)nst::buffer_use/units::MB
@@ -1118,6 +1118,7 @@ public:
 					,	(double)nst::stl_use/units::MB
 					,	(double)btree_totl_used/units::MB
 					,	(double)total_cache_size/units::MB
+					,	(double)allocation_pool.get_used()/units::MB
 					,	(double)allocation_pool.get_total_allocated()/units::MB
 					);
 				}
@@ -1969,16 +1970,17 @@ namespace ts_cleanup{
 
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g t%.4g pc%.4g stl%.4g   pool: %.4g MB\n"
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB\n"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
 					,	(double)nst::buffer_use/units::MB
 					,	(double)nst::col_use/units::MB
-					,	(double)btree_totl_used/units::MB
+					//,	(double)btree_totl_used/units::MB
 					,	(double)total_cache_size/units::MB
 					,	(double)nst::stl_use/units::MB
-					,	(double)allocation_pool.get_total_allocated()/units::MB
+					,	(double)allocation_pool.get_used()/units::MB
+					,	(double)allocation_pool.get_total_allocated()/units::MB					
 					//,	(double)allocation_pool.get_allocated()/units::MB
 					);
 					last_print_size = calc_total_use();

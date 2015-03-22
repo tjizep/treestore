@@ -2416,6 +2416,9 @@ namespace stx
 			size_t refs = 0;
 
 			if(preallocated!=nullptr){
+				if(w!=preallocated->get_address()){
+					///printf("WARNING: input address does not match preallocated node address\n");
+				}
 				/// printf("restoring preallocated version on %lld\n",(long long)w);
 
 				refs = preallocated->refs;
@@ -2431,8 +2434,8 @@ namespace stx
 						printf("there was data\n");
 					}
 
-				}else{
-
+				}else if(w==preallocated->get_address()){
+					
 					request.clear();
 
 					request.push_back(std::make_pair(w,preallocated->get_version()));
@@ -2483,7 +2486,7 @@ namespace stx
 				s.set_where(w);
 				if(!is_preallocated){
 					nodes_loaded[w] = s.rget();
-					surfaces_loaded[w] = s.rget();
+					surfaces_loaded[w] = s.rget();					
 				}
 
 				s.rget()->set_transaction (get_storage()->current_transaction_order() );
@@ -4060,7 +4063,7 @@ namespace stx
 			if(::stx::memory_low_state){
 				reduce_use();
 			}
-			last_surface.validate_surface_links();
+			///last_surface.validate_surface_links();
 		}
 
 		/// writes all modified pages to storage and frees all surface nodes
@@ -4074,7 +4077,7 @@ namespace stx
 			ptrdiff_t save_tot = btree_totl_used;
 			flush();
  			if(reduce){
-				if((*this).stats.surface_use > 0){
+				if(stats.leaves > 4){
 					size_t leaves_before = stats.leaves;
 					check_special_node();
 					unlink_local_nodes_2();
@@ -4129,7 +4132,7 @@ namespace stx
 				}
 			}
 			change_use(sizeof(surface_node),0,sizeof(surface_node));
-			stats.leaves++;
+			stats.leaves = surfaces_loaded.size();
 			pn->initialize();
 			pn->set_slot_loader(loader, slot);
 			typename surface_node::ptr n = pn;
@@ -4157,65 +4160,34 @@ namespace stx
 			pn->initialize(level);
 			typename interior_node::ptr n = pn;
 			n.create(this,w);
-			stats.interiornodes++;
+			
 			if(n.get_where()){
 				nodes_loaded[n.get_where()] = pn;
 				interiors_loaded[n.get_where()] = pn;
 			}
+			stats.interiornodes = interiors_loaded.size();
 			return n;
 		}
-		inline bool partial_free_node( surface_node* n, stream_address w ){
-			if(( n->refs==0 ) || n->is_orphaned()){
-				save(n,w);
-				if(!n->is_orphaned()){
-					nodes_loaded.erase(w);
-					surfaces_loaded.erase(w);
-				}
-
-				surface_node *ln = n;
-				//typename surface_node::alloc_type a(surface_node_allocator());
-				/// TODO: adding multithreaded freeing of pages can improve transactional
-				/// performance where small ammounts of random page access is prevalent
-
-
-				surface_node * removed = ln;
-				if(removed->is_orphaned()){
-					add_btree_totl_used (-(ptrdiff_t)sizeof(surface_node));
-				}else{
-					change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
-				}
-				stats.leaves--;
-				return true;
-			}
-			return false;
-		}
 		inline void free_node( surface_node* n, stream_address w ){
-			//if(partial_free_node(n, w)){
-			//	allocation_pool.free<surface_node>(n);
-			//}
 			if((n->refs==0 ) || n->is_orphaned()){
 				save(n,w);
 				if(!n->is_orphaned()){
-					nodes_loaded.erase(w);
-					surfaces_loaded.erase(w);
+					nodes_loaded.erase(w);						
+					surfaces_loaded.erase(w);					
 				}
 
-				surface_node *ln = n;
-				//typename surface_node::alloc_type a(surface_node_allocator());
-				surface_node * removed = ln;
-
-				if(delete_check && removed->is_deleted){
+				if(delete_check && n->is_deleted){
 					printf("ERROR: node has been deleted\n");
 				}
 
-				if(removed->is_orphaned()){
+				if(n->is_orphaned()){
 					add_btree_totl_used (-(ptrdiff_t)sizeof(surface_node));
 				}else{
 					change_use(-(ptrdiff_t)sizeof(surface_node),0,-(ptrdiff_t)sizeof(surface_node));
 				}
-				allocation_pool.free<surface_node>(removed);
+				allocation_pool.free<surface_node>(n);
 
-				stats.leaves--;
+				stats.leaves = surfaces_loaded.size();
 
 			}
 		}
@@ -4254,10 +4226,16 @@ namespace stx
 		}
 
 		inline void free_node(interior_node* n, stream_address w){
-			if(n->refs == 0 ){
+			if(n->refs == 0 || n->is_orphaned()){
 				save(n,w);
 				if(!n->is_orphaned()){
 					nodes_loaded.erase(w);
+					if(surfaces_loaded.count(w)){
+						printf("ERROR: node cannot be both surface and interior unless its the root node\n");
+					}
+					if(interiors_loaded.count(w)==0){
+						printf("ERROR: node was not registered in the interior list\n");
+					}
 					interiors_loaded.erase(w);
 				}
 				typename interior_node::alloc_type a(interior_node_allocator());
@@ -4506,7 +4484,7 @@ namespace stx
 		/// the first surface of the B+ tree.
 		inline iterator begin()
 		{
-			check_low_memory_state();
+			
 
 			return iterator(headsurface, 0);
 		}
@@ -4515,7 +4493,7 @@ namespace stx
 		/// slot in the last surface of the B+ tree.
 		inline iterator end()
 		{
-			check_low_memory_state();
+			
 			typename surface_node::ptr last = last_surface;
 			last.set_context(this);
 			stats.last_surface_size = last != NULL_REF ? last->get_occupants() : 0;
@@ -4547,8 +4525,7 @@ namespace stx
 		/// invalid slot in the last surface of the B+ tree. Uses STL magic.
 		inline reverse_iterator rbegin()
 		{
-			check_low_memory_state();
-
+			
 			return reverse_iterator(end());
 		}
 
@@ -4556,8 +4533,7 @@ namespace stx
 		/// slot in the first surface of the B+ tree. Uses STL magic.
 		inline reverse_iterator rend()
 		{
-			check_low_memory_state();
-
+			
 			return reverse_iterator(begin());
 		}
 
@@ -4736,8 +4712,7 @@ namespace stx
 		/// key/data slot if found. If unsuccessful it returns end().
 		iterator find(const key_type &key)
 		{
-			check_low_memory_state();
-
+			
 			typename node::ptr n = root;
 			if (n==NULL_REF) return end();
 
@@ -4819,8 +4794,6 @@ namespace stx
 
 			if (root==NULL_REF) return end();
 
-			check_low_memory_state();
-
 			typename interior_node::ptr n = root;
 			while(!n->issurfacenode())
 			{
@@ -4863,8 +4836,6 @@ namespace stx
 		{
 			typename node::ptr n = root;
 			if (n==NULL_REF) return end();
-
-			check_low_memory_state();
 
 			while(!n->issurfacenode())
 			{
@@ -5117,7 +5088,7 @@ namespace stx
 		{
 			unshare();
 
-			check_low_memory_state();
+			/// check_low_memory_state();
 
 			typename node::ptr newchild ;
 			key_type newkey = key_type();

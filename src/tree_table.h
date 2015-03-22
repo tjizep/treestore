@@ -1158,10 +1158,11 @@ namespace tree_stored{
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
 					_Rid d = sample / ((*u).size() == 0 ? 1 : (*u).size());/// accurate to the nearest page
 					index->push_density(d);
+					index->reduce_use();
 					partx++;
 				}
 			}
-			reduce_use_collum_trees();
+			reduce_use();
 			last_density_calc = os::millis();
 			last_density_tx= storage.current_transaction_order();
 			{
