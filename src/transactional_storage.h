@@ -220,6 +220,7 @@ namespace storage{
 		block_type empty_block;
 	private:
 		typedef rabbit::unordered_map<address_type, block_reference> _Allocations;
+		//typedef std::unordered_map<address_type, block_reference> _Allocations;
 		_Allocations allocations;
 		address_type next;
 	public:
@@ -373,7 +374,7 @@ namespace storage{
 		 /// std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> >
 		/// ::google::dense_hash_map
 		///typedef std::vector<version_type> _Versions;
-		/// typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
+		//typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
 		typedef rabbit::unordered_map<address_type, version_type> _Versions;
 
 
@@ -421,10 +422,8 @@ namespace storage{
 
 		typedef block_descriptor* ref_block_descriptor;
 		typedef std::vector<block_descriptor*> _Descriptors;
-		////typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
-		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;
-		/// typedef address_table<address_type, ref_block_descriptor> _Allocations;
-		// typedef imperfect_hash<address_type, ref_block_descriptor> _Allocations;
+		/// typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
+		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;		
 		typedef rabbit::unordered_map<address_type, ref_block_descriptor> _Allocations;
 
 

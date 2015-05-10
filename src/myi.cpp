@@ -87,6 +87,7 @@ namespace tree_stored{
 		int locks;
 
 		bool changed;
+		bool used;
 		Poco::Thread::TID created_tid;
 
 
@@ -94,15 +95,30 @@ namespace tree_stored{
 		int get_locks() const {
 			return locks;
 		}
-		tree_thread() : locks(0),changed(false){
+		
+		tree_thread() : locks(0),changed(false), used(false){
 		    printf("create tree thread\n");
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
 			DBUG_PRINT("info",(" *** Tree Store (eyore) mem use configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
 		}
+		
 		Poco::Thread::TID get_created_tid() const {
 			return (*this).created_tid;
 		}
+		void set_used(){
+			(*this).used = true;
+		}
+		void set_unused(){
+			(*this).used = false;
+		}
+		bool get_used() const{
+			return (*this).used;
+		}
+		void reuse(){
+			created_tid = Poco::Thread::currentTid();
+		}
+
 		~tree_thread(){
 			clear();
 			DBUG_PRINT("info",("tree thread removed\n"));
@@ -319,7 +335,10 @@ public:
 			writer.modify();
 		return &writer;
 	}
-
+	size_t get_thread_count()  {
+		NS_STORAGE::syncronized ul(tlock);
+		return threads.size();
+	}
 	bool release_writer(tree_stored::tree_thread * w){
 
 		if(w == &writer){
@@ -352,6 +371,7 @@ public:
 
 		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
 			if((*t) == tt){
+				tt->set_unused();
 				return;
 			}
 		}
@@ -375,11 +395,25 @@ public:
 				}
 			}
 		}
-
+		if(r == NULL){
+			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
+				if((*t))
+				{
+					if(!(*t)->get_used())
+					{
+						r = (*t);
+						r->reuse();
+						break;
+					}
+				}
+			}
+		}
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
 			threads.push_back(r);
+			printf("INFO: TS: added thread %lu\n", (unsigned long)threads.size());
 		}
+		r->set_used();
 		DBUG_PRINT("info",("{%lld} t resources \n", (NS_STORAGE::u64)threads.size()));
 		return r;
 	}
@@ -395,7 +429,7 @@ public:
 	void reduce_all(){
 		(*this).reduce();
 	}
-	void release_trees(){
+	void release_idle_trees(){
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if((*t)->get_locks()==0)/// this should ignore busy threads
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid()){
@@ -449,15 +483,7 @@ static static_threads st;
 
 void reduce_thread_usage(){
 	if(stx::memory_low_state){
-		st.check_use();
-		//reduce_info_tables();
-
-		if(calc_total_use() > treestore_max_mem_use){
-			//nst::synchronized s2(tt_info_lock);/// the info function may be called in another thread
-
-			stx::process_idle_times();
-		}
-		//}
+		st.check_use();	
 	}
 	if(calc_total_use() > treestore_max_mem_use){
 
@@ -1967,21 +1993,25 @@ namespace ts_cleanup{
 					reduce_thread_usage();
 				}else{
 				}
-
+				if(stx::memory_low_state){
+					//printf("[TREESTORE] reduce idle tree use\n");
+					st.release_idle_trees();	
+				}
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB\n"
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu\n"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
 					,	(double)nst::buffer_use/units::MB
 					,	(double)nst::col_use/units::MB
-					//,	(double)btree_totl_used/units::MB
+					
 					,	(double)total_cache_size/units::MB
 					,	(double)nst::stl_use/units::MB
 					,	(double)allocation_pool.get_used()/units::MB
 					,	(double)allocation_pool.get_total_allocated()/units::MB					
 					//,	(double)allocation_pool.get_allocated()/units::MB
+					,	(unsigned long)st.get_thread_count() 
 					);
 					last_print_size = calc_total_use();
 				}

@@ -46,6 +46,7 @@ namespace stored{
 			r = instances[name];
 			if(r == NULL){
 				r = new _Allocations( std::make_shared<_BaseAllocator>( stx::storage::default_name_factory(name)) );
+				///r->set_readahead(true);
 				instances[name] = r;
 			}
 			r->set_recovery(false);
