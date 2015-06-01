@@ -12,6 +12,7 @@
 #include "NotificationQueueWorker.h"
 #include <stx/storage/types.h>
 #include <vector>
+#include <rabbit/unordered_map>
 #ifdef _MSC_VER
 #include <sparsehash/type_traits.h>
 #include <sparsehash/dense_hash_map>
@@ -303,7 +304,7 @@ namespace stx{
 
 			/// memory allocator overlay to improve allocation speed
 			class unlocked_pool{
-			protected:
+			public:
 				/// types
 				struct _Allocated{
 					_Allocated(u8 *data,const std::type_info& tp):data(data),ti(&tp),is_new(false){
@@ -329,13 +330,14 @@ namespace stx{
 					_Bucket bucket;
 				};
 				#ifdef _MSC_VER
-				typedef ::google::dense_hash_map<size_t, _Clocked> _Buckets;
+				//typedef ::google::dense_hash_map<size_t, _Clocked> _Buckets;
 				#else
 				typedef std::unordered_map<size_t, _Clocked> _Buckets;
 				#endif
+				typedef rabbit::unordered_map<size_t, _Clocked> _Buckets;
 				//typedef std::unordered_map<size_t, _Clocked> _Buckets;
 				//typedef imperfect_hash<size_t, _Clocked> _Buckets;
-
+			protected:
 				typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _CleanupWorkerManager;
 
 				class _CleanupWorker : public asynchronous::AbstractWorker{
@@ -398,8 +400,8 @@ namespace stx{
 
 				void setup_dh(){
 #ifdef _MSC_VER
-					buckets.set_empty_key(MAX_ALLOCATION_SIZE+1);
-					buckets.set_deleted_key(MAX_ALLOCATION_SIZE+2);
+					///buckets.set_empty_key(MAX_ALLOCATION_SIZE+1);
+					///buckets.set_deleted_key(MAX_ALLOCATION_SIZE+2);
 #endif
 				}
 
@@ -412,14 +414,14 @@ namespace stx{
 					size_t row = 0;
 					empties.clear();
 					for(_Buckets::iterator b = (*this).buckets.begin(); b != (*this).buckets.end(); ++b){
-						if((*b).second.bucket.empty()){/// skip empty buckets
-							empties.push_back((*b).first);
+						if(b.get_value().bucket.empty()){/// skip empty buckets
+							empties.push_back(b.get_key());
 						}else{
 
-							if( (*b).second.clock < mclock){
+							if( b.get_value().clock < mclock){
 								row = 0;
-								mclock = (*b).second.clock;
-								msize = (*b).first;
+								mclock = b.get_value().clock;
+								msize = b.get_key();
 							}else{
 								++row;
 							}
@@ -434,7 +436,7 @@ namespace stx{
 					}
 					return msize;
 				}
-				void erase_lru(){
+				void erase_lru(_Bucket& torelease){
 					u64 todo = allocated + used - max_pool_size;
 					while(used > 0 && (allocated + used) > max_pool_size){
 						size_t lru_size = find_lru_size();
@@ -449,7 +451,7 @@ namespace stx{
 								if(clocked.size == lru_size){
 									while((allocated + used) > max_pool_size){
 										_Allocated allocated = clocked.bucket.back();
-										delete allocated.data;
+										torelease.push_back(allocated);
 										used -= lru_size + overhead();
 										clocked.bucket.pop_back();
 										if(clocked.bucket.empty())
@@ -466,9 +468,7 @@ namespace stx{
 						}
 					}
 				}
-				void check_lru(){
-					erase_lru();
-				}
+				
 
 			public:
 
@@ -486,6 +486,10 @@ namespace stx{
 				~unlocked_pool(){
 				}
 
+				void check_lru(_Bucket& torelease){
+					erase_lru(torelease);
+				}
+				
 				size_t get_allocated() const {
 					return (*this).allocated;
 				}
@@ -530,20 +534,24 @@ namespace stx{
 						result = current.back();
 						current.pop_back();
 						used -= size + overhead();
+						
 					}else{
+
 						result.ti = &ti;
 						result.is_new = true;
 						result.data = new u8[size];
 					}
+					
 					allocated+=size + overhead();
+					
 					return result;
 				}
 				void free(void * data, size_t requested){
 					free_type(typeid(u8),data,requested);
 				}
 				void free_type(const std::type_info& ti, void * data, size_t requested){
-
-					check_lru();
+					
+					
 
 					if(heap_for_small_data){// && requested < MAX_SMALL_ALLOCATION_SIZE){
 						allocated -= requested + overhead();
@@ -560,6 +568,7 @@ namespace stx{
 						(*this).allocated -= size + overhead();
 					}
 
+					
 				}
 
 				/// returns true if the pool is depleted
@@ -593,7 +602,7 @@ namespace stx{
 				}
 				template<typename T>
 				void free(T* v){
-					v->~T();
+					
 					free_type(typeid(T), v, sizeof(T));
 				}
 
@@ -688,18 +697,52 @@ namespace stx{
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
-					synchronized l(lock);
-					return get_pool().allocate<T>();
+					T* r;
+					unlocked_pool::_Bucket torelease;
+					{
+						synchronized l(lock);
+						get_pool().check_lru(torelease);
+						if(!torelease.empty()){
+							for(unlocked_pool::_Bucket::iterator b = torelease.begin(); b!=torelease.end(); ++b){
+								unlocked_pool::_Allocated allocated = (*b);
+								delete allocated.data;
+							}
+						}
+						r = get_pool().allocate<T>();
+						
+					
+					}
+				
+					return r;
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
-					synchronized l(lock);
-					return get_pool().allocate<T,_Context>(context);
+					T* r;
+					unlocked_pool::_Bucket torelease;
+					{
+						synchronized l(lock);
+						get_pool().check_lru(torelease);
+						if(!torelease.empty()){
+							for(unlocked_pool::_Bucket::iterator b = torelease.begin(); b!=torelease.end(); ++b){
+								unlocked_pool::_Allocated allocated = (*b);
+								delete allocated.data;
+							}
+						}
+						r = get_pool().allocate<T,_Context>(context);
+						
+						
+					}
+					
+					return r;
 				}
 				template<typename T>
 				void free(T* v){
+					
+					v->~T();
 					synchronized l(lock);
 					get_pool().free<T>(v);
+					
+
 				}
 			};
 		};

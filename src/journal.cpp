@@ -68,16 +68,25 @@ public:
 	}
 private:
 
-
+	struct log_entry{
+		long long sequence;
+		long long command;
+		long long name_size;
+		long long address;
+		long long buffer_size;
+	};
 	void add_entry(Poco::UInt32 command, Poco::BinaryWriter &writer, const std::string &name, long long address, const nst::buffer_type& buffer)
 	{
 		//log_journal(name, "entry", address);
-		writer.write7BitEncoded(++sequence);
-		writer.write7BitEncoded(command);
-		writer.write7BitEncoded(name.size());
-		writer.writeRaw(name );
-		writer.write7BitEncoded((Poco::UInt64)address);
-		writer.write7BitEncoded(buffer.size());
+		log_entry entry;
+		entry.sequence = ++sequence;
+		entry.command = command;
+		entry.name_size = name.size();
+		entry.address = address;
+		entry.buffer_size = buffer.size();
+
+		writer.writeRaw((const char*)&entry,sizeof(entry));
+		writer.writeRaw(name);
 		if(!buffer.empty())
 			writer.writeRaw((const char*)&buffer[0], buffer.size() );
 		/// else if(!(command == nst::JOURNAL_COMMIT || command == nst::JOURNAL_TEMP_INFO)) 	printf("the journal buffer is empty\n");
@@ -117,15 +126,16 @@ public:
 		nst::buffer_type buffer;
 
 		void load(Poco::BinaryReader& reader){
-			Poco::UInt64 size;
-			reader.read7BitEncoded(sequence);
-			reader.read7BitEncoded(command);
-			reader.read7BitEncoded(size);
-			name.resize(size);
-			reader.readRaw(size, name);
-			reader.read7BitEncoded(address);
-			reader.read7BitEncoded(size);
-			buffer.resize(size);
+			log_entry entry;
+			memset(&entry, 0 ,sizeof(entry));
+			reader.readRaw( (char*)&entry, sizeof(entry) );
+			sequence = entry.sequence ;
+			command = entry.command;			
+			address = entry.address ;
+			buffer.resize(entry.buffer_size);
+			name.resize(entry.name_size);			
+			buffer.resize(entry.buffer_size);
+			reader.readRaw( entry.name_size, name );
 			if(!buffer.empty())
 				reader.readRaw( (char*)&buffer[0], buffer.size() );
 		}

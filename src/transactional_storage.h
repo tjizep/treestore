@@ -374,7 +374,7 @@ namespace storage{
 		 /// std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> >
 		/// ::google::dense_hash_map
 		///typedef std::vector<version_type> _Versions;
-		//typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
+		///typedef std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
 		typedef rabbit::unordered_map<address_type, version_type> _Versions;
 
 
@@ -422,7 +422,7 @@ namespace storage{
 
 		typedef block_descriptor* ref_block_descriptor;
 		typedef std::vector<block_descriptor*> _Descriptors;
-		/// typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
+		//typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
 		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;		
 		typedef rabbit::unordered_map<address_type, ref_block_descriptor> _Allocations;
 
@@ -879,29 +879,18 @@ namespace storage{
 			}
 		}
 
-		void print_use(){
-			return;
-			if(::os::millis()-ptime > 3000){
-				//printf("total use blocks %.4g MiB\n", (double)total_use/(1024.0*1024.0));
-				ptime = ::os::millis();
-			}
-		}
-
+		
 		void check_use(){
-			print_use();
-
-			//if(total_use > limit){
-
-				if(treestore_current_mem_use > treestore_max_mem_use){
-					if(get_use() > 1024*1024*2){
-						//ptrdiff_t before = get_use();
-						get_session() << "PRAGMA shrink_memory;", now;
-						flush_back(0.25,true);
-						last_flush_time = ::os::millis();
-						//printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
-					}
+			if(transient) return;			
+			if(treestore_current_mem_use > treestore_max_mem_use){
+				if(get_use() > 1024*1024*2){
+					ptrdiff_t before = get_use();
+					get_session() << "PRAGMA shrink_memory;", now;
+					flush_back(0.5,true,modified());
+					last_flush_time = ::os::millis();
+					printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				}
-
+			}
 		}
 		version_type version_off(address_type which){
 			version_type r = has_version(which);
@@ -926,12 +915,18 @@ namespace storage{
 			currently_active = 0;
 			result = nullptr;
 			if(which){
-				bool finder = allocations.get(which,result);
-				if(!finder && is_readahead){
-					read_ahead(which,32);
-					finder = allocations.get(which,result);
-				}
+				//typename _Allocations::iterator fr = allocations.find(which);
+				
+				bool finder = allocations.get(which,result);//fr != allocations.end(); //
+				//if(finder){
+				//	result = (*fr).second;
+				//}
 
+				if(!finder && !transient ){ //&& is_readahead
+					//read_ahead(which,512);
+					//finder = allocations.get(which,result);
+				}
+				
 				if(!finder){
 					/// load from storage
 
@@ -1029,7 +1024,10 @@ namespace storage{
 				address_type ver = 0;
 
 				versions.get((*v).first,ver);
-
+				//_Versions::iterator fv = versions.find((*v).first);
+				//if(fv!=versions.end()){
+				//	ver = (*fv).second;
+				//}
 				finder = allocations.find((*v).first);
 				if(finder != allocations.end()){
 					ver = std::max<version_type>(ver, (*finder).second->version );
@@ -1477,6 +1475,7 @@ namespace storage{
 
 		}
 		void flush(){
+			if(transient) return;
 			syncronized ul(lock);
 			flush_back(0.85, false); /// write all changes to disk or pigeons etc.
 			get_session() << "PRAGMA shrink_memory;", now;
@@ -1491,6 +1490,7 @@ namespace storage{
 			transacted = false;
 		}
 		void reduce(){
+			if(transient) return;
 			syncronized ul(lock);
 			//if(modified()) return;
 			get_session() << "PRAGMA shrink_memory;", now;

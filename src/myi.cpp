@@ -333,6 +333,7 @@ public:
 		nst::get_single_writer_lock().lock();
 		if(writer.get_locks()==0)
 			writer.modify();
+		writer.set_used();
 		return &writer;
 	}
 	size_t get_thread_count()  {
@@ -343,6 +344,7 @@ public:
 
 		if(w == &writer){
 			nst::get_single_writer_lock().unlock();
+			writer.set_unused();
 			return true;
 		}
 		return false;
@@ -395,19 +397,7 @@ public:
 				}
 			}
 		}
-		if(r == NULL){
-			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
-				if((*t))
-				{
-					if(!(*t)->get_used())
-					{
-						r = (*t);
-						r->reuse();
-						break;
-					}
-				}
-			}
-		}
+		
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
 			threads.push_back(r);
@@ -420,7 +410,7 @@ public:
 
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
-		// return;
+		return;
 		if(stx::memory_low_state){
 			(*this).reduce();
 		}
@@ -430,8 +420,9 @@ public:
 		(*this).reduce();
 	}
 	void release_idle_trees(){
+		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if((*t)->get_locks()==0)/// this should ignore busy threads
+			if(!(*t)->get_used())/// this should ignore busy threads
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid()){
 					(*t)->reduce_col_trees();
 					(*t)->reduce_index_trees();
@@ -440,21 +431,22 @@ public:
 		}
 	}
 	void reduce(){
+		//_reduce();
 	}
 	void _reduce(){
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if((*t)->get_locks()==0)/// this should ignore busy threads
+			if(!(*t)->get_used())/// this should ignore busy threads
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
 					(*t)->check_use_col_trees();
 		}
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if((*t)->get_locks()==0)/// this should ignore busy threads
+			if(!(*t)->get_used())/// this should ignore busy threads
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
 					(*t)->check_use_indexes();
 		}
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if((*t)->get_locks()==0)/// this should ignore busy threads
+			if(!(*t)->get_used())/// this should ignore busy threads
 				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
 					(*t)->check_use_col_caches();
 		}
@@ -483,18 +475,18 @@ static static_threads st;
 
 void reduce_thread_usage(){
 	if(stx::memory_low_state){
-		st.check_use();	
+		//st.check_use();	
 	}
 	if(calc_total_use() > treestore_max_mem_use){
 
 		nst::synchronized s(mut_total_locks);
 		if(total_locks==0){
-			st.reduce_all();
+			//st.reduce_all();
 		}
 	}
 	if(calc_total_use()  > treestore_max_mem_use){
 		/// time to reduce some blocks
-		stored::reduce_all();
+		///stored::reduce_all();
 
 	}
 
@@ -1995,7 +1987,7 @@ namespace ts_cleanup{
 				}
 				if(stx::memory_low_state){
 					//printf("[TREESTORE] reduce idle tree use\n");
-					st.release_idle_trees();	
+					//st.release_idle_trees();	
 				}
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf

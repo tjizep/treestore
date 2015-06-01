@@ -67,34 +67,25 @@
   </Binaries>
   <Reports>
     <Report>
-      <Path>mysql150319.vspx</Path>
+      <Path>mysql150511.vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150320.vspx</Path>
+      <Path>mysql150511(1).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150320(1).vspx</Path>
+      <Path>mysql150530.vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150321.vspx</Path>
+      <Path>mysql150530(1).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150331.vspx</Path>
+      <Path>mysql150530(2).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150401.vspx</Path>
+      <Path>mysql150530(3).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql150404.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql150404(1).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql150503.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql150503(1).vspx</Path>
+      <Path>mysql150531.vspx</Path>
     </Report>
   </Reports>
   <Launches>

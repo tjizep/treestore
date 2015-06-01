@@ -185,10 +185,10 @@ namespace rabbit{
 	
 	class basic_config{
 	public:
-		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
 		/// typedef unsigned long size_type;
-		typedef size_t size_type;
+		typedef unsigned long size_type;
 
 		size_type log2(size_type n){
 			size_type r = 0; 
@@ -234,10 +234,10 @@ namespace rabbit{
 			BITS_SIZE1 = BITS_SIZE-1;
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
-			PROBES = 32;							
-			MIN_EXTENT = 8; /// start size of the hash table
+			PROBES = 16;							
+			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
-			
+			assert(PROBES > log2((size_type)MAX_OVERFLOW));
 		}
 	};
 	template<class _InMapper>
@@ -495,7 +495,7 @@ namespace rabbit{
 			
 			/// total data size, never less than than size()
 			size_type get_data_size() const {
-				return get_extent()+config.PROBES+16+overflow;
+				return get_extent()+config.PROBES+overflow;
 			}
 			
 			/// the overflow start
