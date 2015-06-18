@@ -72,8 +72,8 @@ namespace tree_stored{
 			void next() {
 				value.next();
 			};
-			void previous() {
-				value.previous();
+			bool previous() {
+				return value.previous();
 			};
 			void first() {
 				value.first();

@@ -649,7 +649,7 @@ namespace rabbit{
 				values = get_value_allocator().allocate(get_data_size());
 			
 				for(size_type c = 0; c < esize; ++c){
-					get_segment_allocator().construct(&clusters[c]);
+					get_segment_allocator().construct(&clusters[c],_KeySegment());
 				}
 				set_exists(get_data_size(),true);
 				buckets = 0;
@@ -904,6 +904,20 @@ namespace rabbit{
 					return 0;
 				}else return 1;
 			}
+			const _V& at(const _K& k) const {
+				size_type pos = find(k);			
+				if(pos != (*this).end()){
+					return get_segment_value(pos);					
+				}
+				throw std::exception();
+			}
+			_V& at(const _K& k) {
+				size_type pos = find(k);			
+				if(pos != (*this).end()){
+					return get_segment_value(pos);					
+				}
+				throw std::exception();
+			}
 
 			bool get(const _K& k, _V& v) const {
 				size_type pos = find(k);			
@@ -929,27 +943,10 @@ namespace rabbit{
 					
 				}
 				//if(overflowed_(h)){
-					//size_type e = ((overflow_elements/8)+1)*8;
-					//if(get_data_size() < e) e = get_data_size(); ///overflow is divisible by 8
-					for(pos=get_o_start(); pos < overflow_elements; ){		
-						if(equal_key(pos,k) && exists_(pos) ) return pos;											
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-						if(equal_key(pos,k) && exists_(pos) ) return pos;						
-						++pos;
-					
-					}
+				for(pos=get_o_start(); pos < overflow_elements; ){		
+					if(equal_key(pos,k) && exists_(pos) ) return pos;											
+					++pos;											
+				}
 				//}
 				
 			
@@ -1333,6 +1330,13 @@ namespace rabbit{
 		bool get(const _K& k, _V& v) const {
 			return (*this).current->get(k,v);
 		}
+		/// throws a exception when value could not match the key
+		const _V& at(const _K& k) const {
+			return (*this).current->at(k);
+		}
+		_V& at(const _K& k) {
+			return (*this).current->at(k);
+		}
 
 		_V& operator[](const _K& k){
 			_V *rv = current->subscript(k);
@@ -1558,6 +1562,13 @@ public:
 	_Myt& operator=(_Myt&& from){	// assign by moving _Right
 		_Base::move(from);
 		return (*this);
+	}
+	const mapped_type& at(const key_type& k) const {
+		return _Base::at(k);
+	}
+
+	mapped_type& at(const key_type& k) {
+		return _Base::at(k);
 	}
 
 	mapped_type& operator[](const key_type& k){	

@@ -349,7 +349,7 @@ namespace stored{
 	public:
 		typedef empty_encoder list_encoder;
 		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
-		typedef bool attached_values;
+		//typedef bool attached_values;
 	protected:
 
 		typedef NS_STORAGE::u16 _BufferSize;
@@ -2528,7 +2528,7 @@ namespace stored{
 		virtual bool valid() const = 0;
 		virtual bool invalid() const = 0;
 		virtual void next() = 0;
-		virtual void previous() = 0;
+		virtual bool previous() = 0;
 		virtual void first() = 0;
 		virtual void last() = 0;
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;

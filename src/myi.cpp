@@ -246,6 +246,7 @@ namespace tree_stored{
 		public:
 
 		void own_reduce(){
+			//return;
 			own_reduce_col_trees();
 			own_reduce_index_trees();
 			if(calc_total_use() > treestore_max_mem_use){
@@ -254,13 +255,14 @@ namespace tree_stored{
 		}
 
 		void reduce_col_trees(){
+			return;
 			if(!locks){
 				own_reduce_col_trees();
 			}
 
 		}
 		void reduce_col_trees_only(){
-
+			return;
 			if(!locks){
 				DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 				for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
@@ -420,6 +422,7 @@ public:
 		(*this).reduce();
 	}
 	void release_idle_trees(){
+		return;
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if(!(*t)->get_used())/// this should ignore busy threads
@@ -433,7 +436,9 @@ public:
 	void reduce(){
 		//_reduce();
 	}
+
 	void _reduce(){
+		return;
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if(!(*t)->get_used())/// this should ignore busy threads
@@ -486,7 +491,7 @@ void reduce_thread_usage(){
 	}
 	if(calc_total_use()  > treestore_max_mem_use){
 		/// time to reduce some blocks
-		///stored::reduce_all();
+		/// stored::reduce_all();
 
 	}
 
@@ -1015,6 +1020,8 @@ public:
 		DBUG_PRINT("info",("closing tt %s\n", table->alias));
 		printf("closing tt %s\n", table->alias);
 		clear_selection(selected);
+		r_stop.clear();
+		r.clear();
 		if(tt!= NULL)
 			tt->clear();
 		tt = NULL;
@@ -1054,7 +1061,7 @@ public:
 
 				if
 				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
-				||	high_mem
+				//||	high_mem
 				)
 				{
 					st.check_journal();/// function releases all idle reading transaction locks
@@ -1110,7 +1117,8 @@ public:
 						thread->reduce_index_trees();
 				}
 				clear_selection(selected);
-
+				r_stop.clear();
+				r.clear();
 				clear_thread(thd);
 				if(thread->is_writing()){
 					st.release_writer(thread);
@@ -1122,7 +1130,7 @@ public:
 				/// for testing
 				//st.reduce_all();
 				if(high_mem){
-					stored::reduce_all();
+					//stored::reduce_all();
 				}
 				if(high_mem)
 					get_thread()->own_reduce();
@@ -1500,7 +1508,7 @@ public:
 
 	void resolve_selection_from_index(uint ax,stored::index_interface * current_index){
 
-		tree_stored::CompositeStored& iinfo = current_index->get_index_iterator()->get_key();
+		const tree_stored::CompositeStored &iinfo = current_index->get_index_iterator()->get_key();
 		resolve_selection_from_index(ax, iinfo);
 
 	}
@@ -1636,14 +1644,12 @@ public:
 	}
 
 	int index_prev(byte * buf) {
-		get_index_iterator().previous();
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
-		if(get_index_iterator().valid()){
+		if(get_index_iterator().previous()){
 			r = 0;
 			resolve_selection_from_index();
 			table->status = 0;
-
 		}
 		DBUG_RETURN(r);
 	}

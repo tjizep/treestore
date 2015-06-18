@@ -150,7 +150,8 @@ namespace iterator{
 		const data_type& get_value() const{
 			return i.data();
 		}
-
+		
+		
 		bool valid() const {
 			if(map == NULL) return false;
 			check();
@@ -184,9 +185,13 @@ namespace iterator{
 			check();
 			++i;
 		}
-		void previous(){
-			
-			--i;
+		bool previous(){
+			if(map == NULL) return false;
+			if(i != get_map().begin())	{
+				--i;
+				return true;
+			}
+			return false;
 		}
 	};
 
