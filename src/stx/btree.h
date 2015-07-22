@@ -257,7 +257,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 0,
 			interior_mul = 1,
-			keys_per_page = 128,
+			keys_per_page = 256, ///192 is good for transactions, 384
 			caches_per_page = 16,
 			max_release = 8,
 			version_reload
@@ -683,8 +683,13 @@ namespace stx
 
 				unref(super::ptr);
 				if(super::ptr!=NULL_REF){
-					if(super::ptr->refs == 0 && super::ptr->is_orphaned()){						
-						this->get_context()->free_node(rget(),this->get_where());						
+					if(super::ptr->refs == 0 && super::ptr->is_orphaned()){					
+						if(has_context()){
+							this->get_context()->free_node(rget(),this->get_where());										
+						}else{
+							printf("[ERROR] [TS] context does not exist\n");
+						}
+						ptr = NULL_REF;
 					}
 				}
 			}
@@ -1242,16 +1247,14 @@ namespace stx
 			/// 'natural' ref operator returns the pointer with loading
 
 			inline _Loaded * operator->()
-			{
-				if((*this).ptr != NULL_REF && (*this).is_invalid()){
-					refresh_this(this);
-				}
+			{				
 				if((*this).ptr != NULL_REF){
-					validate_surface_links();
-					next_check();
-					return (_Loaded*)(super::ptr);
+					validate_surface_links();										
+					if((*this).is_invalid()) 
+						refresh_this(this);
+				}else{
+					load();					
 				}
-				load();
 				next_check();
 				return (_Loaded*)(super::ptr);
 			}
@@ -2042,6 +2045,7 @@ namespace stx
 				(*this).set_cache_occupants (0);
 				(*this).set_occupants(leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
+				nst::i32 encoded_key_size = leb128::read_signed(reader);
 				(*this).set_version(version);
 				(*this).next = NULL_REF;
 				(*this).preceding = NULL_REF;
@@ -2049,13 +2053,15 @@ namespace stx
 				(*this).preceding.set_context(context);
 				(*this).preceding.set_where(sa);
 				sa = leb128::read_signed(reader);
+			
+
 				if(sa == address){
 					printf("ERROR: loading node with invalid next address\n");
 				}
 				(*this).next.set_context(context);
 				(*this).next.set_where(sa);
 
-				if(interp.encoded(btree::allow_duplicates)){
+				if(encoded_key_size > 0){
 					interp.decode(buffer, reader, keys, (*this).get_occupants());
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -2078,6 +2084,7 @@ namespace stx
 
 				if(d != bsize){
 					BTREE_ASSERT(d == buffer.size());
+					printf("[ERROR] [TS] surface nodes of invalid size\n");
 				}
 				(*this).sorted = (*this).get_occupants();
 				(*this).check_cache(keys);
@@ -2099,14 +2106,16 @@ namespace stx
 
 			void save(key_interpolator interp, storage_type &storage, buffer_type& buffer) const {
 				using namespace stx::storage;
-
+				nst::i32 encoded_key_size = interp.encoded_size(keys, (*this).get_occupants());
 				ptrdiff_t storage_use = leb128::signed_size((*this).get_occupants());
 				storage_use += leb128::signed_size((*this).level);
+				storage_use += leb128::signed_size(encoded_key_size);
 				storage_use += leb128::signed_size(preceding.get_where());
-				storage_use += leb128::signed_size(next.get_where());
-				if(interp.encoded(btree::allow_duplicates)){
-					storage_use += interp.encoded_size(keys, (*this).get_occupants());
+				storage_use += leb128::signed_size(next.get_where());				
+				if(encoded_key_size > 0 && interp.encoded(btree::allow_duplicates)){
+					storage_use += encoded_key_size;
 				}else{
+					encoded_key_size = 0;
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage_use += storage.store_size(keys[k]);
 					}
@@ -2120,13 +2129,16 @@ namespace stx
 					}
 				}
 				buffer.resize(storage_use);
+				if(buffer.size() != storage_use){
+					printf("[ERROR] [TS] resize failed\n");
+				}
 				buffer_type::iterator writer = buffer.begin();
 				writer = leb128::write_signed(writer, (*this).get_occupants());
 				writer = leb128::write_signed(writer, (*this).level);
-
+				writer = leb128::write_signed(writer, encoded_key_size);
 				writer = leb128::write_signed(writer, preceding.get_where());
 				writer = leb128::write_signed(writer, next.get_where());
-				if(interp.encoded(btree::allow_duplicates)){
+				if(encoded_key_size > 0 && interp.encoded(btree::allow_duplicates)){
 					interp.encode(writer, keys, (*this).get_occupants());
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -2278,8 +2290,9 @@ namespace stx
 		/// called to direct the saving of a surface node to storage through instance
 		/// management routines in the b-tree
 		buffer_type temp_compress;
+		buffer_type create_buffer;
 		void save(surface_node* n, stream_address& w){
-
+			if(storage==nullptr) return;
 			if(get_storage()->is_readonly()){
 
 				return;
@@ -2288,17 +2301,20 @@ namespace stx
 				//printf("[B-TREE SAVE] s-node %lld  ->  %s ver. %lld\n", (long long)w, get_storage()->get_name().c_str(), (long long)get_storage()->get_version());
 				using namespace stx::storage;
 				n->sort(stats, key_less);
-				buffer_type &buffer = get_storage()->allocate(w,stx::storage::create);
+				
+				
 				if(n->get_address() > 0 && n->get_address() == n->get_next().get_where()){
 					printf("saving node with recursive address\n");
 				}
-				n->save(key_interpolator(), *get_storage(), buffer);
+				n->save(key_interpolator(), *get_storage(), create_buffer);
 				if(lz4){
-					inplace_compress_lz4(buffer,temp_compress);
+					inplace_compress_lz4(create_buffer,temp_compress);
 				}else{
-					inplace_compress_zlib(buffer);
+					inplace_compress_zlib(create_buffer);
 				}
 				n->s = loaded;
+				buffer_type &allocated = get_storage()->allocate(w,stx::storage::create);
+				allocated.swap(create_buffer);
 				get_storage()->complete();
 				stats.changes++;
 			}
@@ -2827,7 +2843,7 @@ namespace stx
 				typename btree::surface_node::ptr last_node = to.currnode;
 				typename btree::surface_node::ptr first_node = currnode;
 				typename stx::storage::u64 total = 0ull;
-				
+				auto context = first_node.get_context();
 				while(first_node != NULL_REF && first_node != last_node)
 				{
 				
@@ -2835,7 +2851,9 @@ namespace stx
 					total += first_node->get_occupants();
 					
 					first_node = first_node->get_next();
-					
+					if(context){
+						context->check_low_memory_state();												
+					}
 				
 					
 				}
@@ -2864,7 +2882,7 @@ namespace stx
 					
 					auto context = currnode.get_context();
 					
-					if(context){						
+					if(context){
 						context->check_low_memory_state();												
 					}
 					currnode = currnode->get_next();
@@ -4020,7 +4038,7 @@ namespace stx
 		
 		void free_surfaces(){
 			for(auto s = surfaces.begin(); s != surfaces.end(); ++s){
-				new ((*s)) surface_node();
+				//new ((*s)) surface_node();
 				allocation_pool.free<surface_node>((*s));
 			}
 			surfaces.clear();
@@ -4028,18 +4046,21 @@ namespace stx
 		
 		void free_interiors(){
 			for(auto i = interiors.begin(); i != interiors.end(); ++i){
-				new ((*i)) interior_node();
-				allocation_pool.free<interior_node>((*i));
+				///new ((*i)) interior_node();
+				allocation_pool.free_ns<interior_node>((*i));
 			}
 			interiors.clear();
 		}
 		
 		void recycle(surface_node* s){
-			//s->initialize(this);
-			s->~surface_node();
-			surfaces.push_back(s);
+			
 			if(::stx::memory_low_state){
 				free_surfaces();
+				allocation_pool.free<surface_node>(s);
+			}else{
+				s->initialize(this);
+				//s->~surface_node();
+				surfaces.push_back(s);
 			}
 		}
 		
@@ -4064,7 +4085,7 @@ namespace stx
 			if(!surfaces.empty()){
 				r = surfaces.back();
 				surfaces.pop_back();
-				new (r) surface_node();
+				//new (r) surface_node();
 			}
 			return r;
 		}
@@ -4407,14 +4428,22 @@ namespace stx
 		/// reload the tree when a new transaction starts
 		nst::_VersionRequests request;
 		nst::_VersionRequests response;
-
+		int reloads;
 		void reload()
 		{
 				bool do_reload = version_reload;
 				stx::storage::i64 sa = 0;
 				stx::storage::i64 b = 0;
 				if(do_reload){
-					if(get_storage()->get_boot_value(b) && surfaces_loaded.size() < 300){ ///
+					++reloads;
+					if
+					(	get_storage()->get_boot_value(b) 
+					///&&	(reloads % 4000) != 0
+					&&	(	get_storage()->is_readonly()
+						||	surfaces_loaded.size() < 100
+						)
+					){ ///&& surfaces_loaded.size() < 300
+
 						if(b == root.get_where()){
 							get_storage()->get_boot_value(stats.tree_size,2);
 							get_storage()->get_boot_value(sa,3);
@@ -5203,7 +5232,7 @@ namespace stx
 		std::pair<iterator, bool> insert_start(const key_type& key, const data_type& value)
 		{
 			unshare();
-
+			check_low_memory_state();
 			
 			typename node::ptr newchild ;
 			key_type newkey = key_type();
@@ -5215,7 +5244,7 @@ namespace stx
 				root = last_surface;
 			}
 			
-			std::pair<iterator, bool> r = insert_descend(root, key, value, &newkey, newchild);
+			std::pair<iterator, bool> r = insert_descend(root, 0, 0, key, value, &newkey, newchild);
 
 
 			if (newchild != NULL_REF)
@@ -5256,7 +5285,7 @@ namespace stx
 		* slot. If the node overflows, then it must be split and the new split
 		* node inserted into the parent. Unroll / this splitting up to the root.
 		*/
-		std::pair<iterator, bool> insert_descend(typename node::ptr n,
+		std::pair<iterator, bool> insert_descend(typename node::ptr n, stream_address source, int child_at,
 			const key_type& key, const data_type& value,
 			key_type* splitkey, typename node::ptr& splitnode)
 		{
@@ -5271,11 +5300,8 @@ namespace stx
 				int at = interior->find_lower(key_less, key_terp, key);
 
 				BTREE_PRINT("btree::insert_descend into " << interior->childid[at] << std::endl);
-				if(interior->childid[at]->issurfacenode()){
-					typename surface_node::ptr s = interior->childid[at];
-					s->set_slot_loader(interior.get_where(), at);
-				}
-				std::pair<iterator, bool> r = insert_descend(interior->childid[at],
+				
+				std::pair<iterator, bool> r = insert_descend(interior->childid[at],interior.get_where(),at,
 					key, value, &newkey, newchild);
 				
 				if (newchild != NULL_REF)
@@ -5382,7 +5408,9 @@ namespace stx
 
 
 				}else{
-
+					
+					surface->set_slot_loader(source, child_at);
+				
 					int at = surface->find_lower(key_less, key_terp, key);
 
 					if (!allow_duplicates && at < surface->get_occupants() && key_equal(key, surface->keys[at]))

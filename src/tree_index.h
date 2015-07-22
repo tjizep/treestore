@@ -46,8 +46,10 @@ namespace tree_stored{
 	public:
 		typedef stored::IntTypeStored<char> index_value;
 		typedef index_key_type index_key;//StaticKey
+		typedef stored::byte_col_encoder<index_key,int> interpolator_type;
 		stored::abstracted_storage storage;
-		typedef stx::btree_set< index_key, stored::abstracted_storage> _IndexMap;
+		////, std::less<index_key>,interpolator_type
+		typedef stx::btree_set< index_key, stored::abstracted_storage, std::less<index_key>, interpolator_type> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
 		typedef typename ::iterator::ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key, ::sta::stl_tracker<index_key> > _KeyBuffer;
@@ -259,7 +261,7 @@ namespace tree_stored{
 					os::zzzz(50);
 				}
 			}
-			if(true){
+			if(false){
 				index.insert(k);
 
 			}else{

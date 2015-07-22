@@ -167,6 +167,8 @@ public:
 		_Commands commands;
 		const double MB = 1024.0*1024.0;
 		try{
+			double recovered,last_printed = 0.0;
+
 			while(reader.good()){
 				_Command entry;
 				entry.load(reader);
@@ -184,8 +186,11 @@ public:
 				}
 
 				if(entry.command == nst::JOURNAL_COMMIT){
-
-					printf("recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)(reader.stream().tellg()/(double)MB) );
+					recovered = reader.stream().tellg();
+					if(last_printed + 100*MB < recovered ){
+						printf("[TS] [INFO] recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)(recovered/(double)MB) );
+						last_printed = recovered;
+					}
 					for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
 
 						_Command &entry =  (*c);

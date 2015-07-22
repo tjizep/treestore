@@ -18,6 +18,7 @@ extern long long  _reported_memory_size();
 extern long long calc_total_use();
 /// the allocation pool
 extern stx::storage::allocation::pool allocation_pool;
+extern stx::storage::allocation::pool buffer_allocation_pool;
 extern "C"{
 	#include "zlib.h"
 };
@@ -69,6 +70,54 @@ namespace stx{
 				}
 			};
 
+			template <class T>
+			class buffer_pool_alloc_tracker : public base_tracker<T>{
+			public:
+
+                typedef T        value_type;
+				typedef T*       pointer;
+				typedef const T* const_pointer;
+				typedef T&       reference;
+				typedef const T& const_reference;
+				typedef std::size_t    size_type;
+				typedef std::ptrdiff_t difference_type;
+				// rebind allocator to type U
+				template <class U>
+				struct rebind {
+					typedef buffer_pool_alloc_tracker<U> other;
+				};
+				buffer_pool_alloc_tracker() throw() {
+				}
+				buffer_pool_alloc_tracker(const buffer_pool_alloc_tracker&) throw() {
+				}
+				template <class U>
+				buffer_pool_alloc_tracker (const buffer_pool_alloc_tracker<U>&) throw() {
+				}
+
+				// allocate but don't initialize num elements of type T
+				pointer allocate (size_type num, const void* = 0) {
+					buffer_counter c;
+					c.add(num*sizeof(T)+this->overhead());
+					return (pointer)buffer_allocation_pool.allocate(num);
+				}
+				// deallocate storage p of deleted elements
+				void deallocate (pointer p, size_type num) {
+
+					buffer_allocation_pool.free((void*)p,num);
+
+					buffer_counter c;
+					c.remove(num*sizeof(T)+this->overhead());
+				}
+			};
+			 // return that all specializations of this allocator are interchangeable
+			template <class T1, class T2>
+			bool operator== (const buffer_pool_alloc_tracker<T1>&,const buffer_pool_alloc_tracker<T2>&) throw() {
+				return true;
+			}
+			template <class T1, class T2>
+			bool operator!= (const buffer_pool_alloc_tracker<T1>&, const buffer_pool_alloc_tracker<T2>&) throw() {
+				return false;
+			}
 			template <class T>
 			class buffer_tracker : public base_tracker<T>{
 			public:
@@ -212,7 +261,10 @@ namespace stx{
 				return false;
 			}
 		}; /// allocations
-		typedef std::vector<u8, sta::buffer_tracker<u8>> buffer_type;
+
+		/// the general buffer type
+		typedef std::vector<u8, sta::buffer_pool_alloc_tracker<u8>> buffer_type;
+		/// typedef std::vector<u8, sta::buffer_tracker<u8>> buffer_type;
 
 		/// ZLIBH
 		static void inplace_compress_zlibh(buffer_type& buff){
@@ -256,10 +308,10 @@ namespace stx{
 		static void inplace_compress_fse(buffer_type& buff){
 			typedef unsigned char * encode_type_ref;
 			buffer_type t;
-			i32 origin = buff.size();
+			i32 origin = (i32)buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)], (const encode_type_ref)&buff[0], origin);
-			if(cp < 0){
+			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)],(i32)(t.size())-sizeof(i32), (const encode_type_ref)&buff[0], origin);
+			if(FSE_isError(cp)!=0 || cp <= 1){
 				cp = (i32)buff.size();
 				origin = -cp;
 				memcpy(&t[sizeof(i32)], &buff[0], buff.size());
@@ -284,7 +336,7 @@ namespace stx{
 				}else{
 					decoded.reserve(d);
 					decoded.resize(d);
-					FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)]);
+					FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)],((i32)buff.size())-sizeof(i32));
 				}
 			}
 		}
@@ -305,16 +357,14 @@ namespace stx{
 		static void inplace_compress_lz4(buffer_type& buff, buffer_type& t){
 			typedef char * encode_type_ref;
 
-			i32 origin = buff.size();
+			i32 origin = (i32)buff.size();
 			/// TODO: cannot compress sizes lt 200 mb
 			t.resize(LZ4_compressBound((int)buff.size())+sizeof(i32));
 			i32 cp = buff.empty() ? 0 : LZ4_compress((const encode_type_ref)&buff[0], (encode_type_ref)&t[sizeof(i32)], origin);
 			*((i32*)&t[0]) = origin;
 			t.resize(cp+sizeof(i32));
-
 			/// inplace_compress_zlibh(t);
 			/// inplace_compress_fse(t);
-
 			buff = t;
 
 		}
@@ -323,7 +373,7 @@ namespace stx{
 			buffer_type t;
 			inplace_compress_lz4(buff, t);
 		}
-		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){
+		static void decompress_lz4(buffer_type &decoded,const buffer_type& buff){ /// input <-> buff
 			if(buff.empty()){
 				decoded.clear();
 			}else{
@@ -338,7 +388,7 @@ namespace stx{
 			}
 
 		}
-		static size_t r_decompress_lz4(buffer_type &decoded,const buffer_type& buff){
+		static size_t r_decompress_lz4(buffer_type &decoded,const buffer_type& buff){ /// input <-> buff
 			if(buff.empty()){
 				decoded.clear();
 			}else{

@@ -59,8 +59,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 #include "abstracted_storage.h"
 #include "suffix_array.h"
-
-
+#include <stx/storage/pool.h>
+extern stx::storage::allocation::pool allocation_pool;
 #ifdef _MSC_VER
 #define CONVERSION_NOINLINE_ /// _declspec(noinline)
 #else
@@ -220,8 +220,7 @@ namespace stored{
 		}
 	};
 
-
-
+	
 	template<typename _FType>
 	class FTypeStored {
 	public:
@@ -357,7 +356,7 @@ namespace stored{
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 		NS_STORAGE::u8 buf[_ConstSize];
-		const NS_STORAGE::u8* attached;
+		//const NS_STORAGE::u8* attached;
 		inline NS_STORAGE::u8 *extract_ptr(){
 			return (NS_STORAGE::u8*)(*(size_t*)(buf));
 		}
@@ -365,7 +364,7 @@ namespace stored{
 			return (const NS_STORAGE::u8*)(*(const size_t*)(buf));
 		}
 		inline bool is_static() const {
-			if(attached!=nullptr) return false;
+			//if(attached!=nullptr) return false;
 			return (bytes <= _ConstSize);
 		}
 		NS_STORAGE::u8* data(){
@@ -392,29 +391,32 @@ namespace stored{
 			memcpy(buf, &d, sizeof(NS_STORAGE::i8*));
 		}
 		void null_check() const {
+			if(!this){
+				printf("[ERROR] [TS] Invalid Blob object\n");
+			}
+			if(bytes == 0){
+				printf("[ERROR] [TS] Invalid Blob object size\n");
+			}
 
 		}
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
 			null_check();
 			using namespace NS_STORAGE;
-			if(mnbytes > 32768){
-				printf("WARNING: large buffer\n");
+			if(mnbytes > max_buffersize){
+				printf("[TS] [WARNING] large buffer\n");
 			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
-			NS_STORAGE::u8 * nbuf = new NS_STORAGE::u8 [nbytes]; //allocation_pool.allocate(nbytes);
-			add_col_use(nbytes);
-			memcpy(nbuf, r, std::min<size_t>(nbytes, size));
+			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8*)allocation_pool.allocate(nbytes); ///new NS_STORAGE::u8 [nbytes]; //
+			//add_col_use(nbytes);
+			memcpy(nbuf, r, std::min<size_t>(nbytes, bytes));
 			if(!is_static()){
-				if(attached!=nullptr){
-					attached = nullptr;
-				}else{
-					/// allocation_pool.free(r,bytes);
-					delete [] r;
-					remove_col_use(bytes);
-				}
+				allocation_pool.free(r,bytes);
+				//delete r;
+				//remove_col_use(bytes);				
 			}
 			set_ptr(nbuf);
 			bytes = (u32)nbytes;
+			size = std::min<_BufferSize>(size, bytes);
 			return nbuf;
 		}
 		NS_STORAGE::u8* _resize_buffer(size_t mnbytes){
@@ -435,6 +437,7 @@ namespace stored{
 			memcpy(data(),v,count);
 			if(end_term) data()[count] = 0;
 			size+=(_BufferSize)count + extra;
+			
 		}
 		bool less(const Blobule& right) const {
 			null_check();
@@ -479,11 +482,13 @@ namespace stored{
 
 		}
 		void free_ptr(){
-			if(attached==nullptr && bytes > _ConstSize){
+			if(bytes > _ConstSize){
 				using namespace NS_STORAGE;
-				///allocation_pool.free(data(), bytes)	;
-				delete [] data();
-				remove_col_use(bytes);
+				allocation_pool.free(data(), bytes)	;
+				//delete data();
+				bytes = _ConstSize;
+				size = 0;
+				//remove_col_use(bytes);
 			}
 
 		}
@@ -566,14 +571,14 @@ namespace stored{
 		Blobule ()
 		:	bytes(_ConstSize)
 		,	size(0)
-		,	attached(nullptr)
+		//,	attached(nullptr)
 		{
 			//memset(buf,0,sizeof(buf));
 			buf[0] = 0;
 		}
 		void clear(){
 			free_ptr();
-			attached = nullptr;
+			//attached = nullptr;
 			bytes = _ConstSize;
 			size = 0;
 			buf[0] = 0;
@@ -581,19 +586,20 @@ namespace stored{
 
 		inline ~Blobule(){
 			free_ptr();
+			bytes = 0;
 		}
 
 		Blobule (const Blobule& init)
 		:	bytes(_ConstSize)
 		,	size(0)
-		,	attached(nullptr)
+		//,	attached(nullptr)
 		{
 			*this = init;
 		}
 		Blobule(const char *right)
 		:	bytes(_ConstSize)
 		,	size(0)
-		,	attached(nullptr)
+		//,	attached(nullptr)
 		{
 			*this = right;
 		}
@@ -601,7 +607,7 @@ namespace stored{
 		Blobule(const NS_STORAGE::i64& right)
 		:	bytes(_ConstSize)
 		,	size(0)
-		,	attached(nullptr)
+		//,	attached(nullptr)
 		{
 			set(right);
 
@@ -609,7 +615,7 @@ namespace stored{
 		Blobule(const double& right)
 		:	bytes(_ConstSize)
 		,	size(0)
-		,	attached(nullptr)
+		//,	attached(nullptr)
 		{
 			set(right);
 
@@ -619,16 +625,9 @@ namespace stored{
 		{
 			using namespace NS_STORAGE;
 			if(!right.is_static()){
-				if(attached!=nullptr && attached==right.attached){
-					attached = right.attached;
-					size = right.size;
-					bytes = right.bytes;
-					set_ptr(right.data());
-				}else{
-					u8 * d = _resize_buffer(right.size);
-					size = right.size;
-					memcpy(d,right.data(),size);//right.size+1
-				}
+				u8 * d = _resize_buffer(right.size);
+				size = right.size;
+				memcpy(d,right.data(),size);//right.size+1				
 			}else{
 
 				size = right.size;
@@ -686,10 +685,12 @@ namespace stored{
 			}
 			buffer_type::iterator writer = w;
 			writer = leb128::write_signed(writer, size);
-			const u8 * end = data()+size;
-			for(const u8 * d = data(); d < end; ++d,++writer){
-				*writer = *d;
-			}
+			memcpy(((u8 *)&(*writer)),data(),size);
+			writer += size;
+			//const u8 * end = data()+size;
+			//for(const u8 * d = data(); d < end; ++d,++writer){
+			//	*writer = *d;
+			//}
 			return writer;
 		};
 
@@ -698,31 +699,28 @@ namespace stored{
 			buffer_type::const_iterator reader = r;
 
 			if(reader != buffer.end()){
-				bool fast = false;
+				bool fast = true;
 
-				if(fast){
+				//if(fast){
 
 					size = *reader;
 
-					if(size <= 8){
-						++reader;
-						const nst::u8 * d = &(*reader);
-						*((nst::u64*)data()) = *((const nst::u64*)d);
-					}else{
-						size = leb128::read_signed(reader);
-						_resize_buffer(size);
-						memcpy(data(),&(*reader),size);
-					}
-					reader += size;
-				}else{
-					free_ptr();
-					size_t s = leb128::read_signed(reader);
-					set_ptr(&buffer[reader - buffer.begin()]);
-					attached = &buffer[0];
-					reader += s;
-					bytes = s;
-					size = s;
+					//if(size <= 8){
+					//	++reader;
+					//	const nst::u8 * d = &(*reader);
+					//	*((nst::u64*)data()) = *((const nst::u64*)d);
+					//}else{
+
+				size = leb128::read_signed(reader);
+				_resize_buffer(size);
+				u8 * end = data()+size;
+				for(u8 * d = data(); d < end; ++d,++reader){
+					*d = *reader;
 				}
+				//memcpy(data(),&(*reader),size);
+					//}
+				//reader += size;
+				
 			}
 			return reader;
 		};
@@ -755,8 +753,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 12> BlobStored;
-	typedef stored::Blobule<true, 10> VarCharStored;
+	typedef stored::Blobule<false, 100> BlobStored;
+	typedef stored::Blobule<true, 100> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -1000,7 +998,7 @@ namespace stored{
 
 		void add(const stored::VarCharStored& v){
 
-			add(v.get_value(),v.get_size());
+			add(v.get_value(),v.get_size()-1); /// exclude the terminator
 		}
 
 		void addTerm(const char* k, size_t s){
@@ -1055,7 +1053,30 @@ namespace stored{
 			return r == 0;
 
 		}
-
+		size_t bytes() const{
+			return sizeof(row) + size();
+		}
+		nst::u8 byte(size_t which) const {
+			if(which < sizeof(row)){
+				return ((const nst::u8*)(&row))[which];
+			}else{
+				return data()[which-sizeof(row)];
+			}
+		}
+		void resize_bytes(size_t to){
+			row = 0;
+			_resize_buffer(to-sizeof(row));
+			if(size() != to-sizeof(row)){
+				printf("resize error\n");
+			}
+		}
+		void push_byte(size_t which, nst::u8 v) {
+			if(which < sizeof(row)){
+				((nst::u8*)(&row))[which] = v;				
+			}else{
+				data()[which - sizeof(row)] = v;
+			}
+		}
 		DynamicKey& operator=(const DynamicKey& right){
 			if(!right.bs < static_size){
 				bs = right.bs;
@@ -1213,6 +1234,7 @@ namespace stored{
 					if(r !=0) return r<0;
 					if(*(const nst::i16*)rd != *(const nst::i16*)ld)
 						return (*(const nst::i16*)rd < *(const nst::i16*)ld);
+					l = *(const nst::i16*)ld+sizeof(nst::i16);
 					break;
 				};
 				if( r != 0 ) break;
@@ -1531,7 +1553,27 @@ namespace stored{
 			//return r;
 			return (size_t)data;
 		}
-
+		size_t bytes() const{
+			return sizeof(row) + sizeof(_DataType);
+		}
+		nst::u8 byte(size_t which) const {
+			if(which < sizeof(row)){
+				return ((const nst::u8*)(&row))[which]; //((row >> ((row_type)(which*8))) & 0xFF);
+			}else{
+				
+				return ((const nst::u8*)(&data))[which-sizeof(row)];
+			}
+		}
+		void resize_bytes(size_t){
+			row = 0;
+		}
+		void push_byte(size_t which, nst::u8 v) {
+			if(which < sizeof(row)){
+				((nst::u8*)(&row))[which] = v;				
+			}else{
+				((nst::u8*)(&data))[which-sizeof(row)] = v;
+			}
+		}
 
 		bool operator<(const PrimitiveDynamicKey& right) const {
 			if( data == right.data)
@@ -1580,6 +1622,285 @@ namespace stored{
 			row = s.row;
 			return reader;
 		};
+	};
+
+	/// pivot encoder effective for sorted data i.e. indexes
+	template<class _ByteOrientedKey, class _Value>
+	struct byte_col_encoder{
+	private:
+
+		template<typename _PrimitiveInt>
+		size_t size_int(const _PrimitiveInt value) const {
+			return sizeof(_PrimitiveInt);
+		}
+		template<typename _PrimitiveInt>
+		size_t store_int(nst::buffer_type::iterator& writer,_PrimitiveInt value) const {
+			*((_PrimitiveInt*)&(*writer)) = value;
+			writer+=sizeof(_PrimitiveInt);
+			return sizeof(_PrimitiveInt);
+		}
+		template<typename _PrimitiveInt>
+		size_t read_int(_PrimitiveInt &value, nst::buffer_type::const_iterator& reader) const {
+			value = *((const _PrimitiveInt*)&(*reader));
+			reader += sizeof(_PrimitiveInt);
+			return sizeof(_PrimitiveInt);
+		}
+		
+	public:
+
+		inline bool encoded(bool multi) const{
+
+			return !multi; // only encodes uniques;
+		}
+		
+		inline bool encoded_values(bool multi) const{
+
+			return false; 
+		}
+		
+		typedef nst::u16 count_t;
+		/// delegate value decoder
+		
+		void decode_values(...) {			
+		}
+		/// delegate value encoder
+		void encode_values(...) const {
+			
+		}
+		/// delegate value encoder
+		size_t encoded_values_size(...) {
+		
+			return 0;
+		}
+		template<typename _IntType>
+		void var_int_encode(nst::buffer_type::iterator& writer, _IntType value){
+			_IntType r = value;
+			if(value < 0){
+				r = -r;
+			}
+			while(r > 63){ /// the last value also contains the sign
+				(*writer) = ((nst::u8)(value & 127)) | 128;
+				++writer;
+				r >>= 7; /// 127
+			}
+			if(value < 0){
+				(*writer) = ((nst::u8)(value & 63)) | 64;
+			}else{
+				(*writer) = ((nst::u8)(value & 63));
+			}
+			
+		}
+		template<typename _IntType>
+		_IntType var_int_decode(nst::buffer_type::const_iterator& reader){
+			_IntType r = 0;			
+			for(;;){ /// the last value also contains the sign
+				nst::u8 v = (*reader);
+				++reader;
+				if(!(v & 128)){
+					r |= (_IntType)(v & 63);
+					if((v & 64)) r = (_IntType)(-1*(_IntType)r);
+					break;
+				}else{					
+					r |= (_IntType)(v & 127);
+					r <<= 7;
+				}				
+			}		
+			return r;
+		}
+		/// col oriented encoding for exploiting the sort order of keys on a b-tree page		
+		void encode(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
+			bool tests = false;
+			nst::buffer_type::const_iterator reader = writer;
+			size_t colls = keys[0].bytes();			
+
+			for(size_t k = 1; k < occupants; ++k){
+				if(colls != keys[k].bytes()){
+					colls = 0;
+					break;
+				}
+			}
+			nst::buffer_type col;
+			col.resize(occupants);
+			store_int(writer, colls);
+			for(size_t c = 0; c < colls; ++c){
+				for(size_t k = 0; k < occupants; ++k){
+					col[k] = keys[k].byte(c);
+				}				
+				nst::u8 prev = 0;
+				for(size_t k = 0; k < occupants; ++k){										
+					nst::u8 t = col[k];						
+					col[k] -= prev;
+					prev = t;					
+				}
+				
+				writer = std::copy(col.begin(),col.end(), writer);
+			}
+			if(tests){
+				nst::buffer_type::const_iterator end = writer;
+				
+				std::vector<_ByteOrientedKey> test_keys;
+				test_keys.resize(occupants);
+				nst::buffer_type buffer;
+				buffer.insert(buffer.begin(), reader, end);
+				nst::buffer_type::const_iterator r_test = buffer.begin();
+				decode(buffer, r_test, &test_keys[0], occupants);
+				size_t ltest = r_test - buffer.begin();
+				size_t rtest = end - reader;
+				if(ltest != rtest){
+					printf("[ERROR] [TS] Read length does not verify %lld != %lld\n", (long long)ltest,(long long)rtest);
+				}
+				if(ltest != encoded_size(keys,occupants)){
+					printf("[ERROR] [TS] Read length does not verify with encoded size %lld != %lld\n", (long long)ltest,(long long)encoded_size(keys,occupants));
+				}
+				for(size_t k = 0; k < occupants; ++k){
+					if(test_keys[k] != keys[k]){
+						printf("houston we have a problem\n");
+					}
+				}
+			}
+			
+			
+		}
+
+		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
+			
+			size_t colls = keys[0].bytes();
+			size_t result = 0;
+			
+			for(size_t k = 1; k < occupants; ++k){
+				if(colls != keys[k].bytes()){
+					colls = 0;
+					break;
+				}
+			}
+			if(!colls) return 0;
+			result += size_int(colls) + (occupants*colls);			
+			return result;
+		}
+		mutable nst::buffer_type col;
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
+			size_t colls = 0;
+			read_int(colls, reader);
+			for(size_t o = 0; o < occupants; ++o){
+				keys[o] = _ByteOrientedKey();
+				keys[o].resize_bytes(colls);
+			}
+			
+			col.resize(occupants);
+			
+			for(size_t c = 0; c < colls; ++c){				
+				
+				nst::u8 dt,d = 0;
+				
+				size_t k = 0;
+				
+				for( ;k < occupants; ++k){
+					dt = *reader + d;
+					keys[k].push_byte(c, dt);
+					d = dt;
+					++reader;
+				}
+		
+			}
+		}
+		inline bool can(const _ByteOrientedKey &first , const _ByteOrientedKey &last, int size) const
+		{
+			return false ;
+		}
+		inline unsigned int interpolate(const _ByteOrientedKey &k, const _ByteOrientedKey &first , const _ByteOrientedKey &last, int size) const
+		{
+			return 0;
+		}
+	};
+
+	template <class _StoredRowId, class _Stored>
+	struct int_terpolator{
+		template<typename _PrimitiveInt>
+		size_t size_int(const _PrimitiveInt value) const {
+			return sizeof(_PrimitiveInt);
+		}
+		template<typename _PrimitiveInt>
+		size_t store_int(nst::buffer_type::iterator& writer,_PrimitiveInt value) const {
+			*((_PrimitiveInt*)&(*writer)) = value;
+			writer+=sizeof(_PrimitiveInt);
+			return sizeof(_PrimitiveInt);
+		}
+		template<typename _PrimitiveInt>
+		size_t read_int(_PrimitiveInt &value, nst::buffer_type::const_iterator& reader) const {
+			value = *((const _PrimitiveInt*)&(*reader));
+			reader += sizeof(_PrimitiveInt);
+			return sizeof(_PrimitiveInt);
+		}
+
+		typedef typename _Stored::list_encoder value_encoder;
+		value_encoder encoder; /// delegate encoder/decoder
+		/// function assumes a list of increasing integer values
+		inline bool encoded(bool multi) const
+		{
+			return !multi; // only encodes uniques;
+		}
+		inline bool encoded_values(bool multi) const
+		{
+			return encoder.encoded(multi); // only encodes uniques;
+		}
+		typedef nst::u16 count_t;
+		/// delegate value decoder
+		void decode_values(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
+
+			encoder.decode(buffer, reader, values, occupants);
+		}
+		/// delegate value encoder
+		void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
+
+			encoder.encode(buffer, writer, values, occupants);
+		}
+		/// delegate value encoder
+		size_t encoded_values_size(const _Stored* values, count_t occupants) {
+
+			return encoder.encoded_size(values, occupants);
+		}
+
+
+		/// decode mixed run length and delta for simple sequences
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
+			_StoredRowId prev = 0;
+			for(unsigned k = 0; k < occupants; ++k){	
+				_Rid val = 0;				
+				read_int(val, reader);
+				keys[k].set_value(val + prev.get_value());
+				prev = keys[k];
+			}
+			
+		}
+
+		/// encoding mixes run length and delta encoding for simple sequences
+		int encoded_size(const _StoredRowId* keys, count_t occupants) const {
+			return occupants * sizeof(_Rid);
+			
+		}
+
+		void encode(nst::buffer_type::iterator& writer,const _StoredRowId* keys, count_t occupants) const {
+			_StoredRowId prev;
+			for(unsigned k = 0; k < occupants; ++k){
+				_StoredRowId t = keys[k];
+				_Rid val = keys[k].get_value() - prev.get_value();				
+				store_int(writer, val);				
+				prev = t;
+			}
+						
+		}
+		inline bool can(const _StoredRowId &first , const _StoredRowId &last, int size) const
+		{
+			return ::abs((long long)size - (long long)::abs( (long long)last.get_value() - (long long)first.get_value() )) > 0 ;
+		}
+		inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
+		{
+			if(last.get_value()>first.get_value())
+				return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
+			return 0;
+		}
+
+		
 	};
 
 	static const nst::u32 MAX_HIST = 1 << 31;

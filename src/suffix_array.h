@@ -607,7 +607,7 @@ public:
 			_SuffixArrayType reduced_array;
 			size_t t = ::os::millis();
 			nst::buffer_type dest(length);
-			nst::u64 dsize = FSE_compress(dest.data(),(const unsigned char *)buffer, length);
+			nst::u64 dsize = FSE_compress(dest.data(),length,(const unsigned char *)buffer, length);
 			printf("Compressed %lu bytes to %lu in %lu ms.\n",length, dsize, ::os::millis()-t);
 			/// encode_internal(reduced_array, buffer, length);
 		}else{

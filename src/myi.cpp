@@ -75,12 +75,7 @@ namespace ts_info{
 	void perform_active_stats(const std::string table);
 };
 namespace tree_stored{
-	class tt{
-		int x;
-	public:
-		tt(int x):x(x){
-		}
-	};
+	
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	class tree_thread{
 	protected:
@@ -88,15 +83,24 @@ namespace tree_stored{
 
 		bool changed;
 		bool used;
+		bool _is_writer;
 		Poco::Thread::TID created_tid;
 
 
 	public:
+		Poco::Mutex writer_lock;
 		int get_locks() const {
 			return locks;
 		}
-		
-		tree_thread() : locks(0),changed(false), used(false){
+		bool is_writer() const {
+			return this->_is_writer;
+		}
+		tree_thread(bool _is_writer = false) 
+		:	locks(0)
+		,	changed(false)
+		,	used(false)
+		,	_is_writer(_is_writer)
+		{
 		    printf("create tree thread\n");
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
@@ -196,7 +200,7 @@ namespace tree_stored{
 			}
 
 
-			compose_table(table_arg)->unlock(&p2_lock);
+			compose_table(table_arg)->unlock(&writer_lock);
 
 			if(	changed	)
 				NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage
@@ -325,28 +329,45 @@ static handlerton *static_treestore_hton = NULL;
 class static_threads{
 public:
 	typedef std::vector<tree_stored::tree_thread *, sta::tracker<tree_stored::tree_thread*>> _Threads;
+	typedef std::unordered_map<nst::u64,tree_stored::tree_thread*> _Writers;
 private:
 	_Threads threads;
 	Poco::Mutex tlock;
-
+	_Writers writers;
 	tree_stored::tree_thread writer;
+	tree_stored::tree_thread* map_writer(TABLE_SHARE * share){
+		tree_stored::tree_thread* result = nullptr;
+		nst::u64 wk = (nst::u64)(void*)share;
+		nst::synchronized s(tlock);
+		auto w = writers.find(wk);
+		if(w == writers.end()){
+			result = new tree_stored::tree_thread(true);
+			writers[wk] = result;
+		}else{
+			result = (*w).second;
+		}
+		return result;
+	}
 public:
-	tree_stored::tree_thread *get_writer(){
-		nst::get_single_writer_lock().lock();
-		if(writer.get_locks()==0)
-			writer.modify();
-		writer.set_used();
-		return &writer;
+	tree_stored::tree_thread *get_writer(TABLE_SHARE * share){
+
+		tree_stored::tree_thread* writer = map_writer(share);
+		writer->writer_lock.lock();
+
+		if(writer->get_locks()==0)
+			writer->modify();
+		writer->set_used();
+		return writer;
 	}
 	size_t get_thread_count()  {
 		NS_STORAGE::syncronized ul(tlock);
 		return threads.size();
 	}
-	bool release_writer(tree_stored::tree_thread * w){
+	bool release_writer(TABLE_SHARE * share, tree_stored::tree_thread * w){
 
-		if(w == &writer){
-			nst::get_single_writer_lock().unlock();
-			writer.set_unused();
+		if(w->is_writer()){
+			w->set_unused();
+			w->writer_lock.unlock();			
 			return true;
 		}
 		return false;
@@ -354,10 +375,14 @@ public:
 	void remove_table(const std::string &name){
 		{
 			NS_STORAGE::syncronized ul(tlock);
-			tree_stored::tree_thread * w = get_writer();
-			w->remove_table(name);
-			release_writer(w);
+			
+			for(auto w = writers.begin(); w != writers.end(); ++w){
+				tree_stored::tree_thread * wt = (*w).second;
+				NS_STORAGE::syncronized wl(wt->writer_lock);
+				wt->remove_table(name);			
+			}
 		}
+
 		NS_STORAGE::syncronized ul(tlock);
 
 		for(_Threads::iterator t = threads.begin();t!=threads.end(); ++t){
@@ -478,25 +503,6 @@ public:
 
 static static_threads st;
 
-void reduce_thread_usage(){
-	if(stx::memory_low_state){
-		//st.check_use();	
-	}
-	if(calc_total_use() > treestore_max_mem_use){
-
-		nst::synchronized s(mut_total_locks);
-		if(total_locks==0){
-			//st.reduce_all();
-		}
-	}
-	if(calc_total_use()  > treestore_max_mem_use){
-		/// time to reduce some blocks
-		/// stored::reduce_all();
-
-	}
-
-}
-
 void print_read_lookups(){
 	return;
 	if(os::millis()-ltime > 1000){
@@ -538,10 +544,10 @@ tree_stored::tree_thread * thread_from_thd(THD* thd){
 	return *stpp;
 }
 
-tree_stored::tree_thread * new_thread_from_thd(THD* thd,bool writer){
+tree_stored::tree_thread * new_thread_from_thd(TABLE_SHARE* share, THD* thd,bool writer){
 	tree_stored::tree_thread** stpp = thd_to_tree_thread(thd);
 	if(writer){
-		*stpp = st.get_writer();
+		*stpp = st.get_writer(share);
 	}else{
 		if((*stpp) == NULL){
 
@@ -567,7 +573,7 @@ tree_stored::tree_thread * old_thread_from_thd(THD* thd,THD* thd_old){
 }
 
 tree_stored::tree_thread* updated_thread_from_thd(THD* thd){
-	tree_stored::tree_thread* r = new_thread_from_thd(thd,false);
+	tree_stored::tree_thread* r = new_thread_from_thd(NULL,thd,false);
 	return r;
 }
 
@@ -591,10 +597,10 @@ public:
 	}
 
 	tree_stored::tree_thread* get_thread(THD* thd){
-		return new_thread_from_thd(thd,false);
+		return new_thread_from_thd(NULL,thd,false);
 	}
 	tree_stored::tree_thread* get_thread(){
-		return new_thread_from_thd(ha_thd(),false);
+		return new_thread_from_thd(NULL,ha_thd(),false);
 	}
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
@@ -1053,7 +1059,7 @@ public:
 			writer = true;
 		}
 		bool high_mem = calc_total_use() > treestore_max_mem_use ;
-		tree_stored::tree_thread * thread = new_thread_from_thd(thd,writer);
+		tree_stored::tree_thread * thread = new_thread_from_thd(table->s,thd,writer);
 		if(total_locks==0){
 			nst::synchronized s(mut_total_locks);
 			if(total_locks==0){
@@ -1121,7 +1127,7 @@ public:
 				r.clear();
 				clear_thread(thd);
 				if(thread->is_writing()){
-					st.release_writer(thread);
+					st.release_writer(table->s,thread);
 				}else{
 					st.release_thread(thread);
 				}
@@ -1281,7 +1287,7 @@ public:
 		row = 0;
 		tt = NULL;
 		st.check_use();
-
+		cond_pop();
 		clear_selection(selected);
 		last_resolved = 0;
 		selected = get_tree_table()->create_output_selection(table);
@@ -1332,9 +1338,11 @@ public:
 		}
 
 		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
-
+		table->status = 0;
 		resolve_selection(last_resolved);
-
+		if((last_resolved % 1000000) == 0){
+			printf("[INFO] [TS] resolved %lld rows in table %s\n", (long long)last_resolved,table->s->path.str);
+		}
 		++((*this).r);
 		DBUG_RETURN(0);
 	}
@@ -1356,10 +1364,12 @@ public:
 
 		return 0;
 	}
+	int writes;
 	int write_row(byte * buff){
-		if(stx::memory_low_state){
-			get_thread()->own_reduce();
+		if(stx::memory_low_state ){ ///|| ((writes%300000)==0)
+			//get_thread()->own_reduce();
 		}
+		++writes;
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
 		/// TODO: auto timestamps
 
@@ -1823,7 +1833,7 @@ namespace storage_workers{
 	unsigned int get_next_counter(){
 		return ++ctr;
 	}
-	const int MAX_WORKER_MANAGERS = 2;
+	const int MAX_WORKER_MANAGERS = 4;
 	extern _WorkerManager & get_threads(unsigned int which){
 		static _storage_worker _adders[MAX_WORKER_MANAGERS];
 		return _adders[which % MAX_WORKER_MANAGERS].w;
@@ -1986,11 +1996,13 @@ namespace ts_cleanup{
 				/// int j = int();
 				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
+				buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor)*0.75);
+				
 				stx::memory_low_state = allocation_pool.is_depleted();
-				if(calc_total_use() > treestore_max_mem_use){
-					reduce_thread_usage();
-				}else{
+				if(buffer_allocation_pool.is_near_full()){
+					stored::reduce_all();
 				}
+				
 				if(stx::memory_low_state){
 					//printf("[TREESTORE] reduce idle tree use\n");
 					//st.release_idle_trees();	
@@ -2119,3 +2131,4 @@ void start_calculating(){
 
 #include <stx/storage/pool.h>
 nst::allocation::pool allocation_pool(2*1024ll*1024ll*1024ll);
+nst::allocation::pool buffer_allocation_pool(2*1024ll*1024ll*1024ll);

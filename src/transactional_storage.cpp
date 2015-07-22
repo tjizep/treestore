@@ -1,4 +1,3 @@
-
 #include "Poco/Mutex.h"
 #include "system_timers.h"
 typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;

@@ -179,6 +179,7 @@ namespace tree_stored{
 		virtual void erase_row(stored::_Rid row) = 0;
 		virtual NS_STORAGE::u32 field_size() const = 0;
 		virtual stored::_Rid stored_rows() const = 0;
+		virtual void set_max_size(size_t max_size) = 0;
 		virtual void initialize(bool by_tree) = 0;
 		virtual void compose(CompositeStored& comp)=0;
 		virtual void compose_by_cache(stored::_Rid r, CompositeStored& comp)=0;
@@ -264,7 +265,9 @@ namespace tree_stored{
 		nst::u32 rowsize;
 		//collums::_LockedRowData * row_datas;
 
-
+		void set_max_size(size_t max_size){
+			col.set_data_max_size(max_size);
+		}
 
 		void wait_for_workers(){
 			destroy_worker();
@@ -281,12 +284,12 @@ namespace tree_stored{
 		}
 		void add_worker(){
 			if((*this).worker!=nullptr){
-				if((*this).workers_away == 0 && (*this).worker->size() < MAX_BUFFERED_ROWS){
+				///if((*this).workers_away == 0 && (*this).worker->size() < MAX_BUFFERED_ROWS){
 					delete (*this).worker;
-				}else{
-					storage_workers::get_threads((*this).wid).add((*this).worker);
-					++((*this).workers_away);
-				}
+				///}else{
+				///	storage_workers::get_threads((*this).wid).add((*this).worker);
+				///	++((*this).workers_away);
+				//}
 				(*this).worker = nullptr;
 			}
 		}
@@ -330,14 +333,14 @@ namespace tree_stored{
 
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
-			//col.add(row, temp);
+			col.add(row, temp);
 			if(worker == nullptr){
-				worker = new ColAdder(col,workers_away);
+				//worker = new ColAdder(col,workers_away);
 			}
-			worker->add(row, temp);
-			if(worker->size() >= MAX_BUFFERED_ROWS){
-				add_worker();
-			}
+			//worker->add(row, temp);
+			//if(worker->size() >= MAX_BUFFERED_ROWS){
+				//add_worker();
+			//}
 
 		}
 	protected:
@@ -705,12 +708,14 @@ namespace tree_stored{
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
 		typedef std::vector<abstract_conditional_iterator::ptr> _Conditional;
-
-		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage> _TableMap;
+		///, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator
+		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
+		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
 		struct shared_data{
 			shared_data() : auto_incr(0),row_count(0){
 			}
 			Poco::Mutex lock;
+			Poco::Mutex write_lock;
 			nst::u64 last_write_lock_time;
 			_Rid auto_incr;
 			_Rid row_count;
@@ -808,7 +813,9 @@ namespace tree_stored{
 
 						break; //do nothing pass
 				}//switch
-
+				if(cols[(*field)->field_index]){
+					cols[(*field)->field_index]->set_max_size((*field)->max_display_length());
+				}
 				//_max_row_id = std::max<_Rid>(_max_row_id, cols[(*field)->field_index]->stored_rows());
 			}
 		}
@@ -1237,14 +1244,17 @@ namespace tree_stored{
 			commit_table1();
 		}
 
-		void commit2(){
+		void commit2(Poco::Mutex* p2_lock){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
+				synchronized _s(*p2_lock);
 				(*x)->commit2();
 			}
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
+				synchronized _s(*p2_lock);
 				(*c)->commit2();
 
 			}
+			synchronized _s(*p2_lock);
 			commit_table2();
 			changed = false;
 		}
@@ -1831,9 +1841,9 @@ namespace tree_stored{
 					commit1();
 					/// locks so that all the storages can commit atomically allowing
 					/// other transactions to start on the same version
-					//synchronized _s(*p2_lock);
+					/// synchronized _s(*p2_lock);
 
-					commit2();
+					commit2(p2_lock);
 					if(calc_total_use() > treestore_max_mem_use){
 						stored::reduce_all();
 					}					
@@ -1841,12 +1851,17 @@ namespace tree_stored{
 				}else
 				{
 					bool rolling = true; //treestore_reduce_tree_use_on_unlock;
-					if
-					(	::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-						||	calc_total_use() > treestore_max_mem_use*0.7f
-						||  rolling
-					)
-						rollback();/// relieves the version load when new data is added to the collums
+					//if
+					//(	//::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
+						//||	
+						// calc_total_use() > treestore_max_mem_use*0.7f
+						//||  rolling
+					//)
+					if(os::micros() - last_lock_time > 450000){
+						if(storage.stale()){
+							rollback();
+						}
+					}else rollback();/// relieves the version load when new data is added to the collums
 				}
 				last_unlock_time = os::micros();
 			}

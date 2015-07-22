@@ -46,6 +46,57 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "iterator.h"
 namespace nst = NS_STORAGE;
 namespace collums{
+	
+	template<class _StoredType>
+	struct col_policy_type{
+		bool load(size_t max_size) const{
+			return max_size < 0;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::UShortStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	
+	template<>
+	struct col_policy_type<stored::CharStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::UCharStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::IntStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::UIntStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::LongIntStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	template<>
+	struct col_policy_type<stored::ULongIntStored>{
+		bool load(size_t) const{
+			return true;
+		}
+	};
+	
 	using namespace iterator;
 	typedef stored::_Rid _Rid;
 
@@ -59,155 +110,8 @@ namespace collums{
 		stored::abstracted_storage storage;
 
 
-		struct int_terpolator{
-
-			typedef typename _Stored::list_encoder value_encoder;
-			value_encoder encoder; /// delegate encoder/decoder
-			/// function assumes a list of increasing integer values
-			inline bool encoded(bool multi) const
-			{
-				return !multi; // only encodes uniques;
-			}
-			inline bool encoded_values(bool multi) const
-			{
-				return encoder.encoded(multi); // only encodes uniques;
-			}
-			typedef nst::u16 count_t;
-			/// delegate value decoder
-			void decode_values(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
-
-				encoder.decode(buffer, reader, values, occupants);
-			}
-			/// delegate value encoder
-			void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
-
-				encoder.encode(buffer, writer, values, occupants);
-			}
-			/// delegate value encoder
-			size_t encoded_values_size(const _Stored* values, count_t occupants) {
-
-				return encoder.encoded_size(values, occupants);
-			}
-
-
-			/// decode mixed run length and delta for simple sequences
-			void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_StoredRowId* keys, count_t occupants) const {
-				count_t k = 0, m = occupants - 1;
-				nst::i32 rl = 0;
-				reader = keys[k++].read(buffer, reader);
-				for(; k < occupants; ){
-					rl = nst::leb128::read_signed(reader);
-					if(!rl){
-						rl = nst::leb128::read_signed(reader);
-						count_t e = std::min<count_t>(k+rl,occupants);
-						count_t j = k;
-						_Rid prev = keys[j-1].get_value();
-						for(; j < e; ++j){
-							keys[j].set_value(prev + 1);
-							prev = keys[j].get_value();
-						}
-						k = j;
-					}else{
-						keys[k].set_value(rl + keys[k-1].value);
-						++k;
-
-					}
-				}
-			}
-
-			/// encoding mixes run length and delta encoding for simple sequences
-			int encoded_size(const _StoredRowId* keys, count_t occupants) const {
-				count_t k = 0, m = occupants - 1;
-				nst::i32 rl = 0;
-				int size = keys[k++].stored();
-
-				for(; k < occupants; ++k){
-					// works with keys[k] < 0 too
-					if(keys[k].value - keys[k-1].value == 1 &&  k < m){
-						// halts when k == m
-						++rl;
-					}else if(rl > 3){
-						++rl;
-						size += nst::leb128::signed_size((nst::i64)0);
-						size += nst::leb128::signed_size((nst::i64)rl);
-						rl = 0;
-					}else{
-						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
-							size += nst::leb128::signed_size((nst::i64)keys[j].value - keys[j-1].value);
-						}
-					}
-				}
-				return size;
-			}
-
-			void encode(nst::buffer_type::iterator& writer,const _StoredRowId* keys, count_t occupants) const {
-				count_t k = 0, m = occupants - 1;
-				nst::i32 rl = 0;
-				writer = keys[k++].store(writer);
-
-				for(; k < occupants; ++k){
-					// works with keys[k] < 0 too
-					if(keys[k].value - keys[k-1].value == 1 &&  k < m){
-						// halts when k == m
-						++rl;
-					}else if(rl > 3){
-						++rl;
-						writer = nst::leb128::write_signed(writer, (nst::i64)0);
-						writer = nst::leb128::write_signed(writer, (nst::i64)rl);
-						rl = 0;
-					}else{
-						for(count_t j = k - rl; j <= k; ++j){ // k never < 1
-							writer = nst::leb128::write_signed(writer, keys[j].value - keys[j-1].value);
-						}
-					}
-				}
-			}
-			inline bool can(const _StoredRowId &first , const _StoredRowId &last, int size) const
-			{
-				return ::abs((long long)size - (long long)::abs( (long long)last.get_value() - (long long)first.get_value() )) > 0 ;
-			}
-			inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
-			{
-				if(last.get_value()>first.get_value())
-					return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
-				return 0;
-			}
-
-			void test_sequence(_StoredRowId *sequence,_StoredRowId *decoded,int _TestSize){
-				nst::buffer_type output;
-				output.resize(encoded_size(sequence, _TestSize));
-				encode(output.begin(), sequence, _TestSize);
-				decode(output.begin(), decoded, _TestSize);
-				if(memcmp(sequence,decoded,sizeof(decoded))!=0){
-					printf("Test failed\n");
-				}
-			}
-			void test_encode(){
-				if(1){
-					const int _TestSize = 10;
-					_StoredRowId sequence[_TestSize] = {0,1,2,3,4,5,6,7,8,9};
-					_StoredRowId decoded[_TestSize];
-					test_sequence(sequence, decoded, _TestSize);
-				}
-				if(2){
-					const int _TestSize = 10;
-					_StoredRowId sequence[_TestSize] = {0,1,2,3,5,6,7,8,9,10};
-					_StoredRowId decoded[_TestSize];
-					test_sequence(sequence, decoded, _TestSize);
-				}
-				if(3){
-					const int _TestSize = 15;
-					_StoredRowId sequence[_TestSize] = {0,2,4,8,10,11,12,13,14,15,17,18,20,21,22};
-					_StoredRowId decoded[_TestSize];
-					test_sequence(sequence, decoded, _TestSize);
-					for(int i = 0 ; i < _TestSize; ++i){
-						printf("%ld\n",decoded[i].get_value());
-					}
-
-				}
-			}
-		};
-		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, int_terpolator> _ColMap;
+		
+		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_Stored>> _ColMap;
 	private:
 		static const nst::u16 F_NOT_NULL = 1;
 		static const nst::u16 F_CHANGED = 2;
@@ -308,7 +212,7 @@ namespace collums{
 				(*this) = right;
 			}
 			_CachePage& operator=(const _CachePage& right){
-				printf(" _CachePage ASSIGN \n");
+				/// printf(" _CachePage ASSIGN \n");
 				encoded = right.encoded;
 				data = right.data;
 				_temp = right._temp;
@@ -351,7 +255,7 @@ namespace collums{
 
 			_Rid density;
 			nst::i64 users;
-
+			
 			void resize(nst::i64 size){
 
 
@@ -385,7 +289,8 @@ namespace collums{
 				rows_cached = 0;
 				_data = nullptr;
 				available = true;
-				/// loaded = false;
+				data_size = 0;
+				loaded = false;
 				flagged = false;
 				modified = 0;
 				access = 0;
@@ -640,7 +545,7 @@ namespace collums{
 
 
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 32768*32;
+		static const _Rid MAX_PAGE_SIZE = 32768*16;//*32;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{
@@ -672,9 +577,11 @@ namespace collums{
 					typedef std::vector<_EvictionPair> _Evicted;
 					_Evicted evicted;
 					user->users--;
-					if(false && !user->users){
+					if(!user->users){
 						if(user->pages.size()!=p){
 							printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
+							user->pages.back().unload();/// the last pages encoding will be wrong
+							user->pages.back().loading = false;
 							user->pages.resize(p);
 						}
 						_Rid loaded = 0;
@@ -740,12 +647,14 @@ namespace collums{
 		bool modified;
 		bool lazy;
 		nst::u32 sampler;
+		size_t max_size;
+		col_policy_type<_Stored> col_policy;
 		inline bool has_cache() const {
 			return pages != nullptr ;
 		}
 
 		void load_cache(){
-			if(treestore_column_cache==FALSE || lazy) return;
+			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) return;
 			if(pages==nullptr && max_row_id > 0){
 				using namespace stored;
 				pages = load_cache(storage.get_name(),max_row_id); ///= new _CachePages(); ///
@@ -812,6 +721,7 @@ namespace collums{
 		,	modified(false)
 		,	lazy(load)
 		,	sampler(0)
+		,	max_size(0)
 		{
 
 #ifdef _DEBUG
@@ -825,6 +735,10 @@ namespace collums{
 
 		}
 
+		void set_data_max_size(size_t max_size){
+			this->max_size = max_size;
+		}
+		
 		void initialize(bool by_tree){
 
 			cend = col.end();
@@ -832,10 +746,6 @@ namespace collums{
 			if(!modified){
 
 			}
-
-
-
-
 		}
 		/// returns a sampled rows per key statistic for the collumn
 		_Rid get_rows_per_key(){
@@ -921,8 +831,10 @@ namespace collums{
 					return ival.data();
 				}
 			}
+			//if(allocation_pool.is_near_depleted())
+			///	col.reduce_use();
 			ival = col.find(row);
-
+			
 
 			if(ival == cend || ival.key().get_value() != row)
 			{
@@ -932,21 +844,18 @@ namespace collums{
 		}
 
 		inline _Stored& seek_by_cache(_Rid row)  {
-
-			if(treestore_column_cache && !lazy){
+			
+			if(col_policy.load(max_size) && treestore_column_cache && !lazy){
 				_CachePage* page = load_page(row);
 				if(page != nullptr){
-
-					_Stored & se = page->get(row);
 					if( page->has_flags() ){
 						nst::u8 flags = page->get_flags(row);
 						if(user.valid(flags))
-							return se;
-
+							return page->get(row);
 						if(user.null(flags))
 							return empty;
 					}else{
-						return se;
+						return page->get(row);
 					}
 				}
 			}

@@ -32,9 +32,11 @@ THE SOFTWARE.
 /// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
 
 #ifdef _MSC_VER
-#define RABBIT_NOINLINE_  _declspec(noinline)
+	#define RABBIT_NOINLINE_PRE _declspec(noinline)
+	#define RABBIT_NOINLINE_ 
 #else
-#define RABBIT_NOINLINE_
+	#define RABBIT_NOINLINE_PRE
+	#define RABBIT_NOINLINE_ __attribute__((noinline)) 
 #endif
 namespace rabbit{
 	template <class _Config>
@@ -185,10 +187,10 @@ namespace rabbit{
 	
 	class basic_config{
 	public:
-		typedef unsigned long _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
+		typedef unsigned long long int _Bt; /// exists ebucket type - not using vector<bool> - interface does not support bit bucketing
 		/// if even more speed is desired but you'r willing to live with a 4 billion key limit then
 		/// typedef unsigned long size_type;
-		typedef unsigned long size_type;
+		typedef std::size_t size_type;
 
 		size_type log2(size_type n){
 			size_type r = 0; 
@@ -235,8 +237,8 @@ namespace rabbit{
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
 			PROBES = 16;							
-			MIN_EXTENT = 4; /// start size of the hash table
-			MAX_OVERFLOW = 1024; //BITS_SIZE*8/sizeof(_Bt); 
+			MIN_EXTENT = 8; /// start size of the hash table
+			MAX_OVERFLOW = 512; //BITS_SIZE*8/sizeof(_Bt); 
 			assert(PROBES > log2((size_type)MAX_OVERFLOW));
 		}
 	};
@@ -636,7 +638,7 @@ namespace rabbit{
 				
 				mf = 1.0;
 				assert(config.MAX_OVERFLOW > 0);
-				overflow = std::min<size_type>(get_extent()/config.MAX_OVERFLOW+16,config.MAX_OVERFLOW);
+				overflow = std::min<size_type>(get_extent()/config.MAX_OVERFLOW+8,config.MAX_OVERFLOW);
 				assert(overflow > 0);
 				elements = 0;
 				removed = 0;
@@ -647,9 +649,9 @@ namespace rabbit{
 				keys.resize(get_data_size());
 				clusters = get_segment_allocator().allocate(esize);				
 				values = get_value_allocator().allocate(get_data_size());
-			
+				_KeySegment ks;
 				for(size_type c = 0; c < esize; ++c){
-					get_segment_allocator().construct(&clusters[c],_KeySegment());
+					get_segment_allocator().construct(&clusters[c],ks);
 				}
 				set_exists(get_data_size(),true);
 				buckets = 0;
@@ -770,7 +772,7 @@ namespace rabbit{
 				
 				return unique_subscript_rest(k, pos);
 			}
-			_V* subscript_rest(const _K& k, size_type pos,size_type h){
+			_V* subscript_rest(const _K& k, size_type pos,size_type h) {
 				pos = h;				
 				++pos;
 				for(unsigned int i =0; i < probes;++i){
@@ -844,7 +846,9 @@ namespace rabbit{
 				}
 				return subscript_rest(k,pos,h);
 			}
-			size_type erase_rest(const _K& k,size_type pos){
+			size_type erase_rest(const _K& k,size_type pos)
+			RABBIT_NOINLINE_ /// this function must never be inlined
+			{
 				size_type h = pos;
 				
 				pos = find_rest(k,pos);
@@ -889,8 +893,8 @@ namespace rabbit{
 				}				
 				if(!s.is_overflows(si)){
 					return 0;
-				}
-				return erase_rest(k, pos);
+				}else
+					return erase_rest(k, pos);
 				
 			}
 			/// not used (could be used where hash table must actually shrink too)
@@ -954,7 +958,7 @@ namespace rabbit{
 				return end();
 			}
 			size_type find(const _K& k,size_type& pos) const {				
-				
+				if(!elements) return end();
 				pos = map_key(k);			
 				_Bt index = get_segment_index(pos);
 				const _Segment& s = get_segment(pos);				
@@ -962,9 +966,11 @@ namespace rabbit{
 				if(equal_key(pos,k) && s.is_exists(index) ){ ///get_segment(pos).exists == ALL_BITS_SET || 
 					return pos;
 				}				
+				
 				if(!s.is_overflows(index)){
 					return end();
 				}
+				
 				return find_rest(k,pos);
 			}
 			size_type find(const _K& k) const {				

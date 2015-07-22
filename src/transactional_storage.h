@@ -66,12 +66,15 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/ThreadLocal.h"
 
 #include <stx/storage/pool.h>
-
+#ifdef _MSC_VER
+#define fseek64 _fseeki64
+#define ftell64 _ftelli64
+#endif
 /// TODODONE: initialize 'next' to address of last block available
 /// TODODONE: unmerged version recovery
 /// TODODONE: version storage naming
 /// TODODONE: merge versions on commit or if there are too many versions
-namespace ns_umap = rabbit;
+namespace ns_umap = rabbit; //rabbit;
 namespace storage_workers{
 	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
 
@@ -85,6 +88,473 @@ namespace stored{
 };
 
 namespace NS_STORAGE = stx::storage;
+
+namespace sixsided{
+class FileIOException : public std::exception {
+public:
+	FileIOException() throw(){
+	}
+};
+
+typedef nst::u64 block_address;	
+typedef nst::u64 stream_address;
+typedef nst::u64 address_type;
+typedef nst::u32 block_size;
+
+template<class _BlockType>
+class block_storage{
+public:
+	
+	typedef _BlockType block_type;
+	struct storage_header{
+		block_address size;
+		block_address allocations;
+		block_address used_size;
+		block_address allocated_size;
+	};
+
+	struct block_header{
+		block_size allocated;
+		block_size size;
+		block_address address;
+	};
+	
+protected:
+	
+	typedef  ns_umap::unordered_map<address_type, block_address> _AddressMap;
+
+	static const block_size BUCKET_SIZE = 128;
+	mutable FILE* f;
+	_AddressMap address_map;
+	
+	template<class header_type>
+	void write_header(header_type header){
+		if(sizeof(header) != ::fwrite((const void*)&header, sizeof(char), sizeof(header_type), f)){
+			throw FileIOException();
+		}
+	}
+	
+	template<class header_type>
+	void read_header(header_type &header) const{
+		size_t r = ::fread((void*)&header, sizeof(char), sizeof(header_type), f);
+		if(sizeof(block_header) != r){
+			throw FileIOException();
+		}
+	}
+	
+	void write_block(const block_type& block) {
+				
+		if(block.size() != ::fwrite((const void*)&block[0], sizeof(char), block.size(), f)){
+			throw FileIOException();
+		}
+	}
+
+	void read_block(block_type& block,block_header header) const {
+		if(header.size == 0) return;
+		block.resize(header.size);
+		if(header.size != ::fread((void*)&block[0], sizeof(char), header.size, f)){
+			throw FileIOException();
+		}
+	}
+
+	void set_size(){
+		if(0!=::fseek64(f, 0L, SEEK_END)){
+			throw FileIOException();
+		}
+		this->stream_size = ::ftell64(f);
+	}
+	void reset_file() const {
+		if(f != NULL){
+			::rewind(f);
+		}
+
+	}
+	void move(block_address to) const {
+		if(0!=::fseek64(f, to, SEEK_SET)){
+			throw FileIOException();
+		}
+	}
+	void erase_block(block_address a,const block_header &header){
+		if(!f) return;
+		block_address w;
+		auto b = address_map.find(a);
+		if(b!=address_map.end()){ /// address_map.get(a,w)
+			w = (*b).second;					
+			block_header erased = header;
+			erased.size = 0;
+			erased.address = 0ull;
+			move(w);
+			write_header(erased);
+			address_map.erase(a);
+			//flush();
+		}
+	}
+	void write_header_block(const block_type& block, const block_header& inheader){
+		block_header header = inheader;
+		header.size = (block_size)block.size();
+		block_type data;				
+		data.resize(sizeof(block_header) + header.allocated);
+		memcpy(&data[0], &header, sizeof(block_header));
+		if(!block.empty())
+			memcpy(&data[sizeof(block_header)], &block[0], block.size());								
+		write_block(data);
+	}
+
+	block_header allocate_block(block_address a, const block_type& block){		
+		if(!f) return block_header();
+		if(a > 32 && a < 1000000000ull && block.size() == 0){
+			printf("debug this\n");
+		}
+		block_header header;
+		header.size = (block_size)block.size();
+		header.allocated = header.size + std::max<block_size>((block_size)(header.size*0.2),64); //((header.size /BUCKET_SIZE) + ((header.size % BUCKET_SIZE)!=0?1:0)) * BUCKET_SIZE;
+		header.address = a;
+		move(this->stream_size);
+		write_header_block(block, header);
+		address_map[a] = this->stream_size;
+		this->stream_size += (header.allocated + sizeof(block_header));
+		//flush();
+		return header;
+	}
+	void read_table(){
+		if(!f) return;
+		address_map.clear();
+		block_address at = 0;
+		block_address added = 0;
+		while(at < this->stream_size){
+			block_header header;
+			move(at);
+			read_header(header);
+			if(header.size > header.allocated){
+				printf("[ERROR] [TS] [%s] [%lld] stored address has invalid header\n",name.c_str(),(long long int)at);
+			}
+			if(header.address!=0){
+				address_map[header.address] = at;				
+				++added;
+			}
+			at += (header.allocated+sizeof(block_header));
+		}
+		printf("[INFO] [TS] [%s] added %lld blocks\n",name.c_str(),(unsigned long long)added);
+	}
+public:
+
+	std::string name;
+	block_address stream_size;
+	
+			
+	block_storage() : f(NULL), stream_size(0){
+	}
+
+	block_storage(const std::string& name) : f(NULL), stream_size(0){
+		open(name);
+	}
+			
+	~block_storage(){
+		close();
+	}
+			
+	bool opened() const {
+		return f != NULL;
+	}
+
+	void close(){
+		if(f){
+			::fclose(f);					
+		}
+		f = NULL;
+		name = "";
+		address_map.clear();
+		this->stream_size = 0;
+	}
+			
+	void clear(){
+		std::string name = this->name;
+		close();
+		FILE*ft = ::fopen(name.c_str(),"w+b"); /// truncate and read write
+		if(ft){
+			::fclose(ft);
+			::remove(name.c_str());
+		}
+
+		//Poco::File df (name);
+		//if(df.exists()){
+		//	df.remove();
+		//}			
+	}
+
+	bool open(const std::string& name){				
+		if(opened()) return false;
+		f = ::fopen(name.c_str(),"r+b"); /// for existing updating reading
+		if(f==NULL){			
+			f = ::fopen(name.c_str(),"w+b"); /// truncate and read write
+			storage_header h;
+			::memset(&h,0,sizeof(storage_header));
+			write_header(h);
+		}
+		if(f==NULL){
+			throw FileIOException();
+		}
+		this->name = name;
+		set_size();
+		read_table();
+		return true;
+	}
+	block_address max_block_address() const {
+		block_address m = 0;
+		for(auto a = address_map.begin(); a != address_map.end(); ++a){
+			if((*a).first < 1ull<<61ull){
+				if(m < (*a).first) m = (*a).first;
+			}
+		}
+		return m;
+
+	}
+	void set(stream_address a, const block_type &data){
+		if(!f) return;
+		block_address w;				
+		
+		auto am = address_map.find(a);
+		///if(address_map.get(a,w)){ /// 					
+		if(am != address_map.end()){
+			w = (*am).second;
+			block_header header;
+			//reset_file();
+			move(w);					
+			read_header(header);
+			if(!header.address){
+				printf("[ERROR] [TS] [%s] [%lld] reported address erased\n",name.c_str(),(long long int)a);
+			}
+			if(header.address != a){
+				printf("[ERROR] [TS] [%s] [%lld] stored address does not match request\n",name.c_str(),(long long int)a);
+			}
+			if(header.size > header.allocated){
+				printf("[ERROR] [TS] [%s] [%lld] stored address has invalid header\n",name.c_str(),(long long int)a);
+			}
+			if(data.size() <= (size_t)header.allocated){ //
+				header.size = (block_size)data.size();
+				move(w);						
+				write_header_block(data, header);
+				flush();
+				return;
+			}else{
+				erase_block(a,header);
+			}
+		}
+		allocate_block(a,data);								
+		
+	}	
+
+	bool get(block_type& data, stream_address a) const{
+		data.clear();
+		if(!f) return false;
+		block_address w;
+		auto b = address_map.find(a);
+		if(b != address_map.end()){ /// address_map.get(a,w)
+			w = (*b).second;
+			reset_file();
+			move(w);
+			block_header header;
+			read_header(header);
+			move(w+sizeof(block_header));
+			read_block(data,header);
+			
+			return true;
+		}
+		return false;
+	}
+			
+	bool has(stream_address a) const {
+		return address_map.count(a) > 0;
+	}
+			
+	void flush(){
+		if(f)
+			::fflush(f);
+	}
+
+	void truncate(){				
+		std::string n = this->name;
+		clear();
+		open(n);
+	}
+
+	void copy(block_storage& other){
+		block_type transfer;
+		for(auto a = address_map.begin(); a!=address_map.end(); ++a){
+			get(transfer,(*a).first);
+			other.set((*a).first,  transfer);
+		}
+		other.flush();
+	}
+	/// exclusive merge from this to other
+	void merge(block_storage& other, bool exclusive){
+		block_type transfer;
+		if(exclusive){
+			for(auto a = address_map.begin(); a!=address_map.end(); ++a){
+				if(!other.has((*a).first)){
+					get(transfer,(*a).first);
+					other.set((*a).first,  transfer);
+				}
+			}
+		}else{
+			copy(other);
+		}
+		other.flush();
+	}
+			
+	size_t size() const {
+		return address_map.size();
+	}
+};
+template<class _BlockType>
+class transacted_blocks{
+public:
+	typedef sixsided::block_address block_address;
+	typedef _BlockType block_type;
+	static const block_address TRANSACTION_STATE = (block_address)(-2);
+private:
+	mutable Poco::Mutex lock;
+	std::string name;
+	block_storage<_BlockType> journal;
+	block_storage<_BlockType> main;
+	bool transacted;
+
+	std::string get_journal_name()  const {
+		return name + "-journal";
+	}
+			
+	bool has_journal(){
+		//Poco::File df (get_journal_name());
+		//return df.exists();				
+		FILE* ft = ::fopen(name.c_str(),"r+b"); /// for existing updating reading
+		if(ft){
+			::fclose(ft);
+			return true;
+		}
+		return false;
+	}
+	
+	void merge_journal(){
+		if(has_journal()){
+			if(!journal.opened())
+				journal.open(get_journal_name());
+			if(journal.has(TRANSACTION_STATE)){
+				if(journal.size() > main.size()/3){
+					main.merge(journal,true);
+					main.close();
+					journal.close();
+					::remove(name.c_str());
+					::rename(get_journal_name().c_str(),name.c_str());
+					open();
+				}else{
+					journal.copy(main);	
+				}
+
+			}
+			journal.clear();
+		}
+	}
+
+public:
+	transacted_blocks()
+	:	transacted(false){
+	}
+
+	transacted_blocks(const std::string& name)
+	:	name(name)
+	,	transacted(false)
+	{
+	}
+	void truncate(){
+		///nst::synchronized l(this->lock);
+		rollback();
+		main.truncate();
+	}
+	bool opened() const {
+		///nst::synchronized l(this->lock);
+		return main.opened();
+	}
+	bool open(){
+		//nst::synchronized l(this->lock);
+		if(main.opened()) return false;				
+		main.open(name);
+		merge_journal();
+		return true;
+	}
+
+	void close(){
+		//nst::synchronized l(this->lock);
+		rollback();
+		main.close();
+	}
+			
+	void open(const std::string & name){
+		//nst::synchronized l(this->lock);
+		close();
+		this->name = name;
+		this->open();
+	}
+			
+	~transacted_blocks(){
+		close();
+	}
+
+	block_address max_block_address() const {
+		return std::max<block_address>(main.max_block_address(), journal.max_block_address());
+	}
+
+	void begin(){
+		//nst::synchronized l(this->lock);
+		if(!transacted){
+			journal.open(get_journal_name());					
+			transacted = true;
+		}
+	}
+			
+	void commit(){
+		//nst::synchronized l(this->lock);
+		if(transacted){
+			block_type tx;
+			journal.set(TRANSACTION_STATE, tx);
+			merge_journal();
+			transacted = false;
+		};
+	}
+			
+	void rollback(){
+		//nst::synchronized l(this->lock);
+		if(transacted){
+			journal.clear();
+			transacted = false;
+		}
+	}
+			
+	bool has(stream_address a){
+		//nst::synchronized l(this->lock);
+		if(transacted && journal.has(a)){
+			return true;
+		}
+		return main.has(a);
+	}
+
+	bool get(block_type& data, stream_address a) const{
+		//nst::synchronized l(this->lock);
+		data.clear();
+		if(transacted){
+			if(journal.get(data, a)){
+				return true;
+			}
+		}
+		return main.get(data, a);
+	}
+			
+	void set(stream_address a, const block_type &data){
+		//nst::synchronized l(this->lock);
+		begin();
+		journal.set(a, data);
+	}
+};
+};// sixsided
 namespace stx{
 namespace storage{
 
@@ -435,358 +905,7 @@ namespace storage{
 		typedef ns_umap::unordered_map<address_type, block_type> _BlocksMap;
 
 		typedef ns_umap::unordered_set<address_type> _Changed;
-		class block_storage{
-		public:
-			typedef nst::u64 block_address;
-			typedef nst::u32 block_size;
-			struct block_header{
-				block_size allocated;
-				block_size size;
-				block_address address;
-			};
-		protected:
-
-			typedef ns_umap::unordered_map<address_type, block_address> _AddressMap;
-			
-			static const block_size BUCKET_SIZE = 128;
-			mutable FILE* f;
-			_AddressMap address_map;
-			_BlocksMap verify;
-			
-			void write_header(block_header header){
-				if(sizeof(header) != ::fwrite((const void*)&header, sizeof(char), sizeof(block_header), f)){
-					throw FileIOException();
-				}
-			}
-			void read_header(block_header &header) const{
-				int r = ::fread((void*)&header, sizeof(char), sizeof(block_header), f);
-				if(sizeof(block_header) != r){
-					throw FileIOException();
-				}
-			}
-			void write_block(const block_type& block) {
-				
-				if(block.size() != ::fwrite((const void*)&block[0], sizeof(char), block.size(), f)){
-					throw FileIOException();
-				}
-			}
-
-			void read_block(block_type& block,block_header header) const {
-				block.resize(header.size);
-				if(header.size != ::fread((void*)&block[0], sizeof(char), header.size, f)){
-					throw FileIOException();
-				}
-			}
-
-			void set_size(){
-				if(0!=::fseek(f, 0L, SEEK_END)){
-					throw FileIOException();
-				}
-				this->size = ::ftell(f);
-			}
-			void move(block_address to) const {
-				if(0!=::fseek(f, to, SEEK_SET)){
-					throw FileIOException();
-				}
-			}
-			void erase_block(block_address a,const block_header &header){
-				if(!f) return;
-				block_address w;
-				auto b = address_map.find(a);
-				if(b!=address_map.end()){ /// address_map.get(a,w)
-					w = (*b).second;					
-					block_header erased = header;
-					erased.size = 0;
-					erased.address = 0ull;
-					move(w);
-					write_header(erased);
-					address_map.erase(a);
-				}
-			}
-
-			block_header allocate_block(block_address a, const block_type& block){		
-				if(!f) return block_header();
-				block_header header;
-				header.size = block.size();
-				header.allocated = ((header.size /BUCKET_SIZE) + ((header.size % BUCKET_SIZE)!=0?1:0)) * BUCKET_SIZE;
-				header.address = a;
-				block_type empty;				
-				empty.resize(sizeof(block_header) + header.allocated);
-				memcpy(&empty[0], &header, sizeof(block_header));
-				memcpy(&empty[sizeof(block_header)], &block[0], header.size);
-				move(this->size);
-				write_block(empty);
-				address_map[a] = this->size;
-				this->size += empty.size();
-				return header;
-			}
-			void read_table(){
-				if(!f) return;
-				address_map.clear();
-				block_address at = 0;
-				block_address added = 0;
-				while(at < this->size){
-					block_header header;
-					move(at);
-					read_header(header);
-					if(header.address!=0){
-						if(address_map.count(header.address)){
-							printf("[ERROR] [TS] [%s] added %lld blocks address already exists\n",name.c_str(),(unsigned long long)added);
-						}else{
-							address_map[header.address] = at;
-						}
-						++added;
-					}
-					at += (header.allocated+sizeof(block_header));
-				}
-				printf("[INFO] [TS] [%s] added %lld blocks\n",name.c_str(),(unsigned long long)added);
-			}
-		public:
-
-			std::string name;
-			block_address size;
-			bool verified;
-			
-			block_storage() : f(NULL), size(0),verified(false){
-			}
-
-			block_storage(const std::string& name) : f(NULL), size(0), verified(false){
-				open(name);
-			}
-			
-			~block_storage(){
-				close();
-			}
-			
-			bool opened() const {
-				return f != NULL;
-			}
-
-			void close(){
-				if(f){
-					::fclose(f);					
-				}
-				f = NULL;
-				name = "";
-				address_map.clear();
-				this->size = 0;
-			}
-			
-			void clear(){
-				std::string name = this->name;
-				close();
-
-				Poco::File df (name);
-				if(df.exists()){
-					df.remove();
-				}			
-			}
-
-			void open(const std::string& name){				
-				close();				
-				Poco::File df (name);
-				if(df.exists()){
-					f = ::fopen(name.c_str(),"r+b"); /// for existing updating reading
-				}else{
-					f = ::fopen(name.c_str(),"w+b"); /// truncate and read write
-				}
-				if(f==NULL){
-					throw FileIOException();
-				}
-				this->name = name;
-				set_size();
-				read_table();
-			}
-			
-			void set(stream_address a, const block_type &data){
-				if(!f) return;
-				block_address w;
-				auto b = address_map.find(a);
-				if(verified)
-					verify[a] = data;
-				if(b!=address_map.end()){ /// address_map.get(a,w)
-					w = (*b).second;
-					block_header header;
-					move(w);					
-					read_header(header);
-					if(!header.address){
-						printf("[ERROR] [TS] [%s] [%lld] reported address erased\n",name.c_str(),(long long int)a);
-					}
-					if(header.address != a){
-						printf("[ERROR] [TS] [%s] [%lld] stored address does not match request\n",name.c_str(),(long long int)a);
-					}
-					if(data.size() <= header.allocated){
-						header.size = data.size();
-						move(w);						
-						write_header(header);
-						move(w+sizeof(block_header));
-						write_block(data);
-						return;
-					}else{
-						erase_block(a,header);
-					}
-				}
-				allocate_block(a,data);				
-				flush();
-			}	
-
-			bool get(block_type& data, stream_address a) const{
-				if(!f) return false;
-				block_address w;
-				auto b = address_map.find(a);
-				if(b != address_map.end()){ /// address_map.get(a,w)
-					w = (*b).second;
-					move(w);
-					block_header header;
-					read_header(header);
-					read_block(data,header);
-					if(verified){
-						auto v = verify.find(a);
-						if(v==verify.end()||data!=(*v).second){
-							printf("[ERROR] block does not verify\n");						
-						}
-					}
-					return true;
-				}
-				return false;
-			}
-			
-			bool has(stream_address a) const {
-				return address_map.count(a) > 0;
-			}
-			
-			void flush(){
-				if(f)
-					::fflush(f);
-			}
-
-			void truncate(){				
-				string n = this->name;
-				clear();
-				open(n);
-			}
-
-			void copy(block_storage& other){
-				block_type transfer;
-				for(auto a = address_map.begin(); a!=address_map.end(); ++a){
-					get(transfer,(*a).first);
-					other.set((*a).first,  transfer);
-				}
-				other.flush();
-			}
-			
-			size_t get_size() const {
-				return address_map.size();
-			}
-
-			void copy(const std::string& to){
-			}
-		};
-
-		class transacted_blocks{
-		public:
-			typedef typename block_storage::block_address block_address;
-			static const block_address TRANSACTION_STATE = (block_address)(-2);
-		private:
-			std::string name;
-			block_storage journal;
-			block_storage main;
-			bool transacted;
-
-			std::string get_journal_name()  const {
-				return name + "-journal";
-			}
-			
-			bool has_journal(){
-				Poco::File df (get_journal_name());
-				return df.exists();				
-			}
-			
-			void merge_journal(){
-				if(has_journal()){
-					journal.open(get_journal_name());
-					if(journal.has(TRANSACTION_STATE)){
-						journal.copy(main);
-						journal.clear();
-					}
-				}
-			}
-
-		public:
-			transacted_blocks()
-			:	transacted(false){
-			}
-
-			transacted_blocks(const std::string& name)
-			:	name(name)
-			,	transacted(false)
-			{
-			}
-			bool opened() const {
-				return main.opened();
-			}
-			void open(){
-				close();
-				main.open(name);
-			}
-
-			void close(){
-				rollback();
-				main.close();
-			}
-			
-			void open(const std::string & name){
-				close();
-				this->name = name;
-				this->open();
-			}
-			
-			~transacted_blocks(){
-				close();
-			}
-
-			void begin(){
-				if(!transacted){
-					journal.open(get_journal_name());
-					transacted = true;
-				}
-			}
-			
-			void commit(){
-				if(transacted){
-					block_type tx;
-					journal.set(TRANSACTION_STATE, tx);
-					merge_journal();
-					transacted = false;
-				};
-			}
-			
-			void rollback(){
-				if(transacted){
-					journal.clear();
-					transacted = false;
-				}
-			}
-			
-			bool has(stream_address a){
-				if(transacted && journal.has(a)){
-					return true;
-				}
-				return main.has(a);
-			}
-
-			bool get(block_type& data, stream_address a) const{
-				if(transacted && journal.has(a)){
-					return journal.get(data, a);
-				}
-				return main.get(data,a);
-			}
-			
-			void set(stream_address a, const block_type &data){
-				begin();
-				journal.set(a, data);
-			}
-		};
+		
 	private:
 		/// per instance members
 		Poco::AtomicCounter references;
@@ -850,7 +969,8 @@ namespace storage{
 
 		bool is_readahead;			/// flag set to enable read ahead
 
-		transacted_blocks lego;		/// file blocks
+		sixsided::transacted_blocks<block_type> lego;		
+									/// file blocks
 
 		typename _Allocations::iterator finder;
 
@@ -931,28 +1051,49 @@ namespace storage{
 
 			/// block readahead statements
 
+			if(!lego.opened()){
 
+				max_address = 0;
 
-			max_address = 0;
-
-			get_session() << "SELECT max(a1) AS the_max FROM " << (*this).table_name << " ;" , into(max_address), now;
-			(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
+				get_session() << "SELECT max(a1) AS the_max FROM " << (*this).table_name << " ;" , into(max_address), now;
+				(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
+			}
 
 		}
 		/// open the connection if its closed
 
 		Session& get_session(){
+
+			if(!lego.opened()){
+				//lego.open(name+".blocks");
+				//max_address = 0;
+				//max_address = std::max<address_type>(max_address, lego.max_block_address());
+				//(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
+			}
 			if(_session == nullptr){
 				_session = std::make_shared<Session>("SQLite", get_storage_path() + name + extension);//SessionFactory::instance().create
 				is_new = false;
 				create_allocation_table();
 				create_statements();
+				if(lego.opened()){
+					
+				}
 				//printf("opened %s\n", name.c_str());
 			}
 			return *_session;
 		}
 		void add_buffer(const address_type& w, const block_type& block){
-			//lego.set(w, block);
+			current_address = w;			
+			current_size = block.size()*sizeof(typename block_type::value_type);			
+			
+
+			if(lego.opened()){
+				if(!block.empty()){
+					lego.set(w, block);
+					return;
+				}
+				return;
+			}
 			
 			current_address = w;
 			/// assumes block_type is some form of stl vector container
@@ -965,10 +1106,13 @@ namespace storage{
 				//inplace_compress_zlibh(compressed_block);
 				///current_size = compressed_block.size()*sizeof(typename block_type::value_type);
 				current_size = block.size();
-				encoded_block.assignRaw((const char *)&block[0], (size_t)current_size);
+				encoded_block.clear();
+				if(!lego.opened())
+					encoded_block.assignRaw((const char *)&block[0], (size_t)current_size);
 			}
 
 			insert_stmt->execute();
+			
 		}
 
 		/// returns true if the buffer with address specified by w has been retrieved
@@ -978,38 +1122,24 @@ namespace storage{
 				throw InvalidAddressException();
 			
 			if(is_new) return false;
-				
-
 			get_session();
-
+			current_block.clear();
+			if(lego.opened()){
+				if( lego.get(current_block, w) ){
+					current_size = current_block.size();
+					current_address = w;
+					return true;
+				}
+				return false;
+			}
 			selector_address = w;
 			///queue_block_read(w);
 			get_stmt->execute();
-
 			current_block.clear();
-		
 			if(current_address == selector_address){
 				//decompress_zlibh(current_block, encoded_block.content());
 				current_block.resize(encoded_block.size());
-				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());
-				if(lego.opened()){
-					block_type test;
-					lego.get(test,w);			
-					if(test!=current_block){
-						printf("[ERROR] [TS] [LEGO] does not verify\n");
-						lego.set(w,current_block);
-						lego.get(test,w);
-						if(test!=current_block){
-							printf("[ERROR] [TS] [LEGO] does not verify\n");
-						}
-					}
-				}
-				if(written_blocks.count(w)){
-					
-					if(written_blocks[w] != current_block){
-						printf("[ERROR] [TS] [BS] does not verify\n");
-					}
-				}
+				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());				
 			}
 			
 			return (current_address == selector_address); /// returns true if a record was retrieved
@@ -1147,18 +1277,18 @@ namespace storage{
 		}
 
 		
-		void check_use(){
-			if(transient) return;			
-			if(version > 3) return;
-			if(treestore_current_mem_use > treestore_max_mem_use){
-				if(get_use() > 1024*1024*2){
-					ptrdiff_t before = get_use();
+		void check_use(){			
+
+
+			//if(treestore_current_mem_use > treestore_max_mem_use){
+			if(buffer_allocation_pool.is_near_depleted()){
+				ptrdiff_t before = get_use();
 					
-					flush_back(0.5,true);
-					get_session() << "PRAGMA shrink_memory;", now;
-					last_flush_time = ::os::millis();
-					printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
-				}
+				flush_back(0.1,true);
+				get_session() << "PRAGMA shrink_memory;", now;
+				last_flush_time = ::os::millis();
+				printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
+				
 			}
 		}
 		version_type version_off(address_type which){
@@ -1171,6 +1301,20 @@ namespace storage{
 
 			return r;
 		}
+		bool find_block(const address_type& which, ref_block_descriptor& result){
+			
+			return allocations.get(which,result);
+			
+			if(false){
+				typename _Allocations::iterator fr = allocations.find(which);
+				
+				bool finder = fr != allocations.end(); //allocations.get(which,result);//
+				if(finder){
+					result = (*fr).second;
+				}
+				return finder;
+			}
+		}
 	protected:
 		block_type read_block;
 		block_type & _allocate(address_type& which, storage_action how){
@@ -1180,25 +1324,15 @@ namespace storage{
 				++((*this).changes);
 			busy = true;
 			allocated_version = 0;
-			check_use();
+			
 			currently_active = 0;
 			result = nullptr;
 			if(which){
-				typename _Allocations::iterator fr = allocations.find(which);
-				
-				bool finder = fr != allocations.end(); //allocations.get(which,result);//
-				if(finder){
-					result = (*fr).second;
-				}
-
-				if(!finder && !transient ){ //&& is_readahead
-					//read_ahead(which,512);
-					//finder = allocations.get(which,result);
-				}
+				bool finder = find_block(which, result);
 				
 				if(!finder){
 					/// load from storage
-
+					check_use();
 					if((*this).get_buffer(which))
 					{
 
@@ -1257,7 +1391,6 @@ namespace storage{
 			result->clock = ++clock;
 			currently_active = which;
 			allocated_version = result->version;
-
 			return result->block;
 		}
 
@@ -1335,46 +1468,7 @@ namespace storage{
 			}
 			/// out contains a unique list of addresses in this allocator
 		}
-		/// read all the blocks into cache or until memory limit is reached
-		void read_ahead(address_type start_address, u64 count){
-			get_session();
-			address_type start = start_address;
-			u64 blocks = 0;
-			size_t ts = os::millis();
-
-			//printf("start readahead %s\n", get_name().c_str());
-			//while(blocks < count){
-				block_request_ptr block = std::make_shared<block_request>();
-				block->start = start;
-				/// to retrieve a page of blocks
-				/// to retrieve a range of blocks
-
-				std::shared_ptr<Poco::Data::Statement> block_stmt;
-				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-				//u64 ts = os::millis();
-				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;",
-					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(count,false,false);
-				block_stmt->execute();
-				if(block->addresses.empty()){
-					return;
-				}
-				blocks += block->addresses.size();
-
-				block->init_use();
-				block->decode_all();
-				for(size_t a = 0; a < block->decoded.size(); ++a){
-					if(!inject(block->addresses[a],block->decoded[a])){
-						delete block->decoded[a];
-					}
-				}
-				start = block->addresses.back();
-				if(os::millis() - ts > 1000){
-					printf("read %s %lld\n ", get_name().c_str(), (long long)start);
-					ts = os::millis();
-				}
-			//}
-			//printf("readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
-		}
+		
 		/// copy all data to dest wether it exists or not
 
 		void copy(sqlite_allocator& dest){
@@ -1390,11 +1484,11 @@ namespace storage{
 				//printf("%lld, ", (long long)at);
 				buffer_type &r = allocate(at, read);
 
-				buffer_type *d = &(dest.allocate(at, write));
-				if(dest.is_end(*d)){
-					dest.complete();
-					d = &(dest.allocate(at, create));
-				}
+				buffer_type *d = &(dest.allocate(at, create));
+				//if(dest.is_end(*d)){
+				//	dest.complete();
+				//	d = &(dest.allocate(at, create));
+				//}
 				if((*this).get_allocated_version() <= dest.get_allocated_version()){
 					throw InvalidVersion();
 				}
@@ -1455,16 +1549,12 @@ namespace storage{
 				(*this).is_new = !df.exists();
 				if(!is_new){
 					get_session();
-					/// readahead io opt
-					/// os::read_ahead(get_storage_path() + name + extension);
+					
+					
 
 				}
 			}else (*this).is_new = true;
-			if(!is_new){
-				//lego.open(name+".blocks");
-			}
-			//if(!is_new)
-			//	read_ahead();
+			
 		}
 		virtual std::string get_name() const {
 			return (*this).name;
@@ -1565,7 +1655,8 @@ namespace storage{
 				}
 				allocations.clear();
 				versions.clear();
-				//lego.close();
+				if(lego.opened()) 
+					lego.close();
 			}
 		}
 
@@ -1703,7 +1794,7 @@ namespace storage{
 			if(!transacted){
 				get_session() << "PRAGMA shrink_memory;", now;
 				get_session() << "begin transaction;", now;
-				//lego.begin();
+				if(lego.opened()) lego.begin();
 				transacted = true;
 			}
 		}
@@ -1713,7 +1804,7 @@ namespace storage{
 		void commit_storage(){
 			if(transacted){
 				get_session() << "commit;", now;
-				//lego.commit();
+				if(lego.opened()) lego.commit();
 			}
 			
 			transacted = false;
@@ -1763,8 +1854,10 @@ namespace storage{
 
 		void rollback(){
 			syncronized ul(lock);
-			if(transacted)
+			if(transacted){
 				get_session() << "rollback;", now;
+				if(lego.opened()) lego.rollback();
+			}
 			get_session() << "PRAGMA shrink_memory;", now;
 			transacted = false;
 		}
@@ -2020,7 +2113,8 @@ namespace storage{
 			return false;
 		}
 		void check_global_use(){
-			if(treestore_current_mem_use > treestore_max_mem_use*0.85){
+			//if(treestore_current_mem_use > treestore_max_mem_use*0.85){
+			if(buffer_allocation_pool.is_near_depleted()){
 				stored::reduce_all();
 			}
 		}
@@ -2654,7 +2748,8 @@ namespace storage{
 		/// the version may be merged with dependent previous versions
 		/// returns true if the commit could take place
 		bool commit(version_storage_type* transaction){
-			if(treestore_current_mem_use > treestore_max_mem_use){
+			//if(treestore_current_mem_use > treestore_max_mem_use){
+			if(buffer_allocation_pool.is_near_depleted()){
 				stored::reduce_all();
 			}
 			bool writer = !transaction->is_readonly();

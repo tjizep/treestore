@@ -3,9 +3,11 @@
 #define _POOL_TS_H_20141129_
 #include <limits>
 #include <vector>
+#include <atomic>
 #include <Poco/Mutex.h>
 #include <Poco/Thread.h>
 #include <Poco/ThreadPool.h>
+#include <Poco/ThreadLocal.h>
 #include <Poco/TaskManager.h>
 #include <Poco/Task.h>
 #include <Poco/Timestamp.h>
@@ -22,11 +24,14 @@
 #include <unordered_map>
 extern void add_btree_totl_used(ptrdiff_t added);
 extern void remove_btree_totl_used(ptrdiff_t added);
-
+#ifdef _MSC_VER
+#define thread_local __declspec(thread)
+#endif
 namespace stx{
 	namespace storage{
 
 		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
+		typedef Poco::ScopedLockWithUnlock<Poco::FastMutex> f_synchronized;
 		typedef Poco::ScopedTryLock<Poco::Mutex> synchronizing;
 		extern void add_buffer_use(long long added);
 		extern void remove_buffer_use(long long removed);
@@ -301,6 +306,22 @@ namespace stx{
 					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
+			class pool_shared{
+			public:
+				pool_shared(){
+					allocated = 0;
+					used = 0;
+					max_pool_size = 0;
+					instances = 0;
+					current = 0;
+				}
+				u64 max_pool_size;
+
+				std::atomic<u64> allocated;
+				std::atomic<u64> used;				
+				std::atomic<u64> instances;
+				std::atomic<u64> current;
+			};
 
 			/// memory allocator overlay to improve allocation speed
 			class unlocked_pool{
@@ -329,55 +350,27 @@ namespace stx{
 
 					_Bucket bucket;
 				};
-				#ifdef _MSC_VER
-				//typedef ::google::dense_hash_map<size_t, _Clocked> _Buckets;
-				#else
-				typedef std::unordered_map<size_t, _Clocked> _Buckets;
-				#endif
+				
 				typedef rabbit::unordered_map<size_t, _Clocked> _Buckets;
-				//typedef std::unordered_map<size_t, _Clocked> _Buckets;
-				//typedef imperfect_hash<size_t, _Clocked> _Buckets;
-			protected:
-				typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _CleanupWorkerManager;
-
-				class _CleanupWorker : public asynchronous::AbstractWorker{
-				public:
-
-					_CleanupWorker(const _Clocked &todo) : todo(todo){
-					}
-
-					_Clocked todo;
-
-					virtual void work(){
-						for(_Bucket::iterator b = todo.bucket.begin(); b != todo.bucket.end(); ++b){
-							delete (*b).data; ///[] ???
-						}
-					}
-
-					virtual ~_CleanupWorker(){
-					}
-				};
+				
+			
 			protected:
 				/// data/fields/state
 
 				static const u64 MAX_ALLOCATION_SIZE = 25600000000000ll;
 				static const u64 USED_PERIOD = 1000000000ll;
-				static const u64 MIN_ALLOCATION_SIZE = 32ll;
+				static const u64 MIN_ALLOCATION_SIZE = 64ll;
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
-				u64 allocated;
+				pool_shared * shared;
 
-				u64 used;
 				u64 clock;
-				u64 max_pool_size;
+				u64 allocated;
 				u64 used_period;
+				u64 id;
 				_Buckets buckets;
 
 
 			protected:
-				_CleanupWorkerManager& get_cleanup(){
-					static _CleanupWorkerManager cleanup_workers(2);
-					return cleanup_workers;
-				}
 				/// methods
 				void update_min_used(_Clocked &clocked){
 					if(clocked.bucket.size() < clocked.min_size){
@@ -421,7 +414,8 @@ namespace stx{
 							if( b.get_value().clock < mclock){
 								row = 0;
 								mclock = b.get_value().clock;
-								msize = b.get_key();
+								msize = b.get_key();								
+								break;
 							}else{
 								++row;
 							}
@@ -434,77 +428,86 @@ namespace stx{
 					for(_Empties::iterator e = empties.begin(); e != empties.end();++e){
 						(*this).buckets.erase((*e));
 					}
+					
 					return msize;
 				}
-				void erase_lru(_Bucket& torelease){
-					u64 todo = allocated + used - max_pool_size;
-					while(used > 0 && (allocated + used) > max_pool_size){
+				void erase_lru(){
+					if(shared->used > 0 && (shared->allocated + shared->used) < shared->max_pool_size){
+						return;
+					}
+					if (this->allocated < ( shared->max_pool_size/shared->instances)) return;
+
+					///if(((++shared->current) % shared->instances) != this->id) return;
+					
+					u64 todo = shared->allocated + shared->used - shared->max_pool_size;
+					//while(shared->used > 0 && (shared->allocated + shared->used) > shared->max_pool_size){
 						size_t lru_size = find_lru_size();
 						if(lru_size < MAX_ALLOCATION_SIZE){
-							_Clocked &clocked = (*this).buckets[lru_size];
-							bool treestore_mm_thread = false;
-							if(treestore_mm_thread){
-								get_cleanup().add(new _CleanupWorker(clocked));
-								used -= ( clocked.bucket.size() * ( lru_size + overhead() ) );
-								clocked.bucket.clear();
-							}else{
-								if(clocked.size == lru_size){
-									while((allocated + used) > max_pool_size){
-										_Allocated allocated = clocked.bucket.back();
-										torelease.push_back(allocated);
-										used -= lru_size + overhead();
-										clocked.bucket.pop_back();
-										if(clocked.bucket.empty())
-											break;
-									}
-									/// printf("removed lru pool buckets %lld from size %lld\n",(long long)required,(long long)lru_size);
-								}else{
-									printf("Error in lru pool buckets %lld\n",(long long)lru_size);
-									return;
+							_Clocked &clocked = (*this).buckets[lru_size];						
+							if(clocked.size == lru_size){
+								while((shared->allocated + shared->used) > shared->max_pool_size){
+									_Allocated allocated = clocked.bucket.back();
+									///torelease.push_back(allocated);
+									delete allocated.data;
+									this->allocated -= lru_size + overhead();
+									shared->used -= lru_size + overhead();
+									clocked.bucket.pop_back();
+									if(clocked.bucket.empty())
+										break;
 								}
+								/// printf("removed lru pool buckets %lld from size %lld\n",(long long)required,(long long)lru_size);
+							}else{
+								printf("Error in lru pool buckets %lld\n",(long long)lru_size);
+								
+								return;
 							}
+							
 						}else{
+							
 							return;
 						}
-					}
+					//}					
 				}
 				
 
 			public:
 
-				unlocked_pool(u64 max_pool_size)
-				:	allocated(0)
-				,	used(0)
-				,	clock(0)
-				,	max_pool_size(max_pool_size)
+				unlocked_pool(pool_shared* shared)
+				:	shared(shared)
+				,	clock(0)				
+				,	allocated(0)
 				,	used_period(0)
 				{
+					//unlocked_pool::max_pool_size = max_pool_size;
+					this->id = ++(shared->instances);
+					printf("[INFO] [TS] creating unlocked pool\n");
 					setup_dh();
+
 
 				}
 
 				~unlocked_pool(){
 				}
 
-				void check_lru(_Bucket& torelease){
-					erase_lru(torelease);
+				void check_lru(){
+					erase_lru();
 				}
 				
 				size_t get_allocated() const {
-					return (*this).allocated;
+					return (*this).shared->allocated;
 				}
 				void set_max_pool_size(u64 max_pool_size){
 
-					this->max_pool_size = max_pool_size;
+					shared->max_pool_size = max_pool_size;
 
 				}
 				u64 get_used() {
 
-					return (*this).used;
+					return (*this).shared->used;
 				}
 				u64 get_total_allocated(){
 
-					return (*this).allocated + (*this).used;
+					return (*this).shared->allocated + (*this).shared->used;
 				}
 				void * allocate(size_t requested){
 
@@ -518,7 +521,8 @@ namespace stx{
 				_Allocated allocate_type(size_t requested, const std::type_info& ti) {
 
 					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
-						allocated += requested + overhead() ;
+						this->allocated += requested + overhead() ;
+						shared->allocated += requested + overhead() ;
 						_Allocated result(new u8[requested],ti);
 						result.is_new = true;
 
@@ -533,17 +537,18 @@ namespace stx{
 
 						result = current.back();
 						current.pop_back();
-						used -= size + overhead();
+						shared->used -= size + overhead();
 						
 					}else{
 
 						result.ti = &ti;
 						result.is_new = true;
 						result.data = new u8[size];
+						this->allocated += size ;
 					}
 					
-					allocated+=size + overhead();
-					
+					shared->allocated += size + overhead();
+					release_overflow();
 					return result;
 				}
 				void free(void * data, size_t requested){
@@ -551,10 +556,9 @@ namespace stx{
 				}
 				void free_type(const std::type_info& ti, void * data, size_t requested){
 					
-					
-
 					if(heap_for_small_data){// && requested < MAX_SMALL_ALLOCATION_SIZE){
-						allocated -= requested + overhead();
+						shared->allocated -= requested + overhead();
+						this->allocated -= requested + overhead();
 						delete data;
 						return;
 					}
@@ -564,26 +568,32 @@ namespace stx{
 						_Allocated allocated((u8*)data, ti);
 						allocated.is_new = false;
 						current.push_back(allocated);
-						used += size + overhead();
-						(*this).allocated -= size + overhead();
+						shared->used += size + overhead();
+						(*this).shared->allocated -= size + overhead();
 					}
-
+					release_overflow();
 					
 				}
 
 				/// returns true if the pool is depleted
-				bool is_depleted(){
+				bool is_depleted() const {
 
-					return ( allocated >= max_pool_size );
+					return ( shared->allocated >= shared->max_pool_size );
 				}
-				bool is_full(){
+				bool is_full() const {
 
-					return ( ( used + allocated )  >= max_pool_size );
+					return ( ( shared->used + shared->allocated )  >= shared->max_pool_size );
 				}
+				bool is_near_full() const {
 
+					return ( ( shared->used + shared->allocated )  >= shared->max_pool_size ) && ( shared->allocated > (shared->max_pool_size*0.1) );
+				}
+				void release_overflow(){					
+					check_lru();					
+				}
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
-					return ( allocated >= 0.98*max_pool_size );
+					return ( shared->allocated >= 0.95*shared->max_pool_size ) ;
 				}
 
 				/// simple template allocations
@@ -593,7 +603,7 @@ namespace stx{
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
-
+					
 					_Allocated allocated = (*this).allocate_type(sizeof(T),typeid(T));
 					void * potential = allocated.data;
 					new (potential) T();
@@ -608,16 +618,19 @@ namespace stx{
 
 			};
 			class pool{
-			protected:
-				typedef std::vector<unlocked_pool*> _Pools;
-				unlocked_pool sp;
-				_Pools pools;
-				Poco::Mutex lock;
-				u64 max_pool_size;
-				static const size_t MAX_POOL_ID = 128000;
+			protected:				
+				struct thread_instance{
+					pool* instance;
+					unlocked_pool* per_thread_pool;
+				};
+				typedef std::vector<thread_instance> thread_instances;								
+				pool_shared shared;
+				Poco::FastMutex lock;
+				unlocked_pool* unlocked;
 			public:
-				pool(u64 max_pool_size) : max_pool_size(max_pool_size),sp(max_pool_size){
-					/// pools.resize(MAX_POOL_ID);
+				pool(u64 max_pool_size) : unlocked (nullptr){					
+					set_max_pool_size(max_pool_size);
+					unlocked = new unlocked_pool(&shared);
 				}
 
 				~pool(){
@@ -627,122 +640,124 @@ namespace stx{
 					return const_cast<pool*>(this)->get_pool() ;
 				}
 				unlocked_pool& get_pool(){
+					//if(unlocked)
+					return *unlocked;
 					if(false){
-						int t = Poco::Thread::currentTid();
-						if(t< MAX_POOL_ID){
-
-							unlocked_pool *p = pools[t];
-							if(p == nullptr){
-								synchronized l(lock);
-								p = pools[t];
-								if(p == nullptr){
-									p = new unlocked_pool(max_pool_size/4);
-									pools[t] = p;
-								}
-							}else{
-								p->set_max_pool_size(max_pool_size/4);
-							}
-							return *p;
+						static thread_local thread_instances* instances= nullptr;
+						if(instances==nullptr){
+							instances = new thread_instances;
 						}
-						printf("ERROR: thread id to large\n");
+						for(thread_instances::iterator i = instances->begin(); i != instances->end(); ++i){
+							if((*i).instance==this){
+								return *((*i).per_thread_pool);
+							}
+						}
+						thread_instance instance;
+						instance.instance = this;
+						instance.per_thread_pool = new unlocked_pool(&shared);
+						instances->push_back(instance);					
+						return *(instance.per_thread_pool);
 					}
-					return sp;
+					
 				}
 				size_t get_allocated() const {
 
 					return get_pool().get_allocated();
 				}
 
-				void set_max_pool_size(u64 max_pool_size){
-					/// this->max_pool_size = max_pool_size;
-					this->max_pool_size = max_pool_size;
-					get_pool().set_max_pool_size(max_pool_size);
-
-
+				void set_max_pool_size(u64 max_pool_size){					
+					this->shared.max_pool_size = max_pool_size;					
 				}
-				u64 get_used() {
 
-					return get_pool().get_used();
+				u64 get_used() {
+					return this->shared.used;
 				}
 				u64 get_total_allocated(){
 
 					return get_pool().get_total_allocated();
 				}
-				void * allocate(size_t requested){
-					synchronized l(lock);
-
-					return get_pool().allocate(requested);
+				void * allocate(size_t requested){					
+					if(unlocked){
+						f_synchronized l(lock);
+						return get_pool().allocate(requested);
+					}else 
+						return get_pool().allocate(requested);
+					
 				}
 
 
 				void free(void * data, size_t requested){
-					synchronized l(lock);
-					get_pool().free(data, requested);
+					if(unlocked){
+						f_synchronized l(lock);
+						get_pool().free(data, requested);
+					}else 
+						get_pool().free(data, requested);
 				}
 
 				/// returns true if the pool is depleted
-				bool is_depleted(){
+				bool is_depleted() const {
 					return get_pool().is_depleted();
 
 				}
-				bool is_full(){
+				bool is_full() const {
 					return get_pool().is_full();
+				}
+				
+				bool is_near_full() const {
+					return get_pool().is_near_full();
 				}
 
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
 					return get_pool().is_near_depleted();
 				}
-
+				
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
-					T* r;
-					unlocked_pool::_Bucket torelease;
-					{
-						synchronized l(lock);
-						get_pool().check_lru(torelease);
-						if(!torelease.empty()){
-							for(unlocked_pool::_Bucket::iterator b = torelease.begin(); b!=torelease.end(); ++b){
-								unlocked_pool::_Allocated allocated = (*b);
-								delete allocated.data;
-							}
-						}
-						r = get_pool().allocate<T>();
-						
-					
+					T* r;					
+										
+					if(unlocked){
+						f_synchronized l(lock);
+						release_overflow();
+						r = get_pool().allocate<T>();					
+					}else{
+						release_overflow();
+						r = get_pool().allocate<T>();					
 					}
+					
 				
 					return r;
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
-					T* r;
-					unlocked_pool::_Bucket torelease;
-					{
-						synchronized l(lock);
-						get_pool().check_lru(torelease);
-						if(!torelease.empty()){
-							for(unlocked_pool::_Bucket::iterator b = torelease.begin(); b!=torelease.end(); ++b){
-								unlocked_pool::_Allocated allocated = (*b);
-								delete allocated.data;
-							}
-						}
+					T* r;					
+						
+					if(unlocked){
+						f_synchronized l(lock);
 						r = get_pool().allocate<T,_Context>(context);
-						
-						
+					}else{
+						r = get_pool().allocate<T,_Context>(context);								
 					}
+					
 					
 					return r;
 				}
 				template<typename T>
-				void free(T* v){
-					
-					v->~T();
-					synchronized l(lock);
-					get_pool().free<T>(v);
-					
-
+				inline void free(T* v){
+					if(!v) return;
+					v->~T();					
+					if(unlocked){
+						f_synchronized l(lock);
+						get_pool().free<T>(v);
+					}else{
+						get_pool().free<T>(v);
+					}
+				}
+				template<typename T>
+				inline void free_ns(T* v){
+					f_synchronized l(lock);
+					get_pool().free<T>(v);				
 				}
 			};
 		};
