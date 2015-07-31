@@ -218,6 +218,22 @@ namespace stored{
 		size_t get_hash() const{
 			return (size_t)value;
 		}
+		/// col bytes functions
+		size_t col_bytes() const{
+			return sizeof(value) ;
+		}
+
+		nst::u8 col_byte(size_t which) const {			
+			return ((const nst::u8*)(&value))[which];			
+		}
+		
+		void col_resize_bytes(size_t to){
+			value = 0;			
+		}
+
+		void col_push_byte(size_t which, nst::u8 v) {			
+			((nst::u8*)(&value))[which] = v;							
+		}
 	};
 
 	
@@ -280,6 +296,22 @@ namespace stored{
 		};
 		size_t get_hash() const{
 			return (size_t)value;
+		}
+		/// col bytes functions
+		size_t col_bytes() const{
+			return sizeof(value) ;
+		}
+
+		nst::u8 col_byte(size_t which) const {			
+			return ((const nst::u8*)(&value))[which];			
+		}
+		
+		void col_resize_bytes(size_t to){
+			value = 0;			
+		}
+
+		void col_push_byte(size_t which, nst::u8 v) {			
+			((nst::u8*)(&value))[which] = v;							
 		}
 	};
 
@@ -620,6 +652,24 @@ namespace stored{
 			set(right);
 
 		}
+		
+		/// col bytes functions
+		size_t col_bytes() const{
+			return get_size();
+		}
+		
+		nst::u8 col_byte(size_t which) const {			
+			return data()[which];			
+		}
+		
+		void col_resize_bytes(size_t to){
+			_resize_buffer(to);			
+			this->size = to;
+		}
+		
+		void col_push_byte(size_t which, nst::u8 v) {			
+			data()[which] = v;			
+		}
 
 		inline Blobule& operator=(const Blobule& right)
 		{
@@ -753,8 +803,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 100> BlobStored;
-	typedef stored::Blobule<true, 100> VarCharStored;
+	typedef stored::Blobule<false, 64> BlobStored;
+	typedef stored::Blobule<true, 64> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -1053,24 +1103,24 @@ namespace stored{
 			return r == 0;
 
 		}
-		size_t bytes() const{
+		size_t col_bytes() const{
 			return sizeof(row) + size();
 		}
-		nst::u8 byte(size_t which) const {
+		nst::u8 col_byte(size_t which) const {
 			if(which < sizeof(row)){
 				return ((const nst::u8*)(&row))[which];
 			}else{
 				return data()[which-sizeof(row)];
 			}
 		}
-		void resize_bytes(size_t to){
+		void col_resize_bytes(size_t to){
 			row = 0;
 			_resize_buffer(to-sizeof(row));
 			if(size() != to-sizeof(row)){
 				printf("resize error\n");
 			}
 		}
-		void push_byte(size_t which, nst::u8 v) {
+		void col_push_byte(size_t which, nst::u8 v) {
 			if(which < sizeof(row)){
 				((nst::u8*)(&row))[which] = v;				
 			}else{
@@ -1553,10 +1603,10 @@ namespace stored{
 			//return r;
 			return (size_t)data;
 		}
-		size_t bytes() const{
+		size_t col_bytes() const{
 			return sizeof(row) + sizeof(_DataType);
 		}
-		nst::u8 byte(size_t which) const {
+		nst::u8 col_byte(size_t which) const {
 			if(which < sizeof(row)){
 				return ((const nst::u8*)(&row))[which]; //((row >> ((row_type)(which*8))) & 0xFF);
 			}else{
@@ -1564,10 +1614,10 @@ namespace stored{
 				return ((const nst::u8*)(&data))[which-sizeof(row)];
 			}
 		}
-		void resize_bytes(size_t){
+		void col_resize_bytes(size_t){
 			row = 0;
 		}
-		void push_byte(size_t which, nst::u8 v) {
+		void col_push_byte(size_t which, nst::u8 v) {
 			if(which < sizeof(row)){
 				((nst::u8*)(&row))[which] = v;				
 			}else{
@@ -1623,12 +1673,8 @@ namespace stored{
 			return reader;
 		};
 	};
-
-	/// pivot encoder effective for sorted data i.e. indexes
-	template<class _ByteOrientedKey, class _Value>
-	struct byte_col_encoder{
-	private:
-
+	template<class _ByteOrientedKey>
+	struct byte_col_encoder_impl{
 		template<typename _PrimitiveInt>
 		size_t size_int(const _PrimitiveInt value) const {
 			return sizeof(_PrimitiveInt);
@@ -1644,33 +1690,6 @@ namespace stored{
 			value = *((const _PrimitiveInt*)&(*reader));
 			reader += sizeof(_PrimitiveInt);
 			return sizeof(_PrimitiveInt);
-		}
-		
-	public:
-
-		inline bool encoded(bool multi) const{
-
-			return !multi; // only encodes uniques;
-		}
-		
-		inline bool encoded_values(bool multi) const{
-
-			return false; 
-		}
-		
-		typedef nst::u16 count_t;
-		/// delegate value decoder
-		
-		void decode_values(...) {			
-		}
-		/// delegate value encoder
-		void encode_values(...) const {
-			
-		}
-		/// delegate value encoder
-		size_t encoded_values_size(...) {
-		
-			return 0;
 		}
 		template<typename _IntType>
 		void var_int_encode(nst::buffer_type::iterator& writer, _IntType value){
@@ -1711,10 +1730,10 @@ namespace stored{
 		void encode(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
 			bool tests = false;
 			nst::buffer_type::const_iterator reader = writer;
-			size_t colls = keys[0].bytes();			
+			size_t colls = keys[0].col_bytes();			
 
 			for(size_t k = 1; k < occupants; ++k){
-				if(colls != keys[k].bytes()){
+				if(colls != keys[k].col_bytes()){
 					colls = 0;
 					break;
 				}
@@ -1724,7 +1743,7 @@ namespace stored{
 			store_int(writer, colls);
 			for(size_t c = 0; c < colls; ++c){
 				for(size_t k = 0; k < occupants; ++k){
-					col[k] = keys[k].byte(c);
+					col[k] = keys[k].col_byte(c);
 				}				
 				nst::u8 prev = 0;
 				for(size_t k = 0; k < occupants; ++k){										
@@ -1764,11 +1783,11 @@ namespace stored{
 
 		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
 			
-			size_t colls = keys[0].bytes();
+			size_t colls = keys[0].col_bytes();
 			size_t result = 0;
 			
 			for(size_t k = 1; k < occupants; ++k){
-				if(colls != keys[k].bytes()){
+				if(colls != keys[k].col_bytes()){
 					colls = 0;
 					break;
 				}
@@ -1777,17 +1796,15 @@ namespace stored{
 			result += size_int(colls) + (occupants*colls);			
 			return result;
 		}
-		mutable nst::buffer_type col;
+		
 		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
 			size_t colls = 0;
 			read_int(colls, reader);
 			for(size_t o = 0; o < occupants; ++o){
 				keys[o] = _ByteOrientedKey();
-				keys[o].resize_bytes(colls);
+				keys[o].col_resize_bytes(colls);
 			}
-			
-			col.resize(occupants);
-			
+						
 			for(size_t c = 0; c < colls; ++c){				
 				
 				nst::u8 dt,d = 0;
@@ -1796,12 +1813,58 @@ namespace stored{
 				
 				for( ;k < occupants; ++k){
 					dt = *reader + d;
-					keys[k].push_byte(c, dt);
+					keys[k].col_push_byte(c, dt);
 					d = dt;
 					++reader;
 				}
 		
 			}
+		}
+	};
+	/// pivot encoder effective for sorted data i.e. indexes
+	template<class _ByteOrientedKey, class _Value>
+	struct byte_col_encoder  {
+	private:
+		byte_col_encoder_impl<_ByteOrientedKey> encoder;
+		
+	public:
+
+		inline bool encoded(bool multi) const{
+
+			return !multi; // only encodes uniques;
+		}
+		
+		inline bool encoded_values(bool multi) const{
+
+			return false; 
+		}
+		
+		typedef nst::u16 count_t;
+		/// delegate value decoder
+		
+		void decode_values(...) {			
+		}
+		/// delegate value encoder
+		void encode_values(...) const {
+			
+		}
+		/// delegate value encoder
+		size_t encoded_values_size(...) {
+		
+			return 0;
+		}
+		
+		/// col oriented encoding for exploiting the sort order of keys on a b-tree page		
+		void encode(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
+			encoder.encode(writer, keys, occupants);			
+		}
+
+		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
+			return encoder.encoded_size(keys, occupants);						
+		}
+		
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
+			encoder.decode(buffer, reader, keys, occupants);			
 		}
 		inline bool can(const _ByteOrientedKey &first , const _ByteOrientedKey &last, int size) const
 		{
@@ -1815,6 +1878,8 @@ namespace stored{
 
 	template <class _StoredRowId, class _Stored>
 	struct int_terpolator{
+		byte_col_encoder_impl<_Stored> value_encoder;
+
 		template<typename _PrimitiveInt>
 		size_t size_int(const _PrimitiveInt value) const {
 			return sizeof(_PrimitiveInt);
@@ -1832,8 +1897,8 @@ namespace stored{
 			return sizeof(_PrimitiveInt);
 		}
 
-		typedef typename _Stored::list_encoder value_encoder;
-		value_encoder encoder; /// delegate encoder/decoder
+	//	typedef typename _Stored::list_encoder value_encoder;
+	//	value_encoder encoder; /// delegate encoder/decoder
 		/// function assumes a list of increasing integer values
 		inline bool encoded(bool multi) const
 		{
@@ -1841,23 +1906,23 @@ namespace stored{
 		}
 		inline bool encoded_values(bool multi) const
 		{
-			return encoder.encoded(multi); // only encodes uniques;
+			return true; //value_encoder.encoded(multi); // only encodes uniques;
 		}
 		typedef nst::u16 count_t;
 		/// delegate value decoder
 		void decode_values(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
 
-			encoder.decode(buffer, reader, values, occupants);
+			value_encoder.decode(buffer, reader, values, occupants);
 		}
 		/// delegate value encoder
 		void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
 
-			encoder.encode(buffer, writer, values, occupants);
+			value_encoder.encode(writer, values, occupants);
 		}
 		/// delegate value encoder
 		size_t encoded_values_size(const _Stored* values, count_t occupants) {
 
-			return encoder.encoded_size(values, occupants);
+			return value_encoder.encoded_size(values, occupants);
 		}
 
 
@@ -1911,7 +1976,7 @@ namespace stored{
 		struct entropy_t{
 			typedef _IntType _Sampled;
 			/// , ::sta::col_tracker<_Sampled>
-			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled> > _UnsortedHistogram;
+			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			/// typedef ::google::dense_hash_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>> _UnsortedHistogram;
 			/// typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
@@ -1977,6 +2042,7 @@ namespace stored{
 			void sample(const _IntType& data){
 				if(!sorted_histogram.empty()){
 					clear_sorted();
+					//clear_unsorted();
 				}
 				size_t before = histogram.size();
 				typename _UnsortedHistogram::iterator u = histogram.find(data);
@@ -2091,7 +2157,7 @@ namespace stored{
 				}
 			};
 			/// , sta::col_tracker<_IntType>
-            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
+            typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
 			/// typedef ::google::dense_hash_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
 
 			/// typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::col_tracker<_IntType> > _CodeMap;

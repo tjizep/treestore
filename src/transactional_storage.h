@@ -969,11 +969,16 @@ namespace storage{
 
 		bool is_readahead;			/// flag set to enable read ahead
 
+		bool is_all_loaded;			/// set when all was loaded
+
+		bool is_read_cache;			/// control read caching - existing pages are kept
+
 		sixsided::transacted_blocks<block_type> lego;		
 									/// file blocks
 
 		typename _Allocations::iterator finder;
 
+		nst::u64 file_size;			/// file storage size
 		ptrdiff_t get_block_use(const block_descriptor& v){
 			return v.block.capacity() + sizeof(block_type)+32; /// the 32 is for the increase in the allocations table
 		}
@@ -1029,6 +1034,37 @@ namespace storage{
 		block_type current_block;
 		block_type compressed_block;
 		
+		struct block_request{
+			address_type start;
+			_AddressList addresses;
+			_AddressList sizes;
+			_BLOBs blocks;
+			_Descriptors decoded;
+			void init_use(){
+				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
+					add_buffer_use((*b).content().capacity());
+				}
+			}
+			void decode_all(){
+
+				decoded.clear();
+
+				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
+					block_descriptor* result = new block_descriptor(0);
+					///decompress_zlibh(result->block, (*b).content());
+					result->block.resize((*b).size());
+					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());
+					remove_buffer_use((*b).content().capacity());
+					///std::vector<char> e;
+					///(*b).swap(e);
+					decoded.push_back(result);
+				}
+				///printf("decoded %lld blocks in %lld millis\n",(long long)blocks.size(),(long long)os::millis()-ts);
+
+			}
+		};
+
+
 		address_type calc_block_start(address_type add ){
 			return (add & (~((address_type)MAX_READAHEAD-(address_type)1)));
 		}
@@ -1077,8 +1113,7 @@ namespace storage{
 				create_statements();
 				if(lego.opened()){
 					
-				}
-				//printf("opened %s\n", name.c_str());
+				}				
 			}
 			return *_session;
 		}
@@ -1148,6 +1183,17 @@ namespace storage{
 
 		
 		
+		bool inject(stream_address which, block_descriptor* descriptor){
+			synchronized s(lock);
+			if(allocations.count(which)==0){
+				up_use(reflect_block_use(descriptor));
+				descriptor->version = version_off(which);
+				descriptor->set_storage_action(read);
+				allocations[which] = descriptor;
+				return true;
+			}
+			return false;
+		}
 		/// sort acording to the clock value on a descriptor address pair
 
 		struct less_clock_descriptor{
@@ -1280,14 +1326,16 @@ namespace storage{
 		void check_use(){			
 
 
-			//if(treestore_current_mem_use > treestore_max_mem_use){
-			if(buffer_allocation_pool.is_near_depleted()){
+			if(		treestore_current_mem_use > treestore_max_mem_use
+			||		buffer_allocation_pool.is_near_depleted()
+			){
 				ptrdiff_t before = get_use();
-					
-				flush_back(0.1,true);
-				get_session() << "PRAGMA shrink_memory;", now;
-				last_flush_time = ::os::millis();
-				printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
+				if(before > 1024*1024){
+					flush_back(0.7,true);
+					get_session() << "PRAGMA shrink_memory;", now;
+					last_flush_time = ::os::millis();
+					printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
+				}
 				
 			}
 		}
@@ -1303,9 +1351,9 @@ namespace storage{
 		}
 		bool find_block(const address_type& which, ref_block_descriptor& result){
 			
-			return allocations.get(which,result);
+			//return allocations.get(which,result);
 			
-			if(false){
+			if(true){
 				typename _Allocations::iterator fr = allocations.find(which);
 				
 				bool finder = fr != allocations.end(); //allocations.get(which,result);//
@@ -1316,7 +1364,9 @@ namespace storage{
 			}
 		}
 	protected:
+		/// the single read block to return when read caching is disabled
 		block_type read_block;
+
 		block_type & _allocate(address_type& which, storage_action how){
 
 			lock.lock();
@@ -1332,28 +1382,21 @@ namespace storage{
 				
 				if(!finder){
 					/// load from storage
-					check_use();
+					check_use();	
 					if((*this).get_buffer(which))
 					{
-
-						if(read == how){
-							bool noreadcache = false; //!modified();
-							if(noreadcache){
-								read_block.clear();
-								read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
-								currently_active = which;
-								allocated_version = version_off(which);
-								return read_block;
-							}
-							result = new block_descriptor(version_off(which));
-							result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
-							allocations[which] = result;
-
-						}else{
-							result = new block_descriptor(version_off(which));
-							result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
-							allocations[which] = result;
+						
+						if(!this->is_read_cache){
+							read_block.clear();
+							read_block.insert(read_block.begin(), current_block.begin(), current_block.end());
+							currently_active = which;
+							allocated_version = version_off(which);
+							return read_block;
 						}
+						result = new block_descriptor(version_off(which));
+						result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
+						allocations[which] = result;
+						
 					}else if(how == create)
 					{
 						result = new block_descriptor(version_off(which));
@@ -1371,6 +1414,7 @@ namespace storage{
 				}
 				result->set_storage_action(how);
 			}else{
+				check_use();
 				if(how != create) /// this is also probably a bit pedantic
 					throw InvalidStorageAction();
 
@@ -1468,7 +1512,64 @@ namespace storage{
 			}
 			/// out contains a unique list of addresses in this allocator
 		}
+
+		/// set read cache to desired state
+		void set_read_cache(bool is_read_cache){
+			synchronized s(lock);
+			this->is_read_cache = is_read_cache;
+		}
 		
+		void load_all(){			
+			synchronized s(lock);
+			if(treestore_current_mem_use + this->file_size < treestore_max_mem_use){							
+				if(!is_all_loaded){
+					read_ahead(0, next);
+					is_all_loaded = true;
+				}
+			}
+		}
+		
+		/// read all the blocks into cache or until memory limit is reached
+		void read_ahead(address_type start_address, u64 count){
+			get_session();
+			address_type start = start_address;
+			u64 blocks = 0;
+			size_t ts = os::millis(),tst = os::millis();
+			
+			typedef std::shared_ptr<block_request> block_request_ptr;
+			printf("[TS] [INFO] readahead %s starting %lld s\n", get_name().c_str(),(long long)count);
+			//while(blocks < count){
+				block_request_ptr block = std::make_shared<block_request>();
+				block->start = start;
+				/// to retrieve a page of blocks
+				/// to retrieve a range of blocks
+
+				std::shared_ptr<Poco::Data::Statement> block_stmt;
+				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
+				//u64 ts = os::millis();
+				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;",
+					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(count,false,false);
+				block_stmt->execute();
+				if(block->addresses.empty()){
+					return;
+				}
+				blocks += block->addresses.size();
+
+				block->init_use();
+				block->decode_all();
+				for(size_t a = 0; a < block->decoded.size(); ++a){
+					if(!inject(block->addresses[a],block->decoded[a])){
+						delete block->decoded[a];
+					}
+				}
+				start = block->addresses.back();
+				if(os::millis() - ts > 1000){
+					printf("read %s %lld\n ", get_name().c_str(), (long long)start);
+					ts = os::millis();
+				}
+			//}
+			printf("[TS] [INFO] readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
+		}
 		/// copy all data to dest wether it exists or not
 
 		void copy(sqlite_allocator& dest){
@@ -1534,7 +1635,10 @@ namespace storage{
 		,	_use(0)						/// current memory use in bytes
 		,	decoders_away(0)			/// worker units busy decoding
 		,	is_readahead(false)			/// disables read ahead
+		,	is_all_loaded(false)		/// set when all was loaded to prevent repeat loads
+		,	is_read_cache(true)			/// the read cache defaults to active
 		,	result(nullptr)				///	save the last result after allocate is called to improve safety
+		,	file_size(0)				/// no file size initialy
 
 					/// if true the data files are deleted on destruction
 
@@ -1548,10 +1652,8 @@ namespace storage{
 				File df (get_storage_path() + name + extension );
 				(*this).is_new = !df.exists();
 				if(!is_new){
-					get_session();
-					
-					
-
+					file_size = df.getSize();
+					get_session();					
 				}
 			}else (*this).is_new = true;
 			
@@ -1672,7 +1774,10 @@ namespace storage{
 				++changes;
 			}
 		}
-
+		/// return the storage size of this allocator
+		nst::u64 get_storage_size() const {
+			return this->file_size;
+		}
 		/// return the last allocated address
 
 		address_type last() const{
@@ -1869,7 +1974,7 @@ namespace storage{
 			
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.25,true);
+				flush_back(0.7,true);
 			get_session() << "PRAGMA shrink_memory;", now;
 		}
 	};
@@ -2608,6 +2713,23 @@ namespace storage{
 			journal::get_instance().release_participant(this);
 
 			initial->release();
+		}
+
+		/// return the storage size of the initial storage
+		nst::u64 get_storage_size() const {			
+			return this->initial->get_storage_size();			
+		}
+
+		/// set read cache to desired state
+		void set_read_cache(bool is_read_cache){
+			syncronized _sync(*lock);
+			initial->set_read_cache(is_read_cache);
+		}
+
+		/// load all loads the complete storage into memory
+		void load_all(){
+			syncronized _sync(*lock);
+			initial->load_all();
 		}
 
 		/// engages the instance - its resources may not be released if references > 0

@@ -12,9 +12,23 @@
 #include <string.h>
 #include <stx/storage/pool.h>
 /// memuse variables
+extern char treestore_column_cache ;
 extern long long treestore_max_mem_use ;
 extern long long treestore_current_mem_use ;
+extern double treestore_column_cache_factor;
+extern double treestore_column_block_factor;
 extern long long  _reported_memory_size();
+static double calc_treestore_column_block_factor(){
+	if(treestore_column_cache==0) return 0.98;
+	return treestore_column_block_factor;
+}
+static long long treestore_calc_max_col_use(){
+	return (treestore_max_mem_use*(1-treestore_column_cache_factor)*(1-calc_treestore_column_block_factor()));
+}
+static long long treestore_calc_max_block_use(){	
+	return (treestore_max_mem_use*(1-treestore_column_cache_factor)*(calc_treestore_column_block_factor()));
+}
+
 extern long long calc_total_use();
 /// the allocation pool
 extern stx::storage::allocation::pool allocation_pool;

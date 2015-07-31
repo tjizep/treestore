@@ -314,8 +314,8 @@ namespace tree_stored{
 		}
 	public:
 
-		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize,bool do_load)
-		:	col(name, do_load)
+		my_collumn(std::string name, nst::u32 number, nst::u32 rowsize, nst::u32 max_field_size,bool do_load)
+		:	col(name, max_field_size, do_load)
 		,	worker(nullptr)
 		,	wid(storage_workers::get_next_counter())
 		,	number(number)
@@ -692,13 +692,13 @@ namespace tree_stored{
 			calculated.clear();
 			table_size = 0;
 			row_count = 0;
-			max_row_id = 0;
+			max_row_id = 0;			
 		}
 		_DensityInfo calculated;
 		nst::u64 table_size;
-		/// these two values are synonymous
+		/// these two values are not synonymous
 		_Rid row_count;
-		_Rid max_row_id;
+		_Rid max_row_id;		
 	};
 	
 	typedef std::vector<selection_tuple> _Selection;
@@ -712,13 +712,14 @@ namespace tree_stored{
 		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
 		struct shared_data{
-			shared_data() : auto_incr(0),row_count(0){
+			shared_data() : auto_incr(0),row_count(0),calculated_max_row_id(0){
 			}
 			Poco::Mutex lock;
 			Poco::Mutex write_lock;
 			nst::u64 last_write_lock_time;
 			_Rid auto_incr;
 			_Rid row_count;
+			_Rid calculated_max_row_id;
 		};
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
@@ -744,78 +745,80 @@ namespace tree_stored{
 			for (Field **field=share->field ; *field ; field++){
 				ha_base_keytype bt = (*field)->key_type();
 				nst::u32 fi = (*field)->field_index;
+				nst::u32 field_size = (*field)->max_display_length();
+				//if(cols[(*field)->field_index]){
+					//cols[(*field)->field_index]->set_max_size();
+				//}
 				switch(bt){
 					case HA_KEYTYPE_END:
 						// ERROR ??
 						break;
 					case HA_KEYTYPE_FLOAT:
-						cols[(*field)->field_index] = new my_collumn<stored::FloatStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::FloatStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_DOUBLE:
-						cols[(*field)->field_index] = new my_collumn<stored::DoubleStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::DoubleStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_SHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::ShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_LONG_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_USHORT_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::UShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::UShortStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_ULONG_INT:
-						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_LONGLONG:
-						cols[(*field)->field_index] = new my_collumn<stored::LongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::LongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_ULONGLONG:
-						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi, rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::ULongIntStored>(path+TABLE_SEP()+(*field)->field_name,fi, rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_INT24:
-						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize, false);
+						cols[(*field)->field_index] = new my_collumn<stored::IntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size, false);
 						break;
 					case HA_KEYTYPE_UINT24:
-						cols[(*field)->field_index] = new my_collumn<stored::UIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize, false);
+						cols[(*field)->field_index] = new my_collumn<stored::UIntStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize, field_size,false);
 						break;
 					case HA_KEYTYPE_INT8:
-						cols[(*field)->field_index] = new my_collumn<stored::CharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::CharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 						break;
 					case HA_KEYTYPE_BIT:
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,false);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,false);
 
 						break;
 
 					case HA_KEYTYPE_NUM:			/* Not packed num with pre-space */
 					case HA_KEYTYPE_TEXT:			/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
 						break;
 
 					case HA_KEYTYPE_BINARY:			/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
 						break;
 					/* Varchar (0-255 bytes) with length packed with 1 byte */
 					case HA_KEYTYPE_VARTEXT1:               /* Key is sorted as letters */
 					/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARTEXT2:		/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
 						break;
 					case HA_KEYTYPE_VARBINARY1:             /* Key is sorted as unsigned chars length packed with 1 byte*/
 						/* Varchar (0-65535 bytes) with length packed with 2 bytes */
 					case HA_KEYTYPE_VARBINARY2:		/* Key is sorted as unsigned chars */
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
 						break;
 
 					default:
 						//TODO: ERROR ??
 						/// default to var bin
-						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,treestore_efficient_text);
+						cols[(*field)->field_index] = new my_collumn<stored::BlobStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
 
 						break; //do nothing pass
 				}//switch
-				if(cols[(*field)->field_index]){
-					cols[(*field)->field_index]->set_max_size((*field)->max_display_length());
-				}
+				
 				//_max_row_id = std::max<_Rid>(_max_row_id, cols[(*field)->field_index]->stored_rows());
 			}
 		}
@@ -1051,13 +1054,28 @@ namespace tree_stored{
 			}
 			return 1;
 		}
+		_Rid get_calc_row_id() const {
+			if(share!=nullptr){
+				return share->calculated_max_row_id;
+			}
+			return 0;
+		}
+		void set_calc_max_rowid(_Rid calc_max_id){
+			if(share!=nullptr){
+				nst::synchronized shared(share->lock);
+				share->calculated_max_row_id = calc_max_id;
+			}else{
+				printf("[TS] [ERROR] share not set\n");
+			}
+		}
 		void reset_auto_incr(){
 			if(share!=nullptr){
 				share->auto_incr = 1;
 			}else{
-				printf("share not set\n");
+				printf("[TS] [ERROR] share not set\n");
 			}
 		}
+
 		void reset_auto_incr(_Rid initial){
 			if(share != nullptr){
 				nst::synchronized shared(share->lock);
@@ -1086,7 +1104,8 @@ namespace tree_stored{
 				}
 				(*this).calculated_info.table_size = (*this).table_size();
 				(*this).calculated_info.row_count = (*this).share->row_count;
-				(*this).calculated_info.max_row_id = (*this).get_auto_incr();
+				(*this).calculated_info.max_row_id = (*this).share->calculated_max_row_id; //(*this).get_auto_incr();
+				//(*this).calculated_info.calculated_max_row_id = (*this).share->calculated_max_row_id;
 			}else{
 				printf("share not set\n");
 			}
@@ -1796,8 +1815,9 @@ namespace tree_stored{
 			
 				nst::synchronized shared(share->lock);
 				if(share->row_count == 0){
-					share->row_count = (*this).get_row_count();
+					share->row_count = (*this).get_row_count();					
 					share->auto_incr = ++r;				
+					share->calculated_max_row_id = r;
 				}
 			
 			}
@@ -1866,8 +1886,7 @@ namespace tree_stored{
 				last_unlock_time = os::micros();
 			}
 		}
-
-		void write(TABLE* table){
+		void write_noinc(TABLE* table){
 			check_load(table);
 			if(!changed)
 			{
@@ -1900,14 +1919,17 @@ namespace tree_stored{
 
 			(*this).get_table().insert(get_auto_incr(), '0');
 			if(get_auto_incr() % 300000 == 0){
-				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , table->s->table_name.str);
+				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , table->s->table_name.str);				
 				//reduce_col_use();
 				//reduce_use();
 			}			
-			
-			nst::synchronized shared((*this).share->lock);
+			share->row_count = (*this).get_row_count();			
+		}
+		void write(TABLE* table){
+			write_noinc(table);
+			//nst::synchronized shared((*this).share->lock);
 			(*this).share->auto_incr++;
-			share->row_count = (*this).get_row_count();
+			
 			
 		}
 

@@ -106,7 +106,7 @@ namespace tree_stored{
 		public:
 			void flush_key_buffer(){
 				if(!buffer.empty()){
-					std::sort(buffer.begin(), buffer.end());
+					///std::sort(buffer.begin(), buffer.end());
 
 					for(typename _KeyBuffer::iterator b = buffer.begin(); b != buffer.end(); ++ b){
 						index.insert((*b));

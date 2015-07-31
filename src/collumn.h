@@ -48,11 +48,13 @@ namespace nst = NS_STORAGE;
 namespace collums{
 	
 	template<class _StoredType>
+	
 	struct col_policy_type{
 		bool load(size_t max_size) const{
-			return max_size < 0;
+			return max_size <= 8;
 		}
 	};
+	
 	template<>
 	struct col_policy_type<stored::UShortStored>{
 		bool load(size_t) const{
@@ -423,6 +425,7 @@ namespace collums{
 					clear();
 					available = false;
 				}else{
+					encoded.clear();
 					resize(rows_cached);
 					load_data(col,start,p_end);
 					col_page_use += calc_use() ;
@@ -654,7 +657,10 @@ namespace collums{
 		}
 
 		void load_cache(){
-			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) return;
+			
+			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) {
+				return;
+			}
 			if(pages==nullptr && max_row_id > 0){
 				using namespace stored;
 				pages = load_cache(storage.get_name(),max_row_id); ///= new _CachePages(); ///
@@ -712,7 +718,7 @@ namespace collums{
 
 
 		typedef ImplIterator<_ColMap> iterator_type;
-		collumn(std::string name, bool load = false)
+		collumn(std::string name, size_t max_size, bool load = false)
 		:	storage(name)
 		,	col(storage)
 		,	pages(nullptr)
@@ -721,9 +727,11 @@ namespace collums{
 		,	modified(false)
 		,	lazy(load)
 		,	sampler(0)
-		,	max_size(0)
+		,	max_size(max_size)
 		{
-
+			if(!col_policy.load(max_size) || treestore_column_cache==FALSE ){
+				this->storage.load_all();
+			}
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -737,6 +745,7 @@ namespace collums{
 
 		void set_data_max_size(size_t max_size){
 			this->max_size = max_size;
+			
 		}
 		
 		void initialize(bool by_tree){
@@ -799,7 +808,7 @@ namespace collums{
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
 					if(	(
-							nst::col_use + bytes_used > treestore_max_mem_use / 2
+							nst::col_use + bytes_used > treestore_calc_max_col_use()
 						)
 						||
 						(
@@ -810,7 +819,9 @@ namespace collums{
 						page->loading = false;
 
 					}else{
+						storage.set_read_cache(false);
 						page->finish(col,storage.get_name(),l,l+MAX_PAGE_SIZE);
+						storage.set_read_cache(true);
 						page->loaded = true;
 						page->loading = false;
 					}

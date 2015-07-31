@@ -2046,6 +2046,7 @@ namespace stx
 				(*this).set_occupants(leb128::read_signed(reader));
 				(*this).level = leb128::read_signed(reader);
 				nst::i32 encoded_key_size = leb128::read_signed(reader);
+				nst::i32 encoded_value_size = leb128::read_signed(reader);
 				(*this).set_version(version);
 				(*this).next = NULL_REF;
 				(*this).preceding = NULL_REF;
@@ -2069,7 +2070,7 @@ namespace stx
 					}
 				}
 
-				if(interp.encoded_values(btree::allow_duplicates)){
+				if(encoded_value_size > 0){
 					interp.decode_values(buffer, reader, values, (*this).get_occupants());
 				}else{
 
@@ -2107,9 +2108,17 @@ namespace stx
 			void save(key_interpolator interp, storage_type &storage, buffer_type& buffer) const {
 				using namespace stx::storage;
 				nst::i32 encoded_key_size = interp.encoded_size(keys, (*this).get_occupants());
+				nst::i32 encoded_value_size = interp.encoded_values_size(values, (*this).get_occupants());
+				if(!interp.encoded(btree::allow_duplicates)){
+					encoded_key_size = 0;
+				}
+				if(!interp.encoded_values(btree::allow_duplicates)){
+					encoded_value_size = 0;
+				}
 				ptrdiff_t storage_use = leb128::signed_size((*this).get_occupants());
 				storage_use += leb128::signed_size((*this).level);
 				storage_use += leb128::signed_size(encoded_key_size);
+				storage_use += leb128::signed_size(encoded_value_size);
 				storage_use += leb128::signed_size(preceding.get_where());
 				storage_use += leb128::signed_size(next.get_where());				
 				if(encoded_key_size > 0 && interp.encoded(btree::allow_duplicates)){
@@ -2121,9 +2130,10 @@ namespace stx
 					}
 
 				}
-				if(interp.encoded_values(btree::allow_duplicates)){
+				if(encoded_value_size > 0 && interp.encoded_values(btree::allow_duplicates)){
 					storage_use += interp.encoded_values_size(values, (*this).get_occupants());
 				}else{
+					encoded_value_size = 0;
 					for(u16 k = 0; k < (*this).get_occupants();++k){
 						storage_use += storage.store_size(values[k]);
 					}
@@ -2136,6 +2146,7 @@ namespace stx
 				writer = leb128::write_signed(writer, (*this).get_occupants());
 				writer = leb128::write_signed(writer, (*this).level);
 				writer = leb128::write_signed(writer, encoded_key_size);
+				writer = leb128::write_signed(writer, encoded_value_size);				
 				writer = leb128::write_signed(writer, preceding.get_where());
 				writer = leb128::write_signed(writer, next.get_where());
 				if(encoded_key_size > 0 && interp.encoded(btree::allow_duplicates)){
@@ -2145,7 +2156,7 @@ namespace stx
 						storage.store(writer, keys[k]);
 					}
 				}
-				if(interp.encoded_values(btree::allow_duplicates)){
+				if(encoded_value_size > 0 && interp.encoded_values(btree::allow_duplicates)){
 					interp.encode_values(buffer, writer, values, (*this).get_occupants());
 				}else{
 					for(u16 k = 0; k < (*this).get_occupants();++k){
@@ -3725,14 +3736,7 @@ namespace stx
 			,	changes(0)
 			,	last_surface_size(0)
 			{
-			}
-			void report_use(){
-                /// when use has reached a critical level flushing may start
-                if(OS_CLOCK()-pto > 200){
-                    BTREE_PRINT("mem use %.4g mb \n",(double)use/(1024.0*1024.0));
-                    pto = OS_CLOCK();
-                }
-			}
+			}			
 			/// Return the total number of nodes
 			inline size_type nodes() const
 			{
@@ -4054,7 +4058,7 @@ namespace stx
 		
 		void recycle(surface_node* s){
 			
-			if(::stx::memory_low_state){
+			if( ::stx::memory_low_state){
 				free_surfaces();
 				allocation_pool.free<surface_node>(s);
 			}else{
@@ -4085,7 +4089,7 @@ namespace stx
 			if(!surfaces.empty()){
 				r = surfaces.back();
 				surfaces.pop_back();
-				//new (r) surface_node();
+				/// new (r) surface_node();
 			}
 			return r;
 		}
@@ -4179,7 +4183,6 @@ namespace stx
 
 		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
-			/// ||allocation_pool.is_near_depleted()
 			if(::stx::memory_low_state){
 				reduce_use();
 				
@@ -4438,10 +4441,9 @@ namespace stx
 					++reloads;
 					if
 					(	get_storage()->get_boot_value(b) 
+					&&	surfaces_loaded.size() < 300
 					///&&	(reloads % 4000) != 0
-					&&	(	get_storage()->is_readonly()
-						||	surfaces_loaded.size() < 100
-						)
+					///&&	(	get_storage()->is_readonly()||	)
 					){ ///&& surfaces_loaded.size() < 300
 
 						if(b == root.get_where()){

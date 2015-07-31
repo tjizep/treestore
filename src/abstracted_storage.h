@@ -151,6 +151,17 @@ namespace stored{
 				printf("error closing transaction\n");
 			}
 		}
+
+		nst::u64 get_storage_size() {
+			return get_allocations().get_storage_size();
+		}
+
+		void load_all(){
+			get_allocations().load_all();
+		}
+		void set_read_cache(bool read_cache){
+			get_allocations().set_read_cache(read_cache);
+		}
 		bool is_readahead() const {
 			if(has_allocations()){
 				return get_allocations().is_readahead();

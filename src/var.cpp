@@ -1,18 +1,24 @@
-long long treestore_max_mem_use = 0;
-long long treestore_current_mem_use = 0;
-long long treestore_journal_lower_max = 0;
-long long treestore_journal_upper_max = 0;
-long long treestore_journal_size = 0;
-double	treestore_column_cache_factor = 0.5;
-my_bool treestore_efficient_text = FALSE;
+long long	treestore_max_mem_use = 0;
+long long	treestore_current_mem_use = 0;
+long long	treestore_journal_lower_max = 0;
+long long	treestore_journal_upper_max = 0;
+long long	treestore_journal_size = 0;
+/// if there are more threads than this active (in locked state)
+/// new transactions are throttled to reduce concurrency
+long long	treestore_max_thread_concurrency = 7;
 
-char treestore_column_cache = TRUE;
-char treestore_column_encoded = TRUE;
-char treestore_predictive_hash = TRUE;
-char treestore_reduce_tree_use_on_unlock = FALSE;
-char treestore_reduce_index_tree_use_on_unlock = FALSE;
-char treestore_reduce_storage_use_on_unlock = TRUE;
-char treestore_use_primitive_indexes = TRUE;
+double		treestore_column_cache_factor = 0.5;
+
+double		treestore_column_block_factor = 0.5;
+my_bool		treestore_efficient_text = FALSE;
+
+char		treestore_column_cache = TRUE;
+char		treestore_column_encoded = TRUE;
+char		treestore_predictive_hash = TRUE;
+char		treestore_reduce_tree_use_on_unlock = FALSE;
+char		treestore_reduce_index_tree_use_on_unlock = FALSE;
+char		treestore_reduce_storage_use_on_unlock = TRUE;
+char		treestore_use_primitive_indexes = TRUE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,

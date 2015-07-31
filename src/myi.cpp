@@ -20,8 +20,10 @@ nst::u64 total_cache_size=0;
 nst::u64 ltime = 0;
 bool treestore_print_lox = false;
 Poco::AtomicCounter writers ;
-static nst::u64 total_locks = 0;
+static std::atomic<nst::u64> total_locks = 0;
+static std::atomic<nst::u64> total_threads_locked = 0;
 static Poco::Mutex mut_total_locks;
+static Poco::Mutex mut_concurrency;
 extern "C" int get_l1_bs_memory_use();
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
@@ -84,6 +86,7 @@ namespace tree_stored{
 		bool changed;
 		bool used;
 		bool _is_writer;
+		bool first_throttled;
 		Poco::Thread::TID created_tid;
 
 
@@ -91,6 +94,12 @@ namespace tree_stored{
 		Poco::Mutex writer_lock;
 		int get_locks() const {
 			return locks;
+		}
+		bool is_first_throttled() const {
+			return this->first_throttled;
+		}
+		void set_first_throttled(bool first_throttled){
+			this->first_throttled = first_throttled;
 		}
 		bool is_writer() const {
 			return this->_is_writer;
@@ -100,6 +109,7 @@ namespace tree_stored{
 		,	changed(false)
 		,	used(false)
 		,	_is_writer(_is_writer)
+		,	first_throttled(false)
 		{
 		    printf("create tree thread\n");
 			created_tid = Poco::Thread::currentTid();
@@ -652,10 +662,9 @@ public:
 		if(get_tree_table() == NULL){
 			return 0;
 		}
-		{
-			nst::synchronized s(mut_total_locks);
-			++total_locks;
-		}
+		
+		++total_locks;
+		
 		if (thd_sql_command(ha_thd()) == SQLCOM_TRUNCATE) {
 			DBUG_PRINT("info",("the table is being truncated\n"));
 		}
@@ -727,10 +736,9 @@ public:
 
 
 
-		{
-			nst::synchronized s(mut_total_locks);
-			--total_locks;
-		}
+			
+		--total_locks;
+		
 		return 0;
 	}
 
@@ -1096,10 +1104,18 @@ public:
 				);
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
-			{
-				nst::synchronized s(mut_total_locks);
-				++total_locks;
+							
+			++total_locks;
+			if(thread->get_locks()==0){
+				++total_threads_locked;
+				if(total_threads_locked > treestore_max_thread_concurrency){
+					mut_concurrency.lock();
+					DBUG_PRINT("info",("[TS] [INFO] throtling threads\n"));
+					thread->set_first_throttled(true);
+				
+				}
 			}
+			
 			if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max){
 				NS_STORAGE::journal::get_instance().synch(true);
 				if(get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max)
@@ -1126,12 +1142,19 @@ public:
 				r_stop.clear();
 				r.clear();
 				clear_thread(thd);
+				if(thread->is_first_throttled()){
+					thread->set_first_throttled(false);
+					mut_concurrency.unlock();
+				}
+					
 				if(thread->is_writing()){
 					st.release_writer(table->s,thread);
 				}else{
 					st.release_thread(thread);
 				}
-				/// (*this).tt = 0;
+				
+				--total_threads_locked;
+					
 
 				/// for testing
 				//st.reduce_all();
@@ -1158,11 +1181,9 @@ public:
 
 			}
 
-			{
-				nst::synchronized s(mut_total_locks);
-				--total_locks;
-
-			}
+						
+			--total_locks;
+			
 		}
 
 
@@ -1364,11 +1385,8 @@ public:
 
 		return 0;
 	}
-	int writes;
+	nst::u64 writes;
 	int write_row(byte * buff){
-		if(stx::memory_low_state ){ ///|| ((writes%300000)==0)
-			//get_thread()->own_reduce();
-		}
 		++writes;
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
 		/// TODO: auto timestamps
@@ -1379,18 +1397,12 @@ public:
 			if(auto_increment_update_required){
 				int e = update_auto_increment();
 				if(e) return e;
+				get_tree_table()->set_calc_max_rowid(table->next_number_field->val_int());			
 			}
 
 		}
-
 		get_tree_table()->write((*this).table);
-
-		
-		if(auto_increment_update_required){
-			get_tree_table()->reset_auto_incr(table->next_number_field->val_int());
-		}else{
-			///get_tree_table()->incr_auto_incr();
-		}
+	
 		return 0;
 	}
 
@@ -1692,7 +1704,7 @@ public:
 			table->status = 0;
 			if(table->next_number_field){
 				table->next_number_field->ptr += table->s->rec_buff_length;
-				table->next_number_field->store(get_tree_table()->get_auto_incr());
+				table->next_number_field->store(get_tree_table()->get_calc_row_id());
 				table->next_number_field->ptr -= table->s->rec_buff_length;
 			}
 		}
@@ -1991,16 +2003,21 @@ namespace ts_cleanup{
 			nst::u64 last_print_size = calc_total_use();
 			/// DEBUG: nst::u64 last_check_size = calc_total_use();
 			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+			printf("set block use to %.4g MB \n",(double)treestore_calc_max_block_use()/units::MB);
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(500);
+				Poco::Thread::sleep(200);
 				/// int j = int();
 				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
-				buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor)*0.75);
+				buffer_allocation_pool.set_max_pool_size(treestore_calc_max_block_use());
 				
-				stx::memory_low_state = allocation_pool.is_depleted();
-				if(buffer_allocation_pool.is_near_full()){
-					stored::reduce_all();
+				stx::memory_low_state = allocation_pool.is_near_depleted(); //allocation_pool.is_depleted();//
+				if
+				(	treestore_current_mem_use > treestore_max_mem_use 
+				||	buffer_allocation_pool.is_near_depleted()
+				)
+				{
+					//stored::reduce_all();
 				}
 				
 				if(stx::memory_low_state){
@@ -2044,10 +2061,8 @@ void start_cleaning(){
 
 namespace ts_info{
 	void perform_active_stats(const std::string table){
-		{
-			nst::synchronized s(mut_total_locks);
-			++total_locks;
-		}
+		++total_locks;
+		
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
 		typedef std::vector<tree_stored::tree_table*, sta::tracker<tree_stored::tree_table*> > _Tables;
@@ -2071,16 +2086,11 @@ namespace ts_info{
 			}
 
 		}
-		{
-			nst::synchronized s(mut_total_locks);
-			--total_locks;
-		}
+		--total_locks;		
 	}
 	void perform_active_stats(){
-		{
-			nst::synchronized s(mut_total_locks);
-			++total_locks;
-		}
+		++total_locks;
+		
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
 		typedef std::vector<tree_stored::tree_table*,sta::tracker<tree_stored::tree_table*> > _Tables;
@@ -2100,10 +2110,8 @@ namespace ts_info{
 			(*i)->rollback();
 
 		}
-		{
-			nst::synchronized s(mut_total_locks);
-			--total_locks;
-		}
+		--total_locks;
+		
 	}
 	class info_worker : public Poco::Runnable{
 	public:

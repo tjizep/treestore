@@ -414,7 +414,7 @@ namespace stx{
 							if( b.get_value().clock < mclock){
 								row = 0;
 								mclock = b.get_value().clock;
-								msize = b.get_key();								
+								msize = b.get_key();	
 								break;
 							}else{
 								++row;
@@ -593,7 +593,7 @@ namespace stx{
 				}
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
-					return ( shared->allocated >= 0.95*shared->max_pool_size ) ;
+					return ( shared->allocated >= 0.90*shared->max_pool_size ) ;
 				}
 
 				/// simple template allocations
