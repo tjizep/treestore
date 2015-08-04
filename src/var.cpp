@@ -8,8 +8,6 @@ long long	treestore_journal_size = 0;
 long long	treestore_max_thread_concurrency = 7;
 
 double		treestore_column_cache_factor = 0.5;
-
-double		treestore_column_block_factor = 0.5;
 my_bool		treestore_efficient_text = FALSE;
 
 char		treestore_column_cache = TRUE;

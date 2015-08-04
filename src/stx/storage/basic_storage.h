@@ -16,19 +16,11 @@ extern char treestore_column_cache ;
 extern long long treestore_max_mem_use ;
 extern long long treestore_current_mem_use ;
 extern double treestore_column_cache_factor;
-extern double treestore_column_block_factor;
 extern long long  _reported_memory_size();
-static double calc_treestore_column_block_factor(){
-	if(treestore_column_cache==0) return 0.98;
-	return treestore_column_block_factor;
-}
-static long long treestore_calc_max_col_use(){
-	return (treestore_max_mem_use*(1-treestore_column_cache_factor)*(1-calc_treestore_column_block_factor()));
-}
-static long long treestore_calc_max_block_use(){	
-	return (treestore_max_mem_use*(1-treestore_column_cache_factor)*(calc_treestore_column_block_factor()));
-}
 
+static long long treestore_calc_max_block_col_use(){
+	return (treestore_max_mem_use*(1-treestore_column_cache_factor));
+}
 extern long long calc_total_use();
 /// the allocation pool
 extern stx::storage::allocation::pool allocation_pool;
@@ -72,12 +64,12 @@ namespace stx{
 				pointer allocate (size_type num, const void* = 0) {
 					bt_counter c;
 					c.add(num*sizeof(T)+this->overhead());
-					return (pointer)allocation_pool.allocate(num);
+					return (pointer)allocation_pool.allocate(num*sizeof(T));
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
 
-					allocation_pool.free((void*)p,num);
+					allocation_pool.free((void*)p,num*sizeof(T));
 
 					bt_counter c;
 					c.remove(num*sizeof(T)+this->overhead());
@@ -110,17 +102,11 @@ namespace stx{
 
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
-					buffer_counter c;
-					c.add(num*sizeof(T)+this->overhead());
-					return (pointer)buffer_allocation_pool.allocate(num);
+					return (pointer)buffer_allocation_pool.allocate(num*sizeof(T));
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-
-					buffer_allocation_pool.free((void*)p,num);
-
-					buffer_counter c;
-					c.remove(num*sizeof(T)+this->overhead());
+					buffer_allocation_pool.free((void*)p,num*sizeof(T));
 				}
 			};
 			 // return that all specializations of this allocator are interchangeable
@@ -159,15 +145,15 @@ namespace stx{
 
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
-					buffer_counter c;
-					c.add(num*sizeof(T)+this->overhead());
+					//buffer_counter c;
+					//c.add(num*sizeof(T)+this->overhead());
 					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
 					base_class::deallocate(p, num);
-					buffer_counter c;
-					c.remove(num*sizeof(T)+this->overhead());
+					//buffer_counter c;
+					//c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
@@ -180,6 +166,7 @@ namespace stx{
 			bool operator!= (const buffer_tracker<T1>&, const buffer_tracker<T2>&) throw() {
 				return false;
 			}
+			/// the col tracker allocates from the same pool as buffers
 			template <class T>
 			class col_tracker : public base_tracker<T>{
 			public:
@@ -208,11 +195,11 @@ namespace stx{
 				pointer allocate (size_type num, const void* = 0) {
 					col_counter c;
 					c.add(num*sizeof(T)+this->overhead());
-					return base_class::allocate(num);
+					return (pointer)buffer_allocation_pool.allocate(num*sizeof(T));
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					base_class::deallocate(p, num);
+					buffer_allocation_pool.free((void*)p,num*sizeof(T));
 					col_counter c;
 					c.remove(num*sizeof(T)+this->overhead());
 				}

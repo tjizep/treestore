@@ -3775,7 +3775,7 @@ namespace stx
 
 		/// reload version mode. if true then pages as reloaded on the fly improving small transaction perfromance
 
-		static const bool version_reload = false;
+		static const bool version_reload = true;
 
 		/// Key comparison object. More comparison functions are generated from
 		/// this < relation.
@@ -4434,13 +4434,14 @@ namespace stx
 		int reloads;
 		void reload()
 		{
-				bool do_reload = version_reload;
+				bool do_reload = version_reload ;
 				stx::storage::i64 sa = 0;
 				stx::storage::i64 b = 0;
 				if(do_reload){
 					++reloads;
 					if
 					(	get_storage()->get_boot_value(b) 
+					&&  get_storage()->is_readonly()
 					&&	surfaces_loaded.size() < 300
 					///&&	(reloads % 4000) != 0
 					///&&	(	get_storage()->is_readonly()||	)

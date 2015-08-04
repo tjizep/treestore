@@ -439,12 +439,10 @@ namespace stored{
 			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8*)allocation_pool.allocate(nbytes); ///new NS_STORAGE::u8 [nbytes]; //
-			//add_col_use(nbytes);
+			
 			memcpy(nbuf, r, std::min<size_t>(nbytes, bytes));
 			if(!is_static()){
-				allocation_pool.free(r,bytes);
-				//delete r;
-				//remove_col_use(bytes);				
+				allocation_pool.free(r,bytes);				
 			}
 			set_ptr(nbuf);
 			bytes = (u32)nbytes;

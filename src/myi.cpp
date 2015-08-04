@@ -42,7 +42,13 @@ static Poco::Mutex plock;
 static Poco::Mutex p2_lock;
 
 long long calc_total_use(){
-	treestore_current_mem_use =  NS_STORAGE::total_use+allocation_pool.get_total_allocated()+total_cache_size + get_l1_bs_memory_use();
+	///NS_STORAGE::total_use+buffer_allocation_pool.get_total_allocated()
+	treestore_current_mem_use =  
+		//nst::buffer_use + 		
+		buffer_allocation_pool.get_total_allocated() +
+		allocation_pool.get_total_allocated() +
+		total_cache_size + 
+		get_l1_bs_memory_use();
 	return treestore_current_mem_use;
 }
 void print_read_lookups();
@@ -1072,20 +1078,13 @@ public:
 			nst::synchronized s(mut_total_locks);
 			if(total_locks==0){
 
-
 				if
-				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
-				//||	high_mem
+				(	get_treestore_journal_size() > (nst::u64)treestore_journal_lower_max
 				)
 				{
 					st.check_journal();/// function releases all idle reading transaction locks
 					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage
-
-				}
-				if(high_mem){
-					stored::reduce_all();
-				}
-
+				}			
 			}
 		}
 		if(treestore_print_lox){
@@ -1158,11 +1157,11 @@ public:
 
 				/// for testing
 				//st.reduce_all();
-				if(high_mem){
+				if(buffer_allocation_pool.is_near_depleted()){
 					//stored::reduce_all();
 				}
-				if(high_mem)
-					get_thread()->own_reduce();
+				//if(high_mem)
+					//get_thread()->own_reduce();
 				if(treestore_print_lox){
 					printf
 					(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g / %.4g MB\n"
@@ -2001,46 +2000,48 @@ namespace ts_cleanup{
 	public:
 		void run(){
 			nst::u64 last_print_size = calc_total_use();
+			nst::u64 lpt = ::os::millis();
 			/// DEBUG: nst::u64 last_check_size = calc_total_use();
 			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-			printf("set block use to %.4g MB \n",(double)treestore_calc_max_block_use()/units::MB);
+
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(200);
+				Poco::Thread::sleep(100);
 				/// int j = int();
 				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
-				buffer_allocation_pool.set_max_pool_size(treestore_calc_max_block_use());
+				buffer_allocation_pool.set_max_pool_size(treestore_calc_max_block_col_use());
 				
 				stx::memory_low_state = allocation_pool.is_near_depleted(); //allocation_pool.is_depleted();//
 				if
-				(	treestore_current_mem_use > treestore_max_mem_use 
-				||	buffer_allocation_pool.is_near_depleted()
+				(	buffer_allocation_pool.is_near_depleted()
 				)
 				{
-					//stored::reduce_all();
+					stored::reduce_all();
 				}
 				
 				if(stx::memory_low_state){
 					//printf("[TREESTORE] reduce idle tree use\n");
 					//st.release_idle_trees();	
 				}
-				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
+				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)
+					|| ::os::millis()-lpt > 2000){
 					printf
 					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu\n"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
-					,	(double)nst::buffer_use/units::MB
+					,	(double)(nst::buffer_use+buffer_allocation_pool.get_allocated())/units::MB
 					,	(double)nst::col_use/units::MB
 					
 					,	(double)total_cache_size/units::MB
 					,	(double)nst::stl_use/units::MB
-					,	(double)allocation_pool.get_used()/units::MB
-					,	(double)allocation_pool.get_total_allocated()/units::MB					
+					,	(double)(allocation_pool.get_used()+buffer_allocation_pool.get_used())/units::MB
+					,	(double)(allocation_pool.get_total_allocated()+buffer_allocation_pool.get_total_allocated())/units::MB					
 					//,	(double)allocation_pool.get_allocated()/units::MB
 					,	(unsigned long)st.get_thread_count() 
 					);
 					last_print_size = calc_total_use();
+					lpt = ::os::millis();
 				}
 			}
 		}

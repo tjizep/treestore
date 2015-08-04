@@ -1865,7 +1865,7 @@ namespace tree_stored{
 
 					commit2(p2_lock);
 					if(calc_total_use() > treestore_max_mem_use){
-						stored::reduce_all();
+						///stored::reduce_all();
 					}					
 					changed = false;
 				}else

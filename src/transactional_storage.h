@@ -846,11 +846,8 @@ namespace storage{
 
 		typedef std::vector<Poco::UInt64> _SQLAddresses;
 
-		/// version map - address to version
-		 /// std::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> >
-		/// ::google::dense_hash_map
-		///typedef std::vector<version_type> _Versions;
-		typedef ns_umap::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::buffer_tracker<address_type> > _Versions;
+		/// version map - address to version		
+		typedef ns_umap::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type> > _Versions;
 		/// typedef rabbit::unordered_map<address_type, version_type> _Versions;
 
 
@@ -860,10 +857,10 @@ namespace storage{
 		struct block_descriptor {
 
 			block_descriptor(version_type version) : clock(0), mod(read), use(0), compressed(false), version(version){
-				add_buffer_use(sizeof(*this));
+				//add_buffer_use(sizeof(*this));
 			}
 			block_descriptor(const block_descriptor& right) {
-				add_buffer_use(sizeof(*this));
+				//add_buffer_use(sizeof(*this));
 				*this  = right;
 			}
 			block_descriptor& operator=(const block_descriptor& right){
@@ -875,7 +872,7 @@ namespace storage{
 				return *this;
 			}
 			~block_descriptor(){
-				remove_buffer_use(sizeof(*this));
+				//remove_buffer_use(sizeof(*this));
 			}
 			void set_storage_action(storage_action action){
 				if(mod != read) return;
@@ -901,8 +898,8 @@ namespace storage{
 		typedef std::vector<block_descriptor*> _Descriptors;
 		//typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
 		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;		
-		typedef ns_umap::unordered_map<address_type, ref_block_descriptor> _Allocations;
-		typedef ns_umap::unordered_map<address_type, block_type> _BlocksMap;
+		typedef ns_umap::unordered_map<address_type, ref_block_descriptor, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type>> _Allocations;
+		typedef ns_umap::unordered_map<address_type, block_type, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type>> _BlocksMap;
 
 		typedef ns_umap::unordered_set<address_type> _Changed;
 		
@@ -1111,6 +1108,9 @@ namespace storage{
 				is_new = false;
 				create_allocation_table();
 				create_statements();
+				Poco::File df (get_storage_path() + name + extension );
+				file_size = df.getSize();
+					
 				if(lego.opened()){
 					
 				}				
@@ -1239,7 +1239,7 @@ namespace storage{
 				//up_use(reflect_block_use(*result));
 				result = nullptr;
 			}		
-			
+			/// is_all_loaded = false; /// everything isnt going to be loaded anymore
 			ptrdiff_t before = get_use();
 			typedef std::pair<address_type, ref_block_descriptor> _AddressedBlockPair;
 			typedef std::vector<_AddressedBlockPair, ::sta::tracker<_AddressedBlockPair, ::sta::buffer_counter> > _Blocks;
@@ -1261,21 +1261,30 @@ namespace storage{
 					/// write blocks will be written in address order
 					by_address.push_back(*b);
 					mods++;
-				}else if(get_use() > (before*factor)){ /// flush read blocks in LRU order
-					if(release)
-					{
-						up_use(reflect_block_use((*b).second)); /// update to correctly reflect
-						//written_blocks[(*b).first] = (*b).second->block;
-						allocations.erase((*b).first);
-
-						down_use( get_block_use((*b).second) );
-						delete (*b).second;
-					}
 				}
 
 			}
+			if(!mods){
+				for(typename _Blocks::iterator b = blocks.begin(); b != blocks.end(); ++b){
+					if(get_use() > (before*factor)){ /// flush read blocks in LRU order
+						if(release)
+						{
+							up_use(reflect_block_use((*b).second)); /// update to correctly reflect
+							//written_blocks[(*b).first] = (*b).second->block;
+							allocations.erase((*b).first);
+
+							down_use( get_block_use((*b).second) );
+							delete (*b).second;
+						}
+					}				
+					//if(!buffer_allocation_pool.is_near_depleted()){
+					//	return;
+					//}
+				}
+			}
 			if(!mods && get_use() <= (before*factor)){
 				/// printf("reduced storage %s\n", get_name().c_str());
+				
 				return;
 			}
 
@@ -1310,31 +1319,32 @@ namespace storage{
 
 					down_use( get_block_use((*b).second) );
 					delete (*b).second;
+					
 				}
 				if(mods == 0 && get_use() <= (before*factor)){
 					break;
 				}
+				
 			}
 			get_session() << "PRAGMA shrink_memory;", now;
 			if(write_all){
 				//(*this).changed.clear();
 				(*this).changes = 0;
-			}
+			}			
 		}
 
 		
 		void check_use(){			
-
-
-			if(		treestore_current_mem_use > treestore_max_mem_use
-			||		buffer_allocation_pool.is_near_depleted()
+			
+			return;
+			if(		buffer_allocation_pool.is_near_depleted()
 			){
 				ptrdiff_t before = get_use();
 				if(before > 1024*1024){
-					flush_back(0.7,true);
+					flush_back(0.8, true);
 					get_session() << "PRAGMA shrink_memory;", now;
 					last_flush_time = ::os::millis();
-					printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
+					///printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				}
 				
 			}
@@ -1351,9 +1361,9 @@ namespace storage{
 		}
 		bool find_block(const address_type& which, ref_block_descriptor& result){
 			
-			//return allocations.get(which,result);
+			return allocations.get(which,result);
 			
-			if(true){
+			if(false){
 				typename _Allocations::iterator fr = allocations.find(which);
 				
 				bool finder = fr != allocations.end(); //allocations.get(which,result);//
@@ -1383,7 +1393,7 @@ namespace storage{
 				if(!finder){
 					/// load from storage
 					check_use();	
-					if((*this).get_buffer(which))
+					if(how != create && (*this).get_buffer(which))
 					{
 						
 						if(!this->is_read_cache){
@@ -1520,10 +1530,21 @@ namespace storage{
 		}
 		
 		void load_all(){			
+			
 			synchronized s(lock);
-			if(treestore_current_mem_use + this->file_size < treestore_max_mem_use){							
-				if(!is_all_loaded){
-					read_ahead(0, next);
+			/// check if this file can be loaded
+			if(!is_all_loaded){
+				if(buffer_allocation_pool.can_allocate(this->file_size)){											
+					///TODO: opportunistically read until memory exhausted
+					nst::u64 start = 0;
+					nst::u64 remaining = next;
+					read_ahead(start, remaining); /// read until end
+					/*while(remaining > 0 && !buffer_allocation_pool.is_near_depleted()){
+						nst::u64 block = std::min<nst::u64>(remaining, 2048);
+						read_ahead(start, start+block); /// read until end
+						start += block;
+						remaining -= block;
+					}*/
 					is_all_loaded = true;
 				}
 			}
@@ -1652,7 +1673,6 @@ namespace storage{
 				File df (get_storage_path() + name + extension );
 				(*this).is_new = !df.exists();
 				if(!is_new){
-					file_size = df.getSize();
 					get_session();					
 				}
 			}else (*this).is_new = true;
@@ -1974,7 +1994,7 @@ namespace storage{
 			
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*2)
-				flush_back(0.7,true);
+				flush_back(0.9,true);
 			get_session() << "PRAGMA shrink_memory;", now;
 		}
 	};
@@ -2220,7 +2240,7 @@ namespace storage{
 		void check_global_use(){
 			//if(treestore_current_mem_use > treestore_max_mem_use*0.85){
 			if(buffer_allocation_pool.is_near_depleted()){
-				stored::reduce_all();
+				//stored::reduce_all();
 			}
 		}
 
@@ -2771,7 +2791,8 @@ namespace storage{
 
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				(*c)->get_allocator().reduce();
+				if(buffer_allocation_pool.is_near_depleted())
+					(*c)->get_allocator().reduce();
 
 			}
 
@@ -2872,7 +2893,7 @@ namespace storage{
 		bool commit(version_storage_type* transaction){
 			//if(treestore_current_mem_use > treestore_max_mem_use){
 			if(buffer_allocation_pool.is_near_depleted()){
-				stored::reduce_all();
+				//stored::reduce_all();
 			}
 			bool writer = !transaction->is_readonly();
 			if(!writer){

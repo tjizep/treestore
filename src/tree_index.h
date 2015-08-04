@@ -193,9 +193,9 @@ namespace tree_stored{
 		,	wid(storage_workers::get_next_counter())
 		{
 			using namespace NS_STORAGE;
-			the_end = index.end();
-			index.share(name);
-
+			this->the_end = index.end();
+			this->index.share(name);
+			this->storage.load_all();
 		}
 
 		~col_index(){
@@ -325,7 +325,7 @@ namespace tree_stored{
 
 			}
 			if(treestore_current_mem_use > treestore_max_mem_use){
-				storage.reduce();
+				///storage.reduce();
 			}
 		}
 

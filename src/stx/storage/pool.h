@@ -415,7 +415,7 @@ namespace stx{
 								row = 0;
 								mclock = b.get_value().clock;
 								msize = b.get_key();	
-								break;
+								//break;
 							}else{
 								++row;
 							}
@@ -435,12 +435,12 @@ namespace stx{
 					if(shared->used > 0 && (shared->allocated + shared->used) < shared->max_pool_size){
 						return;
 					}
-					if (this->allocated < ( shared->max_pool_size/shared->instances)) return;
+					//if (this->allocated < ( shared->max_pool_size/shared->instances)) return;
 
 					///if(((++shared->current) % shared->instances) != this->id) return;
 					
 					u64 todo = shared->allocated + shared->used - shared->max_pool_size;
-					//while(shared->used > 0 && (shared->allocated + shared->used) > shared->max_pool_size){
+					while(shared->used > 0 && (shared->allocated + shared->used) > shared->max_pool_size){
 						size_t lru_size = find_lru_size();
 						if(lru_size < MAX_ALLOCATION_SIZE){
 							_Clocked &clocked = (*this).buckets[lru_size];						
@@ -466,7 +466,7 @@ namespace stx{
 							
 							return;
 						}
-					//}					
+					}					
 				}
 				
 
@@ -517,7 +517,7 @@ namespace stx{
 				size_t overhead() const throw(){
 					return sizeof(void*);
 				}
-
+				
 				_Allocated allocate_type(size_t requested, const std::type_info& ti) {
 
 					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
@@ -537,17 +537,17 @@ namespace stx{
 
 						result = current.back();
 						current.pop_back();
-						shared->used -= size + overhead();
+						shared->used -= (size + overhead());
 						
-					}else{
-
+					}else{						
 						result.ti = &ti;
 						result.is_new = true;
 						result.data = new u8[size];
-						this->allocated += size ;
+						
 					}
-					
-					shared->allocated += size + overhead();
+
+					this->allocated += size + overhead();
+					shared->allocated += size + overhead();					
 					release_overflow();
 					return result;
 				}
@@ -568,8 +568,9 @@ namespace stx{
 						_Allocated allocated((u8*)data, ti);
 						allocated.is_new = false;
 						current.push_back(allocated);
-						shared->used += size + overhead();
-						(*this).shared->allocated -= size + overhead();
+						shared->used += (size + overhead());
+						(*this).shared->allocated -= (size + overhead());
+						(*this).allocated -= (size + overhead());
 					}
 					release_overflow();
 					
@@ -593,7 +594,8 @@ namespace stx{
 				}
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
-					return ( shared->allocated >= 0.90*shared->max_pool_size ) ;
+					u64 total = shared->used + shared->allocated;
+					return ( total > 0.99*shared->max_pool_size ) && (shared->allocated > 0.9*shared->max_pool_size);
 				}
 
 				/// simple template allocations
@@ -692,6 +694,13 @@ namespace stx{
 						get_pool().free(data, requested);
 					}else 
 						get_pool().free(data, requested);
+				}
+
+				/// return true if the give size bytes can be allocated
+				bool can_allocate(u64 size) const throw() {
+					if(size <  this->shared.used) return true;
+					u64 extra = size -  this->shared.used;
+					return  this->shared.allocated + extra <  this->shared.max_pool_size;					
 				}
 
 				/// returns true if the pool is depleted

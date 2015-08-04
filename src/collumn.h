@@ -464,11 +464,11 @@ namespace collums{
 						(*this).encoded.sample(c.data());
 
 						++ctr;
-
-						if(used_by_encoding + encoded.total_bytes_allocated() > treestore_max_mem_use/2){
-							unload();
-							return;
-						}
+						/// the storage cache for this operation is disabled
+						//if(buffer_allocation_pool.is_near_depleted()){
+						//	unload();
+						//	return;
+						//}
 
 					}
 					col.reduce_use();
@@ -807,14 +807,7 @@ namespace collums{
 				if(page->available){
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-					if(	(
-							nst::col_use + bytes_used > treestore_calc_max_col_use()
-						)
-						||
-						(
-							treestore_current_mem_use + bytes_used > treestore_max_mem_use
-						)
-						){
+					if(	!buffer_allocation_pool.can_allocate(bytes_used) ){
 						page->unload();
 						page->loading = false;
 
