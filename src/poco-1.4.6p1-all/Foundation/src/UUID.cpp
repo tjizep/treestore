@@ -72,8 +72,15 @@ UUID::UUID(const std::string& uuid)
 	
 UUID::UUID(const char* uuid)
 {
-	poco_check_ptr (uuid);
-	parse(std::string(uuid));
+	if(uuid!=nullptr){	
+		parse(std::string(uuid));
+	}else{
+		_timeLow = 0;	
+		_timeMid = 0;
+		_timeHiAndVersion = 0;
+		_clockSeq = 0;
+		std::memset(_node, 0, sizeof(_node));
+	}
 }
 
 
@@ -259,10 +266,9 @@ int UUID::variant() const
 
 int UUID::compare(const UUID& uuid) const
 {
-	if (_timeLow != uuid._timeLow) return _timeLow < uuid._timeLow ? -1 : 1;
-	if (_timeMid != uuid._timeMid) return _timeMid < uuid._timeMid ? -1 : 1;
 	if (_timeHiAndVersion != uuid._timeHiAndVersion) return _timeHiAndVersion < uuid._timeHiAndVersion ? -1 : 1;
-	if (_clockSeq != uuid._clockSeq) return _clockSeq < uuid._clockSeq ? -1 : 1;
+	if (_timeMid != uuid._timeMid) return _timeMid < uuid._timeMid ? -1 : 1;
+	if (_timeLow != uuid._timeLow) return _timeLow < uuid._timeLow ? -1 : 1;			
 	for (int i = 0; i < sizeof(_node); ++i)
 	{
 		if (_node[i] < uuid._node[i]) 
@@ -270,6 +276,7 @@ int UUID::compare(const UUID& uuid) const
 		else if (_node[i] > uuid._node[i])
 			return 1;	
 	}
+	if (_clockSeq != uuid._clockSeq) return _clockSeq < uuid._clockSeq ? -1 : 1;
 	return 0;
 }
 

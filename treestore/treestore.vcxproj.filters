@@ -114,6 +114,21 @@
     <ClInclude Include="..\src\stx\storage\types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\rednode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\cassandras.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\rednode_cassandra.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\red_includes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\rednode_storage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -232,6 +247,9 @@
     </ClCompile>
     <ClCompile Include="..\repo\fse\zlibh.c">
       <Filter>Source Files\fse</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\rednode.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

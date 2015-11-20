@@ -184,7 +184,7 @@ public:
 					commands.push_back(entry);
 
 				}
-
+			
 				if(entry.command == nst::JOURNAL_COMMIT){
 					recovered = reader.stream().tellg();
 					if(last_printed + 100*MB < recovered ){
@@ -221,7 +221,7 @@ public:
 			}
 
 		}catch(...){
-			printf("unknown exception during recovery\n");
+			printf("[TS] [FATAL] unknown exception during recovery\n");
 			exit(-1);
 		}
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){

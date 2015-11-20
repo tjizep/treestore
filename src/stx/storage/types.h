@@ -64,6 +64,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 *****************************************************************************/
 #include <vector>
 #include <Poco/Types.h>
+#include <Poco/UUID.h>
 namespace stx{
 	namespace storage{
 		/// unsigned integer primitive types
@@ -78,14 +79,31 @@ namespace stx{
 			typedef Poco::Int64 i64;
 			typedef long long int lld;
 		/// virtual allocator address type
-			typedef u32 stream_address ;
+			typedef u64 stream_address ;
 			
 			/// the version type
-			typedef u32 version_type;
+			typedef Poco::UUID version_type;
 
 	};
 };
-
+namespace std {
+    template <>
+    class hash<stx::storage::version_type>{
+    public:
+		size_t operator()(const stx::storage::version_type &version ) const{
+			using namespace stx::storage;
+			u64 r = 0;
+			if(sizeof(version_type) >= sizeof(u64)){
+				const u64 * data = reinterpret_cast<const u64*>(&version);
+				r = data[0];				
+				if(sizeof(version_type) == sizeof(u64) * 2){
+					 r ^= data[1];
+				}
+			}
+			return r;
+		}
+    };
+};
 #endif
 
 ///_STX_STORAGE_TYPES_H_

@@ -138,7 +138,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\cassandra\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <MinimalRebuild>false</MinimalRebuild>
@@ -148,8 +148,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(CPP_REPO)\poco-1.4.6p1-all\lib64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;$(CPP_REPO)\libuv\static\lib\libuv.lib;$(CPP_REPO)\cassandra\lib\cassandra_static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(CPP_REPO)\poco-1.4.6p1-all\lib64;$(CPP_REPO)\cassandra\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -194,7 +194,7 @@
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;TREESTORE_EXPORTS;POCO_STATIC;SQLite_EXPORTS;Foundation_EXPORTS;Data_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Net\include;$(CPP_REPO)\cassandra\include;$(CPP_REPO)\boost_1_57_0;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
@@ -215,9 +215,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>
-      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;Psapi.lib;ws2_32.lib;Userenv.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;$(CPP_REPO)\openssl-1.0.2d\shared\lib\libeay32.lib;$(CPP_REPO)\openssl-1.0.2d\shared\lib\ssleay32.lib;$(CPP_REPO)\libuv\shared\lib\libuv.lib;$(CPP_REPO)\cassandra\lib\cassandra.lib;$(CPP_REPO)\rabbitmq-c-0.7.0\build\librabbitmq\Release\rabbitmq.4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(CPP_REPO)\boost_1_57_0\stage\lib</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -230,7 +229,7 @@
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;POCO_STATIC;TREESTORE_EXPORTS;%(PreprocessorDefinitions);__SSSE3__;__SSE4_1__</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\FastPFor\msvc\getopt;$(ProjectDir)\..\repo\FastPFor\headers;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\src\poco-1.4.6p1-all\;$(ProjectDir)\..\src\poco-1.4.6p1-all\Foundation\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Util\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Data\SQLite\include;$(ProjectDir)\..\src\poco-1.4.6p1-all\Net\include;$(CPP_REPO)\zeromq\include;$(CPP_REPO)\cassandra\include;$(CPP_REPO)\boost_1_57_0;$(CPP_REPO)\$(MYSQL_VERSION)\include;$(CPP_REPO)\$(MYSQL_VERSION)\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql;$(CPP_REPO)\$(MYSQL_VERSION)\bld\include;$(CPP_REPO)\$(MYSQL_VERSION)\regex;$(CPP_REPO)\rabbitmq-c-0.7.0\librabbitmq;$(ProjectDir)\..\repo;$(ProjectDir)\..\repo\SimpleAmqpClient\src;$(ProjectDir)\..\repo\lz4-r101;$(ProjectDir)\..\repo\zlib-1.2.8;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\windows;$(ProjectDir)\..\repo\sparsehash-2.0.2\src\;$(ProjectDir)\..\src</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
@@ -247,8 +246,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(CPP_REPO)\poco-1.4.6p1-all\lib64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;IPHLPAPI.lib;Psapi.lib;ws2_32.lib;Userenv.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\sql\Release\mysqld.lib;$(CPP_REPO)\$(MYSQL_VERSION)\bld\libservices\Release\mysqlservices.lib;$(CPP_REPO)\openssl-1.0.2d\shared\lib\libeay32.lib;$(CPP_REPO)\openssl-1.0.2d\shared\lib\ssleay32.lib;$(CPP_REPO)\libuv\shared\lib\libuv.lib;$(CPP_REPO)\cassandra\lib\cassandra.lib;$(CPP_REPO)\boost_1_57_0\stage\lib\libboost_chrono-vc110-mt-1_57.lib;$(CPP_REPO)\boost_1_57_0\stage\lib\libboost_system-vc110-mt-1_57.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(CPP_REPO)\poco-1.4.6p1-all\lib64;$(CPP_REPO)\boost_1_57_0\stage\lib</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -258,6 +257,7 @@
   <ItemGroup>
     <ClInclude Include="..\src\abstracted_storage.h" />
     <ClInclude Include="..\src\bit_symbols.h" />
+    <ClInclude Include="..\src\cassandras.h" />
     <ClInclude Include="..\src\collumn.h" />
     <ClInclude Include="..\src\conversions.h" />
     <ClInclude Include="..\src\fields.h" />
@@ -266,6 +266,10 @@
     <ClInclude Include="..\src\myi.h" />
     <ClInclude Include="..\src\NotificationQueueWorker.h" />
     <ClInclude Include="..\src\PredictiveCache.h" />
+    <ClInclude Include="..\src\rednode.h" />
+    <ClInclude Include="..\src\rednode_cassandra.h" />
+    <ClInclude Include="..\src\rednode_storage.h" />
+    <ClInclude Include="..\src\red_includes.h" />
     <ClInclude Include="..\src\simple_storage.h" />
     <ClInclude Include="..\src\stx\btree.h" />
     <ClInclude Include="..\src\stx\btree_map.h" />
@@ -321,6 +325,7 @@
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_ucd.c" />
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_valid_utf8.c" />
     <ClCompile Include="..\src\poco-1.4.6p1-all\Foundation\src\pcre_xclass.c" />
+    <ClCompile Include="..\src\rednode.cpp" />
     <ClCompile Include="..\src\stx\btree.cpp" />
     <ClCompile Include="..\src\transactional_storage.cpp" />
     <ClCompile Include="dllmain.cpp">

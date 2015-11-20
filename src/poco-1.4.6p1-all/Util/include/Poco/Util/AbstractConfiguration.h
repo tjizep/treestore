@@ -247,7 +247,7 @@ public:
 	AbstractConfiguration* createView(const std::string& prefix);
 		/// Creates a view (see ConfigurationView) into the configuration.
 	
-	std::string expand(const std::string& value) const;
+	std::string _expand(const std::string& value) const;
 		/// Replaces all occurences of ${<property>} in value with the
 		/// value of the <property>. If <property> does not exist,
 		/// nothing is changed.

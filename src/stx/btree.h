@@ -257,8 +257,8 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 0,
 			interior_mul = 1,
-			keys_per_page = 256, ///192 is good for transactions, 384
-			caches_per_page = 16,
+			keys_per_page = 192, ///192 is good for transactions, 384
+			caches_per_page = 2,
 			max_release = 8,
 			version_reload
 		};
@@ -1328,6 +1328,9 @@ namespace stx
 
 			storage::u16  occupants;
 
+			/// the transaction version of this node
+			nst::version_type version;
+
 			/// cpu cache keys
 			key_type        cached[cacheslotmax+1];
 
@@ -1344,8 +1347,8 @@ namespace stx
 			key_type        int_upper;
 			bool can_interp;
 			bool force_refresh;
-			/// the transaction version of this node
-			nst::version_type version;
+			
+			
 			/// populate cache
 
 			template<typename key_type>
@@ -1363,11 +1366,11 @@ namespace stx
 			}
 			template<typename key_type>
 			void check_cache(const key_type* keys){
-				if(!can_interp){
-					if(get_cache_occupants() == 0){
-						///set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
-					}
-				}
+				//if(!can_interp){
+					//if(get_cache_occupants() == 0){
+						//set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
+					//}
+				//}
 			}
 
 			template<typename key_type>
@@ -1376,7 +1379,7 @@ namespace stx
 			}
 			void check_node() const {
 				if(occupants > interiorslotmax+1){
-					printf("ERROR: page is probably corrupt\n");
+					printf("[TS] [ERROR] page is probably corrupt\n");
 				}
 			}
 		public:
@@ -1436,7 +1439,7 @@ namespace stx
 			/// get version
 
 			nst::version_type get_version() const {
-				check_node();
+				//check_node();
 				return (*this).version;
 			}
 
@@ -1496,7 +1499,7 @@ namespace stx
 
 				can_interp = false;
 				force_refresh = false;
-				version = 0;
+				version = nst::version_type();
 				transaction = 0;
 				address = 0;
 				cache_occupants = 0;
@@ -2055,6 +2058,8 @@ namespace stx
 				(*this).preceding.set_where(sa);
 				sa = leb128::read_signed(reader);
 			
+				int vs = sizeof(values);
+				int ks = sizeof(keys);
 
 				if(sa == address){
 					printf("ERROR: loading node with invalid next address\n");
@@ -2413,7 +2418,7 @@ namespace stx
 			if(!version_reload) return true;
 
 			if(page != NULL_REF){
-				if(page->get_version() == 0) return true;
+				if(page->get_version() == nst::version_type()) return true;
 				return get_storage()->current_transaction_order() == page->get_transaction();
 			}
 			return false;
@@ -4058,7 +4063,7 @@ namespace stx
 		
 		void recycle(surface_node* s){
 			
-			if( ::stx::memory_low_state){
+			if(::stx::memory_low_state){
 				free_surfaces();
 				allocation_pool.free<surface_node>(s);
 			}else{
@@ -4089,7 +4094,7 @@ namespace stx
 			if(!surfaces.empty()){
 				r = surfaces.back();
 				surfaces.pop_back();
-				/// new (r) surface_node();
+				//new (r) surface_node();
 			}
 			return r;
 		}
@@ -4183,6 +4188,7 @@ namespace stx
 
 		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
+			/// ||allocation_pool.is_near_depleted()
 			if(::stx::memory_low_state){
 				reduce_use();
 				
@@ -4442,7 +4448,7 @@ namespace stx
 					if
 					(	get_storage()->get_boot_value(b) 
 					&&  get_storage()->is_readonly()
-					&&	surfaces_loaded.size() < 300
+					//&&	surfaces_loaded.size() < 12000000
 					///&&	(reloads % 4000) != 0
 					///&&	(	get_storage()->is_readonly()||	)
 					){ ///&& surfaces_loaded.size() < 300
@@ -4625,10 +4631,10 @@ namespace stx
 		/// slot in the last surface of the B+ tree.
 		inline iterator end()
 		{
-			
+			int o = last_surface == NULL_REF ? 0 : last_surface->get_occupants();
 			typename surface_node::ptr last = last_surface;
 			last.set_context(this);
-			stats.last_surface_size = last != NULL_REF ? last->get_occupants() : 0;
+			stats.last_surface_size = last != NULL_REF ? o : 0;
 
 			return iterator(last, (short)stats.last_surface_size);/// avoids loading the whole page
 
@@ -4942,8 +4948,11 @@ namespace stx
 			while(!n->issurfacenode())
 			{
 				slot = find_lower(static_cast<interior_node*>(n. operator->()), key);
-				n = static_cast<interior_node*>(n. operator->())->childid[slot];
-				//n = n->childid[slot];
+				typename interior_node::ptr interior = n;
+				interior_node * i = static_cast<interior_node*>(n. operator->());
+				i->childid[slot].load(i->get_address(),slot);
+				
+				n = i->childid[slot];												
 			
 			}
 			typename surface_node::ptr surface = n;

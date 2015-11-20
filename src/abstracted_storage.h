@@ -218,6 +218,10 @@ namespace stored{
 			NS_STORAGE::leb128::write_signed(writer, r);
 			get_transaction().complete();
 		}
+		/// return true if the storage is local
+		bool is_local() const {
+			return get_allocations().is_local();
+		}
 		/// begin a transaction at this very moment
 		void begin(bool writer){
 			rollback();
@@ -231,6 +235,7 @@ namespace stored{
 		NS_STORAGE::u64 current_transaction_order() const{
 			return order;
 		}
+
 		bool stale() const {
 			if(_transaction==nullptr) return true;
 			return (get_transaction().get_order() != get_allocations().get_order());
@@ -281,7 +286,7 @@ namespace stored{
 		nst::u64 get_greater_version_diff(nst::_VersionRequests& request){
 			nst::u64 response = 0;
 			if(_transaction != NULL){
-				response += get_allocations().get_greater_version_diff(request);
+				response += get_transaction().get_greater_version_diff(request);
 			}
 			return response;
 		}

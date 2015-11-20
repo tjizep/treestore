@@ -36,7 +36,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define _PREDICTIVECACHE_H_CEP2013_
 
 //#include "tree_stored.h"
-
+#include <rabbit/rabbit.h>
+#include "fields.h"
 extern NS_STORAGE::u64 hash_hits;
 extern NS_STORAGE::u64 hash_predictions;
 extern NS_STORAGE::u64 total_cache_size;
@@ -61,31 +62,24 @@ namespace tree_stored{
 	template<typename BasicIterator>
 	struct predictive_cache : public eraser_interface{
 	private:
-		static const NS_STORAGE::u64 CIRC_SIZE = 20000000;/// about 128 MB shared - the cachedrow is 32 bytes
-		typedef typename BasicIterator::key_type key_type;
-		static const stored::_Rid STORE_INF = (stored::_Rid)-1;
+		
+		typedef typename BasicIterator::key_type key_type;		
 		typedef cached_row<typename BasicIterator::key_type> CachedRow;
 		typedef std::vector<CompositeStored> _Erased;
 		typedef stored::_Rid _Rid;
+		
+		typedef rabbit::unordered_map<key_type,_Rid, stored::fields_hash<key_type>> _CompHash;
 	private:
 		void _erase(const CompositeStored& input){
-			_Rid h = ((size_t)input) % hash_size;
-			_Rid predictor = cache_index[h];
-
-			if(predictor && sec_cache[predictor].k.left_equal_key(input) ){
-				CachedRow cr;
-				sec_cache[predictor] = cr;
-				cache_index[h] = 0;
-			}
+			
 		}
+		CompositeStored temp;
+		key_type temp_key;
 	public:
 
 
 		void set_hash_size(_Rid hash_size){
-			if((*this).hash_size != hash_size){
-				(*this).clear();
-				(*this).hash_size = hash_size;
-			}
+
 			hash_hits = 0;
 			hash_predictions = 0;
 			misses = 0;
@@ -108,72 +102,21 @@ namespace tree_stored{
 
 		bool load(){
 
-			if(!loaded){
-				if(calc_total_use()+sizeof(CachedRow)*CIRC_SIZE+sizeof(stored::_Rid)*hash_size > (nst::u64)treestore_max_mem_use){
-					return false;
-				}
-				//stx::storage::syncronized ul((*this).plock);
-				using namespace NS_STORAGE;
-				if(cache_index.empty()){
-					cache_index.resize(hash_size);
-					sec_cache.reserve(CIRC_SIZE/8);
-					total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*hash_size);
-					//// printf("total_p_cache_size %.4g GiB\n",(double)total_cache_size/(1024.0*1024.0*1024.0));
-				}
-				loaded = true;
-			}
-			return loaded;
+			return true;
 		}
 
 		/// TODO: NB: the return value should be const
-		const CompositeStored* _int_predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
-
-			using namespace NS_STORAGE;
-			if(predictor){
-				predictor++;
-				const u64 stop = std::min<u64>(sec_cache.size(), predictor + 3);
-
-				while(predictor < stop){ /// this loop finds the hash item based on store history or order
-
-					if(sec_cache[predictor].k.left_equal_key(input) ){
-						++hash_hits;
-						++hash_predictions;
-						return  &sec_cache[predictor].k.return_or_copy(rval);
-
-					}
-					predictor++;
-				}
-			}
-			if(cache_index.empty()){
-				return NULL;
-			}
-			if(!enabled){
-				predictor = 0;
-				return NULL;
-			}
-			typename BasicIterator::key_type kin = input;
-			_Rid h = (((size_t)kin) % hash_size);
-			predictor = cache_index[h];
-			if(predictor < sec_cache.size()){
-				const key_type& k = sec_cache[predictor].k;
-				if(predictor && k.left_equal_key(kin) ){
-
-					++hash_hits; // neither hit nor miss
-					return &sec_cache[predictor].k.return_or_copy(rval);
-
-				}
-				predictor = 0;
-				++misses;
-			}else{
-				printf("invalid h(2)\n");
+		
+		const CompositeStored*  predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
+			this->temp = input;
+			this->temp.row = 0;
+			_Rid r = 0;
+			if(keys.get(this->temp,r)){
+				this->temp.row = r;
+				return &(this->temp);
 			}
 			return NULL;
-
-		}
-
-		const CompositeStored*  predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
-
-			return _int_predict_row(predictor, out, input);
+			///return _int_predict_row(predictor, out, input);
 
 		}
 
@@ -198,44 +141,11 @@ namespace tree_stored{
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
-			if((nst::u64)calc_total_use() > (nst::u64)treestore_max_mem_use){
-				//clear();
-				return;
-			}
-			if(!enabled) return;
-			if(iter.invalid()) return;
-
-			if(!load()) return;
-			store_pos = sec_cache.size();
-			//if(store_pos >= CIRC_SIZE) return;
-			if(!(*this).hash_size) return;
-			if(cache_index.empty()){
-				clear();
-				return;
-			}
-			size_t h = ((size_t)iter.key()) % hash_size;
-
-			if(cache_index[h] == 0){
-				cache_index[h] = (stored::_Rid)sec_cache.size(); //store_pos+1;
-				CachedRow cr;			
-				cr.k = iter.key();
-				total_cache_size-=(sizeof(CachedRow)*sec_cache.capacity());
-				sec_cache.push_back(cr);
-				total_cache_size+=(sizeof(CachedRow)*sec_cache.capacity());	
-			}else{
-				size_t at = cache_index[h];
-				const key_type& k = sec_cache[at].k;
-				size_t h2 = ((size_t)sec_cache[at].k) % hash_size;
-				if(h2 != h){
-					printf("hash does not match position\n");
-				}
-				if(k.left_equal_key(iter.key())){
-					printf("k already exists\n");						
-				}else{
-					sec_cache[at].k = iter.key();
-				}
-			}
-			
+			this->temp_key = const_cast<BasicIterator&>(iter).key();
+			_Rid row = this->temp_key.row;
+			this->temp_key.row = 0;
+			keys[this->temp_key] = row;
+			return;
 			
 		}
 
@@ -249,33 +159,23 @@ namespace tree_stored{
 		void clear(){
 			
 			//stx::storage::syncronized ul((*this).plock);
-			if(!cache_index.empty()){
-				
-				total_cache_size -= (sizeof(CachedRow)*sec_cache.capacity() + sizeof(stored::_Rid)*hash_size);
-				cache_index.clear();
-				sec_cache.clear();
-				sec_cache.resize(1);
-				
-			}
+			
 			loaded = false;
 		}
 
-		typedef std::vector<CachedRow> _SecCache;
-		typedef std::vector<unsigned int> _RowCache;
+		
     private:
         _Erased erased;
 		stored::DynamicKey rval;
-		_Rid hash_size;
-		_Rid last_store;
+		
+		
 		Poco::Mutex erase_lock;
+		_CompHash keys;
     public:
-		stored::_Rid rows;
-		_SecCache sec_cache;
-		_RowCache cache_index;
+		
 		CachedRow empty_row;
-		//Poco::Mutex plock;
-
-		NS_STORAGE::u64 store_pos;
+		
+		
 		NS_STORAGE::u64 hits;
 
 		NS_STORAGE::u64 misses;
@@ -286,16 +186,14 @@ namespace tree_stored{
 
     public:
 		predictive_cache()
-		:   hash_size(11)
-		,   store_pos(0)
-		,   hits(0)
+		:   hits(0)
 		,   misses(0)
 		,   multi(0)
 		,   enabled(treestore_predictive_hash!=0)
 		,   loaded(false)
 
 		{
-			last_store = 3;
+		
 
 		}
 

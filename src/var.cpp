@@ -3,6 +3,10 @@ long long	treestore_current_mem_use = 0;
 long long	treestore_journal_lower_max = 0;
 long long	treestore_journal_upper_max = 0;
 long long	treestore_journal_size = 0;
+long long	treestore_cleanup_time = 500;
+/// a leak
+char* 		treestore_contact_points = new char[400];
+char* 		treestore_red_address = new char[400];
 /// if there are more threads than this active (in locked state)
 /// new transactions are throttled to reduce concurrency
 long long	treestore_max_thread_concurrency = 7;
@@ -32,6 +36,11 @@ static MYSQL_SYSVAR_LONGLONG(journal_size, treestore_journal_size,
   PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
   "The current journal size",
   NULL, NULL, 1*1024*1024*1024LL, 128*1024*1024LL, LONGLONG_MAX, 1024*1024LL);
+
+static MYSQL_SYSVAR_LONGLONG(cleanup_time, treestore_cleanup_time,
+  PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
+  "The memory cleanup time in millis",
+  NULL, NULL, 3600LL, 1LL, LONGLONG_MAX, 500LL);
 
 static MYSQL_SYSVAR_LONGLONG(max_mem_use, treestore_max_mem_use,
   PLUGIN_VAR_RQCMDARG,
@@ -98,3 +107,12 @@ static MYSQL_SYSVAR_BOOL(use_primitive_indexes, treestore_use_primitive_indexes,
   "Default is true",
   NULL, NULL, TRUE);
 
+static MYSQL_SYSVAR_STR(contact_points,treestore_contact_points,
+	PLUGIN_VAR_RQCMDARG,
+	"contact point list for cassandra storage",
+	NULL, NULL, "");
+
+static MYSQL_SYSVAR_STR(red_address,treestore_red_address,
+	PLUGIN_VAR_RQCMDARG,
+	"nonde name and address must be unique and acessible from outside the machine",
+	NULL, NULL, "localhost");

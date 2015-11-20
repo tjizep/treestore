@@ -64,8 +64,14 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "Poco/BinaryReader.h"
 #include "Poco/File.h"
 #include "Poco/ThreadLocal.h"
-
+#include "rednode.h"
 #include <stx/storage/pool.h>
+#include <Poco/UUIDGenerator.h>
+inline Poco::UUID & create_version(){
+	return Poco::UUIDGenerator::defaultGenerator().create();
+}
+extern char * treestore_contact_points;
+
 #ifdef _MSC_VER
 #define fseek64 _fseeki64
 #define ftell64 _ftelli64
@@ -86,8 +92,6 @@ namespace storage_workers{
 namespace stored{
     extern void reduce_all();
 };
-
-namespace NS_STORAGE = stx::storage;
 
 namespace sixsided{
 class FileIOException : public std::exception {
@@ -406,6 +410,8 @@ public:
 		return address_map.size();
 	}
 };
+
+
 template<class _BlockType>
 class transacted_blocks{
 public:
@@ -689,7 +695,7 @@ namespace storage{
 
 		block_type empty_block;
 	private:
-		//typedef rabbit::unordered_map<address_type, block_reference> _Allocations;
+		
 		typedef ns_umap::unordered_map<address_type, block_reference> _Allocations;
 		_Allocations allocations;
 		address_type next;
@@ -846,9 +852,11 @@ namespace storage{
 
 		typedef std::vector<Poco::UInt64> _SQLAddresses;
 
-		/// version map - address to version		
-		typedef ns_umap::unordered_map<address_type, version_type, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type> > _Versions;
-		/// typedef rabbit::unordered_map<address_type, version_type> _Versions;
+		/// version map - address to version
+		/// , rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type>
+		/// , rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> 
+		typedef ns_umap::unordered_map<address_type, version_type, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> > _Versions; 
+
 
 
 	private: /// private types
@@ -880,6 +888,9 @@ namespace storage{
 				if(mod != create)
 					mod = action;
 			}
+			void set_written(){
+				this->mod = read;
+			}
 			storage_action get_storage_action (){
 				return mod;
 			}
@@ -895,13 +906,9 @@ namespace storage{
 		} ;
 
 		typedef block_descriptor* ref_block_descriptor;
-		typedef std::vector<block_descriptor*> _Descriptors;
-		//typedef std::unordered_map<address_type, ref_block_descriptor> _Allocations;
-		/// typedef ::google::dense_hash_map<address_type, ref_block_descriptor> _Allocations;		
-		typedef ns_umap::unordered_map<address_type, ref_block_descriptor, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type>> _Allocations;
-		typedef ns_umap::unordered_map<address_type, block_type, std::hash<address_type>, std::equal_to<address_type>, sta::pool_alloc_tracker<address_type>> _BlocksMap;
-
-		typedef ns_umap::unordered_set<address_type> _Changed;
+		typedef std::vector<block_descriptor*> _Descriptors;				
+		typedef ns_umap::unordered_map<address_type, ref_block_descriptor, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> > _Allocations;
+		typedef ns_umap::unordered_set<address_type > _Changed;
 		
 	private:
 		/// per instance members
@@ -916,9 +923,7 @@ namespace storage{
 
 		_Versions versions;			/// map of transient versions
 
-		_Allocations allocations;	/// the live unflushed allocations
-
-		_BlocksMap written_blocks;
+		_Allocations allocations;	/// the live unflushed allocations		
 
 		_Changed changed;			/// a list of addresses which changed during the current transaction
 
@@ -947,6 +952,9 @@ namespace storage{
 
 		std::shared_ptr<Poco::Data::Statement> get_stmt ;
 
+		/// to check if block exists
+
+		std::shared_ptr<Poco::Data::Statement> exists_stmt ;
 
 		/// has-a transaction been started
 
@@ -970,7 +978,9 @@ namespace storage{
 
 		bool is_read_cache;			/// control read caching - existing pages are kept
 
-		sixsided::transacted_blocks<block_type> lego;		
+		//cassandras<block_type> lego;
+		//sixsided::transacted_blocks<block_type>
+		red::client_allocator_proxy lego;		
 									/// file blocks
 
 		typename _Allocations::iterator finder;
@@ -1026,6 +1036,7 @@ namespace storage{
 		u64 selector_address;
 		u64 current_address;
 		u64 max_address;
+		u64 exists_count;
 		Poco::Data::BLOB encoded_block;
 		Poco::UInt64 current_size;
 		block_type current_block;
@@ -1047,7 +1058,7 @@ namespace storage{
 				decoded.clear();
 
 				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
-					block_descriptor* result = new block_descriptor(0);
+					block_descriptor* result = new block_descriptor(version_type());
 					///decompress_zlibh(result->block, (*b).content());
 					result->block.resize((*b).size());
 					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());
@@ -1082,9 +1093,13 @@ namespace storage{
 				, into(current_address), into(current_size), into(encoded_block)
 				, bind(selector_address);
 
+			exists_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
 			/// block readahead statements
+			*exists_stmt << "SELECT count(*) FROM " << (*this).table_name << " WHERE a1 = ?;"
+				, into(exists_count)
+				, bind(selector_address);
 
-			if(!lego.opened()){
+			if(!lego.is_open()){
 
 				max_address = 0;
 
@@ -1096,12 +1111,16 @@ namespace storage{
 		/// open the connection if its closed
 
 		Session& get_session(){
-
-			if(!lego.opened()){
-				//lego.open(name+".blocks");
-				//max_address = 0;
-				//max_address = std::max<address_type>(max_address, lego.max_block_address());
-				//(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
+			if(_session != nullptr){
+				return *_session;
+			}
+			if(true){
+				if(get_version() == version_type() && !lego.is_open()){
+					lego.open(name);
+					max_address = 0;
+					max_address = std::max<address_type>(max_address, lego.max_block_address());
+					(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
+				}
 			}
 			if(_session == nullptr){
 				_session = std::make_shared<Session>("SQLite", get_storage_path() + name + extension);//SessionFactory::instance().create
@@ -1111,9 +1130,10 @@ namespace storage{
 				Poco::File df (get_storage_path() + name + extension );
 				file_size = df.getSize();
 					
-				if(lego.opened()){
+				if(lego.is_open()){
 					
-				}				
+				}
+				//printf("is_open %s\n", name.c_str());
 			}
 			return *_session;
 		}
@@ -1122,9 +1142,9 @@ namespace storage{
 			current_size = block.size()*sizeof(typename block_type::value_type);			
 			
 
-			if(lego.opened()){
+			if(lego.is_open()){
 				if(!block.empty()){
-					lego.set(w, block);
+					lego.store(w, block);
 					return;
 				}
 				return;
@@ -1142,7 +1162,7 @@ namespace storage{
 				///current_size = compressed_block.size()*sizeof(typename block_type::value_type);
 				current_size = block.size();
 				encoded_block.clear();
-				if(!lego.opened())
+				if(!lego.is_open())
 					encoded_block.assignRaw((const char *)&block[0], (size_t)current_size);
 			}
 
@@ -1151,7 +1171,20 @@ namespace storage{
 		}
 
 		/// returns true if the buffer with address specified by w has been retrieved
-
+		bool get_exists(const address_type& w){
+			if(is_new) return false;
+			if(w >= next) return false;
+			get_session();
+			
+			
+			selector_address = w;
+			exists_count = 0;
+			if(lego.is_open()){
+				return lego.contains(w);					
+			}
+			exists_stmt->execute();
+			return exists_count > 0;
+		}
 		bool get_buffer(const address_type& w){
 			if(!w)
 				throw InvalidAddressException();
@@ -1159,8 +1192,10 @@ namespace storage{
 			if(is_new) return false;
 			get_session();
 			current_block.clear();
-			if(lego.opened()){
-				if( lego.get(current_block, w) ){
+			if(lego.is_open()){
+				version_type version;
+				if( lego.get(w,version,current_block) ){
+					update_versions(w) = version;
 					current_size = current_block.size();
 					current_address = w;
 					return true;
@@ -1239,7 +1274,7 @@ namespace storage{
 				//up_use(reflect_block_use(*result));
 				result = nullptr;
 			}		
-			/// is_all_loaded = false; /// everything isnt going to be loaded anymore
+			
 			ptrdiff_t before = get_use();
 			typedef std::pair<address_type, ref_block_descriptor> _AddressedBlockPair;
 			typedef std::vector<_AddressedBlockPair, ::sta::tracker<_AddressedBlockPair, ::sta::buffer_counter> > _Blocks;
@@ -1261,30 +1296,21 @@ namespace storage{
 					/// write blocks will be written in address order
 					by_address.push_back(*b);
 					mods++;
+				}else if(get_use() > (before*factor)){ /// flush read blocks in LRU order
+					if(release)
+					{
+						versions[(*b).first] = (*b).second->version;	
+						up_use(reflect_block_use((*b).second)); /// update to correctly reflect						
+						allocations.erase((*b).first);
+
+						down_use( get_block_use((*b).second) );
+						delete (*b).second;
+					}
 				}
 
-			}
-			if(!mods){
-				for(typename _Blocks::iterator b = blocks.begin(); b != blocks.end(); ++b){
-					if(get_use() > (before*factor)){ /// flush read blocks in LRU order
-						if(release)
-						{
-							up_use(reflect_block_use((*b).second)); /// update to correctly reflect
-							//written_blocks[(*b).first] = (*b).second->block;
-							allocations.erase((*b).first);
-
-							down_use( get_block_use((*b).second) );
-							delete (*b).second;
-						}
-					}				
-					//if(!buffer_allocation_pool.is_near_depleted()){
-					//	return;
-					//}
-				}
 			}
 			if(!mods && get_use() <= (before*factor)){
 				/// printf("reduced storage %s\n", get_name().c_str());
-				
 				return;
 			}
 
@@ -1308,10 +1334,9 @@ namespace storage{
 			for(typename _Blocks::iterator b = by_address.begin(); b != by_address.end(); ++b){
 
 				mods--;
-				versions[(*b).first] = (*b).second->version;
-				//written_blocks[(*b).first] = (*b).second->block;
+				versions[(*b).first] = (*b).second->version;				
 				add_buffer((*b).first, (*b).second->block);
-
+				(*b).second->set_written();
 				up_use(reflect_block_use((*b).second)); /// update to correctly reflect
 				if(release)
 				{
@@ -1319,39 +1344,36 @@ namespace storage{
 
 					down_use( get_block_use((*b).second) );
 					delete (*b).second;
-					
 				}
 				if(mods == 0 && get_use() <= (before*factor)){
 					break;
 				}
-				
 			}
 			get_session() << "PRAGMA shrink_memory;", now;
 			if(write_all){
 				//(*this).changed.clear();
 				(*this).changes = 0;
-			}			
+			}
 		}
 
 		
 		void check_use(){			
+
 			
-			return;
-			if(		buffer_allocation_pool.is_near_depleted()
-			){
+			//if(treestore_current_mem_use > treestore_max_mem_use){
+			if(buffer_allocation_pool.is_near_depleted() && (*this)._use > 1024*1024*2){
 				ptrdiff_t before = get_use();
-				if(before > 1024*1024){
-					flush_back(0.8, true);
-					get_session() << "PRAGMA shrink_memory;", now;
-					last_flush_time = ::os::millis();
-					///printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
-				}
+					
+				flush_back(0.1,true);
+				get_session() << "PRAGMA shrink_memory;", now;
+				last_flush_time = ::os::millis();
+				printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				
 			}
 		}
 		version_type version_off(address_type which){
 			version_type r = has_version(which);
-			if(r == 0){
+			if(r == version_type()){
 
 				r = (*this).get_version();
 				update_versions(which) = r;
@@ -1374,16 +1396,15 @@ namespace storage{
 			}
 		}
 	protected:
-		/// the single read block to return when read caching is disabled
 		block_type read_block;
-
 		block_type & _allocate(address_type& which, storage_action how){
-
+			
 			lock.lock();
+			check_use();
 			if(how != read)
 				++((*this).changes);
 			busy = true;
-			allocated_version = 0;
+			allocated_version = version_type();
 			
 			currently_active = 0;
 			result = nullptr;
@@ -1392,8 +1413,8 @@ namespace storage{
 				
 				if(!finder){
 					/// load from storage
-					check_use();	
-					if(how != create && (*this).get_buffer(which))
+					
+					if(how!=create && (*this).get_buffer(which))
 					{
 						
 						if(!this->is_read_cache){
@@ -1424,7 +1445,6 @@ namespace storage{
 				}
 				result->set_storage_action(how);
 			}else{
-				check_use();
 				if(how != create) /// this is also probably a bit pedantic
 					throw InvalidStorageAction();
 
@@ -1462,10 +1482,10 @@ namespace storage{
 			if(v != versions.end()){
 				return (*v).second;
 			}
-			return 0;
+			return version_type();
 
 		}
-		nst::version_type& update_versions(nst::version_type v){
+		nst::version_type& update_versions(address_type v){
 			return versions[v];
 		}
 
@@ -1477,17 +1497,31 @@ namespace storage{
 			nst::u64 responses = 0;
 			syncronized ul(lock);
 			for(typename _VersionRequests::iterator v = request.begin(); v != request.end(); ++v){
-				address_type ver = 0;
-
+				version_type ver = version_type();
+				bool found = false;
 				///versions.get((*v).first,ver);
 				_Versions::iterator fv = versions.find((*v).first);
 				if(fv!=versions.end()){
 					ver = (*fv).second;
+					found = true;
 				}
 				finder = allocations.find((*v).first);
 				if(finder != allocations.end()){
 					ver = std::max<version_type>(ver, (*finder).second->version );
+					found = true;
 				}
+				if(!found){
+					if(lego.is_open()){
+						if(!lego.get_version((*v).first, ver)){
+							ver = this->get_version();
+						}
+					}else{
+						if(get_exists((*v).first)){
+							ver = this->get_version();
+						}
+					}
+				}
+
 				if((*v).second < ver ){
 					(*v).second = ver;
 					++responses;
@@ -1522,6 +1556,22 @@ namespace storage{
 			}
 			/// out contains a unique list of addresses in this allocator
 		}
+		void get_modified_addresses(_Addresses& out){
+			synchronized s(lock);
+			if(_session != nullptr){
+				_SQLAddresses addresses;
+				get_session() << "select a1 from " << (*this).table_name << " ;" , into(addresses), now;
+				for(_SQLAddresses::iterator sa = addresses.begin(); sa != addresses.end(); ++sa){
+					out.insert((stream_address)(*sa));
+				}
+			}
+			for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
+				if((*a).second->is_modified()){
+					out.insert((stream_address)(*a).first);
+				}
+			}
+			/// out contains a unique list of addresses in this allocator
+		}
 
 		/// set read cache to desired state
 		void set_read_cache(bool is_read_cache){
@@ -1530,7 +1580,8 @@ namespace storage{
 		}
 		
 		void load_all(){			
-			
+			if(treestore_column_cache!=0) 
+				return;
 			synchronized s(lock);
 			/// check if this file can be loaded
 			if(!is_all_loaded){
@@ -1664,16 +1715,15 @@ namespace storage{
 					/// if true the data files are deleted on destruction
 
 		{
-			//allocations.set_empty_key(0xFFFFFFFFll);
-			//allocations.set_deleted_key(0xFFFFFFFFll-1);
-
+		
 			using Poco::File;
 			
 			if(!is_new){
 				File df (get_storage_path() + name + extension );
 				(*this).is_new = !df.exists();
-				if(!is_new){
-					get_session();					
+				if(!(*this).is_new){
+					get_session();
+					
 				}
 			}else (*this).is_new = true;
 			
@@ -1777,7 +1827,7 @@ namespace storage{
 				}
 				allocations.clear();
 				versions.clear();
-				if(lego.opened()) 
+				if(lego.is_open()) 
 					lego.close();
 			}
 		}
@@ -1787,7 +1837,7 @@ namespace storage{
 		void initialize(const address_type& which){
 			syncronized ul(lock);
 			if(!(*this).get_buffer(which)){
-				ref_block_descriptor result = new block_descriptor(0);
+				ref_block_descriptor result = new block_descriptor(version_type());
 				result->set_storage_action(create);
 				allocations[which] = result;
 				//changed.insert(which);
@@ -1861,7 +1911,7 @@ namespace storage{
 		void complete(){
 			///NS_STORAGE::synchronized s(lock);
 
-			allocated_version = 0;
+			allocated_version = version_type();
 			if(busy){
 				if(nullptr != result){
 					up_use(reflect_block_use(result)); /// update changes made to last allocation
@@ -1892,7 +1942,11 @@ namespace storage{
 		}
 		void open(){
 			syncronized ul(lock);
-			(*this).open_session();
+			
+		}
+		/// NL
+		bool is_local() const {
+			return !lego.is_open();
 		}
 		/// close all handles and opened files and release memory held in caches, unwritten pages are not flushed
 		void close(){
@@ -1919,7 +1973,7 @@ namespace storage{
 			if(!transacted){
 				get_session() << "PRAGMA shrink_memory;", now;
 				get_session() << "begin transaction;", now;
-				if(lego.opened()) lego.begin();
+				if(lego.is_open()) lego.begin(true);
 				transacted = true;
 			}
 		}
@@ -1929,7 +1983,7 @@ namespace storage{
 		void commit_storage(){
 			if(transacted){
 				get_session() << "commit;", now;
-				if(lego.opened()) lego.commit();
+				if(lego.is_open()) lego.commit();
 			}
 			
 			transacted = false;
@@ -1956,7 +2010,7 @@ namespace storage{
 		void journal(const std::string& name){
 			_Addresses todo;
 			syncronized ul(lock);
-			get_addresses(todo);
+			get_modified_addresses(todo);
 			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
 				stream_address at = (*a);
 				buffer_type &r = allocate(at, read);
@@ -1981,20 +2035,20 @@ namespace storage{
 			syncronized ul(lock);
 			if(transacted){
 				get_session() << "rollback;", now;
-				if(lego.opened()) lego.rollback();
+				if(lego.is_open()) lego.rollback();
 			}
 			get_session() << "PRAGMA shrink_memory;", now;
 			transacted = false;
 		}
 		void reduce(){
 			if(transient) return;
-			if(version > 3) return;
+			if(version != version_type()) return;
 			syncronized ul(lock);
 			//if(modified()) return;
 			
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
-			if((*this)._use > 1024*1024*2)
-				flush_back(0.9,true);
+			if((*this)._use > 1024*1024*1)
+				flush_back(0.45,true);
 			get_session() << "PRAGMA shrink_memory;", now;
 		}
 	};
@@ -2071,6 +2125,9 @@ namespace storage{
 			nst::u64 responses = 0;
 			if((*this).allocations != nullptr){
 				responses += (*this).allocations->get_greater_version_diff(request);
+			}
+			if(based != nullptr){
+				responses += (*this).based->get_greater_version_diff(request);
 			}
 			return responses;
 		}
@@ -2240,7 +2297,7 @@ namespace storage{
 		void check_global_use(){
 			//if(treestore_current_mem_use > treestore_max_mem_use*0.85){
 			if(buffer_allocation_pool.is_near_depleted()){
-				//stored::reduce_all();
+				stored::reduce_all();
 			}
 		}
 
@@ -2260,7 +2317,7 @@ namespace storage{
 			//check_global_use();
 			last_base = nullptr;
 			(*lock).lock();
-			(*this).allocated_version = 0;
+			(*this).allocated_version = version_type();
 
 			if(is_readonly() && how != read)
 				throw InvalidStorageAction();
@@ -2456,7 +2513,7 @@ namespace storage{
 
 		typedef std::vector<version_storage_type_ptr> storage_container;
 
-		typedef ns_umap::unordered_map<u64, version_storage_type_ptr> version_storage_map;
+		typedef ns_umap::unordered_map<version_type, version_storage_type_ptr> version_storage_map;
 
 		typedef typename storage_allocator_type::address_type address_type;
 
@@ -2467,13 +2524,19 @@ namespace storage{
 
 		struct version_namer{
 			std::string name;
-
-			version_namer(u64 version, const std::string extension) {
+			std::string to_string(const Poco::UUID& version){
+				return version.toString();
+			}
+			std::string to_string(const u32& version){
+				std::string result;
+				Poco::NumberFormatter::append(result, version);
+				return result;
+			}
+			version_namer(const version_type &version, const std::string extension) {
 
 				name += extension;
 				name += ".";
-				Poco::NumberFormatter::append(name, version);
-
+				name += to_string(version);				
 			}
 
 			version_namer (const default_name_factory& nf){
@@ -2560,11 +2623,12 @@ namespace storage{
 				storage_container merged;
 				typename storage_container::reverse_iterator latest_idle = storages.rbegin();
 				storage_container idle;
-				u64 version = 0;
+				version_type version = version_type();
 				for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 				{
-					if((*c)->get_version() <= version)
+					if((*c)->get_version() <= version){						
 						throw InvalidWriterOrder();
+					}
 					(*c)->clear_merged();
 					version = (*c)->get_version();
 				}
@@ -2674,7 +2738,7 @@ namespace storage{
 		,	active_transactions(0)
 		,	writing_transactions(0)
 		,	writing_transaction_thread(0)
-		,	next_version(1)
+		//,	next_version(1)
 		,	last_address ( initial->last() )
 		,	initial(initial)
 		,   lock(std::make_shared<Poco::Mutex>())
@@ -2683,7 +2747,7 @@ namespace storage{
 		{
 			//initial->engage();
 			delete_temp_files_of(initial->get_name());
-			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, create_version(), (*this).lock);
 			b->set_allocator(initial);
 			b->set_previous(nullptr);
 			storages.push_back(b);
@@ -2701,12 +2765,12 @@ namespace storage{
 				bool delete_temp_files = true;
 				if(delete_temp_files){
 
-				}else{
+				}else {
 					Poco::StringTokenizer tokens(names, ",");
 					for(Poco::StringTokenizer::Iterator t = tokens.begin(); t != tokens.end(); ++t){
 						storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t)));
 						last_address = std::max<stream_address>(last_address, allocator->last() );
-						version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, ++order, ++next_version, (*this).lock);
+						version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, ++order, create_version(), (*this).lock);
 						allocator->set_allocation_start(last_address);
 						b->set_allocator(allocator);
 						storages.push_back(b);
@@ -2752,6 +2816,11 @@ namespace storage{
 			initial->load_all();
 		}
 
+		/// true if the storage is local
+		bool is_local() const {
+			return initial->is_local();
+		}
+
 		/// engages the instance - its resources may not be released if references > 0
 
 		void engage(){
@@ -2791,8 +2860,7 @@ namespace storage{
 
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				if(buffer_allocation_pool.is_near_depleted())
-					(*c)->get_allocator().reduce();
+				(*c)->get_allocator().reduce();
 
 			}
 
@@ -2836,7 +2904,7 @@ namespace storage{
 				printf("WARNING: started transaction without active references\n");
 			}
 
-			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, ++next_version, (*this).lock);
+			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, create_version(), (*this).lock);
 			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()),true);
 			allocator->set_allocation_start(last_address);
 			b->set_allocator(allocator);
@@ -2893,7 +2961,7 @@ namespace storage{
 		bool commit(version_storage_type* transaction){
 			//if(treestore_current_mem_use > treestore_max_mem_use){
 			if(buffer_allocation_pool.is_near_depleted()){
-				//stored::reduce_all();
+				stored::reduce_all();
 			}
 			bool writer = !transaction->is_readonly();
 			if(!writer){

@@ -35,6 +35,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #ifndef _COLLUM_DEF_CEP_20130801_
 #define _COLLUM_DEF_CEP_20130801_
 #include <stdlib.h>
+#include <string>
 #include "fields.h"
 #include "Poco/Mutex.h"
 #include "Poco/Thread.h"
@@ -44,17 +45,781 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "NotificationQueueWorker.h"
 #include "conversions.h"
 #include "iterator.h"
+#include <rabbit/unordered_map>
+#include <stx/storage/pool.h>
 namespace nst = NS_STORAGE;
+extern Poco::Mutex data_loading_lock;
 namespace collums{
-	
-	template<class _StoredType>
-	
-	struct col_policy_type{
-		bool load(size_t max_size) const{
-			return max_size <= 8;
+	template<typename _Key, typename _Value, typename _Storage, typename _ValueEncoder>
+	class paged_vector{
+	public:
+		/// size type
+		typedef size_t							size_type;
+		/// version type
+		typedef nst::version_type				version_type;
+		/// key address size type
+		typedef _Key							key_type;
+		/// the type of values stored
+		typedef _Value							data_type;
+		
+		/// the value encoder
+		typedef _ValueEncoder					value_encoder_type;
+		/// the storage type
+		typedef _Storage						storage_type;
+		/// the persistent buffer type for encoding pages
+		typedef nst::buffer_type				buffer_type;
+		/// the key value pair for iterators
+		typedef std::pair<key_type, data_type>	value_type;
+		
+	protected:
+		enum{
+			page_size = 348,			
+			use_pool_allocator = 1
+		};
+		struct stored_page{
+		private:
+			mutable bool modified;
+			size_type size; 	
+			size_type address;
+			version_type version;
+			nst::u8	exists[page_size/8];
+			data_type values[page_size];
+			std::atomic<nst::u64> references;
+		private:
+			void set_bit(nst::u8& w, nst::u8 index, bool f){
+				
+				#ifdef _MSC_VER
+				#pragma warning(disable:4804)
+				#endif				
+				nst::u8 m = (nst::u8)1ul << index;// the bit mask				
+				w ^= (-f ^ w) & m;				
+			}
+		
+			
+		public:
+			void reset_references(){
+				this->references = 0;
+			}
+			nst::u64 get_references() const {
+				return this->references;
+			}
+			void ref(){
+				++references;
+			}
+			void unref(){
+				--references;
+			}
+			stored_page(){
+				references = 0;
+				modified = false;
+				size = page_size;
+				address = 0;
+				memset(&exists[0], 0, sizeof(exists)); /// empty
+				if(use_pool_allocator!=1)
+					nst::add_buffer_use(sizeof(*this));
+			}
+			~stored_page(){
+				if(use_pool_allocator!=1)
+					nst::remove_buffer_use(sizeof(*this));
+			}
+			void set_exists(size_type which, bool val){
+				size_type b = which & (page_size-1);
+				nst::u8& v = exists[b>>3];// 8 == 1<<3,/8 >>3
+				nst::u8 bit = b & 7;
+				set_bit(v, bit, val);
+			}
+			/// this function takes an page untranslated address - which
+			bool is_exists(size_type which) const {
+				size_type b = which & (page_size-1);
+				nst::u8 v = exists[b>>3];// 8 == 1<<3,/8 >>3
+				nst::u8 bit = b & 7;
+				return ((v >> bit) & (nst::u8)1ul);
+			}
+
+			data_type& get(size_type which) {				
+				return values[which % page_size];
+			}
+			
+			const data_type& get(size_type which) const {
+				return values[which % page_size];
+			}
+			
+			void set(size_type which, const data_type& value){				
+				modified = true;
+				set_exists(which, true);
+				get(which) = value;				
+			}
+			
+			void set_address(size_type address){
+				(*this).address = address;
+			}
+			
+			size_type get_address() const {
+				return (*this).address;
+			}
+			
+			void set_version(version_type version){
+				this->version = version;
+			}
+
+			version_type get_version() const {
+				return (*this).version;
+			}
+			
+			void load
+			(	value_encoder_type encoder
+			,	storage_type & storage
+			,	buffer_type& buffer
+			,	size_t bsize
+			){
+				if(!bsize) return;
+				 using namespace stx::storage;
+				(*this).address = address;
+				buffer_type::const_iterator reader = buffer.begin();
+				nst::i32 encoded_value_size = leb128::read_signed(reader);
+				for(size_type b = 0; b < page_size/8; ++b){
+					exists[b] = (*reader);
+					++reader;
+				}
+				if(encoded_value_size > 0){
+					encoder.decode_values(buffer, reader, (*this).values, page_size);
+				}else{
+					for(size_type v = 0; v < page_size; ++v){
+						storage.retrieve(buffer, reader, values[v]);
+					}
+				}
+
+				size_t d = reader - buffer.begin();
+
+				if(d != bsize){					
+					printf("[ERROR] [TS] page has invalid size\n");
+				}
+			}
+			
+			void save(value_encoder_type encoder, storage_type &storage, buffer_type& buffer) const {
+				if(!modified) return;
+					
+				using namespace stx::storage;
+				size_type storage_use = 0;
+				nst::i32 encoded_value_size = encoder.encoded_values_size((*this).values, page_size);
+				storage_use += leb128::signed_size(encoded_value_size);				
+				storage_use += page_size/8;
+				if(encoded_value_size > 0){
+					storage_use += encoded_value_size;
+				}else{
+					encoded_value_size = 0;
+					for(size_type v = 0; v < page_size; ++v){
+						storage_use += storage.store_size(values[v]);
+					}
+				}
+				buffer.resize(storage_use);
+				if(buffer.size() != storage_use){
+					printf("[ERROR] [TS] resize failed\n");
+				}
+				buffer_type::iterator writer = buffer.begin();				
+				writer = leb128::write_signed(writer, encoded_value_size);			
+				for(size_type b = 0; b < page_size/8; ++b){
+					(*writer) = exists[b];
+					++writer;
+				}
+					
+				if(encoded_value_size > 0 ){
+					encoder.encode_values(buffer, writer, (*this).values, page_size);
+				}else{
+					for(size_type v = 0; v < page_size; ++v){
+						storage.store(writer, values[v]);
+					}
+				}
+				size_type d = writer - buffer.begin();
+				if(d > storage_use){
+					printf("[ERROR] [TS] array page encoding failed\n");
+				}
+				
+				modified = false;
+			}
+				
+			bool is_modified() const {
+				return this->modified;
+			}
+			typedef stored_page* ptr;
+		};
+
+		typedef typename stored_page::ptr stored_page_ptr;
+		class shared_context{
+		public:
+			typedef std::pair<size_type,version_type> address_version;
+			
+			struct hash_address_version{
+				unsigned long operator() (const address_version& k) const {
+					return (k.first << 7) ^ std::hash<version_type>()(k.second);
+				}
+			};
+			typedef rabbit::unordered_map<address_version, stored_page_ptr,hash_address_version> _Pages;
+		protected:
+			mutable Poco::Mutex lock;
+			_Pages versioned_pages;
+			nst::u64 reduced;
+		public:
+			shared_context(){
+				reduced = 0;
+			}
+			~shared_context(){
+			}			
+			
+			bool has(stored_page_ptr page){
+				
+				nst::synchronized l(this->lock);
+				address_version location = std::make_pair(page->get_address(), page->get_version());
+				if(versioned_pages.count(location)){
+					return true;
+				}
+				return false;
+			}
+			bool release(stored_page_ptr page){
+				
+				nst::synchronized l(this->lock);
+				address_version location = std::make_pair(page->get_address(), page->get_version());
+				stored_page_ptr r = nullptr;
+				if(versioned_pages.get(location,r)){
+					if(r == page){
+						page->unref();
+						versioned_pages.erase(location);
+						if(page->get_references()==0){
+							if(use_pool_allocator==1){
+								allocation_pool.free<stored_page>(page);
+							}else{
+								delete page;
+							}
+						}
+						return true;
+					}
+				}
+				return false;
+			}
+			void reduce(){
+				//auto now = os::millis() ;
+				if(versioned_pages.empty()) return;
+				nst::synchronized l(this->lock);
+				if(!stx::memory_low_state){
+					return;
+				}
+				
+				
+				//if(now - this->reduced < treestore_cleanup_time/4){
+				//	return;
+				//}
+				
+				//printf("[TS] [INFO] reduce pages\n");
+				typedef std::vector<address_version> _Released;
+				_Released released;
+				for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
+					stored_page_ptr page = p.get_value();
+					if(page->get_references() == 0){
+						printf("[TS] [SEVERE] [ERROR] inconsistent memory previously visited page or page invalid\n");
+					}
+					if(page->get_references() == 1 && page->is_modified()){
+						printf("[TS] [SEVERE] [ERROR] inconsistent memory page state\n");
+					}
+					if(page->get_references() == 1 && !page->is_modified()){
+						page->reset_references();
+						if(use_pool_allocator == 1){
+							allocation_pool.free<stored_page>(page);
+						}else{
+							delete page;
+						}
+						
+						released.push_back(p.get_key());
+					}
+					if(released.size() > versioned_pages.size() / 10){
+						break;
+					}
+				}
+				size_t old = versioned_pages.size();
+				for(_Released::iterator r = released.begin(); r != released.end(); ++r){
+					versioned_pages.erase((*r));
+				}
+				if(versioned_pages.size() != old-released.size()){
+					printf("[TS] [SEVERE] [ERROR] inconsistent memory\n");
+				}
+				//this->reduced = now ;
+			}
+			/// add the page to version control
+			bool add(stored_page_ptr p){
+				if(p->get_references() < 1){
+					printf("[TS] [ERROR] page has invalid reference count\n");
+				}
+				address_version location = std::make_pair(p->get_address(), p->get_version());				
+				nst::synchronized l(this->lock);
+				if(versioned_pages.count(location)==0){					
+					p->ref();/// reference for pages collection			
+					if(p->is_modified()){
+						printf("[TS] [ERROR] page added as modified\n");
+					}
+					versioned_pages[location] = p;				
+					return true;
+				}				
+				return false;
+			}
+
+			/// get the page of specified version
+			stored_page_ptr check_out(size_type address, version_type version){
+				stored_page_ptr r = nullptr;
+				nst::synchronized l(this->lock);
+				address_version query = std::make_pair(address, version);
+				versioned_pages.get(query,r);				
+				if(r != nullptr){
+					address_version location = std::make_pair(r->get_address(), r->get_version());	
+					if(location != query){
+						printf("[TS] [ERROR] the retrieved version does not match the query\n");
+					}
+					r->ref(); 
+				}
+				
+				return r;
+			}
+		
+		};
+
+		class shared_pages{
+		private:
+			typedef rabbit::unordered_map<std::string, shared_context*> _Contexts;
+			_Contexts contexts;
+			mutable Poco::Mutex lock;
+		public:
+			shared_pages(){
+			}
+			~shared_pages(){
+				for(_Contexts::iterator c = contexts.begin(); c!=contexts.end(); ++c){
+					delete (*c).second;
+				}
+			}
+			shared_context * get_context(std::string name){
+				nst::synchronized l(this->lock);
+				shared_context * r = nullptr;
+				if(!contexts.get(name,r)){
+					r = new shared_context();
+					contexts[name] = r;
+				}
+				return r;
+			}
+		};
+
+		/// the page map
+		typedef rabbit::unordered_map<size_type, stored_page_ptr> page_map_type;
+	private:
+		/// keeps cached pages
+		mutable page_map_type pages;
+		/// storage from where pages are loaded
+		mutable storage_type* storage;
+		/// the largest key added
+		stx::storage::i64 largest;
+		/// the key count 
+		stx::storage::i64 _size;
+		/// buffer type temporary compress destination
+		mutable buffer_type temp_compress;
+		mutable buffer_type temp_decompress;
+		/// the encoder/decoder for arrays of values
+		value_encoder_type encoder;
+		shared_context * version_control;
+		mutable stored_page_ptr last_loaded;
+		mutable stored_page_ptr local_page;
+	private:
+		stored_page_ptr allocate_page() const {
+			stored_page_ptr page = nullptr;
+			if(use_pool_allocator==1){
+				page = allocation_pool.allocate<stored_page>();
+			}else{
+				page = new stored_page(); 
+			}
+			return page;
+		}
+
+		void free_page(stored_page_ptr page) const {
+			if(use_pool_allocator==1){
+				allocation_pool.free<stored_page>(page);
+			}else{
+				delete page;
+			}
+		}
+
+		shared_pages& get_shared(){
+			synchronized sl(data_loading_lock);
+			static shared_pages shared;
+			return shared;
+		}
+
+		storage_type& get_storage() const {
+			return *storage;
+		}
+		/// this function expects all reference counts to be updated
+		void store_page(stored_page_ptr page){
+			if(!page->is_modified()){
+				return;
+			}
+			if(page->get_address()==0){
+				printf("[TS] [ERROR] array page has no address\n");
+				return;
+			}
+			using namespace stx::storage;
+			//if(version_control->has(page)){
+			//	if(page->get_references() < 2){
+			//		printf("[TS] [ERROR] array page is under referenced\n");
+			//	}				
+				
+			//}
+			version_control->release(page);
+			stream_address w = page->get_address();
+			buffer_type &buffer = get_storage().allocate(w, stx::storage::create);
+			page->save(encoder, get_storage(), buffer);			
+			page->set_version(get_storage().get_allocated_version());
+			inplace_compress_lz4(buffer,temp_compress);						
+			get_storage().complete();
+
+			version_control->add(page);
+		}
+		void clear_cache() const {
+			const_cast<paged_vector*>(this)->clear_cache();
+		}
+		void clear_cache(){
+			
+			last_loaded = nullptr;
+			if(pages.empty()) return;
+			for(page_map_type::iterator p = pages.begin(); p != pages.end();++p){
+				stored_page_ptr page = (*p).second;
+				if(page == local_page){
+					if(page->is_modified()){
+						printf("[TS] [ERROR] local page not saved");
+					}
+					page->set_address(0);
+				}else{
+					page->unref();
+				}
+			}
+			pages.clear();
+		}
+		nst::_VersionRequests version_req;
+		/// get version of page relative to current transaction
+		version_type get_page_version(size_type address) {
+			version_req.clear();
+			version_req.push_back(std::make_pair(address, version_type()));
+			if(get_storage().get_greater_version_diff(version_req)){
+				if(!version_req.empty() && version_req[0].first == address){
+					/// version_req[0].second != 0
+					return version_req[0].second;
+				}
+			}
+			return version_type();
+		}
+		/// get version of page relative to current transaction (const)
+		version_type get_page_version(size_type address) const {
+			return ((paged_vector*)this)->get_page_version(address);
+		}
+		/// load a page from an address 
+		stored_page_ptr load_page(size_type address) const {
+			bool mem_low = (treestore_column_cache != 0) && get_storage().is_readonly();
+			stored_page_ptr page = nullptr;
+			if(false){ ///get_storage().is_local()
+				version_type current_version = get_page_version(address);
+				page = version_control->check_out(address, current_version);
+				if(page){	/// check out refs the page			
+					return page;
+				}
+			}
+			
+			/// storage operation started
+			nst::stream_address w = address;
+			
+			buffer_type& dangling_buffer = get_storage().allocate(w, stx::storage::read);
+			if(get_storage().is_end(dangling_buffer) || dangling_buffer.size() == 0){
+				
+			}else{
+				version_type current_version = get_storage().get_allocated_version(); //get_page_version(address);
+				page = version_control->check_out(address, current_version);
+			}
+			if(page){	/// check out refs the page
+				get_storage().complete(); /// storage operation complete				
+				return page;
+			}
+			/// TODO: if there is shortage of ram first try getting a page from version control
+			if(mem_low ){				
+				//clear_cache();
+				//version_control->reduce();
+			}
+			if(mem_low){
+				page = local_page;
+			}else {
+				page = allocate_page(); 
+			}			
+			page->set_address(address);
+			nst::version_type version = get_storage().get_allocated_version();
+			//if(current_version != version){	
+			//	current_version = get_page_version(address);
+			//	printf("[TS] [ERROR] the current version is invalid - does not match allocated version\n");
+			//}
+			
+			size_t load_size = nst::r_decompress_lz4(temp_decompress, dangling_buffer );
+			get_storage().complete(); /// storage operation complete
+			
+			page->load(encoder, get_storage(), temp_decompress, load_size);
+			page->set_version(version);
+			
+			if(!mem_low){
+				page->ref();/// for this
+				if(version_control->add(page)){				
+				
+				}else{
+					///printf("[TS] [ERROR] the current page already exists in version control or could not be added\n");
+				}
+			}
+			return page;
+		}
+		
+		stored_page& get_page(size_type which) const {
+			size_type address = (which / page_size) + 128;
+			if(last_loaded && last_loaded->get_address()==address){
+				return *last_loaded;
+			}
+
+			stored_page::ptr page;
+			auto i = pages.find(address);
+			///if(!pages.get(address,page)){
+			if(i != pages.end()){
+				page = (*i).second;
+			}else{
+				page = load_page(address);
+				if(page!=local_page){
+					pages[address] = page;
+				}
+			}
+			last_loaded = page;
+			return *page;
+		}
+
+	public:
+		data_type& resolve(size_type key){
+			size_type h = key;
+			return get_page(h).get(h);
+		}
+		const data_type& resolve(size_type key) const {
+			size_type h = key;
+			return get_page(h).get(h);
+		}
+
+		struct iterator{
+			mutable paged_vector* h;			
+			size_type pos;
+			mutable value_type t;
+			mutable key_type k;
+		private:
+			
+			
+		public:
+			iterator(){
+				
+			}
+			iterator(const paged_vector* h, size_type pos): h((paged_vector*)h),pos(pos){
+				
+			}
+			iterator(const iterator& r){
+				(*this) = r;
+			}
+			iterator& operator=(const iterator& r){
+				h = r.h;
+				pos = r.pos;
+				return (*this);
+			}
+			iterator& operator++(){
+				++pos;
+				return (*this);
+			}
+			iterator operator++(int){
+				iterator t = (*this);
+				++(*this);
+				return t;
+			}
+			/// --Prefix backstep the iterator to the last slot
+			inline iterator& operator--()
+			{
+
+				--pos;
+
+				return *this;
+			}
+
+			/// Postfix-- backstep the iterator to the last slot
+			inline iterator operator--(int)
+			{
+
+				iterator t = (*this);
+				--(*this);
+				return t;
+				
+			}
+			inline data_type& value(){
+				return h->resolve(pos);
+			}
+
+			inline const data_type& value() const {
+				return h->resolve(pos);
+			}
+
+			inline data_type& data(){
+				return h->resolve(pos);
+			}
+
+			inline const data_type& data() const {
+				return h->resolve(pos);
+			}
+
+			inline key_type& key() {
+				k = (key_type::value_type)pos;
+				return k;
+			}
+
+			inline const key_type& key() const {
+				k = (key_type::value_type)pos;
+				return k;
+			}
+
+			const value_type& operator*() const {
+				t = std::make_pair(key(), value());
+				return std::make_pair(key(), value());
+			}
+
+			inline value_type& operator*() {
+				t = std::make_pair(key(), value());
+				return t;
+			}
+		
+			inline const value_type* operator->() {
+				t = std::make_pair(key(), value());
+				return &t;
+			}
+
+			inline bool operator==(const iterator& r) const {
+				return (pos == r.pos);
+			}
+			bool operator!=(const iterator& r) const {
+				return (pos != r.pos);
+			}
+		};
+		typedef iterator const_iterator;
+		paged_vector(storage_type& storage) 
+		:	storage(&storage)
+		,	largest(0)
+		,	_size(0)
+		{
+			local_page = allocate_page();
+			last_loaded = nullptr;
+			version_control = get_shared().get_context(storage.get_name());
+			get_storage().get_boot_value(largest,2) ;
+			get_storage().get_boot_value(_size,3);
+		}
+		
+		~paged_vector(){
+			clear_cache();
+			free_page(local_page);
+		}
+		std::pair<iterator, bool> insert(const key_type&  key, const data_type& value){
+			//if(stx::memory_low_state){
+			//	flush();
+			//	clear_cache();
+			//}
+			size_t h = key.get_hash();
+			largest = std::max<size_type>(largest, h+1);
+			if(get_storage().is_readonly()){
+				get_page(h);
+			}else{
+				if(!get_page(h).is_exists(h)){
+					++_size;
+				}
+				get_page(h).set(h, value);
+
+			}
+			std::pair<iterator, bool> r = std::make_pair(iterator(this, key.get_hash()), false);
+			return r;
+		}
+		/// Returns a reference to the object that is associated with a particular
+		/// key. If the map does not already contain such an object, operator[]
+		/// inserts the default object data_type().
+		inline data_type& operator[](const key_type& key)
+		{
+			iterator i = insert( key, data_type() ).first;
+			return i.data();
+		}
+
+		/// Returns a const reference to the object that is associated with a particular
+		/// key. If the map does not already contain such an object, operator[] const
+		/// returns the object at the end.
+		inline const data_type& operator[](const key_type& key) const
+		{
+			const_iterator i = find( key );
+			return i.data();
+		}
+		iterator find(const key_type& key) const{
+			return iterator(this, key.get_hash());
+		}
+		iterator lower_bound(const key_type& key) const{
+			return iterator(this, key.get_hash());
+		}
+		iterator end() const {
+			return iterator(this, largest);
+		}
+		iterator begin() const {
+			return iterator(this, 0);
+		}
+		void erase(size_type key){
+		}
+		bool count(size_type key) {
+			return false;
+		}
+		void reduce_use(){			
+			//if(stx::memory_low_state){
+				flush();
+				if(pages.size()*sizeof(stored_page) < 2048*1024) return;
+				clear_cache();
+				version_control->reduce();
+			//}			
+		}
+		
+		void flush(){
+			flush_buffers();
+			if(stx::memory_low_state){
+				clear_cache();
+				version_control->reduce();
+			}
+		}
+
+		void flush_buffers(){
+			if(!get_storage().is_readonly()){
+				get_storage().set_boot_value(largest, 2);
+				get_storage().set_boot_value(_size, 3);
+				for(page_map_type::iterator p = pages.begin(); p != pages.end();++p){
+					store_page((*p).second);
+				}				
+			}
+		}
+
+		void reload(){
+			//if(!get_storage().is_readonly()){
+				clear_cache();
+			//}
+		}
+		void unshare(){
+		}
+		size_type size() const {
+			return _size;
+		}
+		bool empty() const {
+			return size() == 0;
 		}
 	};
-	
+	template<class _StoredType>
+	struct col_policy_type{
+		bool load(size_t max_size) const{
+			return max_size < 128;
+		}
+	};
 	template<>
 	struct col_policy_type<stored::UShortStored>{
 		bool load(size_t) const{
@@ -111,9 +876,8 @@ namespace collums{
 		typedef typename stored::IntTypeStored<_Rid> _StoredRowId;
 		stored::abstracted_storage storage;
 
-
-		
-		typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_Stored>> _ColMap;
+		///typedef stx::btree_map<_StoredRowId, _Stored, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_Stored>> _ColMap;
+		typedef paged_vector<_StoredRowId, _Stored, stored::abstracted_storage, stored::int_terpolator<_StoredRowId,_Stored> > _ColMap;
 	private:
 		static const nst::u16 F_NOT_NULL = 1;
 		static const nst::u16 F_CHANGED = 2;
@@ -173,7 +937,9 @@ namespace collums{
 
 
 		};
-		typedef std::vector<_StoredEntry, sta::col_tracker<_StoredEntry> > _Cache;
+		typedef std::vector<_StoredEntry, sta::pool_alloc_tracker<_StoredEntry> > _Cache;
+		/// this is a little faster but prone to exploding
+		/// typedef std::vector<_StoredEntry, sta::col_tracker<_StoredEntry> > _Cache;
 
 		typedef std::vector<nst::u8, sta::col_tracker<nst::u8> > _Flags;
 		struct _CachePage{
@@ -544,6 +1310,10 @@ namespace collums{
 				}
 				return 0;
 			}
+			inline _Rid get_rows_start() const {
+				return this->rows_start;
+
+			}
 		};
 
 
@@ -640,7 +1410,7 @@ namespace collums{
 		typedef typename _ColMap::iterator _ColIter;
 		typename _ColMap::iterator cend;
 		typename _ColMap::iterator ival;
-
+		_CachePage* current_page;
 		_CachePages *pages;
 		_StoredEntry user;
 		_Stored empty;
@@ -657,10 +1427,7 @@ namespace collums{
 		}
 
 		void load_cache(){
-			
-			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) {
-				return;
-			}
+			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) return;
 			if(pages==nullptr && max_row_id > 0){
 				using namespace stored;
 				pages = load_cache(storage.get_name(),max_row_id); ///= new _CachePages(); ///
@@ -721,6 +1488,7 @@ namespace collums{
 		collumn(std::string name, size_t max_size, bool load = false)
 		:	storage(name)
 		,	col(storage)
+		,	current_page(nullptr)
 		,	pages(nullptr)
 		,	max_row_id(0)
 		,	rows_per_key(0)
@@ -745,7 +1513,6 @@ namespace collums{
 
 		void set_data_max_size(size_t max_size){
 			this->max_size = max_size;
-			
 		}
 		
 		void initialize(bool by_tree){
@@ -783,8 +1550,20 @@ namespace collums{
 			_Rid i = (requested % MAX_PAGE_SIZE);
 			_Rid l = requested - i;
 			_Rid p = l/MAX_PAGE_SIZE;
+			if(current_page && current_page->get_rows_start() == l){
+				return current_page;
+			}
+			current_page = _load_page(requested, no_load );
+			return current_page;
+		}
+		_CachePage* _load_page(_Rid requested, bool no_load = false){
+			_Rid i = (requested % MAX_PAGE_SIZE);
+			_Rid l = requested - i;
+			_Rid p = l/MAX_PAGE_SIZE;
 			_CachePage * page = nullptr;
 			++sampler;
+			
+
 			if( has_cache() && p < (*pages).size()){
 				page = &((*pages)[p]);
 				if(page->loaded){
@@ -807,7 +1586,7 @@ namespace collums{
 				if(page->available){
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-					if(	!buffer_allocation_pool.can_allocate(bytes_used) ){
+					if(	allocation_pool.get_allocated() > treestore_max_mem_use*treestore_column_cache_factor*0.85 || !allocation_pool.can_allocate(bytes_used) ){
 						page->unload();
 						page->loading = false;
 
@@ -887,7 +1666,7 @@ namespace collums{
 		}
 
 		void commit1(){
-
+			current_page = nullptr;
 			if(modified){
 				col.flush_buffers();
 
@@ -918,6 +1697,7 @@ namespace collums{
 			return max_row_id;
 		}
 		void rollback(){
+			current_page = nullptr;
 			if(modified){
 				col.flush();
 			}

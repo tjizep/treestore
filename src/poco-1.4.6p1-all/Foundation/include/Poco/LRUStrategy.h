@@ -48,7 +48,7 @@
 #include <list>
 #include <map>
 #include <cstddef>
-
+#include <rabbit/unordered_map>
 
 namespace Poco {
 
@@ -61,7 +61,8 @@ public:
 	typedef std::list<TKey>                   Keys;
 	typedef typename Keys::iterator           Iterator;
 	typedef typename Keys::const_iterator     ConstIterator;
-	typedef std::map<TKey, Iterator>          KeyIndex;
+	typedef rabbit::
+		unordered_map<TKey, Iterator>          KeyIndex;
 	typedef typename KeyIndex::iterator       IndexIterator;
 	typedef typename KeyIndex::const_iterator ConstIndexIterator;
 

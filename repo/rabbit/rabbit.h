@@ -26,6 +26,7 @@ THE SOFTWARE.
 #include <chrono>
 #include <assert.h>
 #include <memory>
+#include <string>
 
 /// the rab-bit hash
 /// probably the worlds simplest working hashtable - only kiddingk
@@ -114,8 +115,6 @@ namespace rabbit{
 		_BinMapper(size_type new_extent,const _Config& config){
 			this->config = config;		
 			this->extent = ((size_type)1) << this->config.log2(new_extent);
-			
-			
 			this->extent1 = this->extent-1;	
 			this->extent2 = this->config.log2(new_extent);								
 			this->primary_bits = extent2;
@@ -145,7 +144,7 @@ namespace rabbit{
 	template<typename _Ht>
 	struct rabbit_hash{	
 		unsigned long operator()(const _Ht& k) const{	
-			return std::hash<_Ht>(k);		
+			return (unsigned long)(size_t)std::hash<_Ht>() (k);		
 		};
 	};
 	template<>
@@ -237,7 +236,7 @@ namespace rabbit{
 			BITS_LOG2_SIZE = (size_type) log2((size_type)BITS_SIZE);
 			ALL_BITS_SET = ~(_Bt)0;				
 			PROBES = 16;							
-			MIN_EXTENT = 8; /// start size of the hash table
+			MIN_EXTENT = 4; /// start size of the hash table
 			MAX_OVERFLOW = 512; //BITS_SIZE*8/sizeof(_Bt); 
 			assert(PROBES > log2((size_type)MAX_OVERFLOW));
 		}
@@ -402,7 +401,10 @@ namespace rabbit{
 				set_bit(overflows,index,f);
 			}
 
-			
+			void clear(){
+				exists = 0;
+				overflows = 0;
+			}
 			_KeySegment(){
 				exists = 0;
 				overflows = 0;
@@ -604,15 +606,20 @@ namespace rabbit{
 			size_type get_e_size() const {
 				return (size_type) (get_data_size()/config.BITS_SIZE)+1;
 			}
-
-			void free_data(){									
+			void clear_data(){
 				if(values) {
 					
 					for(size_type pos = 0; pos < get_data_size(); ++pos){
 						if(exists_(pos)){
 							get_value_allocator().destroy(&values[pos]);
 						}
-					}
+					}					
+				}
+			}
+			void free_data(){									
+				if(values) {
+					
+					clear_data();
 					get_value_allocator().deallocate(values,get_data_size());				
 				}
 				if(clusters) {
@@ -658,17 +665,25 @@ namespace rabbit{
 
 			};
 		
-			void clear(){				
-				resize_clear(config.MIN_EXTENT);
+			void clear(){			
+				size_type esize = get_e_size();				
+				//clear_data();				
+				for(size_type c = 0; c < esize; ++c){
+					clusters[c].clear();
+				}
+				set_exists(get_data_size(),true);
+				elements = 0;
+				removed = 0;
+				//resize_clear(config.MIN_EXTENT);
 			}
 
 			hash_kernel(const key_compare& compare,const allocator_type& allocator) 
 			:	clusters(nullptr), values(nullptr), eq_f(compare), mf(1.0f), allocator(allocator){
-				clear();
+				resize_clear(config.MIN_EXTENT);
 			}
 
 			hash_kernel() : clusters(nullptr), values(nullptr), mf(1.0f){
-				clear();
+				resize_clear(config.MIN_EXTENT);
 			}
 			
 			hash_kernel(const hash_kernel& right) : clusters(nullptr), values(nullptr), mf(1.0f) {
@@ -1051,7 +1066,9 @@ namespace rabbit{
 				return (*this);
 			}
 			iterator operator++(int){
-				return (*this);
+				iterator t = (*this);
+				++(*this);
+				return t;
 			}
 			inline _V& get_value(){
 				return const_cast<hash_kernel *>(hc)->get_segment_value((*this).pos);
@@ -1200,7 +1217,7 @@ namespace rabbit{
 			current->max_load_factor(z);
 		}
 		bool empty() const {
-			return (*this).elements == 0;
+			return current->size() == 0;
 		}
 		void reserve(size_type atleast){
 			
@@ -1263,8 +1280,9 @@ namespace rabbit{
 			
 		}
 		void clear(){
-			
-			set_current(std::make_shared<hash_kernel>());
+			if(current!=nullptr)
+				current->clear();
+			///set_current(std::make_shared<hash_kernel>());
 		}
 		
 		void clear(const key_compare& compare,const allocator_type& allocator){
@@ -1272,7 +1290,7 @@ namespace rabbit{
 		}
 
 		basic_unordered_map() {
-			clear();
+			set_current(std::make_shared<hash_kernel>());
 		}
 
 		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) {
@@ -1299,7 +1317,7 @@ namespace rabbit{
 		}
 		
 		basic_unordered_map& operator=(const basic_unordered_map& right){
-			(*this).clear();
+			(*this).set_current(std::make_shared<hash_kernel>());
 			(*this).reserve(right.size());
 			const_iterator e = right.end();
 			for(const_iterator c = right.begin(); c!=e;++c){

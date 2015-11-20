@@ -45,6 +45,7 @@ long long calc_total_use(){
 	///NS_STORAGE::total_use+buffer_allocation_pool.get_total_allocated()
 	treestore_current_mem_use =  
 		//nst::buffer_use + 		
+		nst::col_use +
 		buffer_allocation_pool.get_total_allocated() +
 		allocation_pool.get_total_allocated() +
 		total_cache_size + 
@@ -144,7 +145,7 @@ namespace tree_stored{
 			DBUG_PRINT("info",("tree thread removed\n"));
 
 		}
-
+		
 		_Tables tables;
 
 		void modify(){
@@ -345,16 +346,17 @@ static handlerton *static_treestore_hton = NULL;
 class static_threads{
 public:
 	typedef std::vector<tree_stored::tree_thread *, sta::tracker<tree_stored::tree_thread*>> _Threads;
-	typedef std::unordered_map<nst::u64,tree_stored::tree_thread*> _Writers;
+	typedef std::unordered_map<std::string,tree_stored::tree_thread*> _Writers;
 private:
 	_Threads threads;
 	Poco::Mutex tlock;
 	_Writers writers;
 	tree_stored::tree_thread writer;
-	tree_stored::tree_thread* map_writer(TABLE_SHARE * share){
+	tree_stored::tree_thread* map_writer(TABLE * table){
 		tree_stored::tree_thread* result = nullptr;
-		nst::u64 wk = (nst::u64)(void*)share;
-		nst::synchronized s(tlock);
+
+		std::string wk = table->s->path.str;
+		
 		auto w = writers.find(wk);
 		if(w == writers.end()){
 			result = new tree_stored::tree_thread(true);
@@ -365,9 +367,9 @@ private:
 		return result;
 	}
 public:
-	tree_stored::tree_thread *get_writer(TABLE_SHARE * share){
-
-		tree_stored::tree_thread* writer = map_writer(share);
+	tree_stored::tree_thread *get_writer(TABLE * table){
+		nst::synchronized s(tlock);
+		tree_stored::tree_thread* writer = map_writer(table);
 		writer->writer_lock.lock();
 
 		if(writer->get_locks()==0)
@@ -560,10 +562,10 @@ tree_stored::tree_thread * thread_from_thd(THD* thd){
 	return *stpp;
 }
 
-tree_stored::tree_thread * new_thread_from_thd(TABLE_SHARE* share, THD* thd,bool writer){
+tree_stored::tree_thread * new_thread_from_thd(TABLE* table, THD* thd,bool writer){
 	tree_stored::tree_thread** stpp = thd_to_tree_thread(thd);
 	if(writer){
-		*stpp = st.get_writer(share);
+		*stpp = st.get_writer(table);
 	}else{
 		if((*stpp) == NULL){
 
@@ -739,10 +741,6 @@ public:
 		if(which & HA_STATUS_ERRKEY) // - status pertaining to last error key (errkey and dupp_ref)
 		{}
 
-
-
-
-			
 		--total_locks;
 		
 		return 0;
@@ -783,7 +781,7 @@ public:
 
 	double scan_time()
 	{
-		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/16384));/*assume an average page size of 8192 bytes*/
+		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/2048));/*assume an average page size of 8192 bytes*/
 	}
 	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows)
@@ -1073,18 +1071,25 @@ public:
 			writer = true;
 		}
 		bool high_mem = calc_total_use() > treestore_max_mem_use ;
-		tree_stored::tree_thread * thread = new_thread_from_thd(table->s,thd,writer);
+		tree_stored::tree_thread * thread = new_thread_from_thd(table,thd,writer);
 		if(total_locks==0){
 			nst::synchronized s(mut_total_locks);
 			if(total_locks==0){
 
+
 				if
-				(	get_treestore_journal_size() > (nst::u64)treestore_journal_lower_max
+				(	get_treestore_journal_size() > (nst::u64)treestore_journal_upper_max
+				//||	high_mem
 				)
 				{
 					st.check_journal();/// function releases all idle reading transaction locks
 					NS_STORAGE::journal::get_instance().synch( high_mem ); /// synchronize to storage
-				}			
+
+				}
+				if(high_mem){
+					stored::reduce_all();
+				}
+
 			}
 		}
 		if(treestore_print_lox){
@@ -1127,7 +1132,7 @@ public:
 
 
 		}else if(lock_type == F_UNLCK){
-			DBUG_PRINT("info", (" -unlocking %s \n", table->s->normalized_path.str));
+			DBUG_PRINT("info", (" -unlocking %s \n", table->s->path.str));
 
 			thread->release(table);
 			if(thread->get_locks()==0){
@@ -1157,11 +1162,11 @@ public:
 
 				/// for testing
 				//st.reduce_all();
-				if(buffer_allocation_pool.is_near_depleted()){
+				if(high_mem){
 					//stored::reduce_all();
 				}
-				//if(high_mem)
-					//get_thread()->own_reduce();
+				if(high_mem)
+					get_thread()->own_reduce();
 				if(treestore_print_lox){
 					printf
 					(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g / %.4g MB\n"
@@ -1307,7 +1312,7 @@ public:
 		row = 0;
 		tt = NULL;
 		st.check_use();
-		cond_pop();
+		/// cond_pop();
 		clear_selection(selected);
 		last_resolved = 0;
 		selected = get_tree_table()->create_output_selection(table);
@@ -1320,7 +1325,11 @@ public:
 	// tscan 4
 
 	int rnd_next(byte *buf){
+
 		DBUG_ENTER("rnd_next");
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		if((*this).r == (*this).r_stop){
 			get_tree_table()->pop_all_conditions();
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
@@ -1386,6 +1395,9 @@ public:
 	}
 	nst::u64 writes;
 	int write_row(byte * buff){
+		if(((writes%10000ll)==0) && stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		++writes;
 		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
 		/// TODO: auto timestamps
@@ -1600,7 +1612,7 @@ public:
 
 		}
 		if(stx::memory_low_state){
-			//get_thread()->own_reduce();
+			get_thread()->own_reduce();
 		}
 		DBUG_RETURN(r);
 	}
@@ -1651,6 +1663,9 @@ public:
 		return index_read_idx_map(buf, keynr, key, keypart_map, find_flag);
 	}
 	int index_next(byte * buf) {
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		int r = HA_ERR_END_OF_FILE;
 		get_index_iterator().next();
 		table->status = STATUS_NOT_FOUND;
@@ -1667,6 +1682,9 @@ public:
 	int index_prev(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
+		if(stx::memory_low_state){
+			get_thread()->own_reduce();
+		}
 		if(get_index_iterator().previous()){
 			r = 0;
 			resolve_selection_from_index();
@@ -1833,6 +1851,7 @@ static int treestore_rollback(handlerton *hton, THD *thd, bool all){
 
 
 namespace storage_workers{
+	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
 
     struct _storage_worker{
         _storage_worker() : w(1){
@@ -1963,7 +1982,10 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_storage_use_on_unlock),
-  MYSQL_SYSVAR(use_primitive_indexes),
+  MYSQL_SYSVAR(cleanup_time),
+  MYSQL_SYSVAR(use_primitive_indexes), 
+  MYSQL_SYSVAR(contact_points),
+  MYSQL_SYSVAR(red_address),
   NULL
 };
 
@@ -1995,27 +2017,27 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
+extern void start_red(const nst::u64& id);
+
 namespace ts_cleanup{
 	class print_cleanup_worker : public Poco::Runnable{
 	public:
 		void run(){
+			start_red(0);
 			nst::u64 last_print_size = calc_total_use();
-			nst::u64 lpt = ::os::millis();
 			/// DEBUG: nst::u64 last_check_size = calc_total_use();
 			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-
 			while(Poco::Thread::current()->isRunning()){
-				Poco::Thread::sleep(100);
+				if(stx::memory_low_state){
+					Poco::Thread::sleep(50);
+				}else Poco::Thread::sleep(treestore_cleanup_time);
 				/// int j = int();
 				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
-				buffer_allocation_pool.set_max_pool_size(treestore_calc_max_block_col_use());
+				buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor)*0.95);
 				
-				stx::memory_low_state = allocation_pool.is_near_depleted(); //allocation_pool.is_depleted();//
-				if
-				(	buffer_allocation_pool.is_near_depleted()
-				)
-				{
+				stx::memory_low_state = (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.75) || allocation_pool.is_depleted();
+				if(buffer_allocation_pool.is_near_full()){
 					stored::reduce_all();
 				}
 				
@@ -2023,8 +2045,7 @@ namespace ts_cleanup{
 					//printf("[TREESTORE] reduce idle tree use\n");
 					//st.release_idle_trees();	
 				}
-				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)
-					|| ::os::millis()-lpt > 2000){
+				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
 					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu\n"
 					,	"o"
@@ -2041,7 +2062,6 @@ namespace ts_cleanup{
 					,	(unsigned long)st.get_thread_count() 
 					);
 					last_print_size = calc_total_use();
-					lpt = ::os::millis();
 				}
 			}
 		}

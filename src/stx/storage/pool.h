@@ -15,6 +15,7 @@
 #include <stx/storage/types.h>
 #include <vector>
 #include <rabbit/unordered_map>
+#include <system_timers.h>
 #ifdef _MSC_VER
 #include <sparsehash/type_traits.h>
 #include <sparsehash/dense_hash_map>
@@ -359,10 +360,10 @@ namespace stx{
 
 				static const u64 MAX_ALLOCATION_SIZE = 25600000000000ll;
 				static const u64 USED_PERIOD = 1000000000ll;
-				static const u64 MIN_ALLOCATION_SIZE = 64ll;
+				static const u64 MIN_ALLOCATION_SIZE = 16ll;
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
 				pool_shared * shared;
-
+				u64 last_full_flush;
 				u64 clock;
 				u64 allocated;
 				u64 used_period;
@@ -414,8 +415,8 @@ namespace stx{
 							if( b.get_value().clock < mclock){
 								row = 0;
 								mclock = b.get_value().clock;
-								msize = b.get_key();	
-								//break;
+								msize = b.get_key();								
+								
 							}else{
 								++row;
 							}
@@ -432,15 +433,22 @@ namespace stx{
 					return msize;
 				}
 				void erase_lru(){
-					if(shared->used > 0 && (shared->allocated + shared->used) < shared->max_pool_size){
+					bool full_flush = false;
+					if(::os::millis() > last_full_flush  + 180000){
+						last_full_flush = ::os::millis() ;
+						printf("[TS] [INFO] Pool full flush of unused memory\n");
+						full_flush = true;
+					}
+					if(shared->used > 0 && (full_flush || (shared->allocated + shared->used) < shared->max_pool_size)){
 						return;
 					}
+
 					//if (this->allocated < ( shared->max_pool_size/shared->instances)) return;
 
 					///if(((++shared->current) % shared->instances) != this->id) return;
 					
 					u64 todo = shared->allocated + shared->used - shared->max_pool_size;
-					while(shared->used > 0 && (shared->allocated + shared->used) > shared->max_pool_size){
+					while(shared->used > 0 && (full_flush||(shared->allocated + shared->used) > shared->max_pool_size)){
 						size_t lru_size = find_lru_size();
 						if(lru_size < MAX_ALLOCATION_SIZE){
 							_Clocked &clocked = (*this).buckets[lru_size];						
@@ -482,7 +490,7 @@ namespace stx{
 					this->id = ++(shared->instances);
 					printf("[INFO] [TS] creating unlocked pool\n");
 					setup_dh();
-
+					last_full_flush = ::os::millis();
 
 				}
 
@@ -517,7 +525,7 @@ namespace stx{
 				size_t overhead() const throw(){
 					return sizeof(void*);
 				}
-				
+
 				_Allocated allocate_type(size_t requested, const std::type_info& ti) {
 
 					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
@@ -594,14 +602,17 @@ namespace stx{
 				}
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
-					u64 total = shared->used + shared->allocated;
-					return ( total > 0.99*shared->max_pool_size ) && (shared->allocated > 0.9*shared->max_pool_size);
+					return ( shared->allocated >= 0.95*shared->max_pool_size ) ;
 				}
 
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
-					return reinterpret_cast<T*>((*this).allocate(sizeof(T)));
+					_Allocated allocated = (*this).allocate_type(sizeof(T),typeid(T));
+					void * potential = allocated.data;
+					new (potential) T();
+
+					return reinterpret_cast<T*>(potential);
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
@@ -728,10 +739,8 @@ namespace stx{
 										
 					if(unlocked){
 						f_synchronized l(lock);
-						release_overflow();
 						r = get_pool().allocate<T>();					
-					}else{
-						release_overflow();
+					}else{						
 						r = get_pool().allocate<T>();					
 					}
 					

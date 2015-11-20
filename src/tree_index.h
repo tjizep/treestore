@@ -261,7 +261,7 @@ namespace tree_stored{
 					os::zzzz(50);
 				}
 			}
-			if(false){
+			if(true){
 				index.insert(k);
 
 			}else{
@@ -325,7 +325,7 @@ namespace tree_stored{
 
 			}
 			if(treestore_current_mem_use > treestore_max_mem_use){
-				///storage.reduce();
+				storage.reduce();
 			}
 		}
 
@@ -466,6 +466,7 @@ namespace tree_stored{
 			if(unique){
 
 				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
+			
 			}
 
 		}

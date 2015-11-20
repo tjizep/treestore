@@ -439,10 +439,12 @@ namespace stored{
 			}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8*)allocation_pool.allocate(nbytes); ///new NS_STORAGE::u8 [nbytes]; //
-			
+			//add_col_use(nbytes);
 			memcpy(nbuf, r, std::min<size_t>(nbytes, bytes));
 			if(!is_static()){
-				allocation_pool.free(r,bytes);				
+				allocation_pool.free(r,bytes);
+				//delete r;
+				//remove_col_use(bytes);				
 			}
 			set_ptr(nbuf);
 			bytes = (u32)nbytes;
@@ -801,8 +803,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 64> BlobStored;
-	typedef stored::Blobule<true, 64> VarCharStored;
+	typedef stored::Blobule<false, 16> BlobStored;
+	typedef stored::Blobule<true, 16> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -828,39 +830,48 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data)*8;
+		static const size_t static_size = sizeof(_Data)+8;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];
 		_BufferSize bs;// bytes used
 
-		inline _Data& get_Data(){
+		inline _Data& __get_Data(){
 			return *(_Data*)&buf[0];
 		}
-		inline const _Data& get_Data() const {
+		inline const _Data& __get_Data() const {
 			return *(const _Data*)&buf[0];
 		}
 		inline nst::u8* data(){
 			if(bs==static_size)
-				return &(get_Data())[0];
+				return &(__get_Data())[0];
 			return &buf[0];
 		}
 		inline const nst::u8* data() const{
 			if(bs==static_size)
-				return &(get_Data())[0];
+				return &(__get_Data())[0];
 			return &buf[0];
 		}
 		inline nst::u8* _resize_buffer(size_t mnbytes){
 
 			using namespace NS_STORAGE;
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffer_size);
-			if(nbytes >= static_size && bs < nbytes){
-				bs = static_size;
-				new (&get_Data()) _Data();
-			}else
+			if(nbytes >= static_size){
+				if(bs < static_size){
+					nst::u8 tbuf[static_size];
+					memcpy(tbuf, buf, static_size);
+					new (&__get_Data()) _Data(nbytes);
+					memcpy(__get_Data().data(), tbuf, static_size);
+					bs = static_size;
+				}
+			}else if(bs < static_size){
 				bs = (_BufferSize)nbytes;
+			}else if(bs != static_size){
+				printf("[TS] [ERROR] invalid key buffer size\n");
+			}
+
 			if(bs==static_size){
-				get_Data().resize(nbytes);
+				__get_Data().resize(nbytes);
 			}
 
 			return data();
@@ -916,8 +927,8 @@ namespace stored{
 	public:
 		void add(const char* k, size_t s){
 			size_t sad = s;
-			*_append(1) = DynamicKey::S;
-			( *(nst::u16*)_append(2)) = (nst::u16)sad;
+			*_append(1) = DynamicKey::S;			
+			( *(nst::u16*)_append(sizeof(nst::u16))) = (nst::u16)sad;
 			if(sad > 0){
 				memcpy(_append(sad), k, sad);
 			}
@@ -927,12 +938,12 @@ namespace stored{
 	public:
 		size_t total_bytes_allocated() const {
 			if(bs==static_size)
-				return sizeof(*this) + get_Data().capacity();
+				return sizeof(*this) + __get_Data().capacity();
 			return sizeof(*this);
 		}
 		int size() const {
 			if(bs==static_size)
-				return (int)get_Data().size();
+				return (int)__get_Data().size();
 			return bs;
 		}
 		/// 2nd level
@@ -1057,7 +1068,7 @@ namespace stored{
 
 			row = 0;
 			if(bs==static_size){
-				get_Data().clear();
+				__get_Data().clear();
 			}else{
 				bs = 0;
 				//memset(buf, 0,sizeof(buf));
@@ -1066,7 +1077,7 @@ namespace stored{
 
 		~DynamicKey(){
 			if(bs==static_size){
-				get_Data().~_Data();
+				__get_Data().~_Data();
 			}
 			//bs = 0;
 			//row = 0;
@@ -1126,7 +1137,7 @@ namespace stored{
 			}
 		}
 		DynamicKey& operator=(const DynamicKey& right){
-			if(!right.bs < static_size){
+			if(bs < static_size && right.bs < static_size){
 				bs = right.bs;
 				memcpy(buf, right.buf, bs);
 			}else{
@@ -1139,6 +1150,11 @@ namespace stored{
 		}
 		DynamicKey& return_or_copy(DynamicKey& ){
 			return *this;
+		}
+		inline size_t get_hash() const {
+			size_t r = 0;
+			MurmurHash3_x86_32(data(), size(), 0, &r);
+			return r;
 		}
 		inline operator size_t() const {
 			size_t r = 0;
@@ -1276,13 +1292,16 @@ namespace stored{
 						return false;
 					else r = 0;
 					break;
-				case DynamicKey::S:
-
-					r = memcmp(ld+2, rd+2, std::min<nst::i16>(*(const nst::i16*)rd, *(const nst::i16*)ld));
+				case DynamicKey::S:{
+					nst::i16 ls = sizeof(nst::i16);
+					nst::i16 lr = *(const nst::i16*)rd;
+					nst::i16 ll = *(const nst::i16*)ld;
+					r = memcmp(ld+ls, rd+ls, std::min<nst::i16>(lr, ll));
 					if(r !=0) return r<0;
-					if(*(const nst::i16*)rd != *(const nst::i16*)ld)
-						return (*(const nst::i16*)rd < *(const nst::i16*)ld);
-					l = *(const nst::i16*)ld+sizeof(nst::i16);
+					if(lr != ll)
+						return (lr < ll);
+					l = ll+ls;
+								   }
 					break;
 				};
 				if( r != 0 ) break;
@@ -1641,6 +1660,9 @@ namespace stored{
 			return !(*this != right);
 		}
 
+		inline size_t get_hash() const {
+			return (size_t)data;
+		}
 		NS_STORAGE::u32 stored() const {
 			_FieldType f;
 			f.set_value(data);
@@ -1782,7 +1804,7 @@ namespace stored{
 		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
 			
 			size_t colls = keys[0].col_bytes();
-			size_t result = 0;
+			size_t result = 0;		
 			
 			for(size_t k = 1; k < occupants; ++k){
 				if(colls != keys[k].col_bytes()){
@@ -1810,7 +1832,7 @@ namespace stored{
 				size_t k = 0;
 				
 				for( ;k < occupants; ++k){
-					dt = *reader + d;
+					dt =  *reader + d;
 					keys[k].col_push_byte(c, dt);
 					d = dt;
 					++reader;
@@ -2040,7 +2062,6 @@ namespace stored{
 			void sample(const _IntType& data){
 				if(!sorted_histogram.empty()){
 					clear_sorted();
-					//clear_unsorted();
 				}
 				size_t before = histogram.size();
 				typename _UnsortedHistogram::iterator u = histogram.find(data);

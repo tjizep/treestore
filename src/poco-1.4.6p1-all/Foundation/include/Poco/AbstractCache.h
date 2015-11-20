@@ -49,6 +49,7 @@
 #include "Poco/Delegate.h"
 #include "Poco/SharedPtr.h"
 #include <map>
+#include <rabbit/unordered_map>
 #include <set>
 #include <cstddef>
 
@@ -67,7 +68,7 @@ public:
 	FIFOEvent<const TKey, TEventMutex>                         Get;
 	FIFOEvent<const EventArgs, TEventMutex>                    Clear;
 
-	typedef std::map<TKey, SharedPtr<TValue > > DataHolder;
+	typedef rabbit::unordered_map<TKey, SharedPtr<TValue > > DataHolder;
 	typedef typename DataHolder::iterator       Iterator;
 	typedef typename DataHolder::const_iterator ConstIterator;
 	typedef std::set<TKey>                      KeySet;

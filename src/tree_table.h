@@ -1151,39 +1151,40 @@ namespace tree_stored{
 				
 				
 				stored::index_interface::ptr index = (*this).indexes[i];
-				printf("Calculating cardinality of index parts for %s\n",(*this).indexes[i]->name.c_str());
-				const _Rid ratio = 5;
-				const _Rid page_size = 512;
-				const _Rid sample = std::min<_Rid>(page_size*2048, get_row_count() > ratio ? get_row_count()/ratio: get_row_count());				
+				printf("[TS] [INFO] Calculating cardinality of index parts for %s\n",(*this).indexes[i]->name.c_str());
+				
+				const _Rid step_size = 8;
+				const _Rid rows = get_row_count();
+				const _Rid sample = rows/step_size;				
 				typedef std::unordered_set<CompositeStored,hash_composite, std::equal_to<CompositeStored>, sta::tracker<CompositeStored> > _Unique;
 				typedef std::vector<_Unique,sta::tracker<_Unique> > _Uniques;				
 				_Uniques uniques( index->parts.size() );
 				CompositeStored ir;
-				typedef std::minstd_rand G;
-				G g;
-				typedef std::uniform_int_distribution<_Rid> D;
-				D d(0, get_row_count());
 				
-				for(_Rid row = 0; row < ((sample/page_size)+1); ++row){
-					_Rid gen = d(g);
-					for(_Rid ss = gen; ss < std::min<_Rid>(get_row_count(),gen+page_size);++ss){					
-						nst::u32 u = 0;
-						stored::_Parts::iterator pend = index->parts.end();
-						for(stored::_Parts::iterator p = index->parts.begin(); p != pend; ++p){
-							int ip = (*p);
-							(*this).cols[ip]->compose_by_tree(ss, ir);
-							uniques[u].insert(ir);
-
-							++u;
-
-						}
+				for(_Rid row = 0; row < rows/step_size; ++row){								
+					nst::u32 u = 0;
+					stored::_Parts::iterator pbegin = index->parts.begin();
+					stored::_Parts::iterator pend = index->parts.end();
+					//for(;u<uniques.size();){ ///
 						ir.clear();
-					}					
+						for(stored::_Parts::iterator p = pbegin; p != pend; ++p){
+							int ip = (*p);
+							(*this).cols[ip]->compose_by_tree(row, ir);													
+						}	
+						uniques[u].insert(ir);
+						++u;
+						//++pbegin;
+					//}
 				}
 				nst::u32 partx = 1;
-				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
-					_Rid d = sample / ((*u).size() == 0 ? 1 : (*u).size());/// accurate to the nearest page
-					index->push_density(d);
+				//_Uniques::iterator u = uniques.begin();
+				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){				
+					_Rid den = 1;
+					if(!uniques[0].empty()) den = sample/uniques[0].size(); //(*u).size() ;/// accurate to the nearest page
+					if(den > 1) den = den * 5;
+					
+					printf("[TS] [INFO] Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
+					index->push_density(den);
 					index->reduce_use();
 					partx++;
 				}
@@ -1749,6 +1750,7 @@ namespace tree_stored{
 			if(!changed){
 				if(ix->is_unique() && out.valid()){
 					ix->cache_it(out);
+
 				}
 			}
 

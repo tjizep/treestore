@@ -12,15 +12,9 @@
 #include <string.h>
 #include <stx/storage/pool.h>
 /// memuse variables
-extern char treestore_column_cache ;
 extern long long treestore_max_mem_use ;
 extern long long treestore_current_mem_use ;
-extern double treestore_column_cache_factor;
 extern long long  _reported_memory_size();
-
-static long long treestore_calc_max_block_col_use(){
-	return (treestore_max_mem_use*(1-treestore_column_cache_factor));
-}
 extern long long calc_total_use();
 /// the allocation pool
 extern stx::storage::allocation::pool allocation_pool;
@@ -62,8 +56,8 @@ namespace stx{
 
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
-					bt_counter c;
-					c.add(num*sizeof(T)+this->overhead());
+					//bt_counter c;
+					//c.add(num*sizeof(T)+this->overhead());
 					return (pointer)allocation_pool.allocate(num*sizeof(T));
 				}
 				// deallocate storage p of deleted elements
@@ -71,11 +65,19 @@ namespace stx{
 
 					allocation_pool.free((void*)p,num*sizeof(T));
 
-					bt_counter c;
-					c.remove(num*sizeof(T)+this->overhead());
+					//bt_counter c;
+					//c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
-
+			 // return that all specializations of this allocator are interchangeable
+			template <class T1, class T2>
+			bool operator== (const pool_alloc_tracker<T1>&,const pool_alloc_tracker<T2>&) throw() {
+				return true;
+			}
+			template <class T1, class T2>
+			bool operator!= (const pool_alloc_tracker<T1>&, const pool_alloc_tracker<T2>&) throw() {
+				return false;
+			}
 			template <class T>
 			class buffer_pool_alloc_tracker : public base_tracker<T>{
 			public:
@@ -102,11 +104,17 @@ namespace stx{
 
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
+					//buffer_counter c;
+					//c.add(num*sizeof(T)+this->overhead());
 					return (pointer)buffer_allocation_pool.allocate(num*sizeof(T));
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
+
 					buffer_allocation_pool.free((void*)p,num*sizeof(T));
+
+					//buffer_counter c;
+					//c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 			 // return that all specializations of this allocator are interchangeable
@@ -145,15 +153,15 @@ namespace stx{
 
 				// allocate but don't initialize num elements of type T
 				pointer allocate (size_type num, const void* = 0) {
-					//buffer_counter c;
-					//c.add(num*sizeof(T)+this->overhead());
+					buffer_counter c;
+					c.add(num*sizeof(T)+this->overhead());
 					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
 					base_class::deallocate(p, num);
-					//buffer_counter c;
-					//c.remove(num*sizeof(T)+this->overhead());
+					buffer_counter c;
+					c.remove(num*sizeof(T)+this->overhead());
 				}
 			};
 
@@ -166,7 +174,6 @@ namespace stx{
 			bool operator!= (const buffer_tracker<T1>&, const buffer_tracker<T2>&) throw() {
 				return false;
 			}
-			/// the col tracker allocates from the same pool as buffers
 			template <class T>
 			class col_tracker : public base_tracker<T>{
 			public:
@@ -195,11 +202,11 @@ namespace stx{
 				pointer allocate (size_type num, const void* = 0) {
 					col_counter c;
 					c.add(num*sizeof(T)+this->overhead());
-					return (pointer)buffer_allocation_pool.allocate(num*sizeof(T));
+					return base_class::allocate(num);
 				}
 				// deallocate storage p of deleted elements
 				void deallocate (pointer p, size_type num) {
-					buffer_allocation_pool.free((void*)p,num*sizeof(T));
+					base_class::deallocate(p, num);
 					col_counter c;
 					c.remove(num*sizeof(T)+this->overhead());
 				}
@@ -514,7 +521,7 @@ namespace stx{
 		};
 		/// versions for all
 
-		typedef std::pair<u64, u64> _VersionRequest;
+		typedef std::pair<u64, version_type> _VersionRequest;
 
 		typedef std::vector<_VersionRequest> _VersionRequests;
 
