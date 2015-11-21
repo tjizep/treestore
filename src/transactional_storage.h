@@ -1121,13 +1121,8 @@ namespace storage{
 					nst::u64 start = 0;
 					nst::u64 remaining = next;
 					read_ahead(start, remaining); /// read until end
-					/*while(remaining > 0 && !buffer_allocation_pool.is_near_depleted()){
-						nst::u64 block = std::min<nst::u64>(remaining, 2048);
-						read_ahead(start, start+block); /// read until end
-						start += block;
-						remaining -= block;
-					}*/
-					is_all_loaded = true;
+					
+					//is_all_loaded = true;
 				}
 			}
 		}

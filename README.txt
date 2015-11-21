@@ -35,6 +35,7 @@ Machine
 + Core i7 3770s 
 + 16 GB RAM
 + Samsung SSD 850 Pro 256 GB
++ Western Digital Caviar Green 1.5 TB
 + Windows 10 x64
 
 Software
@@ -47,8 +48,12 @@ Load
 + Linkbench (44 000 000 rows in link table)
 
 Results (cold start 30 % variance)
+SSD
 + InnoDB 2020 ops/s
 + TuReestore 3100 ops/s
+HDD
++ InnoDB 40 ops/s
++ TuReestore 1000 ops/s
 
 Load
 + TPC-H Scale 1 all queries
