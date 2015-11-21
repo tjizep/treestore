@@ -1550,9 +1550,9 @@ namespace collums{
 			_Rid i = (requested % MAX_PAGE_SIZE);
 			_Rid l = requested - i;
 			_Rid p = l/MAX_PAGE_SIZE;
-			if(current_page && current_page->get_rows_start() == l){
-				return current_page;
-			}
+			//if(current_page && current_page->get_rows_start() == l){
+			//	return current_page;
+			//}
 			current_page = _load_page(requested, no_load );
 			return current_page;
 		}

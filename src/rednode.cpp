@@ -1176,15 +1176,15 @@ namespace red{
 					address_type max_address = alloc->max_block_address();
 					symbols.write(max_address);
 				}
-			}
-			catch (Poco::Exception& e)
-			{
+				red_println("[SERVER] [%lld] there is %lld lock(s) ",this->id,(address_type)get_versions().size());
+						
+				symbols.write(r);
+				symbols.flush_buffer();
+
+			}catch (Poco::Exception& e)	{
 				red_error("[SERVER] Could not process storage instruction - %s",e.name());
 			}
-			red_println("[SERVER] [%lld] there is %lld lock(s) ",this->id,(address_type)get_versions().size());
-						
-			symbols.write(r);
-			symbols.flush_buffer();
+			
 			
 			return result;
 		}
