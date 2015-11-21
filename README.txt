@@ -1,7 +1,7 @@
 treestore
 =========
 
-TuReestore MySQL Storage Engine version 0.31 (beta)
+TuReestore MySQL Storage Engine version 0.5 (beta)
 --------------------------------------------------
 
 TuReestore is a high performance ACID compliant storage engine for MySQL 5.6.20
@@ -15,7 +15,18 @@ Features
 + Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
 + Good write performance under transactional and bulk loads, similar or exceeding row databases
 + High read performance - average increase of 200% performance on tpc-h (HammerDB) from hot cache and more up to 1000% (10x)when running from cold cache
++ Bytewise wise rotation encoding to expose low entropy to 
 + In memory compression without performance loss
+
+Rednode (Experimental)
+----------------------
+
++ Rednode is a multimaster node distribution architecture 
++ PAXOS based consistency protocol using timestamps
++ partitioning
++ Dataless Virtual masters can be elastically provisioned - 
+  operates as a branch or as part of the 'trunk'
++ can be enabled in TuReeStore with simple config parameters
 
 Benchmarks
 ----------
@@ -23,24 +34,34 @@ Benchmarks
 Machine
 + Core i7 3770s 
 + 16 GB RAM
-+ Western Digital Green 1.5 TB hardrive
-+ Windows 8.1 x64
++ Samsung SSD 850 Pro 256 GB
++ Windows 10 x64
 
 Software
 + Mysql 5.6.20
 + HammerDB 2.1.4
-+ Treestore 0.31 beta
++ Treestore 0.5 beta
++ Facebook Linkbench
+
+Load
++ Linkbench (44 000 000 rows in link table)
+
+Results (cold start 30 % variance)
++ InnoDB 2020 ops/s
++ TuReestore 3100 ops/s
 
 Load
 + TPC-H Scale 1 all queries
 
 Results (hot start 0.5 % variance)
 + InnoDB 76 secs 
-+ Treestore 25 secs
++ Treestore 29 secs
 
 Results (cold start 30 % variance)
-+ InnoDB 660 secs
++ InnoDB 75 secs
 + TuReestore 59 secs
+
++ note: 80% of the queries run in 12 secs on ts vs 36 secs on innodb (300% improvement)
 
 Linux Installation and Notes
 ----------------------------
@@ -65,10 +86,11 @@ Microsoft Windows Installation
 Technical
 ---------
 
-+ B+ TREE indexes AND tables
++ B+ TREE indexes 
++ Hashed columns 
 + variable row size, theres no minimum row size, unused fields in a row are not stored, unlike table structures 
 + portable columns
-+ 2 Level CPU Cache Aware Predictive Hash Table for unique index optimization
++ 2 Level CPU Cache Aware Hash Table for unique index optimization
 + Simple and easy to change code base
 + STL like internal data structures for index and column storage
 + No NULL storage format i.e no extra bit for NULL values
@@ -76,11 +98,6 @@ Technical
 + Multi threaded bulk loads - bulk loads are threaded for further performance gains
 + Simple entropy coding is used for in memory compression 
 + filter expressions are evaluated in the storage engine for better performance
-+ Mini B-tree static page stores most frequently used keys in continous memory area (i.e. 'harmonic' keys in binary  search). 
-  The CPU cache is usually an LRU (least recently used) type which throws away the harmonic keys or the middle key of each binary search iteration.
-  This reduces the average CPU cache miss rate by about 50% while overall performance
-  is improved by 20% on loads exceeding CPU cache size until there are no more fully associative or L3 CPU cache
-  space available for mini pages.
 
 Configuration
 -------------
