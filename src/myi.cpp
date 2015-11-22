@@ -1984,6 +1984,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(reduce_storage_use_on_unlock),
   MYSQL_SYSVAR(cleanup_time),
   MYSQL_SYSVAR(use_primitive_indexes), 
+  MYSQL_SYSVAR(block_read_ahead),
   MYSQL_SYSVAR(contact_points),
   MYSQL_SYSVAR(red_address),
   NULL

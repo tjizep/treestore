@@ -21,6 +21,7 @@ char		treestore_reduce_tree_use_on_unlock = FALSE;
 char		treestore_reduce_index_tree_use_on_unlock = FALSE;
 char		treestore_reduce_storage_use_on_unlock = TRUE;
 char		treestore_use_primitive_indexes = TRUE;
+char		treestore_block_read_ahead = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -106,6 +107,13 @@ static MYSQL_SYSVAR_BOOL(use_primitive_indexes, treestore_use_primitive_indexes,
   "enables or disables primitive index trees - primitive index trees use less memory"
   "Default is true",
   NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(block_read_ahead, treestore_block_read_ahead,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "read ahead block storage until block memory is exhausted"
+  "Default is false",
+  NULL, NULL, TRUE);
+
 
 static MYSQL_SYSVAR_STR(contact_points,treestore_contact_points,
 	PLUGIN_VAR_RQCMDARG,

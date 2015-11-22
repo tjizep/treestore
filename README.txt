@@ -12,7 +12,7 @@ Features
 + Collumn oriented
 + ACID Compliant through Multi version concurrency (REPEATABLE READ isolation only)
 + Global journal provides cross database consistency and durability
-+ Low storage overhead and small datasize - combined with zlib or lz4 minimum of 3 times smaller data size
++ Low storage overhead and small datasize - combined with zlib or lz4 minimum of 4 times smaller data size
 + Good write performance under transactional and bulk loads, similar or exceeding row databases
 + High read performance - average increase of 200% performance on tpc-h (HammerDB) from hot cache and more up to 1000% (10x)when running from cold cache
 + Bytewise wise rotation encoding to expose low entropy to 

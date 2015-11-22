@@ -71,7 +71,7 @@ inline Poco::UUID & create_version(){
 	return Poco::UUIDGenerator::defaultGenerator().create();
 }
 extern char * treestore_contact_points;
-
+extern char	treestore_block_read_ahead;
 #ifdef _MSC_VER
 #define fseek64 _fseeki64
 #define ftell64 _ftelli64
@@ -1116,7 +1116,10 @@ namespace storage{
 			synchronized s(lock);
 			/// check if this file can be loaded
 			if(!is_all_loaded){
-				if(buffer_allocation_pool.can_allocate(this->file_size)){											
+				if
+				(	treestore_block_read_ahead==TRUE
+				&&	buffer_allocation_pool.can_allocate(this->file_size)
+				){											
 					///TODO: opportunistically read until memory exhausted
 					nst::u64 start = 0;
 					nst::u64 remaining = next;
