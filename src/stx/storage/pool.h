@@ -87,7 +87,7 @@ namespace stx{
 					remove_buffer_use(bytes);
 				};
 			};
-			static const bool heap_for_small_data = false;
+			static const bool heap_for_small_data = true;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
 			template <class T>
@@ -738,7 +738,7 @@ namespace stx{
 					T* r;					
 										
 					if(unlocked){
-						f_synchronized l(lock);
+						//f_synchronized l(lock);
 						r = get_pool().allocate<T>();					
 					}else{						
 						r = get_pool().allocate<T>();					
@@ -752,7 +752,7 @@ namespace stx{
 					T* r;					
 						
 					if(unlocked){
-						f_synchronized l(lock);
+						//f_synchronized l(lock);
 						r = get_pool().allocate<T,_Context>(context);
 					}else{
 						r = get_pool().allocate<T,_Context>(context);								
@@ -766,7 +766,7 @@ namespace stx{
 					if(!v) return;
 					v->~T();					
 					if(unlocked){
-						f_synchronized l(lock);
+						//f_synchronized l(lock);
 						get_pool().free<T>(v);
 					}else{
 						get_pool().free<T>(v);
@@ -774,7 +774,7 @@ namespace stx{
 				}
 				template<typename T>
 				inline void free_ns(T* v){
-					f_synchronized l(lock);
+					//f_synchronized l(lock);
 					get_pool().free<T>(v);				
 				}
 			};
