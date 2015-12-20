@@ -16,11 +16,7 @@
 #include <vector>
 #include <rabbit/unordered_map>
 #include <system_timers.h>
-#ifdef _MSC_VER
-#include <sparsehash/type_traits.h>
-#include <sparsehash/dense_hash_map>
-#include <sparsehash/sparse_hash_map>
-#endif
+
 #include <typeinfo>
 #include <unordered_map>
 extern void add_btree_totl_used(ptrdiff_t added);
@@ -159,6 +155,14 @@ namespace stx{
 					new((void*)p)T(value);
 				}
 
+				// initialize elements with variyng args
+#ifndef _MSC_VER 
+				template<typename... _Args>
+				void construct(T* p, _Args&&... __args) {
+					new((void*)p)T(std::forward<_Args>(__args)...);
+				}
+
+#endif
 				// destroy elements of initialized storage p
 				void destroy (pointer p) {
 					// destroy objects by calling their destructor
@@ -208,11 +212,14 @@ namespace stx{
 				*/
 				tracker() throw() {
 				}
+				
 				tracker(const tracker&) throw() {
 				}
+				
 				template <class U>
 				tracker (const tracker<U>&) throw() {
 				}
+				
 				~tracker() throw() {
 				}
 
@@ -228,7 +235,7 @@ namespace stx{
 				pointer allocate (size_type num, const void* = 0) {
 					pointer ret = (pointer)(malloc(num*sizeof(T)));
 					counter_type c;
-					c.add(num*sizeof(T));
+					c.add(num*sizeof(T)+overhead());
 					return ret;
 				}
 				// deallocate storage p of deleted elements
@@ -247,7 +254,14 @@ namespace stx{
 					// initialize memory with placement new
 					new((void*)p)T(value);
 				}
-
+				
+				// initialize elements with variyng args
+#ifndef _MSC_VER
+				template<typename... _Args>
+				void construct(T* p, _Args&&... __args) {
+					new((void*)p)T(std::forward<_Args>(__args)...);
+				}
+#endif				
 				// destroy elements of initialized storage p
 				void destroy (pointer p) {
 					// destroy objects by calling their destructor

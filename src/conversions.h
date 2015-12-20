@@ -150,6 +150,7 @@ namespace tree_stored{
 			memcpy(f->ptr, b.chars(), b.get_size());
 			f->bin_size = b.get_size();
 		}
+
 		CONVERSION_NOINLINE_
 		void fset(stored::_Rid row, Field * f, const stored::BlobStored& b){
 
@@ -173,8 +174,10 @@ namespace tree_stored{
 				f->store(b.chars(), (uint)b.get_size(), &my_charset_bin);
 
 		}
+		
+		template<typename BlobType>
 		CONVERSION_NOINLINE_
-		void fset(stored::_Rid row, Field * f, const stored::VarCharStored& b){
+		void tfset(stored::_Rid row, Field * f, const BlobType& b){
 			if(b.get_size()==0){
 				printf("WARNING: invalid source varchar buffer supplied\n");
 				return;
@@ -215,6 +218,17 @@ namespace tree_stored{
 			}else 
 				f->store(b.chars(), (uint)b.get_size()-1, &my_charset_bin);
 
+		}
+
+		CONVERSION_NOINLINE_
+		void fset(stored::_Rid row, Field * f, const stored::VarCharStored& b){
+			tfset(row, f, b);		
+		}
+		
+		CONVERSION_NOINLINE_
+		template<int L>
+		void fset(stored::_Rid row, Field * f, const stored::StaticBlobule<true,L>& b){
+			tfset(row, f, b);		
 		}
 		/// getters mysql->ts
 		inline void fget(stored::FloatStored &fs, Field * f, const uchar*, uint flags){
@@ -266,7 +280,8 @@ namespace tree_stored{
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			b.set(r->ptr(),r->length());//
 		}
-		inline void fget(stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+		template<typename BlobType>
+		inline void tfget(BlobType& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
@@ -278,7 +293,15 @@ namespace tree_stored{
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			b.setterm(r->ptr(),r->length());//
 		}
-
+		
+		inline void fget(stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+			tfget(b, f, n_ptr, flags);
+		}
+		template<int L>
+		inline void fget(stored::StaticBlobule<true, L>& b, Field * f, const uchar*n_ptr, uint flags){
+			tfget(b, f, n_ptr, flags);
+		}
+		
 		/// direct getters into the composite type for indexes
         typedef stored::DynamicKey CompositeStored;
 		inline void fadd(CompositeStored& to, stored::FloatStored &fs, Field * f, const uchar*, uint flags){
@@ -337,8 +360,8 @@ namespace tree_stored{
 			r = n_ptr==NULL ? f->val_str(&attribute): f->val_str(&attribute,n_ptr);
 			to.add(r->ptr(),r->length());//
 		}
-
-		inline void fadd(CompositeStored& to, stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+		template<typename BlobType>
+		inline void tfadd(CompositeStored& to, BlobType& b, Field * f, const uchar*n_ptr, uint flags){
 			if(flags & f_use_var_header){
 				String varchar;
 				uint var_length= uint2korr(n_ptr);
@@ -355,6 +378,14 @@ namespace tree_stored{
 			r =  f->val_str(&attribute);
 			to.addTerm(r->ptr(),r->length());
 			return;
+		}
+
+		inline void fadd(CompositeStored& to, stored::VarCharStored& b, Field * f, const uchar*n_ptr, uint flags){
+			tfadd(to, b, f, n_ptr, flags);
+		}
+		template<int L>
+		inline void fadd(CompositeStored& to, stored::StaticBlobule<true, L>& b, Field * f, const uchar*n_ptr, uint flags){
+			tfadd(to, b, f, n_ptr, flags);
 		}
 		/// item conversions
 		template<typename _IntType>
@@ -480,8 +511,12 @@ namespace tree_stored{
 			make_binary_item_val(b, conversion, val);
 		}
 
-
 		inline void make_item_val(stored::VarCharStored& b, Field* conversion, const Item* val){
+			make_binary_item_val(b, conversion, val);
+		}
+
+		template<int L>
+		inline void make_item_val(stored::StaticBlobule<true, L>& b, Field* conversion, const Item* val){
 			make_binary_item_val(b, conversion, val);
 		}
 

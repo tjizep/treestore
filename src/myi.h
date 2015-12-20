@@ -28,8 +28,8 @@ myi.cpp" - MySQL Storage Engine Interfaces
 #include <cmath>
 //#define isfinite std::isfinite
 #endif
-
-#include "sql_priv.h"
+#include <algorithm>
+//#include "sql_priv.h"
 #include "probes_mysql.h"
 #include "key.h"                                // key_copy
 #include "sql_plugin.h"

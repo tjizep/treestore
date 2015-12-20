@@ -42,9 +42,8 @@
 #endif
 #include <cstdio>
 
-
 #if defined(_MSC_VER) || defined(__MINGW32__)
-	#define I64_FMT "I64"
+	#define I64_FMT "ll"//"I64"
 #elif defined(__APPLE__) 
 	#define I64_FMT "q"
 #else
@@ -245,7 +244,7 @@ void NumberFormatter::appendHex(std::string& str, unsigned long value, int width
 void NumberFormatter::append(std::string& str, Int64 value)
 {
 	char buffer[64];
-	std::sprintf(buffer, "%"I64_FMT"d", value);
+	std::sprintf(buffer, "%" I64_FMT "d", value);
 	str.append(buffer);
 }
 
@@ -255,7 +254,7 @@ void NumberFormatter::append(std::string& str, Int64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%*"I64_FMT"d", width, value);
+	std::sprintf(buffer, "%*" I64_FMT "d", width, value);
 	str.append(buffer);
 }
 
@@ -265,7 +264,7 @@ void NumberFormatter::append0(std::string& str, Int64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%0*"I64_FMT"d", width, value);
+	std::sprintf(buffer, "%0*" I64_FMT "d", width, value);
 	str.append(buffer);
 }
 
@@ -273,7 +272,7 @@ void NumberFormatter::append0(std::string& str, Int64 value, int width)
 void NumberFormatter::appendHex(std::string& str, Int64 value)
 {
 	char buffer[64];
-	std::sprintf(buffer, "%"I64_FMT"X", value);
+	std::sprintf(buffer, "%" I64_FMT "X", value);
 	str.append(buffer);
 }
 
@@ -283,7 +282,7 @@ void NumberFormatter::appendHex(std::string& str, Int64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%0*"I64_FMT"X", width, value);
+	//std::sprintf(buffer, "%0*" I64_FMT "X", width, value);
 	str.append(buffer);
 }
 
@@ -291,7 +290,7 @@ void NumberFormatter::appendHex(std::string& str, Int64 value, int width)
 void NumberFormatter::append(std::string& str, UInt64 value)
 {
 	char buffer[64];
-	std::sprintf(buffer, "%"I64_FMT"u", value);
+	//std::sprintf(buffer, "%" I64_FMT "u", value);
 	str.append(buffer);
 }
 
@@ -301,7 +300,7 @@ void NumberFormatter::append(std::string& str, UInt64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%*"I64_FMT"u", width, value);
+	//std::sprintf(buffer, "%*" I64_FMT "u", width, value);
 	str.append(buffer);
 }
 
@@ -311,7 +310,7 @@ void NumberFormatter::append0(std::string& str, UInt64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%0*"I64_FMT"u", width, value);
+	std::sprintf(buffer, "%0*" I64_FMT "u", width, value);
 	str.append(buffer);
 }
 
@@ -319,7 +318,7 @@ void NumberFormatter::append0(std::string& str, UInt64 value, int width)
 void NumberFormatter::appendHex(std::string& str, UInt64 value)
 {
 	char buffer[64];
-	std::sprintf(buffer, "%"I64_FMT"X", value);
+	std::sprintf(buffer, "%" I64_FMT "X", value);
 	str.append(buffer);
 }
 
@@ -329,7 +328,7 @@ void NumberFormatter::appendHex(std::string& str, UInt64 value, int width)
 	poco_assert (width > 0 && width < 64);
 
 	char buffer[64];
-	std::sprintf(buffer, "%0*"I64_FMT"X", width, value);
+	std::sprintf(buffer, "%0*" I64_FMT "X", width, value);
 	str.append(buffer);
 }
 
@@ -396,7 +395,7 @@ void NumberFormatter::append(std::string& str, const void* ptr)
 	#if defined(POCO_LONG_IS_64_BIT)
 		std::sprintf(buffer, "%016lX", (UIntPtr) ptr);
 	#else
-		std::sprintf(buffer, "%016"I64_FMT"X", (UIntPtr) ptr);
+		std::sprintf(buffer, "%016" I64_FMT "X", (UIntPtr) ptr);
 	#endif
 #else
 	std::sprintf(buffer, "%08lX", (UIntPtr) ptr);

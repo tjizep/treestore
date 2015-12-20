@@ -36,4 +36,6 @@
 #include "Poco/LRUCache.h"
 #include "Poco/UUID.h"
 #include "Poco/UUIDGenerator.h"
+#include <stx/storage/types.h>
 #include <stx/storage/pool.h>
+

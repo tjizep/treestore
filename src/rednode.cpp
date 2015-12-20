@@ -2,7 +2,7 @@
 #include "Poco/Thread.h"
 #include "Poco/Glob.h"
 #include <string>
-#include "rednode_cassandra.h"
+#include "rednode_file.h"
 #include "rednode_storage.h"
 #include "NotificationQueueWorker.h"
 #include "system_timers.h"

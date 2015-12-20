@@ -407,7 +407,7 @@ public:
 			if(compressed < min_compressed ){
 				min_bucket_size = bucket_size;
 				min_compressed = compressed;
-				printf("min compressed %lu, min bucket size %lu\n",compressed,(nst::u64)bucket_size);
+				printf("min compressed %llu, min bucket size %llu\n",compressed,(nst::u64)bucket_size);
 			}
 			reduced_array.clear();
 			bucket_size -= 1;
@@ -590,7 +590,7 @@ public:
 							++errc;
 						}
 					}
-					printf("decode errors: %lu\n",errc);
+					printf("decode errors: %llu\n",errc);
 				}
 			}
 			printf("code size %iu %lu codes written to %lu bytes\n",parameters.code_size,out_pos,parameters.capacity());
@@ -608,7 +608,7 @@ public:
 			size_t t = ::os::millis();
 			nst::buffer_type dest(length);
 			nst::u64 dsize = FSE_compress(dest.data(),length,(const unsigned char *)buffer, length);
-			printf("Compressed %lu bytes to %lu in %lu ms.\n",length, dsize, ::os::millis()-t);
+			printf("Compressed %llu bytes to %lu in %llu ms.\n",length, dsize, ::os::millis()-t);
 			/// encode_internal(reduced_array, buffer, length);
 		}else{
 			typedef _SuffixArray _SuffixArrayType;

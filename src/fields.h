@@ -374,6 +374,332 @@ namespace stored{
 	};
 
 	template<bool CHAR_LIKE, int _MConstSize = 16>
+	class StaticBlobule {
+	protected:
+		static const int _ConstSize = _MConstSize;
+	public:
+		typedef empty_encoder list_encoder;
+		static const int CHAR_TYPE = CHAR_LIKE ? 1 : 0;
+		//typedef bool attached_values;
+	protected:
+
+		typedef NS_STORAGE::u16 _BufferSize;
+		static const size_t max_buffersize = _ConstSize;
+		
+		_BufferSize size;// bytes used
+		NS_STORAGE::u8 buf[_ConstSize];
+		//const NS_STORAGE::u8* attached;
+		void set_size(size_t ns){
+			this->size = std::min<_BufferSize>(ns, _ConstSize);
+		}
+
+		inline bool is_static() const {			
+			return true;
+		}
+
+		NS_STORAGE::u8* data(){
+			return buf;			
+		}
+
+		const NS_STORAGE::u8* data() const{			
+			return buf;			
+		}
+
+		void null_check() const {
+			if(!this){
+				printf("[ERROR] [TS] Invalid Blob object\n");
+			}
+			if(size > _ConstSize){
+				printf("[ERROR] [TS] Invalid Static Blob object size\n");
+			}
+
+		}
+		void _add( const void * v, size_t count, bool end_term = false){
+			null_check();
+
+			_BufferSize extra = end_term ? 1 : 0;
+			if((size + count + extra) > _ConstSize){
+				printf("[WARNING] [TS] Attempt to set Invalid Static Blob object size\n");
+			}else{
+
+				memcpy(data()+size,v,count);
+				if(end_term) data()[size+count] = 0;
+				set_size(size+count+extra);
+			}
+			
+		}
+		bool less(const StaticBlobule& right) const {
+			null_check();
+			using namespace NS_STORAGE;
+
+			const u8 * lp = data();
+			const u8 * rp = right.data();
+			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));
+			if(r != 0){
+				return (r < 0);
+			}
+
+			return (size < right.size);
+		}
+		bool greater(const StaticBlobule& right) const {
+			null_check();
+			using namespace NS_STORAGE;
+
+			const u8 * lp = data();
+			const u8 * rp = right.data();
+			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));
+			if(r != 0){
+				return (r > 0);
+			}
+
+			return (size > right.size);
+		}
+		bool not_equal(const StaticBlobule& right) const {
+			null_check();
+			using namespace NS_STORAGE;
+			if(size != right.size){
+				return true;
+			}
+			const u8 * lp = data();
+			const u8 * rp = right.data();
+			int r = memcmp(lp,rp,std::min<_BufferSize>(size,right.size));
+			if(r != 0){
+				return true;
+			}
+
+			return size != right.size;
+
+		}
+		void free_ptr(){
+		
+			size = 0;			
+
+		}
+
+	public:
+		size_t total_bytes_allocated() const {
+			return sizeof(*this);
+		}
+		char * get_value(){
+			null_check();
+			return chars();
+		}
+		const char * get_value() const {
+			null_check();
+			return chars();
+		}
+		char * chars(){
+
+			return (char *)data();
+		}
+		const char * chars() const {
+			return (const char *)data();
+		}
+		void add(){
+			_add(NULL, 0);
+		}
+		void add(NS_STORAGE::i64 val){
+			using namespace NS_STORAGE;
+            NS_STORAGE::i64 v = val;
+			_add(&v, sizeof(v));
+
+		}
+		void add(float v){
+			_add(&v, sizeof(v));
+		}
+		void add(double v){
+			_add(&v, sizeof(v));
+		}
+
+		void add(const char * nt,size_t n){
+			_add(nt,n);
+		}
+		void addterm(const char * nt,size_t n){
+			_add(nt,n,true);
+		}
+		void add(const char * nt){
+			_add(nt,strlen(nt)+1);
+		}
+		void set(const char * nt){
+			size = 0;
+			_add(nt,strlen(nt)+1);
+		}
+		void set(NS_STORAGE::i64 v){
+			size = 0;
+			add(v);
+		}
+		void set(float v){
+			size = 0;
+			add(v);
+		}
+		void set(double v){
+			size = 0;
+			add(v);
+		}
+		void set(const char * nt,size_t n){
+			size = 0;
+			_add(nt,(int)n);
+		}
+		void setterm(const char * nt,size_t n){
+			size = 0;
+			_add(nt,(int)n,true);
+		}
+		void set(){
+			size = 0;
+			add();
+		}
+
+		StaticBlobule ()
+		:	size(0)
+		//,	attached(nullptr)
+		{
+			//memset(buf,0,sizeof(buf));
+			buf[0] = 0;
+		}
+		void clear(){
+			free_ptr();
+			//attached = nullptr;			
+			size = 0;
+			buf[0] = 0;
+		}
+
+		inline ~StaticBlobule(){
+			free_ptr();
+			size = 0;
+		}
+
+		StaticBlobule (const StaticBlobule& init)
+		:	size(0)
+		//,	attached(nullptr)
+		{
+			*this = init;
+		}
+		StaticBlobule(const char *right)
+		:	size(0)
+		//,	attached(nullptr)
+		{
+			*this = right;
+		}
+
+		StaticBlobule(const NS_STORAGE::i64& right)
+		:	size(0)
+		//,	attached(nullptr)
+		{
+			set(right);
+
+		}
+		StaticBlobule(const double& right)
+		:	size(0)
+		//,	attached(nullptr)
+		{
+			set(right);
+
+		}
+		
+		/// col bytes functions
+		size_t col_bytes() const{
+			return get_size();
+		}
+		
+		nst::u8 col_byte(size_t which) const {			
+			return data()[which];			
+		}
+		
+		void col_resize_bytes(size_t to){
+			set_size(to);			
+		}
+		
+		void col_push_byte(size_t which, nst::u8 v) {			
+			data()[which] = v;			
+		}
+
+		inline StaticBlobule& operator=(const StaticBlobule& right)
+		{
+			using namespace NS_STORAGE;
+			
+			set_size(right.size);
+			memcpy(data(),right.data(),this->size);
+			
+			return *this;
+		}
+
+		StaticBlobule& operator=(const char *right) {
+			set(right);
+			return *this;
+		}
+		StaticBlobule& operator=(const NS_STORAGE::i64& right) {
+			set(right);
+			return *this;
+		}
+		StaticBlobule& operator=(const double& right) {
+			set(right);
+			return *this;
+		}
+		inline bool operator>(const StaticBlobule& right) const {
+			return greater(right);
+		}
+		inline bool operator<(const StaticBlobule& right) const {
+			return less(right);
+		}
+
+		inline bool operator!=(const StaticBlobule& right) const {
+
+			return not_equal(right);
+		}
+		inline bool operator==(const StaticBlobule& right) const {
+
+			return !not_equal(right);
+		}
+		inline size_t  get_size() const {
+			return size;
+		}
+		NS_STORAGE::u32 stored() const {
+			return NS_STORAGE::leb128::signed_size((*this).size)+(*this).size;
+		};
+		size_t get_hash() const{
+			nst::u32 h = 0;
+			MurmurHash3_x86_32(data(), (nst::u32)get_size(), 0, &h);
+			return h;
+		}
+		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
+			using namespace NS_STORAGE;
+			if(size > 32768){
+				printf("WARNING: large buffer %lld\n",(long long)size);
+			}
+			buffer_type::iterator writer = w;
+			writer = leb128::write_signed(writer, size);
+			memcpy(((u8 *)&(*writer)),data(),size);
+			writer += size;
+			//const u8 * end = data()+size;
+			//for(const u8 * d = data(); d < end; ++d,++writer){
+			//	*writer = *d;
+			//}
+			return writer;
+		};
+
+		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
+			using namespace NS_STORAGE;
+			buffer_type::const_iterator reader = r;
+
+			if(reader != buffer.end()){
+				
+				size = leb128::read_signed(reader);
+				if(size > _ConstSize){
+					printf("[ERROR] [TS] reading invalid buffer size for temp\n");
+				}
+				u8 * d = data();
+				u8 * end = data() + size;
+				u8 * dend = data() + _ConstSize;
+				for(u8 * d = data(); d < end; ++d,++reader){
+					if(d < dend)
+						*d = *reader;
+				}				
+			}
+			return reader;
+		};
+	};
+
+	template<bool CHAR_LIKE, int _MConstSize = 16>
 	class Blobule {
 	protected:
 		static const int _ConstSize = _MConstSize;
@@ -775,7 +1101,6 @@ namespace stored{
 			return reader;
 		};
 	};
-
 	template <typename _Hashed>
 	struct fields_hash
 	{
@@ -792,7 +1117,7 @@ namespace stored{
 	typedef NS_STORAGE::u64 _Rid;
 	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
 
-	typedef std::vector<_Rid,sta::col_tracker<_Rid> > _Parts;
+	typedef std::vector<_Rid > _Parts; //,sta::col_tracker<_Rid>
 	typedef stored::FTypeStored<float> FloatStored ;
 	typedef stored::FTypeStored<double> DoubleStored ;
 	typedef stored::IntTypeStored<short> ShortStored;
@@ -803,8 +1128,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 16> BlobStored;
-	typedef stored::Blobule<true, 16> VarCharStored;
+	typedef stored::Blobule<false,8> BlobStored;
+	typedef stored::Blobule<true, 8> VarCharStored;
 
 	class DynamicKey{
 	public:
@@ -830,7 +1155,7 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data)+8;
+		static const size_t static_size = sizeof(_Data) + 4;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];
@@ -1059,7 +1384,11 @@ namespace stored{
 
 			add(v.get_value(),v.get_size()-1); /// exclude the terminator
 		}
+		template<int L>
+		void add(const stored::StaticBlobule<true, L>& v){
 
+			add(v.get_value(),v.get_size()-1); /// exclude the terminator
+		}
 		void addTerm(const char* k, size_t s){
 			add(k, s);
 		}
@@ -1997,8 +2326,6 @@ namespace stored{
 			typedef _IntType _Sampled;
 			/// , ::sta::col_tracker<_Sampled>
 			typedef std::unordered_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
-			/// typedef ::google::dense_hash_map<_Sampled, nst::u64, fields_hash<_Sampled>, std::equal_to<_Sampled>> _UnsortedHistogram;
-			/// typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _UnsortedHistogram;
 			typedef std::map<_Sampled, nst::u64, std::less<_Sampled>, ::sta::col_tracker<_Sampled> > _Histogram;
 			typedef std::vector<_Sampled, ::sta::col_tracker<_Sampled> > _UniqueSamples; //
 		protected:
@@ -2167,7 +2494,7 @@ namespace stored{
 		template<typename _IntType>
 		struct int_fix_encoded_buffer{
 			typedef nst::u32 _CodeType;
-			typedef symbol_vector<_CodeType, sta::tracker<_CodeType, sta::col_counter> > _Symbols;
+			typedef symbol_vector<_CodeType, std::allocator<_CodeType> > _Symbols; //, sta::tracker<_CodeType, sta::col_counter>
 
 			typedef entropy_t<_IntType> _Entropy;
 			struct hash_fixed{
@@ -2180,7 +2507,7 @@ namespace stored{
 			/// typedef ::google::dense_hash_map<_IntType, _CodeType, fields_hash<_IntType>, std::equal_to<_IntType> > _CodeMap;
 
 			/// typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::col_tracker<_IntType> > _CodeMap;
-			typedef std::vector<_IntType, sta::col_tracker<_IntType> > _DeCodeMap;
+			typedef std::vector<_IntType > _DeCodeMap; //, sta::col_tracker<_IntType>
 
 			_Entropy stats;
 			_CodeMap codes;
@@ -2303,7 +2630,7 @@ namespace stored{
 		template<typename _IntType>
 		struct int_fix_unmapped_encoded_buffer{
 			typedef nst::u32 _CodeType;
-			typedef symbol_vector<_CodeType,  sta::tracker<_CodeType, sta::col_counter> > _Symbols;
+			typedef symbol_vector<_CodeType > _Symbols; //,  sta::tracker<_CodeType>, sta::col_counter
 
 			typedef int_entropy_t<_IntType> _Entropy;
 			struct hash_fixed{
@@ -2312,8 +2639,8 @@ namespace stored{
 				}
 			};
             //typedef std::unordered_map<_IntType, _CodeType, fields_hash<_IntType> > _CodeMap;
-			typedef std::map<_IntType, _CodeType, std::less<_IntType>, sta::tracker<_IntType, sta::col_counter> > _CodeMap;
-			typedef std::vector<_IntType, sta::tracker<_IntType, sta::col_counter> > _DeCodeMap;
+			typedef std::map<_IntType, _CodeType, std::less<_IntType>> _CodeMap; //, sta::tracker<_IntType>
+			typedef std::vector<_IntType> _DeCodeMap; //, sta::tracker<_IntType>
 
 			_Entropy stats;
 			_CodeMap codes;
@@ -2971,12 +3298,13 @@ namespace stored{
 		virtual stored::_Rid& density_at(size_t at) = 0;
 		virtual const stored::_Rid& density_at(size_t at) const = 0;
 		virtual void end(index_iterator_interface& out)=0;
-		virtual index_iterator_interface * get_index_iterator() = 0;
+		virtual index_iterator_interface * get_index_iterator(nst::u64 inst) = 0;		
 		virtual index_iterator_interface * get_prepared_index_iterator() = 0;
 		virtual index_iterator_interface * get_first1() = 0;
 		virtual index_iterator_interface * get_last1() = 0;
 
 		virtual void first(index_iterator_interface& out)=0;
+		
 		virtual void lower_(index_iterator_interface& out,const DynamicKey& key)=0;
 		virtual void lower(index_iterator_interface& out,const DynamicKey& key)=0;
 		virtual void upper(index_iterator_interface& out, const DynamicKey& key)=0;

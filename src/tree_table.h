@@ -793,7 +793,17 @@ namespace tree_stored{
 
 					case HA_KEYTYPE_NUM:			/* Not packed num with pre-space */
 					case HA_KEYTYPE_TEXT:			/* Key is sorted as letters */
-						cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						if(field_size==1){
+							cols[(*field)->field_index] = new my_collumn<stored::StaticBlobule<true,2> >(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						}else if(field_size<=6){
+							cols[(*field)->field_index] = new my_collumn<stored::StaticBlobule<true,8> >(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						}else if(field_size<=10){
+							cols[(*field)->field_index] = new my_collumn<stored::StaticBlobule<true,12> >(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						}else if(field_size<=14){
+							cols[(*field)->field_index] = new my_collumn<stored::StaticBlobule<true,16> >(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						}else{
+							cols[(*field)->field_index] = new my_collumn<stored::VarCharStored>(path+TABLE_SEP()+(*field)->field_name,fi,rowsize,field_size,treestore_efficient_text);
+						}
 						break;
 
 					case HA_KEYTYPE_BINARY:			/* Key is sorted as unsigned chars */
@@ -1910,6 +1920,7 @@ namespace tree_stored{
 					}
 				}
 			}
+
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){

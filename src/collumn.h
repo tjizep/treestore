@@ -73,7 +73,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 348,			
+			page_size = 256,//348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -258,7 +258,8 @@ namespace collums{
 		protected:
 			mutable Poco::Mutex lock;
 			_Pages versioned_pages;
-			nst::u64 reduced;
+			mutable nst::u64 reduced;
+			
 		public:
 			shared_context(){
 				reduced = 0;
@@ -291,13 +292,16 @@ namespace collums{
 								delete page;
 							}
 						}
+						this->reduced = 0;
 						return true;
 					}
 				}
+				
 				return false;
 			}
 			void reduce(){
 				//auto now = os::millis() ;
+				if(reduced!=0) return; /// nothing happened since last reduce
 				if(versioned_pages.empty()) return;
 				nst::synchronized l(this->lock);
 				if(!stx::memory_low_state){
@@ -341,7 +345,7 @@ namespace collums{
 				if(versioned_pages.size() != old-released.size()){
 					printf("[TS] [SEVERE] [ERROR] inconsistent memory\n");
 				}
-				//this->reduced = now ;
+				//this->reduced = 1 ;
 			}
 			/// add the page to version control
 			bool add(stored_page_ptr p){
@@ -355,12 +359,17 @@ namespace collums{
 					if(p->is_modified()){
 						printf("[TS] [ERROR] page added as modified\n");
 					}
-					versioned_pages[location] = p;				
+					versioned_pages[location] = p;			
+					this->reduced = 0;
 					return true;
 				}				
 				return false;
 			}
-
+			/// notify that something has changed inside
+			/// which means the reduce function may continue
+			void notify_modify(){
+				this->reduced = 0;
+			}
 			/// get the page of specified version
 			stored_page_ptr check_out(size_type address, version_type version){
 				stored_page_ptr r = nullptr;
@@ -373,6 +382,7 @@ namespace collums{
 						printf("[TS] [ERROR] the retrieved version does not match the query\n");
 					}
 					r->ref(); 
+					this->reduced = 0;
 				}
 				
 				return r;
@@ -409,6 +419,7 @@ namespace collums{
 	private:
 		/// keeps cached pages
 		mutable page_map_type pages;
+		mutable page_map_type modified_pages;
 		/// storage from where pages are loaded
 		mutable storage_type* storage;
 		/// the largest key added
@@ -496,6 +507,7 @@ namespace collums{
 				}
 			}
 			pages.clear();
+			version_control->notify_modify();
 		}
 		nst::_VersionRequests version_req;
 		/// get version of page relative to current transaction
@@ -733,7 +745,9 @@ namespace collums{
 				if(!get_page(h).is_exists(h)){
 					++_size;
 				}
-				get_page(h).set(h, value);
+				stored_page::ptr page = &(get_page(h));
+				page->set(h, value);
+				modified_pages[h] = page;
 
 			}
 			std::pair<iterator, bool> r = std::make_pair(iterator(this, key.get_hash()), false);
@@ -794,9 +808,10 @@ namespace collums{
 			if(!get_storage().is_readonly()){
 				get_storage().set_boot_value(largest, 2);
 				get_storage().set_boot_value(_size, 3);
-				for(page_map_type::iterator p = pages.begin(); p != pages.end();++p){
+				for(auto p = modified_pages.begin(); p != modified_pages.end();++p){
 					store_page((*p).second);
-				}				
+				}		
+				modified_pages.clear();
 			}
 		}
 

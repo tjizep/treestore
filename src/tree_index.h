@@ -421,14 +421,23 @@ namespace tree_stored{
 		_PredictiveCache cache;
 
 		ColIndex index;
-		typename ColIndex::index_iterator_impl cur;
-		typename ColIndex::index_iterator_impl _1st;
-		typename ColIndex::index_iterator_impl _lst;
+		typedef typename ColIndex::index_iterator_impl iterator_impl_type;
+		typedef rabbit::unordered_map<nst::u64,std::shared_ptr<iterator_impl_type>> _IteratorInstances;
+		_IteratorInstances current_instances;
+		iterator_impl_type cur;
+		iterator_impl_type cur_map;
+		iterator_impl_type _1st;
+		iterator_impl_type _lst;
 	public:
 
-		stored::index_iterator_interface * get_index_iterator() {
-			return &cur;
+		stored::index_iterator_interface * get_index_iterator(nst::u64 inst) {
+			std::shared_ptr<iterator_impl_type> &r = current_instances[inst];
+			if(r==nullptr){
+				r = std::make_shared<iterator_impl_type>();
+			}
+			return r.get();
 		}
+		
 		stored::index_iterator_interface * get_prepared_index_iterator() {
 			cur.value = index.first();
 			return &cur;
@@ -500,6 +509,7 @@ namespace tree_stored{
 		void first(stored::index_iterator_interface& out){
 			((typename ColIndex::index_iterator_impl&)out).value = index.first();
 		}
+		
 		void lower_(stored::index_iterator_interface& out,const tree_stored::CompositeStored& key){
 			index.lower_(((typename ColIndex::index_iterator_impl&)out).value, key);
 		}

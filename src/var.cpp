@@ -1,3 +1,7 @@
+#ifndef LONGLONG_MAX
+#define LONGLONG_MAX 10000000000000ll
+#endif
+
 long long	treestore_max_mem_use = 0;
 long long	treestore_current_mem_use = 0;
 long long	treestore_journal_lower_max = 0;

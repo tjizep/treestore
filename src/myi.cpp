@@ -45,7 +45,8 @@ long long calc_total_use(){
 	///NS_STORAGE::total_use+buffer_allocation_pool.get_total_allocated()
 	treestore_current_mem_use =  
 		//nst::buffer_use + 		
-		nst::col_use +
+		//nst::col_use +
+		nst::total_use +
 		buffer_allocation_pool.get_total_allocated() +
 		allocation_pool.get_total_allocated() +
 		total_cache_size + 
@@ -345,11 +346,11 @@ static handlerton *static_treestore_hton = NULL;
 
 class static_threads{
 public:
-	typedef std::vector<tree_stored::tree_thread *, sta::tracker<tree_stored::tree_thread*>> _Threads;
+	typedef std::vector<tree_stored::tree_thread *> _Threads; ///, sta::tracker<tree_stored::tree_thread*>
 	typedef std::unordered_map<std::string,tree_stored::tree_thread*> _Writers;
 private:
 	_Threads threads;
-	Poco::Mutex tlock;
+	mutable Poco::Mutex tlock;
 	_Writers writers;
 	tree_stored::tree_thread writer;
 	tree_stored::tree_thread* map_writer(TABLE * table){
@@ -367,6 +368,8 @@ private:
 		return result;
 	}
 public:
+	static_threads() {
+	}
 	tree_stored::tree_thread *get_writer(TABLE * table){
 		nst::synchronized s(tlock);
 		tree_stored::tree_thread* writer = map_writer(table);
@@ -610,10 +613,11 @@ public:
 
 	stored::index_interface * current_index;
 	stored::index_iterator_interface * current_index_iterator;
+	
 	inline stored::index_iterator_interface& get_index_iterator(){
 		return *current_index_iterator;
 	}
-
+	
 	tree_stored::tree_thread* get_thread(THD* thd){
 		return new_thread_from_thd(NULL,thd,false);
 	}
@@ -1104,7 +1108,7 @@ public:
 				,	(double)nst::stl_use/units::MB
 				,	(double)btree_totl_used/units::MB
 				,	(double)total_cache_size/units::MB
-				,	(double)allocation_pool.get_total_allocated()/units::MB
+				,	(double)(buffer_allocation_pool.get_total_allocated() + allocation_pool.get_total_allocated())/units::MB
 				);
 		}
 		if (lock_type == F_RDLCK || lock_type == F_WRLCK){
@@ -1194,7 +1198,8 @@ public:
 		DBUG_RETURN(0);
 	}
 
-
+/// TODO: the 5.7 internal parsers have changed so this code may need to be rewritten
+#if 0
 	bool push_func(const Item_func* f,tree_stored::logical_conditional_iterator::ptr parent){
 		/// int argc = f->argument_count();
 		Item_func::Functype ft = f->functype();
@@ -1292,10 +1297,10 @@ public:
 		}
 		return false;
 	}
-
+#endif
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
-		if(push_cond(acon,nullptr))
+		//if(push_cond(acon,nullptr))
 			return NULL;
 		get_tree_table()->pop_all_conditions();
 		return acon;
@@ -1366,7 +1371,7 @@ public:
 			last_resolved = (*this).r.key().get_value();
 		}
 
-		statistic_increment(table->in_use->status_var.ha_read_rnd_next_count, &LOCK_status);
+		ha_statistic_increment(&SSV::ha_read_rnd_next_count);
 		table->status = 0;
 		resolve_selection(last_resolved);
 		if((last_resolved % 1000000) == 0){
@@ -1377,7 +1382,7 @@ public:
 	}
 
 	int delete_row(const byte *buf){
-		statistic_increment(table->in_use->status_var.ha_delete_count,&LOCK_status);
+		ha_statistic_increment(&SSV::ha_delete_count);
 
 		get_tree_table()->erase(last_resolved, (*this).table);
 
@@ -1399,7 +1404,7 @@ public:
 			get_thread()->own_reduce();
 		}
 		++writes;
-		statistic_increment(table->in_use->status_var.ha_write_count,&LOCK_status);
+		ha_statistic_increment(&SSV::ha_write_count);
 		/// TODO: auto timestamps
 
 		bool auto_increment_update_required= (table->next_number_field != NULL);
@@ -1418,12 +1423,11 @@ public:
 	}
 
 	int update_row(const byte *old_data, byte *new_data) {
-		 statistic_increment(table->in_use->status_var.ha_read_rnd_next_count,
-                      &LOCK_status);
+		ha_statistic_increment(&SSV::ha_read_rnd_next_count);
 		 
 		uchar *record_old = table->record[0];
 		uchar *record_new = table->record[1];
-		typedef std::vector<uchar *,  sta::tracker<uchar*> > _Saved;
+		typedef std::vector<uchar *> _Saved; ///,  sta::tracker<uchar*>
 		_Saved saved;
 
 		for (Field **field=table->field ; *field ; field++){// offset to old rec
@@ -1489,16 +1493,18 @@ public:
 	bool readset_covered;
 	virtual int index_init(uint keynr, bool sorted){
 		handler::active_index = keynr;
+		
 		tt = NULL;
 		clear_selection(selected);
 		current_index = get_tree_table()->get_index_interface(handler::active_index);
-		current_index_iterator = current_index->get_index_iterator();
-
+		current_index_iterator = current_index->get_index_iterator((nst::u64)this);
+		
 		selected = get_tree_table()->create_output_selection(table);
 		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
 		if(stx::memory_low_state){
 			st.reduce();
 		}
+		
 		return 0;
 	}
 
@@ -1537,17 +1543,20 @@ public:
 		last_resolved = row;
 		resolve_selection(row);
 	}
+	
+	void resolve_selection_from_index(uint ax, stored::index_iterator_interface * current_iterator) {
 
-
-	void resolve_selection_from_index(uint ax,stored::index_interface * current_index){
-
-		const tree_stored::CompositeStored &iinfo = current_index->get_index_iterator()->get_key();
+		const tree_stored::CompositeStored &iinfo = current_iterator->get_key();
 		resolve_selection_from_index(ax, iinfo);
 
 	}
 
-	void resolve_selection_from_index(){
-		resolve_selection_from_index(active_index,current_index);
+	void resolve_selection_from_index(stored::index_iterator_interface * current_index_iterator) {
+		resolve_selection_from_index(active_index, current_index_iterator);
+	}
+	
+	void resolve_selection_from_index(stored::index_iterator_interface & current_index_iterator) {
+		resolve_selection_from_index(active_index, &current_index_iterator);
 	}
 
 	int basic_index_read_idx_map
@@ -1560,7 +1569,7 @@ public:
 	){
 		int r = HA_ERR_END_OF_FILE;
 		table->status = STATUS_NOT_FOUND;
-		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator());
+		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator((nst::u64)this));///
 
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 
@@ -1607,7 +1616,7 @@ public:
 			if(pred != NULL)
 				resolve_selection_from_index(keynr, *pred);
 			else
-				resolve_selection_from_index(keynr,current_index);
+				resolve_selection_from_index(keynr,&current_iterator);
 			//if(HA_READ_KEY_EXACT != find_flag)
 
 		}
@@ -1670,7 +1679,7 @@ public:
 		get_index_iterator().next();
 		table->status = STATUS_NOT_FOUND;
 		if(get_index_iterator().valid()){
-			resolve_selection_from_index();
+			resolve_selection_from_index(get_index_iterator());
 			r = 0;
 			table->status = 0;
 			//index_iterator.next();
@@ -1687,7 +1696,7 @@ public:
 		}
 		if(get_index_iterator().previous()){
 			r = 0;
-			resolve_selection_from_index();
+			resolve_selection_from_index(get_index_iterator());
 			table->status = 0;
 		}
 		DBUG_RETURN(r);
@@ -1698,11 +1707,12 @@ public:
 
 		DBUG_ENTER("index_first");
 		ha_statistic_increment(&SSV::ha_read_first_count);
-		stored::index_iterator_interface & current_iterator = *(current_index->get_prepared_index_iterator());
+		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator((nst::u64)this));
+		current_index->first(current_iterator);
 		current_iterator.first();
 		table->status = STATUS_NOT_FOUND;
-		if(get_index_iterator().valid()){
-			resolve_selection_from_index();
+		if(current_iterator.valid()){
+			resolve_selection_from_index(current_iterator);
 			r = 0;
 			table->status = 0;
 		}
@@ -1712,11 +1722,12 @@ public:
 
 	int index_last(byte * buf) {
 		int r = HA_ERR_END_OF_FILE;
-		stored::index_iterator_interface & current_iterator = *(current_index->get_prepared_index_iterator());
+		stored::index_iterator_interface & current_iterator = *(current_index->get_index_iterator((nst::u64)this));
+		current_index->end(current_iterator);
 		current_iterator.last();
 		table->status = STATUS_NOT_FOUND;
-		if(get_index_iterator().valid()){
-			resolve_selection_from_index();
+		if(current_iterator.valid()){
+			resolve_selection_from_index(current_iterator);
 			r = 0;
 			table->status = 0;
 			if(table->next_number_field){
@@ -1796,7 +1807,7 @@ public:
 		r = set_index_iterator_lower(start_key);
 		if(r==0){
 			table->status = 0;
-			resolve_selection_from_index();
+			resolve_selection_from_index(get_index_iterator());
 			read_lookups++;
 			get_index_iterator_upper(*current_index->get_first1(), end_key);
 			get_index_iterator().set_end(*current_index->get_first1());
@@ -1816,7 +1827,7 @@ public:
 		if(get_index_iterator().valid()){
 			r = 0;
 			table->status = 0;
-			resolve_selection_from_index();
+			resolve_selection_from_index(get_index_iterator());
 			get_index_iterator().next();
 		}
 
@@ -2024,6 +2035,7 @@ namespace ts_cleanup{
 	class print_cleanup_worker : public Poco::Runnable{
 	public:
 		void run(){
+			stx::memory_low_state = false;
 			start_red(0);
 			nst::u64 last_print_size = calc_total_use();
 			/// DEBUG: nst::u64 last_check_size = calc_total_use();
@@ -2087,7 +2099,7 @@ namespace ts_info{
 		
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
-		typedef std::vector<tree_stored::tree_table*, sta::tracker<tree_stored::tree_table*> > _Tables;
+		typedef std::vector<tree_stored::tree_table*> _Tables; ///, sta::tracker<tree_stored::tree_table*> 
 		_Tables tables;
 
 		{
@@ -2115,7 +2127,7 @@ namespace ts_info{
 		
 		/// other threads cant delete while this section is active
 		nst::synchronized synch2(tt_info_delete_lock);
-		typedef std::vector<tree_stored::tree_table*,sta::tracker<tree_stored::tree_table*> > _Tables;
+		typedef std::vector<tree_stored::tree_table*> _Tables; ///,sta::tracker<tree_stored::tree_table*> 
 		_Tables tables;
 
 		{

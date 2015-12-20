@@ -24,9 +24,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #define TREESTORE_FILE_EXTENSION ""
 #define TREESTORE_FILE_SEPERATOR "_"
-#ifdef _MSC_VER
-#include <sparsehash/internal/sparseconfig.h>
-#endif
 #include <stdlib.h>
 #include <memory>
 #include <string>
@@ -34,11 +31,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#ifdef _MSC_VER
-#include <sparsehash/type_traits.h>
-#include <sparsehash/dense_hash_map>
-#include <sparsehash/sparse_hash_map>
-#endif
+
 #include <rabbit/unordered_map>
 #include <stx/storage/types.h>
 #include <stx/storage/basic_storage.h>
@@ -808,7 +801,7 @@ namespace storage{
 			
 			ptrdiff_t before = get_use();
 			typedef std::pair<address_type, ref_block_descriptor> _AddressedBlockPair;
-			typedef std::vector<_AddressedBlockPair, ::sta::tracker<_AddressedBlockPair, ::sta::buffer_counter> > _Blocks;
+			typedef std::vector<_AddressedBlockPair> _Blocks; //, ::sta::tracker<_AddressedBlockPair, ::sta::buffer_counter> 
 
 			_Blocks blocks;
 			_Blocks by_address;

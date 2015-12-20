@@ -31,7 +31,7 @@ namespace bits{
 	}
 }
 
-template<typename _IntSymBolType, typename _Allocator = sta::tracker<nst::u32, sta::stl_counter> >
+template<typename _IntSymBolType, typename _Allocator = std::allocator<nst::u32> > //= sta::tracker<nst::u32, sta::stl_counter> 
 class symbol_vector{
 public:
 	typedef nst::u32 _BucketType;/// use a configurable bucket type for larger code size performance

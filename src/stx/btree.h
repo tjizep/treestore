@@ -59,7 +59,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
 // *** Required Headers from the STL
 #ifdef _MSC_VER
 #include <Windows.h>
-#include <sparsehash/internal/sparseconfig.h>
 #endif
 
 #include <algorithm>
@@ -181,7 +180,7 @@ namespace stx
 	public:
 		virtual void idle_time() = 0;
 	};
-	typedef std::vector<idle_processor*, sta::tracker<idle_processor*> > _idle_processors;
+	typedef std::vector<idle_processor*> _idle_processors; //, sta::tracker<idle_processor*> 
 	extern _idle_processors idle_processors;
 	extern bool memory_low_state;
 	static void process_idle_times(){
@@ -258,7 +257,7 @@ namespace stx
 			max_scan = 0,
 			interior_mul = 1,
 			keys_per_page = 192, ///192 is good for transactions, 384
-			caches_per_page = 2,
+			caches_per_page = 0,
 			max_release = 8,
 			version_reload
 		};
@@ -1332,7 +1331,7 @@ namespace stx
 			nst::version_type version;
 
 			/// cpu cache keys
-			key_type        cached[cacheslotmax+1];
+			//key_type        cached[cacheslotmax+1];
 
 			/// the persistence context
 			btree * context;
@@ -1367,8 +1366,8 @@ namespace stx
 			template<typename key_type>
 			void check_cache(const key_type* keys){
 				//if(!can_interp){
-					//if(get_cache_occupants() == 0){
-						//set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
+					//if(sizeof(key_type) > 12 && get_cache_occupants() == 0){
+					//	set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
 					//}
 				//}
 			}
@@ -1574,9 +1573,10 @@ namespace stx
 				l = 0;
 				/// multiple search type lower bound function
 				unsigned int ml  = 0,mb = 0;
-				unsigned int step = o / cacheslotmax;
-				if(get_cache_occupants()){
-					ml = min_find_lower(key_less,&cached[0],get_cache_occupants(),key);
+				
+				if(cacheslotmax && get_cache_occupants()){
+					unsigned int step = o / cacheslotmax;
+					//ml = min_find_lower(key_less,&cached[0],get_cache_occupants(),key);
 					if(ml > 0) mb = ml-1;
 					l = mb * step ;
 					h =(ml==cacheslotmax) ? o : ml * step;
@@ -2200,8 +2200,8 @@ namespace stx
 		typedef std::map<_AddressPair, node*, ::std::less<_AddressPair>> _AddressedVersionNodes; /// , ::sta::tracker<_AddressPair, ::sta::bt_counter>
 		typedef std::pair<stream_address, node*> _AllocatedNode;
 		typedef std::pair<stream_address, surface_node*> _AllocatedSurfaceNode;
-		typedef std::vector< _AllocatedSurfaceNode, ::sta::tracker<_AllocatedSurfaceNode,::sta::bt_counter> > _AllocatedSurfaceNodes;
-		typedef std::vector< _AllocatedNode, ::sta::tracker<_AllocatedSurfaceNode,::sta::bt_counter> > _AllocatedNodes;
+		typedef std::vector< _AllocatedSurfaceNode > _AllocatedSurfaceNodes; //, ::sta::tracker<_AllocatedSurfaceNode,::sta::bt_counter>
+		typedef std::vector< _AllocatedNode> _AllocatedNodes; //, ::sta::tracker<_AllocatedSurfaceNode,::sta::bt_counter> 
 
 		
 		/// provides register for currently loaded/decoded nodes
@@ -4034,10 +4034,10 @@ namespace stx
 		private:
 		typedef std::pair<stream_address, node*> _NodePair;
 		typedef std::pair<stream_address, surface_node*> _SurfaceNodePair;
-		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _ToDeleteSurface;
-		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _ToDelete;
+		typedef std::vector<_SurfaceNodePair> _ToDeleteSurface; ///, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> 
+		typedef std::vector<_SurfaceNodePair> _ToDelete; //, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> 
 		/// remove inter node dependencies
-		typedef std::vector<_SurfaceNodePair, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter> > _UnlinkNodes;
+		typedef std::vector<_SurfaceNodePair > _UnlinkNodes; //, ::sta::tracker<_SurfaceNodePair,::sta::bt_counter>
 		/// recycling of allocated nodes
 		typedef std::vector<interior_node*> _Interiors;
 		typedef std::vector<surface_node*> _Surfaces;

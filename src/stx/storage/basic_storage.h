@@ -318,7 +318,7 @@ namespace stx{
 			buffer_type t;
 			i32 origin = (i32)buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : FSE_compress((encode_type_ref)&t[sizeof(i32)],(i32)(t.size())-sizeof(i32), (const encode_type_ref)&buff[0], origin);
+			i32 cp = buff.empty() ? 0 : (i32)FSE_compress((encode_type_ref)&t[sizeof(i32)],(i32)(t.size())-sizeof(i32), (const encode_type_ref)&buff[0], origin);
 			if(FSE_isError(cp)!=0 || cp <= 1){
 				cp = (i32)buff.size();
 				origin = -cp;
