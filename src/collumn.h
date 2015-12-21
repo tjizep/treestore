@@ -73,7 +73,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 256,//348
+			page_size = 348,//348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -530,7 +530,7 @@ namespace collums{
 		stored_page_ptr load_page(size_type address) const {
 			bool mem_low = (treestore_column_cache != 0) && get_storage().is_readonly();
 			stored_page_ptr page = nullptr;
-			if(false){ ///get_storage().is_local()
+			if(true){ ///get_storage().is_local()
 				version_type current_version = get_page_version(address);
 				page = version_control->check_out(address, current_version);
 				if(page){	/// check out refs the page			
@@ -545,13 +545,13 @@ namespace collums{
 			if(get_storage().is_end(dangling_buffer) || dangling_buffer.size() == 0){
 				
 			}else{
-				version_type current_version = get_storage().get_allocated_version(); //get_page_version(address);
-				page = version_control->check_out(address, current_version);
+				//version_type current_version = get_storage().get_allocated_version(); //get_page_version(address);
+				//page = version_control->check_out(address, current_version);
 			}
-			if(page){	/// check out refs the page
-				get_storage().complete(); /// storage operation complete				
-				return page;
-			}
+			//if(page){	/// check out refs the page
+			//	get_storage().complete(); /// storage operation complete				
+			//	return page;
+			//}
 			/// TODO: if there is shortage of ram first try getting a page from version control
 			if(mem_low ){				
 				//clear_cache();
@@ -1333,7 +1333,7 @@ namespace collums{
 
 
 		typedef std::vector<char, sta::col_tracker<char> >    _Nulls;
-		static const _Rid MAX_PAGE_SIZE = 32768*16;//*32;
+		static const _Rid MAX_PAGE_SIZE = 32768;//*32*16;
 		typedef std::vector<_CachePage, sta::col_tracker<_CachePage> > _CachePages;
 
 		struct _CachePagesUser{
@@ -1367,7 +1367,7 @@ namespace collums{
 					user->users--;
 					if(!user->users){
 						if(user->pages.size()!=p){
-							printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
+							//printf("resizing col '%s' from %lld to %lld\n",name.c_str(),(long long)user->pages.size(),(long long)p);
 							user->pages.back().unload();/// the last pages encoding will be wrong
 							user->pages.back().loading = false;
 							user->pages.resize(p);

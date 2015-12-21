@@ -1155,7 +1155,7 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data) + 4;
+		static const size_t static_size = sizeof(_Data) + 34;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];

@@ -257,7 +257,7 @@ namespace stx
 			max_scan = 0,
 			interior_mul = 1,
 			keys_per_page = 192, ///192 is good for transactions, 384
-			caches_per_page = 0,
+			caches_per_page = 4,
 			max_release = 8,
 			version_reload
 		};
@@ -1331,7 +1331,7 @@ namespace stx
 			nst::version_type version;
 
 			/// cpu cache keys
-			//key_type        cached[cacheslotmax+1];
+			key_type        cached[cacheslotmax+1];
 
 			/// the persistence context
 			btree * context;
@@ -1365,11 +1365,11 @@ namespace stx
 			}
 			template<typename key_type>
 			void check_cache(const key_type* keys){
-				//if(!can_interp){
-					//if(sizeof(key_type) > 12 && get_cache_occupants() == 0){
-					//	set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
-					//}
-				//}
+				if(!can_interp){
+					if(sizeof(key_type) > 12 && get_cache_occupants() == 0){
+						set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
+					}
+				}
 			}
 
 			template<typename key_type>
@@ -1576,7 +1576,7 @@ namespace stx
 				
 				if(cacheslotmax && get_cache_occupants()){
 					unsigned int step = o / cacheslotmax;
-					//ml = min_find_lower(key_less,&cached[0],get_cache_occupants(),key);
+					ml = min_find_lower(key_less,&cached[0],get_cache_occupants(),key);
 					if(ml > 0) mb = ml-1;
 					l = mb * step ;
 					h =(ml==cacheslotmax) ? o : ml * step;
