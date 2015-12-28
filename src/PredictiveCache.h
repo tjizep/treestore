@@ -78,7 +78,7 @@ namespace tree_stored{
 	public:
 
 
-		void set_hash_size(_Rid hash_size){
+		void initialize(){
 
 			hash_hits = 0;
 			hash_predictions = 0;

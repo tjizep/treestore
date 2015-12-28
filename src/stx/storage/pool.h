@@ -83,7 +83,7 @@ namespace stx{
 					remove_buffer_use(bytes);
 				};
 			};
-			static const bool heap_for_small_data = true;
+			static const bool heap_for_small_data = false;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
 			template <class T>
@@ -567,7 +567,12 @@ namespace stx{
 						result.data = new u8[size];
 						
 					}
-
+					if(requested < size){
+						result.data[requested] = (u8)result.data;
+					}
+					if(requested+1 < size){
+						result.data[requested+1] = (u8)size;
+					}
 					this->allocated += size + overhead();
 					shared->allocated += size + overhead();					
 					release_overflow();
@@ -588,6 +593,21 @@ namespace stx{
 						size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
 						_Bucket &current =  get_bucket(size,false);
 						_Allocated allocated((u8*)data, ti);
+						if(requested < size){
+							if(((u8*)data)[requested] != (u8)data){
+								printf("[TS] [ERROR] memory has been overwritten or deallocated\n");
+							}else{
+								((u8*)data)[requested] = ((u8)data)-1;
+							}
+
+						}
+						if(requested+1 < size){
+							if(((u8*)data)[requested+1] != (u8)size){
+								printf("[TS] [ERROR] memory has been overwritten or deallocated\n");
+							}else{
+								((u8*)data)[requested+1] = (u8)(size-1);
+							}
+						}
 						allocated.is_new = false;
 						current.push_back(allocated);
 						shared->used += (size + overhead());
@@ -704,7 +724,7 @@ namespace stx{
 					return get_pool().get_total_allocated();
 				}
 				void * allocate(size_t requested){					
-					if(unlocked){
+					if(!heap_for_small_data){
 						f_synchronized l(lock);
 						return get_pool().allocate(requested);
 					}else 
@@ -714,7 +734,7 @@ namespace stx{
 
 
 				void free(void * data, size_t requested){
-					if(unlocked){
+					if(!heap_for_small_data){
 						f_synchronized l(lock);
 						get_pool().free(data, requested);
 					}else 
@@ -751,8 +771,8 @@ namespace stx{
 				T* allocate(){
 					T* r;					
 										
-					if(unlocked){
-						//f_synchronized l(lock);
+					if(!heap_for_small_data){
+						f_synchronized l(lock);
 						r = get_pool().allocate<T>();					
 					}else{						
 						r = get_pool().allocate<T>();					
@@ -765,8 +785,8 @@ namespace stx{
 				T* allocate(_Context * context){
 					T* r;					
 						
-					if(unlocked){
-						//f_synchronized l(lock);
+					if(!heap_for_small_data){
+						f_synchronized l(lock);
 						r = get_pool().allocate<T,_Context>(context);
 					}else{
 						r = get_pool().allocate<T,_Context>(context);								
@@ -779,8 +799,8 @@ namespace stx{
 				inline void free(T* v){
 					if(!v) return;
 					v->~T();					
-					if(unlocked){
-						//f_synchronized l(lock);
+					if(!heap_for_small_data){
+						f_synchronized l(lock);
 						get_pool().free<T>(v);
 					}else{
 						get_pool().free<T>(v);
@@ -788,8 +808,12 @@ namespace stx{
 				}
 				template<typename T>
 				inline void free_ns(T* v){
-					//f_synchronized l(lock);
-					get_pool().free<T>(v);				
+					if(!heap_for_small_data){
+						f_synchronized l(lock);
+						get_pool().free<T>(v);				
+					}else{						
+						get_pool().free<T>(v);				
+					}
 				}
 			};
 		};

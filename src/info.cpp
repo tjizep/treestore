@@ -31,13 +31,13 @@ void delete_info_table(const char* name){
 	}
 	info_tables.erase(name);
 }
-tree_stored::tree_table * get_info_table(TABLE* table){
+tree_stored::tree_table * get_info_table(TABLE* table,const std::string& path){
 	nst::synchronized synch(tt_info_lock);
 
-	tree_stored::tree_table * result = info_tables[table->s->path.str];
+	tree_stored::tree_table * result = info_tables[path];
 	if(NULL == result){
-		result = new tree_stored::tree_table(table);
-		info_tables[table->s->path.str] = result;
+		result = new tree_stored::tree_table(table,path);
+		info_tables[path] = result;
 		result->begin(true,false);
 		result->calc_rowcount(); // the minimum statistics required
 		result->rollback();

@@ -60,9 +60,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "rednode.h"
 #include <stx/storage/pool.h>
 #include <Poco/UUIDGenerator.h>
-inline Poco::UUID & create_version(){
+inline Poco::UUID create_version(){
 	return Poco::UUIDGenerator::defaultGenerator().create();
 }
+
+
 extern char * treestore_contact_points;
 extern char	treestore_block_read_ahead;
 #ifdef _MSC_VER
@@ -88,6 +90,7 @@ namespace stored{
 namespace stx{
 namespace storage{
 
+	typedef std::basic_string<char, std::char_traits<char>, sta::buffer_pool_alloc_tracker<char> > pool_string;
 
 	extern Poco::UInt64 ptime;
 	extern Poco::UInt64 last_flush_time;		/// last time it released memory to disk
@@ -100,9 +103,9 @@ namespace storage{
 	/// a name factory for some persistent allocators
 	struct default_name_factory{
 
-		std::string name;
-
-		default_name_factory(const std::string &name) : name(name){
+		pool_string name;
+		
+		default_name_factory(const pool_string &name) : name(name){
 		}
 
 		default_name_factory (const default_name_factory& nf){
@@ -117,7 +120,7 @@ namespace storage{
 			(*this).name = nf.name;
 			return *this;
 		}
-		const std::string & get_name() const {
+		const pool_string & get_name() const {
 			return (*this).name;
 		}
 	};
@@ -167,7 +170,7 @@ namespace storage{
 		/// notify the participant that any stray versions should
 		/// be merged
 		virtual bool make_singular() = 0;
-		virtual std::string get_name() const = 0;
+		virtual pool_string get_name() const = 0;
 		bool participating;
 		journal_participant():participating(false){};
 
@@ -193,7 +196,7 @@ namespace storage{
 		void release_participant(journal_participant* p);
 		/// adds a journal entry written to disk
 
-		void add_entry(Poco::UInt32 command, const std::string& name, long long address, const buffer_type& buffer);
+		void add_entry(Poco::UInt32 command, const pool_string& name, long long address, const buffer_type& buffer);
 
 		/// ensures all journal entries are synched to storage
 
@@ -205,7 +208,7 @@ namespace storage{
 
 		/// log new address creation
 
-		void log(const std::string &name, const std::string& jtype, stream_address sa);
+		void log(const pool_string &name, const pool_string& jtype, stream_address sa);
 	};
 
 	template <typename _AddressType, typename _BlockType = std::vector<u8>>
@@ -220,7 +223,7 @@ namespace storage{
 		block_type empty_block;
 	private:
 		
-		typedef ns_umap::unordered_map<address_type, block_reference> _Allocations;
+		typedef ns_umap::unordered_map<address_type, block_reference, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> > _Allocations;
 		_Allocations allocations;
 		address_type next;
 	public:
@@ -430,9 +433,9 @@ namespace storage{
 		} ;
 
 		typedef block_descriptor* ref_block_descriptor;
-		typedef std::vector<block_descriptor*> _Descriptors;				
+		typedef std::vector<block_descriptor*, sta::buffer_pool_alloc_tracker<block_descriptor*> > _Descriptors;				
 		typedef ns_umap::unordered_map<address_type, ref_block_descriptor, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> > _Allocations;
-		typedef ns_umap::unordered_set<address_type > _Changed;
+		typedef std::unordered_set<address_type, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type>  > _Changed;
 		
 	private:
 		/// per instance members
@@ -458,11 +461,11 @@ namespace storage{
 
 		block_type empty_block;		/// the empty block returned as end of storage
 
-		std::string table_name;		/// table name in sqlite
+		pool_string table_name;		/// table name in sqlite
 
-		std::string name;			/// external name to users of class
+		pool_string name;			/// external name to users of class
 
-		std::string extension;		/// extension of data file
+		pool_string extension;		/// extension of data file
 
 		u64 changes;				/// counts the changes made
 
@@ -530,14 +533,14 @@ namespace storage{
 			return reflect_block_use(*v);
 		}
 
-		static std::string get_storage_path(){
+		static pool_string get_storage_path(){
 
 			return ""; //".\\";
 		}
 
 		/// does this table exist in storage
 
-		bool has_table(std::string name){
+		bool has_table(pool_string name){
 
 			int count = 0;
 			get_session() << "SELECT count(*) FROM sqlite_master WHERE type in ('table', 'view') AND name = '" << name << "';", into(count), now;
@@ -547,7 +550,7 @@ namespace storage{
 
 		void create_allocation_table(){
 			if(!has_table(table_name)){
-				 std::string sql = "CREATE TABLE " + table_name + "(";
+				 pool_string sql = "CREATE TABLE " + table_name + "(";
 				 sql += "a1 integer primary key, ";
 				 sql += "dsize integer, ";
 				 sql += "data BLOB);";
@@ -555,7 +558,7 @@ namespace storage{
 			}
 		}
 		typedef std::vector<address_type> _AddressList;
-		typedef std::set<address_type> _AddressSet;
+		
 		typedef std::vector<Poco::Data::BLOB> _BLOBs;
 		u64 selector_address;
 		u64 current_address;
@@ -640,18 +643,20 @@ namespace storage{
 			}
 			if(true){
 				if(get_version() == version_type() && !lego.is_open()){
-					lego.open(name);
+					lego.open(is_new,name.c_str());
 					max_address = 0;
 					max_address = std::max<address_type>(max_address, lego.max_block_address());
 					(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
 				}
 			}
 			if(_session == nullptr){
-				_session = std::make_shared<Session>("SQLite", get_storage_path() + name + extension);//SessionFactory::instance().create
+				pool_string npath = get_storage_path() + name + extension;
+				_session = std::make_shared<Session>("SQLite", npath.c_str());//SessionFactory::instance().create
 				is_new = false;
 				create_allocation_table();
 				create_statements();
-				Poco::File df (get_storage_path() + name + extension );
+				pool_string path = get_storage_path() + name + extension;
+				Poco::File df ( path.c_str());
 				file_size = df.getSize();
 					
 				if(lego.is_open()){
@@ -1064,7 +1069,7 @@ namespace storage{
 			(*this).version = version;
 		}
 		/// get the list of addresses stored
-		typedef std::set<stream_address> _Addresses;
+		typedef std::set<stream_address, std::less<stream_address>, sta::buffer_pool_alloc_tracker<stream_address> > _Addresses;
 
 		void get_addresses(_Addresses& out){
 			synchronized s(lock);
@@ -1241,7 +1246,8 @@ namespace storage{
 			using Poco::File;
 			
 			if(!is_new){
-				File df (get_storage_path() + name + extension );
+				pool_string npath = get_storage_path() + name + extension;
+				File df ( npath.c_str() );
 				(*this).is_new = !df.exists();
 				if(!(*this).is_new){
 					get_session();
@@ -1250,7 +1256,7 @@ namespace storage{
 			}else (*this).is_new = true;
 			
 		}
-		virtual std::string get_name() const {
+		virtual pool_string get_name() const {
 			return (*this).name;
 		}
 		void set_readahead(bool is_readahead){
@@ -1271,7 +1277,8 @@ namespace storage{
 				using Poco::File;
 				using Poco::Path;
 				try{
-					File df (get_name() + extension);
+					pool_string nname = get_name() + extension;
+					File df (nname.c_str());
 					if(df.exists()){
 						df.remove();
 					}
@@ -1529,7 +1536,7 @@ namespace storage{
 
 
 
-		void journal(const std::string& name){
+		void journal(const pool_string& name){
 			_Addresses todo;
 			syncronized ul(lock);
 			get_modified_addresses(todo);
@@ -1939,7 +1946,7 @@ namespace storage{
 		}
 
 		/// write the allocated data to the global journal
-		void journal(const std::string &name){
+		void journal(const pool_string &name){
 			syncronized _sync(*lock);
 			if(allocations!=nullptr)
 				allocations->journal(name);
@@ -1961,10 +1968,11 @@ namespace storage{
 	/// list of file names actioned or to action
 	typedef std::vector<std::string> _FileNames;
 	/// remove all related tempfiles for a storage
-	static _FileNames delete_temp_files_of(const std::string& name){
+	static _FileNames delete_temp_files_of(const pool_string& _pool_name){
 		using Poco::StringTokenizer;
 		using Poco::Path;
 		using Poco::DirectoryIterator;
+		std::string name = _pool_name.c_str();
 		StringTokenizer components(name, "\\/");
 		std::string path;
 		std::string numbers = "0123456789";
@@ -1985,7 +1993,7 @@ namespace storage{
 					if(full_name.substr(0,name.size())==name
 						&& full_name.size() > name.size() + 1
 						&& full_name[name.size()] == '.'
-						&& numbers.find_first_of(full_name[name.size()+1]) != std::string::npos
+						&& numbers.find_first_of(full_name[name.size()+1]) != pool_string::npos
 						){
 						printf("found temp file %s\n",full_name.c_str());
 
@@ -2035,26 +2043,25 @@ namespace storage{
 
 		typedef std::vector<version_storage_type_ptr> storage_container;
 
-		typedef ns_umap::unordered_map<version_type, version_storage_type_ptr> version_storage_map;
+		typedef ns_umap::unordered_map<version_type, version_storage_type_ptr,rabbit::rabbit_hash<version_type>, std::equal_to<version_type>, sta::buffer_pool_alloc_tracker<version_type> > version_storage_map;
 
 		typedef typename storage_allocator_type::address_type address_type;
-
-
+		
 	private:
 
 
 
 		struct version_namer{
-			std::string name;
-			std::string to_string(const Poco::UUID& version){
-				return version.toString();
+			pool_string name;
+			pool_string to_string(const Poco::UUID& version){
+				return version.toString().c_str();
 			}
-			std::string to_string(const u32& version){
+			pool_string to_string(const u32& version){
 				std::string result;
 				Poco::NumberFormatter::append(result, version);
-				return result;
+				return result.c_str();
 			}
-			version_namer(const version_type &version, const std::string extension) {
+			version_namer(const version_type &version, const pool_string extension) {
 
 				name += extension;
 				name += ".";
@@ -2070,7 +2077,7 @@ namespace storage{
 				(*this).name = nf.name;
 				return *this;
 			}
-			const std::string & get_name() const {
+			const pool_string & get_name() const {
 				return (*this).name;
 			}
 
@@ -2106,14 +2113,14 @@ namespace storage{
 	private:
 		void save_recovery_info(){
 			if(storages.size() > 1){
-				std::string names;
+				pool_string names;
 				typename storage_container::iterator c = storages.begin();
 				typename storage_container::iterator c_begin = ++c;
 				for(; c != storages.end(); ++c)
 				{
 					if( c != c_begin )
 						names += ",";
-					std::string n = (*c)->get_allocator().get_name();
+					pool_string n = (*c)->get_allocator().get_name();
 					names += n;
 				}
 
@@ -2273,7 +2280,7 @@ namespace storage{
 			b->set_allocator(initial);
 			b->set_previous(nullptr);
 			storages.push_back(b);
-			std::string names;
+			pool_string names;
 			stream_address addr = INTITIAL_ADDRESS;
 			buffer_type& content = initial->allocate(addr, read);
 			if(!initial->is_end(content) && content.size() > 0){
@@ -2288,9 +2295,9 @@ namespace storage{
 				if(delete_temp_files){
 
 				}else {
-					Poco::StringTokenizer tokens(names, ",");
+					Poco::StringTokenizer tokens(names.c_str(), ",");
 					for(Poco::StringTokenizer::Iterator t = tokens.begin(); t != tokens.end(); ++t){
-						storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t)));
+						storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(default_name_factory((*t).c_str()));
 						last_address = std::max<stream_address>(last_address, allocator->last() );
 						version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, ++order, create_version(), (*this).lock);
 						allocator->set_allocation_start(last_address);
@@ -2639,7 +2646,7 @@ namespace storage{
 			journal_synching = false;
 			this->reduce();
 		}
-		virtual std::string get_name() const {
+		virtual pool_string get_name() const {
 			return this->initial->get_name();
 		}
 	};

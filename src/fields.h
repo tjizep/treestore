@@ -1141,7 +1141,8 @@ namespace stored{
 			I8 ,
 			R4 ,
 			R8 ,
-			S
+			S,
+			KEY_MAX
 
 		};
 
@@ -1248,6 +1249,10 @@ namespace stored{
 		void addDynReal(float v){
 			*_append(1) = DynamicKey::R4;
 			*(float*)_append(sizeof(v)) = v;
+		}
+		void addDynInf(){
+			*_append(1) = DynamicKey::KEY_MAX;
+			*(nst::u8*)_append(sizeof(nst::u8)) = 0xff;
 		}
 	public:
 		void add(const char* k, size_t s){
@@ -1379,7 +1384,9 @@ namespace stored{
 
 			add(v.get_value(),v.get_size());
 		}
-
+		void addInf(){
+			addDynInf();
+		}
 		void add(const stored::VarCharStored& v){
 
 			add(v.get_value(),v.get_size()-1); /// exclude the terminator
@@ -1389,6 +1396,7 @@ namespace stored{
 
 			add(v.get_value(),v.get_size()-1); /// exclude the terminator
 		}
+
 		void addTerm(const char* k, size_t s){
 			add(k, s);
 		}
@@ -1427,6 +1435,149 @@ namespace stored{
 			*this = right;
 		}
 
+		/// returns true if this is a prefix of the other key
+		inline bool is_prefix(const DynamicKey& other) const {
+			if( other.size() < size() ) return false; /// this cannot be a prefix of something smaller
+
+			int r = memcmp(data(), other.data(), size() );
+			return r == 0;
+		}
+		nst::u32 count_parts() const {
+			const nst::u8 *ld = data();
+			
+			nst::u8 lt = *ld;
+			
+			nst::u32 r = 0,l=0,ll=0;
+			while(true){
+				++ld;			
+				++ll;
+				switch(lt){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					break;
+				case DynamicKey::I8 :
+					l = sizeof(nst::i64);
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					break;
+				case DynamicKey::S:{					
+					nst::i16 
+					ls = sizeof(nst::i16),					
+					ll = *(const nst::i16*)ld;				
+					l = ll+ls;
+								   }
+					break;
+				default:
+					break;
+				};				
+				ld += l; // increments buffer
+				ll += l; // increments length
+				++r;
+				if(ll >= size()) break;				
+				lt = *ld;								
+			}		
+			return r;
+		}
+		/// returns true if this is a prefix of the other key
+		inline bool contains_prefix(const DynamicKey& other) const {
+			///if( other.size() < size() ) return false; /// this cannot be a prefix of something smaller
+			nst::u32 parts = count_parts();
+			if(parts==0) return true; // the empty key is a prefix of all other keys
+			
+			const nst::u8 *ld = data();
+			const nst::u8 *rd = other.data();
+			nst::u8 lt = *ld;
+			nst::u8 rt = *rd;
+			nst::u32 kn = 0,klast = parts-1;
+			int r = 0,l=0,ll=0;
+			while(lt == rt){
+				++ld;
+				++rd;
+				++ll;
+				switch(lt){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					if(*(nst::i8*)ld != *(nst::i8*)rd)
+						return kn >= klast;
+					else r = 0;
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					if(*(nst::i16*)ld != *(nst::i16*)rd)
+						return kn >= klast;
+					else r = 0;
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					if(*(nst::i32*)ld != *(nst::i32*)rd)
+						return kn >= klast;
+					else r = 0;
+					break;
+				case DynamicKey::I8 :
+					l = sizeof(nst::i64);
+					if(*(nst::i64*)ld != *(nst::i64*)rd)
+						return kn >= klast;
+					else r = 0;
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					if(*(float*)ld != *(float*)rd)
+						return kn >= klast;
+					else r = 0;
+
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					if(*(double*)ld != *(double*)rd)
+						return kn >= klast;
+					else r = 0;
+					break;
+				case DynamicKey::S:{
+					
+					nst::i16 
+					ls = sizeof(nst::i16),
+					lr = *(const nst::i16*)rd,
+					ll = *(const nst::i16*)ld;
+					if(kn < klast){
+						r = memcmp(ld+ls, rd+ls, std::min<nst::i16>(lr, ll));
+						if(r !=0) return kn >= klast;
+						if(lr != ll)
+							return kn >= klast;
+					}else{
+						if(lr < ll) return kn >= (parts-1); /// key cannot be prefix of some smaller key
+						r = memcmp(ld+ls, rd+ls, ll);
+						if(r !=0) return kn >= klast;
+						return true; /// finished no reason to carry on
+					}
+					l = ll+ls;
+								   }
+					break;
+				};
+				if( r != 0 ) break;
+				++kn;
+				ld += l;
+				rd += l;
+				ll += l;
+				if(ll >= size()) break;
+				if(ll >= other.size()) break; /// this shouldnt ever happen
+				lt = *ld;
+				rt = *rd;
+				
+			}		
+			return kn >= klast;
+		}
+
+		
 		inline bool left_equal_key(const DynamicKey& right) const {
 			//if( size != right.size ) return false;
 			if( size() == 0 ) return false;
@@ -1551,6 +1702,9 @@ namespace stored{
 						return false;
 					}
 					break;
+				case DynamicKey::KEY_MAX:
+					l = 1;					
+					break;
 				};
 				ld += l;
 				lt = *ld;
@@ -1632,6 +1786,11 @@ namespace stored{
 					l = ll+ls;
 								   }
 					break;
+				case DynamicKey::KEY_MAX:
+					l = 1;
+					r = 0;
+					break;
+
 				};
 				if( r != 0 ) break;
 

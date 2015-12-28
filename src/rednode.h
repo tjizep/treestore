@@ -44,49 +44,69 @@ namespace red{
 	private:
 		client_allocator* thing;
 	public:
-		client_allocator_proxy() : thing(create_allocator()){
+		client_allocator_proxy() : thing(nullptr){
 		}
 		~client_allocator_proxy(){
+			if(thing == nullptr) return;
 			destroy_allocator(thing);
 		}
-		bool open(const std::string &name) {
-			return thing->open(name);
+		bool open(bool temp, const std::string &name) {
+			close();
+			if(!temp){
+				thing = create_allocator();
+				return thing->open(name);
+			}
+			return false;
 		}
 
 		bool contains(address_type address){
+			if(thing == nullptr) return false;
 			return thing->contains(address);
 		}
 		
 		bool get_version(address_type address, version_type& version) {
+			if(thing == nullptr) return false;
 			return thing->get_version(address, version);
 		}
 
 		bool store(address_type address, const block_type &data){
+			if(thing == nullptr) return false;
 			return thing->store(address, data);
 		}
 		bool get(address_type address, block_type& data) {
+			if(thing == nullptr) return false;
 			return thing->get(address, data);
 		}
 		bool get(address_type address, version_type& version, block_type& data) {
+			if(thing == nullptr) return false;
 			return thing->get(address, version, data);
 		}
 		bool begin(bool writer){
+			if(thing == nullptr) return false;
 			return thing->begin(writer);
 		}
 		bool commit(){
+			if(thing == nullptr) return false;
 			return thing->commit();
 		}
 		bool rollback(){
+			if(thing == nullptr) return false;
 			return thing->rollback();
 		}
 		bool is_open() const {
+			if(thing == nullptr) return false;
 			return thing->is_open();
 		}
 		bool close(){
-			return thing->close();
+			if(thing == nullptr) return false;
+			bool result = thing->close();
+			destroy_allocator(thing);
+			thing = nullptr;
+			return result;
 		}
 
 		virtual address_type max_block_address() {
+			if(thing == nullptr) return false;
 			return thing->max_block_address();
 		}
 		

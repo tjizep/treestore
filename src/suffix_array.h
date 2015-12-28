@@ -99,7 +99,7 @@ namespace suffix_array{
 		std::string name;
 	public:
 
-		suffix_storage(std::string name) : allocations( nst::default_name_factory(name)), boot(1),name(name){
+		suffix_storage(std::string name) : allocations( nst::default_name_factory(name.c_str())), boot(1),name(name.c_str()){
 			allocations.set_limit(1024*1024*32);
 			allocations.begin();
 
@@ -613,7 +613,7 @@ public:
 		}else{
 			typedef _SuffixArray _SuffixArrayType;
 			std::string storage_name = "suffix_temp.dat";
-			_SuffixStorage storage(storage_name); /// a file to place the storage in
+			_SuffixStorage storage(storage_name.c_str()); /// a file to place the storage in
 			_SuffixArrayType reduced_array(storage);
 			encode_internal(reduced_array, buffer, length);
 		}

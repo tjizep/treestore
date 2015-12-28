@@ -538,7 +538,7 @@ namespace tree_stored{
 
 		void begin(bool read,bool shared){
 			index.begin(read,shared);
-			cache.set_hash_size((nst::u32)index.get_size()*1.5);
+			cache.initialize();
 		}
 
 		void commit1_asynch(){

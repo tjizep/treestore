@@ -736,7 +736,7 @@ namespace tree_stored{
 			TABLE_SHARE *share= table_arg->s;
 			cols.clear();
 			cols.resize(share->fields);
-			std::string path = table_arg->s->path.str;
+			std::string path = this->get_name();//table_arg->s->path.str;
 			nst::u32 rowsize = 0;
 			for (Field **field=share->field ; *field ; field++){
 				++rowsize;
@@ -839,7 +839,7 @@ namespace tree_stored{
 			TABLE_SHARE *share= table_arg->s;
 			pos = table_arg->key_info;
 			_FileNames names;
-			std::string path = table_arg->s->path.str;
+			std::string path = this->get_name(); //table_arg->s->path.str;
 			names.push_back(path);
 			std::string extension = TREESTORE_FILE_EXTENSION;
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
@@ -866,7 +866,7 @@ namespace tree_stored{
 			KEY *pos;
 			TABLE_SHARE *share= table_arg->s;
 			pos = table_arg->key_info;
-			std::string path = share->path.str;
+			//std::string path = share->path.str;
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				stored::index_interface::ptr index = nullptr;
@@ -996,14 +996,15 @@ namespace tree_stored{
 		std::string get_name() const {
 			return this->storage.get_name();
 		}
-		tree_table(TABLE *table_arg)
+		tree_table(TABLE *table_arg, const std::string& path)
 		:	changed(false)				
 		,	locks(0)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
 		,	last_density_calc(0)
 		,	last_density_tx(999999999)
-		,	storage(table_arg->s->path.str)
+		,	storage(path)
+		,	path(path)
 		,	table(nullptr)
 		,	calculating_statistics(false)
 		,	share(nullptr)
@@ -1340,7 +1341,7 @@ namespace tree_stored{
 
 		void load(TABLE *table_arg){
 			clear();
-			printf("load table %s\n", table_arg->alias);
+			printf("[TS] [INFO] load table %s\n", this->path.c_str());
 			(*this).load_indexes(table_arg);
 			(*this).load_cols(table_arg);
 			file_names = create_file_names(table_arg);
@@ -1581,9 +1582,10 @@ namespace tree_stored{
 					}
 					field->ptr = okey;
 				}else{
-					//if(bound==0xffffffff){
-					//	temp.addInf();
-					//}else
+					if(bound==0xffffffff){
+						temp.addInf();
+					}
+					//else
 					//	temp.add();
 				}
 				ptr += store_length;
@@ -1740,6 +1742,27 @@ namespace tree_stored{
 
 			indexes[ax]->lower_(out, temp);
 		}
+		
+		/// returns true if temo is less than other
+		bool is_less(const tree_stored::CompositeStored& other){			
+			return temp < other;
+		}
+
+		/// returns true if temo is equal to other
+		bool is_equal(const tree_stored::CompositeStored& other){			
+			return temp == other;
+		}
+		
+		/// returns true if temp is a prefix of other
+		bool is_temp_prefix_of(const tree_stored::CompositeStored& other){			
+			return temp.contains_prefix(other);
+		}
+
+		/// returns true if temp is a prefix of the key on the input iterator
+		bool is_temp_prefix_of(stored::index_iterator_interface& iterator){
+			const tree_stored::CompositeStored& other = iterator.get_key();
+			return is_temp_prefix_of(other);
+		}
 
 		void temp_lower
 		(	TABLE* table
@@ -1889,7 +1912,7 @@ namespace tree_stored{
 						// calc_total_use() > treestore_max_mem_use*0.7f
 						//||  rolling
 					//)
-					if(os::micros() - last_lock_time > 450000){
+					if(os::micros() - last_lock_time > 45000000){
 						if(storage.stale()){
 							rollback();
 						}
@@ -1932,7 +1955,7 @@ namespace tree_stored{
 
 			(*this).get_table().insert(get_auto_incr(), '0');
 			if(get_auto_incr() % 300000 == 0){
-				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , table->s->table_name.str);				
+				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
 				//reduce_col_use();
 				//reduce_use();
 			}			

@@ -9,7 +9,7 @@ namespace stored{
 		_Allocations* r = NULL;
 		r = instances[name];
 		if(r == NULL){
-			r = new _Allocations( std::make_shared<_BaseAllocator>( stx::storage::default_name_factory(name)) );
+			r = new _Allocations( std::make_shared<_BaseAllocator>( stx::storage::default_name_factory(name.c_str())) );
 			instances[name] = r;
 		}
 
@@ -45,7 +45,7 @@ namespace stored{
 				nst::journal::get_instance().recover();
 			r = instances[name];
 			if(r == NULL){
-				r = new _Allocations( std::make_shared<_BaseAllocator>( stx::storage::default_name_factory(name)) );
+				r = new _Allocations( std::make_shared<_BaseAllocator>( stx::storage::default_name_factory(name.c_str())) );
 				///r->set_readahead(true);
 				instances[name] = r;
 			}

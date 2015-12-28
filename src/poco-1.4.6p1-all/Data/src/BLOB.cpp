@@ -42,25 +42,25 @@ namespace Data {
 
 
 BLOB::BLOB():
-	_pContent(new std::vector<char>())
+	_pContent(nullptr)
 {
 }
 
 
 BLOB::BLOB(const std::vector<char>& content):
-	_pContent(new std::vector<char>(content))
+	_pContent(std::make_shared<std::vector<char>>(content))
 {
 }
 
 
 BLOB::BLOB(const char* const pContent, std::size_t size):
-	_pContent(new std::vector<char>(pContent, pContent + size))
+	_pContent(std::make_shared<std::vector<char>>(pContent, pContent + size))
 {
 }
 
 
 BLOB::BLOB(const std::string& content):
-	_pContent(new std::vector<char>(content.begin(), content.end()))
+	_pContent(std::make_shared<std::vector<char>>(content.begin(), content.end()))
 {
 }
 
@@ -83,5 +83,10 @@ BLOB& BLOB::operator = (const BLOB& other)
 	return *this;
 }
 
+void BLOB::createEmpty() const
+{
+	if(_pContent == nullptr)
+		_pContent = std::make_shared<std::vector<char>>();
+}
 
 } } // namespace Poco::Data

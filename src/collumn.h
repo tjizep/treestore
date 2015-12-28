@@ -49,6 +49,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <stx/storage/pool.h>
 namespace nst = NS_STORAGE;
 extern Poco::Mutex data_loading_lock;
+extern double		treestore_column_cache_factor;
 namespace collums{
 	template<typename _Key, typename _Value, typename _Storage, typename _ValueEncoder>
 	class paged_vector{

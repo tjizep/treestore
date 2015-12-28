@@ -33,11 +33,11 @@ public:
 	typedef std::shared_ptr<nst::buffer_type> buffer_type_ptr;
 	typedef std::map<long long, buffer_type_ptr> buffers_type;
 	typedef std::shared_ptr<buffers_type> buffers_type_ptr;
-	typedef std::unordered_map<std::string, buffers_type_ptr> block_registery_type ;
-	typedef std::unordered_map<std::string, participant_ref> participants_type;
+	typedef std::unordered_map<nst::pool_string, buffers_type_ptr> block_registery_type ;
+	typedef std::unordered_map<nst::pool_string, participant_ref> participants_type;
 private:
-	std::string journal_name;
-	std::string compact_name;
+	nst::pool_string journal_name;
+	nst::pool_string compact_name;
 	Poco::Mutex jlock;
 
 	std::ofstream journal_ostr;
@@ -54,8 +54,8 @@ public:
 	journal_state()
 	:	journal_name("treestore-journal.dat")
 	,	compact_name("treestore-compact-journal.dat")
-	,	journal_ostr(journal_name, o_mode)
-	,	compacted_ostr(compact_name, o_mode)
+	,	journal_ostr(journal_name.c_str(), o_mode)
+	,	compacted_ostr(compact_name.c_str(), o_mode)
 	,	writer(journal_ostr)
 	,	compacted_writer(compacted_ostr)
 	,	bytes_used(0)
@@ -160,7 +160,7 @@ public:
 		nst::synchronized _llock(llock);
 		typedef std::vector<_Command> _Commands;
 		typedef std::unordered_map<std::string, stored::_Transaction*> _PendingTransactions;
-		std::ifstream journal_istr(journal_name, std::ios::binary);
+		std::ifstream journal_istr(journal_name.c_str(), std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
 		nst::u64 sequence = 0;
 		_PendingTransactions pending;
@@ -243,13 +243,14 @@ public:
 		bytes_used = 0;
 		journal_istr.close();
 		journal_ostr.close();
-		Poco::File jf(journal_name);
+		Poco::File jf(journal_name.c_str());
 		jf.remove();
-		journal_ostr.open(journal_name, o_mode);
+		journal_ostr.open(journal_name.c_str(), o_mode);
 	}
 
 	void synch(bool force)
 	{
+		
 		nst::synchronized _llock(llock);
 		if(last_synch != sequence){
 
@@ -260,7 +261,7 @@ public:
 			journal_ostr.rdbuf()->pubsync();
 			if(force || os::millis() - last_check > 3000){
 				last_check = os::millis();
-				Poco::File jf(journal_name);
+				Poco::File jf(journal_name.c_str());
 				if(jf.exists()){
 					nst::u64 jsize = 0;
 					try{
@@ -281,13 +282,13 @@ public:
 							set_treestore_journal_size( 0 );
 							printf("journal file > n GB compacting\n");
 							//compact();
-							log_journal(journal_name,"commit",0);
+							log_journal(journal_name.c_str(),"commit",0);
 							for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 								(*p).second->journal_synch_start();
 							}
 							for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 								/// test if the data files have not been deleted
-								if(is_valid_storage_directory((*p).second->get_name())){
+								if(is_valid_storage_directory((*p).second->get_name().c_str())){
 									(*p).second->journal_commit();
 								}
 							}
@@ -299,7 +300,7 @@ public:
 							jf.remove();
 							sequence = 0;
 							last_synch = sequence;
-							journal_ostr.open(journal_name, std::ios::binary);
+							journal_ostr.open(journal_name.c_str(), std::ios::binary);
 							set_treestore_journal_size( jf.getSize() );
 						}
 					}
@@ -341,14 +342,14 @@ namespace storage{
 		return j;
 	}
 
-	void journal::log(const std::string &name, const std::string& jtype, stream_address sa){
-		log_journal(name, jtype, sa);
+	void journal::log(const pool_string &name, const pool_string& jtype, stream_address sa){
+		log_journal(name.c_str(), jtype.c_str(), sa);
 	}
 
 	/// adds a journal entry written to disk
 
-	void journal::add_entry(Poco::UInt32 command, const std::string &name, long long address, const buffer_type& buffer){
-		js().add_entry(command, name, address, buffer);
+	void journal::add_entry(Poco::UInt32 command, const pool_string &name, long long address, const buffer_type& buffer){
+		js().add_entry(command, name.c_str(), address, buffer);
 	}
 
 	/// ensures all journal entries are synched to storage

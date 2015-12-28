@@ -120,8 +120,10 @@ public:
 	std::size_t size() const;
 		/// Returns the size of the BLOB in bytes.
 
+	void createEmpty() const ;
+		/// causes the internal pointer to be assigned to something
 private:
-	Poco::SharedPtr<std::vector<char> > _pContent;
+	mutable std::shared_ptr<std::vector<char> > _pContent;
 	
 	friend class BLOBStreamBuf;
 };
@@ -132,12 +134,16 @@ private:
 //
 inline const std::vector<char>& BLOB::content() const
 {
-	return *_pContent;
+	createEmpty();
+
+	return *(_pContent.get());
 }
 
 
 inline const char* BLOB::rawContent() const
 {
+	if(_pContent==nullptr) return nullptr;
+
 	if (_pContent->empty())
 		return 0;
 	else
@@ -147,30 +153,44 @@ inline const char* BLOB::rawContent() const
 
 inline std::size_t BLOB::size() const
 {
+	
+	if(_pContent==nullptr) return 0;
+
 	return _pContent->size();
 }
 
 
 inline bool BLOB::operator == (const BLOB& other) const
 {
-	return *_pContent == *other._pContent;
+	if(_pContent==other._pContent) return true;
+	
+	if(_pContent==nullptr) return false;
+	if(other._pContent==nullptr) return false;
+
+	return *(_pContent.get()) == *(other._pContent.get());
 }
 
 
 inline bool BLOB::operator != (const BLOB& other) const
 {
-	return *_pContent != *other._pContent;
+	return !(*this == other);
 }
 
 
 inline BLOB::Iterator BLOB::begin() const
 {
+	
+	
+	createEmpty();
+	
 	return _pContent->begin();
 }
 
 
 inline BLOB::Iterator BLOB::end() const
 {
+	createEmpty();
+
 	return _pContent->end();
 }
 
@@ -186,6 +206,7 @@ inline void BLOB::assignRaw(const char* pChar, std::size_t count)
 inline void BLOB::appendRaw(const char* pChar, std::size_t count)
 {
 	poco_assert_dbg (pChar);
+	createEmpty();
 	_pContent->insert(_pContent->end(), pChar, pChar+count);
 }
 
@@ -199,13 +220,18 @@ inline void BLOB::swap(BLOB& other)
 
 inline void BLOB::clear(bool doCompact)
 {
+	if(_pContent==nullptr) return;
+
 	_pContent->clear();
 	if (doCompact) compact();
+	
 }
 
 
 inline void BLOB::compact()
 {
+	createEmpty();
+
 	std::vector<char>(*_pContent).swap(*_pContent);
 }
 
