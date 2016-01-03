@@ -1014,9 +1014,9 @@ namespace rabbit{
 		}; /// hash_kernel
 		public:
 		struct iterator{
-
+			typedef std::shared_ptr<hash_kernel> kernel_ptr;
 			const basic_unordered_map* h;
-			hash_kernel * hc;
+			kernel_ptr hc;
 			size_type pos;
 		private:
 			_Bt index;
@@ -1044,7 +1044,7 @@ namespace rabbit{
 
 			}
 			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current.get();
+				 hc = h->current;
 				 set_index();
 			}
 			iterator(const iterator& r){
@@ -1071,25 +1071,25 @@ namespace rabbit{
 				return t;
 			}
 			inline _V& get_value(){
-				return const_cast<hash_kernel *>(hc)->get_segment_value((*this).pos);
+				return hc->get_segment_value((*this).pos);
 			}
 			inline const _V& get_value() const {
 				return hc->get_segment_value((*this).pos);
 			}
 			inline _K& get_key() {
-				return const_cast<hash_kernel *>(hc)->get_segment_key((*this).pos);
+				return hc->get_segment_key((*this).pos);
 			}
 			inline const _K& get_key() const {
 				return hc->get_segment_key((*this).pos);
 			}
 			const _ElPair operator*() const {
-				return const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos);
+				return hc->get_segment_pair((*this).pos);
 			}
 			inline _ElPair& operator*() {
 				return hc->get_segment_pair((*this).pos);
 			}
 			inline _ElPair* operator->() const {
-				return &(const_cast<hash_kernel *>(hc)->get_segment_pair((*this).pos));
+				return &(hc->get_segment_pair((*this).pos));
 			}
 			inline const _ElPair* operator->() {
 				return &(hc->get_segment_pair((*this).pos));
@@ -1104,8 +1104,9 @@ namespace rabbit{
 
 		struct const_iterator{
 		private:
+			typedef std::shared_ptr<hash_kernel> kernel_ptr;
 			const basic_unordered_map* h;
-			const hash_kernel * hc;
+			mutable kernel_ptr hc;
 			_Bt index;
 			_Bt exists;
 			void set_index(){
@@ -1131,7 +1132,7 @@ namespace rabbit{
 
 			}
 			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current.get();
+				 hc = h->current;
 				 set_index();
 			}
 			const_iterator(const iterator& r){

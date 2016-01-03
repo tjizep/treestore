@@ -581,17 +581,18 @@ namespace storage{
 				}
 			}
 			void decode_all(){
-
+				//init_use();
 				decoded.clear();
 
 				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
 					block_descriptor* result = new block_descriptor(version_type());
 					///decompress_zlibh(result->block, (*b).content());
 					result->block.resize((*b).size());
-					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());
-					remove_buffer_use((*b).content().capacity());
-					///std::vector<char> e;
-					///(*b).swap(e);
+					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());					
+					//remove_buffer_use((*b).content().capacity());
+					(*b).clear(true);
+					//std::vector<char> e;
+					//(*b).swap(e);
 					decoded.push_back(result);
 				}
 				///printf("decoded %lld blocks in %lld millis\n",(long long)blocks.size(),(long long)os::millis()-ts);
@@ -720,6 +721,7 @@ namespace storage{
 			
 			if(is_new) return false;
 			get_session();
+			///read_ahead(w+1, std::min<address_type>(w+8,next)); /// read 8 addresses at a time
 			current_block.clear();
 			if(lego.is_open()){
 				version_type version;
@@ -1024,30 +1026,42 @@ namespace storage{
 		template<typename _VersionRequests>
 		nst::u64 get_greater_version_diff(_VersionRequests& request){
 			nst::u64 responses = 0;
-			syncronized ul(lock);
+			
 			for(typename _VersionRequests::iterator v = request.begin(); v != request.end(); ++v){
 				version_type ver = version_type();
 				bool found = false;
 				///versions.get((*v).first,ver);
-				_Versions::iterator fv = versions.find((*v).first);
-				if(fv!=versions.end()){
-					ver = (*fv).second;
-					found = true;
-				}
-				finder = allocations.find((*v).first);
-				if(finder != allocations.end()){
-					ver = std::max<version_type>(ver, (*finder).second->version );
-					found = true;
+				/// TODO: IF there are intermittent crashes or corruptions this is the first place to look
+				if(!found){
+					//_Versions::iterator fv = versions.find((*v).first);
+					if(versions.get((*v).first,ver)){
+						//ver = (*fv).second;						
+						found = true;
+					}
 				}
 				if(!found){
-					if(lego.is_open()){
-						if(!lego.get_version((*v).first, ver)){
-							ver = this->get_version();
+					syncronized ul(lock);
+					if(!found){
+						finder = allocations.find((*v).first);
+						if(finder != allocations.end()){
+							ver = std::max<version_type>(ver, (*finder).second->version );
+							versions[(*v).first] = ver;
+							found = true;
 						}
-					}else{
-						if(get_exists((*v).first)){
-							ver = this->get_version();
-						}
+					}
+				
+					if(!found){
+						//if(lego.is_open()){
+						//	if(!lego.get_version((*v).first, ver)){
+						//		ver = this->get_version();
+						//	}
+						//}else{
+							if(get_exists((*v).first)){
+								ver = this->get_version();
+								versions[(*v).first] = ver;
+							
+							}
+						//}
 					}
 				}
 
@@ -1123,7 +1137,10 @@ namespace storage{
 					nst::u64 remaining = next;
 					read_ahead(start, remaining); /// read until end
 					
-					//is_all_loaded = true;
+					is_all_loaded = true;
+				}else if(treestore_block_read_ahead==TRUE && !buffer_allocation_pool.can_allocate(this->file_size)){
+					printf("[TS] [WARING] cannot block read-ahead because insufficient memory\n");
+
 				}
 			}
 		}
@@ -1153,8 +1170,7 @@ namespace storage{
 					return;
 				}
 				blocks += block->addresses.size();
-
-				block->init_use();
+				
 				block->decode_all();
 				for(size_t a = 0; a < block->decoded.size(); ++a){
 					if(!inject(block->addresses[a],block->decoded[a])){
@@ -1346,7 +1362,7 @@ namespace storage{
 						printf(" discarding transient %s\n",name.c_str());
 					insert_stmt = nullptr;
 					get_stmt = nullptr;
-
+					exists_stmt = nullptr;
 					_session = nullptr;
 				}
 				for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){

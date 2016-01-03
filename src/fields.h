@@ -1156,7 +1156,7 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data) + 34;
+		static const size_t static_size = sizeof(_Data) + 4;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];
@@ -1441,6 +1441,118 @@ namespace stored{
 
 			int r = memcmp(data(), other.data(), size() );
 			return r == 0;
+		}
+
+		struct iterator{
+			const nst::u8 *ld;
+			nst::u32 s;			
+			nst::u32 ll;
+
+			iterator(const nst::u8 *ld,nst::u32 s) : s(s),ld(ld),ll(0){				
+			}
+			iterator(const iterator&  right) {
+				(*this) = right;
+			}
+			iterator& operator=(const iterator&  right) {
+				ld = right.ld;
+				s = right.s;
+				ll = right.ll;
+			}
+			inline nst::u32 size() const {
+				return s;
+			}
+
+			inline nst::u8 get_type() const {
+				if(!valid()) return 0;
+				return *ld;
+			}
+			
+			inline nst::u32 get_length() const {
+				if(!valid()) return 0;
+				nst::u32 l = 0;
+				switch(get_type()){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					break;
+				case DynamicKey::I8 :
+					l = sizeof(nst::i64);
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					break;
+				case DynamicKey::S:{					
+					nst::i16 
+					ls = sizeof(nst::i16),					
+					ll = *(const nst::i16*)ld;				
+					l = ll+ls;
+								   }
+					break;
+				default:
+					break;
+				};	
+				return l;
+			}
+			
+			inline nst::u32 get_data_length() const {
+				if(!valid()) return 0;
+				nst::u32 l = 0;
+				switch(get_type()){
+				case DynamicKey::I1 :
+					l=sizeof(nst::i8);
+					break;
+				case DynamicKey::I2:
+					l = sizeof(nst::i16);
+					break;
+				case DynamicKey::I4:
+					l = sizeof(nst::i32);
+					break;
+				case DynamicKey::I8 :
+					l = sizeof(nst::i64);
+					break;
+				case DynamicKey::R4 :
+					l = sizeof(float);
+					break;
+				case DynamicKey::R8 :
+					l = sizeof(double);
+					break;
+				case DynamicKey::S:										
+					l = *(const nst::i16*)(ld+sizeof(nst::u8));								
+					break;
+				default:
+					break;
+				};	
+				return l;
+			}
+			
+			inline bool valid() const {
+				if(ll >= size()) return false;				
+				return true;
+			}
+			
+			inline const nst::u8 * get_data() const {
+				if(get_type() == DynamicKey::S){								
+					return &ld[sizeof(nst::u8) + sizeof(nst::i16)];
+				}
+				return &ld[sizeof(nst::u8)];					
+			}
+
+			inline void next(){
+				nst::u32 l = get_length()+sizeof(nst::u8);
+				ld += l; // increments buffer
+				ll += l; // increments length																	
+			}
+		};
+		iterator begin() const {
+			return iterator(data(),size());
 		}
 		nst::u32 count_parts() const {
 			const nst::u8 *ld = data();

@@ -612,8 +612,11 @@ public:
 	stored::_Rid row;
 	stored::_Rid last_resolved;
 	typedef tree_stored::_Selection  _Selection;
+	typedef tree_stored::_SetFields  _SetFields;
+	typedef std::vector<Field*> _FieldMap;
 	tree_stored::_Selection selected;// direct selection filter
-
+	_FieldMap field_map;
+	_SetFields fields_set;
 	stored::index_interface * current_index;
 	stored::index_iterator_interface * current_index_iterator;
 	tree_stored::tree_thread * writer_thread; /// set when write lock
@@ -625,9 +628,11 @@ public:
 	tree_stored::tree_thread* get_thread(THD* thd){
 		return new_thread_from_thd(NULL,thd, this->path,false);
 	}
+	
 	tree_stored::tree_thread* get_thread(){
 		return new_thread_from_thd(NULL,ha_thd(), this->path, false);
 	}
+	
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
 			tt = get_thread()->compose_table((*this).table, this->path);
@@ -635,13 +640,37 @@ public:
 		tt->check_load((*this).table);
 		return tt;
 	}
-	void clear_selection(_Selection & selected){
+	
+	void create_selection_map(){
+		if(treestore_resolve_values_from_index==TRUE){
+			field_map.resize(get_tree_table()->get_col_count());
+			for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
+				field_map[(*s).field->field_index] = (*s).field;
+			}
+		}
+	}
 
+	void clear_selection(_Selection & selected){
 		for(_Selection::iterator s = selected.begin(); s != selected.end(); ++s){
 			(*s).restore_ptr();
 		}
-		selected.clear();
+		selected.clear();		
+	}
+	
+	void initialize_selection(uint keynr){
+		clear_selection(selected);
+		selected = get_tree_table()->create_output_selection(table);		
+		if(keynr < get_tree_table()->get_indexes().size()){
+			create_selection_map();
+		}
+	}
 
+	void clear_fields_set(){
+		
+		fields_set.resize(get_tree_table()->get_col_count());
+		for(size_t s = 0; s < get_tree_table()->get_col_count(); ++s){
+			fields_set[s] = 0;
+		}
 	}
 
 	ha_treestore
@@ -1331,9 +1360,10 @@ public:
 		tt = NULL;
 		st.check_use();
 		/// cond_pop();
-		clear_selection(selected);
+		
 		last_resolved = 0;
-		selected = get_tree_table()->create_output_selection(table);
+		
+		initialize_selection(get_tree_table()->get_indexes().size());
 		(*this).r = get_tree_table()->get_table().begin();
 		(*this).r_stop = get_tree_table()->get_table().end();
 
@@ -1508,12 +1538,11 @@ public:
 		handler::active_index = keynr;
 		
 		tt = NULL;
-		clear_selection(selected);
+		
+		initialize_selection(keynr);
 		current_index = get_tree_table()->get_index_interface(handler::active_index);
 		current_index_iterator = current_index->get_index_iterator((nst::u64)this);
-		
-		selected = get_tree_table()->create_output_selection(table);
-		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);
+		readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, selected);		
 		if(stx::memory_low_state){
 			st.reduce();
 		}
@@ -1527,6 +1556,19 @@ public:
 	)
 	{
 		return input.row;
+	}
+	void resolve_selection(stored::_Rid row, const _SetFields& fields_set){
+		last_resolved = row;
+
+		_Selection::iterator s = selected.begin();
+		for(; s != selected.end(); ++s){
+			tree_stored::selection_tuple & sel = (*s);				
+			if(0==fields_set[sel.field->field_index]){
+				sel.col->seek_retrieve(row,sel.field);
+			}
+		
+		}		
+
 	}
 	void resolve_selection(stored::_Rid row){
 		last_resolved = row;
@@ -1548,28 +1590,40 @@ public:
 
 
 	}
-	void resolve_selection_from_index(uint ax,  const tree_stored::CompositeStored& iinfo){
+	void resolve_selection_from_index(uint ax,  const tree_stored::CompositeStored& iinfo, bool use_index = true){
 
 		using namespace NS_STORAGE;
-
+		
 		stored::_Rid row = key_to_rid(ax, iinfo);
 		last_resolved = row;
+
+		if(use_index && treestore_resolve_values_from_index==TRUE){
+			if( get_tree_table()->read_set_covered_by_index(table, active_index, selected) ){
+				clear_fields_set();	
+				get_tree_table()->read_index_key_to_fields(this->fields_set,table,ax,iinfo,this->field_map);
+				resolve_selection(row,this->fields_set);
+				return;
+			}
+		}
 		resolve_selection(row);
+		
+		
+		
 	}
 	
-	void resolve_selection_from_index(uint ax, stored::index_iterator_interface * current_iterator) {
+	void resolve_selection_from_index(uint ax, stored::index_iterator_interface * current_iterator, bool use_index = true) {
 
 		const tree_stored::CompositeStored &iinfo = current_iterator->get_key();
-		resolve_selection_from_index(ax, iinfo);
+		resolve_selection_from_index(ax, iinfo, use_index);
 
 	}
 
-	void resolve_selection_from_index(stored::index_iterator_interface * current_index_iterator) {
-		resolve_selection_from_index(active_index, current_index_iterator);
+	void resolve_selection_from_index(stored::index_iterator_interface * current_index_iterator, bool use_index = true) {
+		resolve_selection_from_index(active_index, current_index_iterator,use_index);
 	}
 	
-	void resolve_selection_from_index(stored::index_iterator_interface & current_index_iterator) {
-		resolve_selection_from_index(active_index, &current_index_iterator);
+	void resolve_selection_from_index(stored::index_iterator_interface & current_index_iterator, bool use_index = true) {
+		resolve_selection_from_index(active_index, &current_index_iterator, use_index);
 	}
 
 	int basic_index_read_idx_map
@@ -1594,18 +1648,18 @@ public:
 			tt->temp_lower(table, keynr, key, 0xffffff, keypart_map,current_iterator);
 		}
 
-		const tree_stored::CompositeStored& current_key = current_iterator.get_key();
+		
 		if(current_iterator.valid()){
-
+			const tree_stored::CompositeStored& current_key = current_iterator.get_key();
 			switch(find_flag){
 			case HA_READ_PREFIX:				
 			case HA_READ_PREFIX_LAST:				
 				
 				break;
 			case HA_READ_PREFIX_LAST_OR_PREV:				
-				if(!tt->is_equal(current_key)){
-					current_iterator.previous();
-				}				
+				//if(!tt->is_equal(current_key)){
+				//	current_iterator.previous();
+				//}				
 				break;
 			case HA_READ_AFTER_KEY:
 				current_iterator.next();
@@ -1678,8 +1732,8 @@ public:
 	){
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 		clear_selection(selected);
-		selected = tt->create_output_selection(table);
 		
+		initialize_selection(keynr);
 		int r = basic_index_read_idx_map(buf, keynr, key, keypart_map, find_flag,get_tree_table()->get_index_interface(keynr));
 
 		DBUG_RETURN(r);
@@ -1751,7 +1805,7 @@ public:
 		current_iterator.last();
 		table->status = STATUS_NOT_FOUND;
 		if(current_iterator.valid()){
-			resolve_selection_from_index(current_iterator);
+			resolve_selection_from_index(current_iterator,false);
 			r = 0;
 			table->status = 0;
 			if(table->next_number_field){
@@ -2022,6 +2076,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(block_read_ahead),
   MYSQL_SYSVAR(contact_points),
   MYSQL_SYSVAR(red_address),
+  MYSQL_SYSVAR(resolve_values_from_index),
   NULL
 };
 

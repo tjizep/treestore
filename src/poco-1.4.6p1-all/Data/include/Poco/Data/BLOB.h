@@ -223,7 +223,8 @@ inline void BLOB::clear(bool doCompact)
 	if(_pContent==nullptr) return;
 
 	_pContent->clear();
-	if (doCompact) compact();
+	if (doCompact)
+		_pContent = nullptr; // compact();
 	
 }
 

@@ -44,6 +44,7 @@ typedef std::vector<std::string> _FileNames;
 extern my_bool treestore_efficient_text;
 extern char treestore_use_primitive_indexes;
 namespace tree_stored{
+	
 	class InvalidTablePointer : public std::exception{
 	public:
 		InvalidTablePointer () throw(){
@@ -700,7 +701,8 @@ namespace tree_stored{
 		_Rid row_count;
 		_Rid max_row_id;		
 	};
-	
+
+	typedef std::string _SetFields; ///indicates which fields have been set by index
 	typedef std::vector<selection_tuple> _Selection;
 	
 	class tree_table{
@@ -970,6 +972,7 @@ namespace tree_stored{
 		bool calculating_statistics;
 		Poco::Mutex tt_info_copy_lock;
 		table_info calculated_info;
+		
     public:
         _Conditional conditional;
 		abstract_conditional_iterator::ptr rcond;
@@ -990,12 +993,22 @@ namespace tree_stored{
 				(*this).calculated_info.max_row_id = share->auto_incr;			
 			calc = (*this).calculated_info;
 		}
+
+		/// upto 4 beelion collumns
 		nst::u32 get_col_count() const {
-			return cols.size();
+			return (nst::u32)cols.size();
 		}
+
+		/// this is also the physical path of the storage
 		std::string get_name() const {
 			return this->storage.get_name();
 		}
+
+		/// same as the name
+		std::string get_path() const {
+			return this->path;
+		}
+
 		tree_table(TABLE *table_arg, const std::string& path)
 		:	changed(false)				
 		,	locks(0)
@@ -1331,7 +1344,9 @@ namespace tree_stored{
 		_Indexes& get_indexes(){
 			return indexes;
 		};
-
+		const _Indexes& get_indexes() const {
+			return indexes;
+		};
 		void check_load(TABLE *table_arg){
 			if(cols.empty()){
 				load(table_arg);
@@ -1457,6 +1472,7 @@ namespace tree_stored{
 		,	uint ax
 		,	_Selection& s
 		){
+			return true;
 			KEY & ki = table->key_info[ax];
 			KEY_PART_INFO * pi = ki.key_part;
 
@@ -1467,10 +1483,7 @@ namespace tree_stored{
 					++at;
 				}
 			}
-			return
-			(	at == s.size() //first: the full read_set has to be covered
-			&& 	at <= ki.usable_key_parts // this condition will probably not be reached
-			);
+			return ( at > 0);
 
 		}
 		stored::_Rid key_to_rid
@@ -1912,11 +1925,12 @@ namespace tree_stored{
 						// calc_total_use() > treestore_max_mem_use*0.7f
 						//||  rolling
 					//)
-					if(os::micros() - last_lock_time > 45000000){
+					if(os::micros() - last_lock_time > 45000){
 						if(storage.stale()){
 							rollback();
 						}
-					}else rollback();/// relieves the version load when new data is added to the collums
+					}else 
+						rollback();/// relieves the version load when new data is added to the collums
 				}
 				last_unlock_time = os::micros();
 			}
@@ -1947,6 +1961,7 @@ namespace tree_stored{
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
+
 					cols[(*p)]->compose(temp);
 				}
 				temp.row = get_auto_incr() ;
@@ -1960,6 +1975,66 @@ namespace tree_stored{
 				//reduce_use();
 			}			
 			share->row_count = (*this).get_row_count();			
+		}
+		void read_index_key_to_fields(_SetFields& to_set, TABLE* table, nst::u32 ix, const tree_stored::CompositeStored& key,std::vector<Field*>& field_map){
+			TABLE_SHARE *share= table->s;
+			stored::index_interface::ptr index  = indexes[ix];
+			Field **fields =share->field ;
+			
+			tree_stored::CompositeStored::iterator k = key.begin();
+			for(stored::_Parts::iterator p = index->parts.begin(); p != index->parts.end(); ++p){
+				if(bitmap_is_set(table->read_set, (*p) )){
+					Field * f = field_map[(*p)];
+					if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
+						const nst::u8 * data = k.get_data();
+						longlong lval = 0;
+						to_set[(*p)] = 1;
+						switch(k.get_type()){						
+						case CompositeStored::I1:
+							lval = *(const nst::i8*)(data);
+							f->set_notnull();
+							f->store(lval,f->key_type()!=HA_KEYTYPE_INT8);						
+							break;
+						case CompositeStored::I2:
+							lval = *(const nst::i16*)(data);
+							f->set_notnull();
+							f->store(lval,f->key_type()==HA_KEYTYPE_USHORT_INT);
+							break;
+						case CompositeStored::I4:
+							lval = *(const nst::i32*)(data);
+							f->set_notnull();
+							f->store(lval,f->key_type()==HA_KEYTYPE_ULONG_INT||f->key_type()==HA_KEYTYPE_UINT24);
+							break;
+						case CompositeStored::I8:
+							lval = *(const nst::i64*)(data);
+							f->set_notnull();
+							f->store(lval,f->key_type()==HA_KEYTYPE_ULONGLONG||f->key_type()==HA_KEYTYPE_ULONG_INT);
+							break;
+						case CompositeStored::R4:
+							f->store(*(const float*)(data));
+							f->set_notnull();
+							f->store(lval,false);
+							break;
+						case CompositeStored::R8:
+							f->set_notnull();
+							f->store(*(const double*)(data));					
+							break;
+						case CompositeStored::S:
+							to_set[(*p)] = 0;
+							break;
+						default:
+							to_set[(*p)] = 0;
+							break;
+							
+						};
+					}else{/// complain about the field index
+						printf("[TS] [WARNING] the field index and index part index is not the same");
+					}
+				}
+				k.next();
+				if(!k.valid()) break;
+			}
+			
 		}
 		void write(TABLE* table){
 			write_noinc(table);

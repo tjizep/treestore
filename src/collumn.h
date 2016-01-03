@@ -74,7 +74,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 348,//348
+			page_size = 192,//348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -242,6 +242,7 @@ namespace collums{
 			bool is_modified() const {
 				return this->modified;
 			}
+			//typedef std::shared_ptr<stored_page> ptr;
 			typedef stored_page* ptr;
 		};
 
@@ -269,8 +270,8 @@ namespace collums{
 			}			
 			
 			bool has(stored_page_ptr page){
-				
-				nst::synchronized l(this->lock);
+				//
+				//nst::synchronized l(this->lock);
 				address_version location = std::make_pair(page->get_address(), page->get_version());
 				if(versioned_pages.count(location)){
 					return true;
@@ -438,6 +439,7 @@ namespace collums{
 	private:
 		stored_page_ptr allocate_page() const {
 			stored_page_ptr page = nullptr;
+			//page = std::make_shared<stored_page>();
 			if(use_pool_allocator==1){
 				page = allocation_pool.allocate<stored_page>();
 			}else{
@@ -512,6 +514,7 @@ namespace collums{
 		}
 		nst::_VersionRequests version_req;
 		/// get version of page relative to current transaction
+		/// this is an expensive function - relatively speaking
 		version_type get_page_version(size_type address) {
 			version_req.clear();
 			version_req.push_back(std::make_pair(address, version_type()));
@@ -541,18 +544,12 @@ namespace collums{
 			
 			/// storage operation started
 			nst::stream_address w = address;
-			
+			/// the dangling buffer is not copied
 			buffer_type& dangling_buffer = get_storage().allocate(w, stx::storage::read);
 			if(get_storage().is_end(dangling_buffer) || dangling_buffer.size() == 0){
 				
-			}else{
-				//version_type current_version = get_storage().get_allocated_version(); //get_page_version(address);
-				//page = version_control->check_out(address, current_version);
 			}
-			//if(page){	/// check out refs the page
-			//	get_storage().complete(); /// storage operation complete				
-			//	return page;
-			//}
+			
 			/// TODO: if there is shortage of ram first try getting a page from version control
 			if(mem_low ){				
 				//clear_cache();
@@ -587,10 +584,10 @@ namespace collums{
 			return page;
 		}
 		
-		stored_page& get_page(size_type which) const {
+		stored_page_ptr get_page(size_type which) const {
 			size_type address = (which / page_size) + 128;
 			if(last_loaded && last_loaded->get_address()==address){
-				return *last_loaded;
+				return last_loaded;
 			}
 
 			stored_page::ptr page;
@@ -605,17 +602,17 @@ namespace collums{
 				}
 			}
 			last_loaded = page;
-			return *page;
+			return page;
 		}
 
 	public:
 		data_type& resolve(size_type key){
 			size_type h = key;
-			return get_page(h).get(h);
+			return get_page(h)->get(h);
 		}
 		const data_type& resolve(size_type key) const {
 			size_type h = key;
-			return get_page(h).get(h);
+			return get_page(h)->get(h);
 		}
 
 		struct iterator{
@@ -743,10 +740,10 @@ namespace collums{
 			if(get_storage().is_readonly()){
 				get_page(h);
 			}else{
-				if(!get_page(h).is_exists(h)){
+				if(!get_page(h)->is_exists(h)){
 					++_size;
 				}
-				stored_page::ptr page = &(get_page(h));
+				stored_page::ptr page = get_page(h);
 				page->set(h, value);
 				modified_pages[h] = page;
 

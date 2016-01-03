@@ -26,6 +26,7 @@ char		treestore_reduce_index_tree_use_on_unlock = FALSE;
 char		treestore_reduce_storage_use_on_unlock = TRUE;
 char		treestore_use_primitive_indexes = TRUE;
 char		treestore_block_read_ahead = FALSE;
+char		treestore_resolve_values_from_index = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -128,3 +129,9 @@ static MYSQL_SYSVAR_STR(red_address,treestore_red_address,
 	PLUGIN_VAR_RQCMDARG,
 	"nonde name and address must be unique and acessible from outside the machine",
 	NULL, NULL, "localhost");
+
+static MYSQL_SYSVAR_BOOL(resolve_values_from_index, treestore_resolve_values_from_index,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "resolve values from index first before consulting columns"
+  "Default is false",
+  NULL, NULL, TRUE);

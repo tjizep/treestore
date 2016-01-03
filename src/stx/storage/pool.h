@@ -83,7 +83,7 @@ namespace stx{
 					remove_buffer_use(bytes);
 				};
 			};
-			static const bool heap_for_small_data = false;
+			static const bool heap_for_small_data = true;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
 			template <class T>
