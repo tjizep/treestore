@@ -39,6 +39,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <stx/btree.h>
 #include "iterator.h"
 
+
+
 namespace tree_stored{
 	typedef stored::_Rid _Rid;
 	template<typename index_key_type>
@@ -51,6 +53,7 @@ namespace tree_stored{
 		////, std::less<index_key>,interpolator_type
 		typedef stx::btree_set< index_key, stored::abstracted_storage, std::less<index_key>, interpolator_type> _IndexMap;
 		typedef typename _IndexMap::iterator iterator_type;
+		typedef typename _IndexMap::const_iterator const_iterator_type;
 		typedef typename ::iterator::ImplIterator<_IndexMap> IndexIterator;
 		typedef std::vector<index_key, ::sta::stl_tracker<index_key> > _KeyBuffer;
 
@@ -171,6 +174,8 @@ namespace tree_stored{
 		IndexLoader * loader;
 		Poco::AtomicCounter loaders_away;
 		unsigned int wid;
+		index_key empty;
+		mutable index_key rval;
 	private:
 		void destroy_loader(){
 			if(loader != nullptr){
@@ -191,6 +196,8 @@ namespace tree_stored{
 		,	modified(false)
 		,	loader(nullptr)
 		,	wid(storage_workers::get_next_counter())
+		,	empty(index_key())
+		,	rval(index_key())
 		{
 			using namespace NS_STORAGE;
 			this->the_end = index.end();
@@ -238,6 +245,27 @@ namespace tree_stored{
 			out.set(index.lower_bound(k),the_end,index);
 		}
 
+		std::pair<const index_key&,bool> lower_key( const index_key& k) const {
+			dbg_print("Index size %lld\n",index.size());
+			typename _IndexMap::const_iterator i = index.lower_bound(k);
+			if(i != index.end()){				
+				dbg_print("found key row %lld\n",i.key().row);
+				return std::make_pair(i.key(),true);
+			}
+			dbg_print("no key found",index.size());
+			return std::make_pair(empty,false);
+		}
+		bool find_key( stored::DynamicKey& k) const {
+			index_key f = k;
+			typename _IndexMap::const_iterator i = index.lower_bound(f);
+			if(i != index.end()){				
+				if(f.equal_key(i.key())){
+					k.row = i.key().row;
+					return true;
+				}				
+			}			
+			return false;
+		}
 		IndexIterator lower(const index_key& k){
 			return IndexIterator(index, index.lower_bound(k));
 		}
@@ -344,6 +372,7 @@ namespace tree_stored{
 	class tree_index : public stored::index_interface{
 	public:
 		typedef col_index<index_key_type> ColIndex;
+		typedef index_key_type key_type;
 		typedef typename ColIndex::IndexIterator IndexIterator;
 	private:
 		//CachedRow empty;
@@ -520,6 +549,9 @@ namespace tree_stored{
 			((typename ColIndex::index_iterator_impl&)out).value  = index.upper(key);
 		}
 		void add(const tree_stored::CompositeStored& k){
+			if(k.size()==0){
+				printf("[TS] [WARNING] inserting empty key\n");
+			}
 			index.add(k, 0);
 		}
 		void remove(const tree_stored::CompositeStored& k){
@@ -527,6 +559,13 @@ namespace tree_stored{
 		}
 		void find(stored::index_iterator_interface& out, const tree_stored::CompositeStored& key){
 			((typename ColIndex::index_iterator_impl&)out).value = index.find(key);
+		}
+		_Rid resolve(tree_stored::CompositeStored& k)  {
+			k.row = 0;
+			if(!index.find_key(k)){
+				k.row = stored::MAX_ROWS;
+			}
+			return k.row;
 		}
 		void from_initializer(stored::index_iterator_interface& out, const stx::initializer_pair& ip){
 			index.from_initializer(((typename ColIndex::index_iterator_impl&)out).value ,ip);
@@ -537,8 +576,7 @@ namespace tree_stored{
 		}
 
 		void begin(bool read,bool shared){
-			index.begin(read,shared);
-			cache.initialize();
+			index.begin(read,shared);			
 		}
 
 		void commit1_asynch(){
@@ -547,7 +585,6 @@ namespace tree_stored{
 
 		void commit1(){
 			index.commit1();
-			cache.flush_erases();
 		}
 
 		void commit2(){
@@ -556,7 +593,7 @@ namespace tree_stored{
 
 		void rollback(){
 			index.rollback();
-			cache.flush_erases();/// respond to erase messages
+
 		}
 
 		void share(){

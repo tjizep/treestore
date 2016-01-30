@@ -74,7 +74,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 192,//348
+			page_size = 128,//192,348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -336,7 +336,7 @@ namespace collums{
 						
 						released.push_back(p.get_key());
 					}
-					if(released.size() > versioned_pages.size() / 10){
+					if(released.size() > versioned_pages.size() / 8){
 						break;
 					}
 				}
@@ -347,7 +347,7 @@ namespace collums{
 				if(versioned_pages.size() != old-released.size()){
 					printf("[TS] [SEVERE] [ERROR] inconsistent memory\n");
 				}
-				//this->reduced = 1 ;
+				this->reduced = 1 ;
 			}
 			/// add the page to version control
 			bool add(stored_page_ptr p){
@@ -429,6 +429,7 @@ namespace collums{
 		/// the key count 
 		stx::storage::i64 _size;
 		/// buffer type temporary compress destination
+		mutable buffer_type temp_encode;
 		mutable buffer_type temp_compress;
 		mutable buffer_type temp_decompress;
 		/// the encoder/decoder for arrays of values
@@ -483,10 +484,13 @@ namespace collums{
 			//}
 			version_control->release(page);
 			stream_address w = page->get_address();
+			//temp_encode.clear();
+			page->save(encoder, get_storage(), temp_encode);		
+			compress_lz4(temp_compress,temp_encode);	
 			buffer_type &buffer = get_storage().allocate(w, stx::storage::create);
-			page->save(encoder, get_storage(), buffer);			
+			buffer = temp_compress;
 			page->set_version(get_storage().get_allocated_version());
-			inplace_compress_lz4(buffer,temp_compress);						
+								
 			get_storage().complete();
 
 			version_control->add(page);
@@ -516,7 +520,7 @@ namespace collums{
 		/// get version of page relative to current transaction
 		/// this is an expensive function - relatively speaking
 		version_type get_page_version(size_type address) {
-			version_req.clear();
+			version_req.clear();			
 			version_req.push_back(std::make_pair(address, version_type()));
 			if(get_storage().get_greater_version_diff(version_req)){
 				if(!version_req.empty() && version_req[0].first == address){
@@ -553,6 +557,7 @@ namespace collums{
 			/// TODO: if there is shortage of ram first try getting a page from version control
 			if(mem_low ){				
 				//clear_cache();
+				
 				//version_control->reduce();
 			}
 			if(mem_low){
@@ -589,6 +594,7 @@ namespace collums{
 			if(last_loaded && last_loaded->get_address()==address){
 				return last_loaded;
 			}
+			last_loaded = nullptr;
 
 			stored_page::ptr page;
 			auto i = pages.find(address);
@@ -616,18 +622,19 @@ namespace collums{
 		}
 
 		struct iterator{
+			
+		private:
 			mutable paged_vector* h;			
 			size_type pos;
 			mutable value_type t;
 			mutable key_type k;
-		private:
-			
 			
 		public:
-			iterator(){
+			iterator() : h(nullptr), pos(0), t(value_type()), k(key_type()){
 				
 			}
-			iterator(const paged_vector* h, size_type pos): h((paged_vector*)h),pos(pos){
+			iterator(const paged_vector* h, size_type pos)
+			: h((paged_vector*)h),pos(pos), t(value_type()), k(key_type()){
 				
 			}
 			iterator(const iterator& r){
@@ -670,14 +677,23 @@ namespace collums{
 			}
 
 			inline const data_type& value() const {
+				if(h==nullptr){
+					printf("[TS] [ERROR] h is null\n");
+				}
 				return h->resolve(pos);
 			}
 
 			inline data_type& data(){
+				if(h==nullptr){
+					printf("[TS] [ERROR] h is null\n");
+				}
 				return h->resolve(pos);
 			}
 
 			inline const data_type& data() const {
+				if(h==nullptr){
+					printf("[TS] [ERROR] h is null\n");
+				}
 				return h->resolve(pos);
 			}
 
@@ -685,22 +701,30 @@ namespace collums{
 				k = (key_type::value_type)pos;
 				return k;
 			}
-
+			/// TODO:
+			/// this might be safe but if the iterator itself is temporary its not
+			/// the key should be safe while the map type is still alive
 			inline const key_type& key() const {
 				k = (key_type::value_type)pos;
 				return k;
 			}
-
+			/// TODO:
+			/// this might be safe but if the iterator itself is temporary its not
+			/// the key should be safe while the map type is still alive
 			const value_type& operator*() const {
 				t = std::make_pair(key(), value());
-				return std::make_pair(key(), value());
+				return t;
 			}
-
+			/// TODO:
+			/// this might be safe but if the iterator itself is temporary its not
+			/// the key should be safe while the map type is still alive
 			inline value_type& operator*() {
 				t = std::make_pair(key(), value());
 				return t;
 			}
-		
+			/// TODO:
+			/// this might be safe but if the iterator itself is temporary its not
+			/// the key should be safe while the map type is still alive
 			inline const value_type* operator->() {
 				t = std::make_pair(key(), value());
 				return &t;
@@ -787,8 +811,9 @@ namespace collums{
 		}
 		void reduce_use(){			
 			//if(stx::memory_low_state){
+				
 				flush();
-				if(pages.size()*sizeof(stored_page) < 2048*1024) return;
+				//if(pages.size()*sizeof(stored_page) < 2048*1024) return;
 				clear_cache();
 				version_control->reduce();
 			//}			
@@ -1503,6 +1528,8 @@ namespace collums{
 		,	col(storage)
 		,	current_page(nullptr)
 		,	pages(nullptr)
+		,	empty(_Stored())
+		,	cache_size(0)
 		,	max_row_id(0)
 		,	rows_per_key(0)
 		,	modified(false)
@@ -1642,7 +1669,23 @@ namespace collums{
 		inline _Stored& seek_by_cache(_Rid row)  {
 			
 			if(col_policy.load(max_size) && treestore_column_cache && !lazy){
-				_CachePage* page = load_page(row);
+				_CachePage * page = nullptr;
+				if(has_cache()){
+					_Rid i = row % MAX_PAGE_SIZE;					
+					_Rid p = (row - i) /MAX_PAGE_SIZE;				
+					if( p < (*pages).size()){
+						page = &((*pages)[p]);
+						if(page->loaded){
+							if(!page->included(row))							
+								page = nullptr;
+						}else{
+							page = nullptr;
+						}
+					}
+				}
+				if(page == nullptr){
+					page = load_page(row);
+				}
 				if(page != nullptr){
 					if( page->has_flags() ){
 						nst::u8 flags = page->get_flags(row);
@@ -1667,6 +1710,7 @@ namespace collums{
 				col.flush_buffers();
 				//col.reduce_use();
 				storage.commit();
+				initialize(true);
 			}
 			modified = false;
 		}
@@ -1674,7 +1718,7 @@ namespace collums{
 		void flush2(){
 			if(modified){
 				col.flush_buffers();
-
+				initialize(true);
 			}
 		}
 
@@ -1682,7 +1726,7 @@ namespace collums{
 			current_page = nullptr;
 			if(modified){
 				col.flush_buffers();
-
+				initialize(true);
 			}
 
 			reset_cache_locals();
@@ -1738,6 +1782,7 @@ namespace collums{
 			col.flush_buffers();
 			if(!tx)
 				storage.rollback();
+			initialize(true);
 		}
 		ImplIterator<_ColMap> find(_Rid rid){
 			return ImplIterator<_ColMap> (col, col.find(rid));

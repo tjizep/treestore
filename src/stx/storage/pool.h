@@ -545,7 +545,9 @@ namespace stx{
 					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
 						this->allocated += requested + overhead() ;
 						shared->allocated += requested + overhead() ;
-						_Allocated result(new u8[requested],ti);
+						u8 * a = new u8[requested];
+						//memset(a,0,requested);
+						_Allocated result(a,ti);
 						result.is_new = true;
 
 						return result;

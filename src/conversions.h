@@ -179,7 +179,7 @@ namespace tree_stored{
 		CONVERSION_NOINLINE_
 		void tfset(stored::_Rid row, Field * f, const BlobType& b){
 			if(b.get_size()==0){
-				printf("WARNING: invalid source varchar buffer supplied\n");
+				printf("[TS] [WARNING] invalid source varchar buffer supplied\n");
 				return;
 			}
 			enum_field_types et = f->type();

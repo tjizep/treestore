@@ -68,22 +68,16 @@ namespace tree_stored{
 		typedef std::vector<CompositeStored> _Erased;
 		typedef stored::_Rid _Rid;
 		
-		typedef rabbit::unordered_map<key_type,_Rid, stored::fields_hash<key_type>> _CompHash;
+		typedef rabbit::unordered_map<CompositeStored, BasicIterator, stored::fields_hash<key_type>> _CompHash;
 	private:
 		void _erase(const CompositeStored& input){
 			
 		}
 		CompositeStored temp;
+		CompositeStored rval;
 		key_type temp_key;
 	public:
 
-
-		void initialize(){
-
-			hash_hits = 0;
-			hash_predictions = 0;
-			misses = 0;
-		}
 
 		~predictive_cache(){
 		}
@@ -110,13 +104,11 @@ namespace tree_stored{
 		const CompositeStored*  predict_row(stored::_Rid& predictor, BasicIterator& out, const CompositeStored& input){
 			this->temp = input;
 			this->temp.row = 0;
-			_Rid r = 0;
-			if(keys.get(this->temp,r)){
-				this->temp.row = r;
-				return &(this->temp);
+			if(keys.get(this->temp,out)){				
+				return &(out.key().return_or_copy(rval));				
 			}
 			return NULL;
-			///return _int_predict_row(predictor, out, input);
+			
 
 		}
 
@@ -124,29 +116,15 @@ namespace tree_stored{
 		void erase(const CompositeStored& input){
 			nst::synchronized critical(erase_lock);
 			/// push it on the erase buffer
-			erased.push_back(input);
+			_erase(input);
 		}
-
-		/// called when the cached isnt used for reading
-		void flush_erases(){
-			nst::synchronized critical(erase_lock);
-			for(_Erased::iterator e = erased.begin(); e != erased.end(); ++e){
-				_erase((*e));
-			}
-			erased.clear();
-
-		}
-
 
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
-			this->temp_key = const_cast<BasicIterator&>(iter).key();
-			_Rid row = this->temp_key.row;
-			this->temp_key.row = 0;
-			keys[this->temp_key] = row;
-			return;
-			
+			this->temp = const_cast<BasicIterator&>(iter).key().return_or_copy(this->rval);
+			this->temp.row = 0;
+			keys[this->temp] = iter;			
 		}
 
 		void reduce(){
@@ -165,10 +143,7 @@ namespace tree_stored{
 
 		
     private:
-        _Erased erased;
-		stored::DynamicKey rval;
-		
-		
+        _Erased erased;		
 		Poco::Mutex erase_lock;
 		_CompHash keys;
     public:
@@ -192,8 +167,7 @@ namespace tree_stored{
 		,   enabled(treestore_predictive_hash!=0)
 		,   loaded(false)
 
-		{
-		
+		{			
 
 		}
 

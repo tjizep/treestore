@@ -44,7 +44,9 @@ typedef std::vector<std::string> _FileNames;
 extern my_bool treestore_efficient_text;
 extern char treestore_use_primitive_indexes;
 namespace tree_stored{
-	
+	/// the table clock
+	extern std::atomic<nst::u64> table_clock;	
+
 	class InvalidTablePointer : public std::exception{
 	public:
 		InvalidTablePointer () throw(){
@@ -177,12 +179,14 @@ namespace tree_stored{
 		}
 		virtual void seek_retrieve(stored::_Rid row, Field* f) = 0;
 		virtual void add_row(stored::_Rid row, Field * f) = 0;
+		virtual void add_row(stored::_Rid row, Field * f,const uchar * n_ptr, uint flags) = 0;
 		virtual void erase_row(stored::_Rid row) = 0;
 		virtual NS_STORAGE::u32 field_size() const = 0;
 		virtual stored::_Rid stored_rows() const = 0;
 		virtual void set_max_size(size_t max_size) = 0;
 		virtual void initialize(bool by_tree) = 0;
 		virtual void compose(CompositeStored& comp)=0;
+		virtual void compose(CompositeStored & to, Field* f)=0;
 		virtual void compose_by_cache(stored::_Rid r, CompositeStored& comp)=0;
 		virtual void compose_by_tree(stored::_Rid r, CompositeStored& comp)=0;
 		virtual void compose(CompositeStored & to, Field* f,const uchar * n_ptr, uint flags)=0;
@@ -332,6 +336,18 @@ namespace tree_stored{
 
 		}
 
+		virtual void add_row(collums::_Rid row, Field * f,const uchar * n_ptr, uint flags){
+			convertor.fget(temp, f, n_ptr, flags);
+			col.add(row, temp);
+			if(worker == nullptr){
+				//worker = new ColAdder(col,workers_away);
+			}
+			//worker->add(row, temp);
+			//if(worker->size() >= MAX_BUFFERED_ROWS){
+				//add_worker();
+			//}
+
+		}
 		virtual void add_row(collums::_Rid row, Field * f){
 			convertor.fget(temp, f, NULL, 0);
 			col.add(row, temp);
@@ -558,6 +574,12 @@ namespace tree_stored{
 			to.add(field);
 		}
 
+		virtual void compose(CompositeStored & to, Field* f){
+			/// possibly also use , const uchar * ptr, uint flags
+			convertor.fget(temp, f, NULL, 0);/// convert into temp
+			to.add(temp); /// append to destination
+		}
+		
 		virtual void compose(CompositeStored & to, Field* f, const uchar * ptr, uint flags){
 			//convertor.fget(temp, f, ptr, flags);
 			//to.add(temp.get_value());// TODO: due to this interface, BLOBS are impossible in indexes
@@ -641,6 +663,7 @@ namespace tree_stored{
 		:	col(NULL)
 		,	field(NULL)
 		,	saved_ptr(NULL)
+		,	base_ptr(NULL)
 		{
 		}
 
@@ -648,6 +671,7 @@ namespace tree_stored{
 		:	col(NULL)
 		,	field(NULL)
 		,	saved_ptr(NULL)
+		,	base_ptr(NULL)
 		{
 			*this = right;
 		}
@@ -656,6 +680,7 @@ namespace tree_stored{
 			col = right.col;
 			field = right.field;
 			saved_ptr = right.saved_ptr;
+			base_ptr = right.base_ptr;
 			return *this;
 		}
 
@@ -674,9 +699,10 @@ namespace tree_stored{
 		abstract_my_collumn * col;
 		Field * field;
         uchar * saved_ptr;
+		uchar * base_ptr;
 	};
 	
-	typedef std::vector<nst::u32> _Density;
+	typedef std::vector<nst::u64> _Density;
 
 	struct density_info{
 		_Density density;
@@ -686,7 +712,7 @@ namespace tree_stored{
 	
 	struct table_info{
 		
-		table_info() : table_size(0),row_count(0){
+		table_info() : table_size(0),row_count(0),max_row_id(0){
 		}
 
 		void clear(){
@@ -704,7 +730,8 @@ namespace tree_stored{
 
 	typedef std::string _SetFields; ///indicates which fields have been set by index
 	typedef std::vector<selection_tuple> _Selection;
-	
+	/// this class translates errors and behaviour into internal data structures without
+	/// exposing them to mysql shenanigans
 	class tree_table{
 	public:
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
@@ -714,7 +741,7 @@ namespace tree_stored{
 		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
 		struct shared_data{
-			shared_data() : auto_incr(0),row_count(0),calculated_max_row_id(0){
+			shared_data() : last_write_lock_time(0),auto_incr(0),row_count(0),calculated_max_row_id(0){
 			}
 			Poco::Mutex lock;
 			Poco::Mutex write_lock;
@@ -726,6 +753,7 @@ namespace tree_stored{
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
 		static _SharedData shared;
+		
 	protected:
 		bool changed;
 		inline const char* INDEX_SEP(){
@@ -743,11 +771,14 @@ namespace tree_stored{
 			for (Field **field=share->field ; *field ; field++){
 				++rowsize;
 			}
+			all_changed.resize(rowsize);
 			//collums::_LockedRowData * lrd = collums::get_locked_rows(storage.get_name());
 			for (Field **field=share->field ; *field ; field++){
+				
 				ha_base_keytype bt = (*field)->key_type();
 				nst::u32 fi = (*field)->field_index;
 				nst::u32 field_size = (*field)->max_display_length();
+				all_changed[fi] = true;
 				//if(cols[(*field)->field_index]){
 					//cols[(*field)->field_index]->set_max_size();
 				//}
@@ -952,7 +983,7 @@ namespace tree_stored{
 					index->push_part(field->field_index);
 
 				}
-
+				index->set_ix(i);
 				get_indexes().push_back(index);
 			}
 		}
@@ -972,7 +1003,8 @@ namespace tree_stored{
 		bool calculating_statistics;
 		Poco::Mutex tt_info_copy_lock;
 		table_info calculated_info;
-		
+		nst::u64 clock;
+		std::vector<bool> all_changed;
     public:
         _Conditional conditional;
 		abstract_conditional_iterator::ptr rcond;
@@ -983,7 +1015,6 @@ namespace tree_stored{
 		std::string path;
 		_TableMap * table;
 		shared_data * share;
-		
 		
 	public:
 		void get_calculated_info(table_info& calc){
@@ -1020,6 +1051,7 @@ namespace tree_stored{
 		,	path(path)
 		,	table(nullptr)
 		,	calculating_statistics(false)
+		,	clock(++table_clock)
 		,	share(nullptr)
 		{
 			{
@@ -1290,15 +1322,15 @@ namespace tree_stored{
 
 		void commit2(Poco::Mutex* p2_lock){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				synchronized _s(*p2_lock);
+				//synchronized _s(*p2_lock);
 				(*x)->commit2();
 			}
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
-				synchronized _s(*p2_lock);
+				//synchronized _s(*p2_lock);
 				(*c)->commit2();
 
 			}
-			synchronized _s(*p2_lock);
+			//synchronized _s(*p2_lock);
 			commit_table2();
 			changed = false;
 		}
@@ -1347,7 +1379,14 @@ namespace tree_stored{
 		const _Indexes& get_indexes() const {
 			return indexes;
 		};
+
+		nst::u64 get_clock() const {
+			return this->clock;
+		}
+		
+		/// this function gets called before the table gets accessed
 		void check_load(TABLE *table_arg){
+			clock = ++table_clock; /// used for lru
 			if(cols.empty()){
 				load(table_arg);
 			}
@@ -1470,7 +1509,7 @@ namespace tree_stored{
 		bool read_set_covered_by_index
 		(	TABLE* table
 		,	uint ax
-		,	_Selection& s
+		,	const _Selection& s
 		){
 			return true;
 			KEY & ki = table->key_info[ax];
@@ -1590,7 +1629,7 @@ namespace tree_stored{
 						field->ptr = (uchar *)ptr;
 						if(pi->null_bit)
 							field->ptr++;
-						cols[field->field_index]->compose(temp, field, ptr, 0);
+						cols[field->field_index]->compose(temp, field, field->ptr, 0);
 
 					}
 					field->ptr = okey;
@@ -1794,7 +1833,7 @@ namespace tree_stored{
 
 			ix->lower_(out, temp);
 			if(!changed){
-				if(ix->is_unique() && out.valid()){
+				if(treestore_predictive_hash == TRUE && ix->is_unique() && out.valid()){
 					ix->cache_it(out);
 
 				}
@@ -1906,7 +1945,8 @@ namespace tree_stored{
 			if(--locks == 0){
 				if(changed)
 				{
-					commit1();
+					commit1();/// this phase does all the encoding
+
 					/// locks so that all the storages can commit atomically allowing
 					/// other transactions to start on the same version
 					/// synchronized _s(*p2_lock);
@@ -1935,47 +1975,92 @@ namespace tree_stored{
 				last_unlock_time = os::micros();
 			}
 		}
-		void write_noinc(TABLE* table){
+		stored::index_interface *error_index;
+		int write_noinc(TABLE* table,_Rid auto_row){			
+			error_index  = nullptr;
 			check_load(table);
 			if(!changed)
 			{
-				printf("table not locked for writing\n");
-				return;
+				printf("[TS] [ERROR] table not locked for writing\n");
+				return HA_ERR_UNSUPPORTED;
 			}
 
+			if(auto_row == stored::MAX_ROWS){
+				return HA_ERR_UNSUPPORTED;
+			}
+
+			_Rid resolved = auto_row ;
+			_Rid last_resolved = stored::MAX_ROWS;
+			nst::u32 unique_keys = 0;
+			nst::u32 unique_keys_matching = 0;
+			nst::u32 keys_matching = 0;
+			nst::u32 keys = (nst::u32)indexes.size();
+
+			/// first check for unique indexes
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
+				(*x)->temp.clear();				
+				(*x)->resolved.row = stored::MAX_ROWS;
+				if((*x)->is_unique()){										
+					++unique_keys;
+				}
+			}
+
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){	
+				(*x)->temp.clear();
+				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
+					cols[(*p)]->compose((*x)->temp,table->field[(*p)]); /// compose the new field data into temp
+				}
+				if((*x)->is_unique()){					
+					/// places matching key data in resolved if it exists				
+					if((*x)->resolve((*x)->temp) != stored::MAX_ROWS){						
+						(*x)->resolved = (*x)->temp;
+						error_index = (*x);
+					
+						return HA_ERR_FOUND_DUPP_KEY;
+					}else{
+					
+					}
+				}
+			}
+
+			
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
 				if(bitmap_is_set(table->write_set, (*field)->field_index)){
-					if(!(*field)->is_null() && cols[(*field)->field_index]){
+					if(cols[(*field)->field_index]){
 						/// TODO: set read set
 						//bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
 						//if(flip)
 						//	bitmap_set_bit(table->read_set, (*field)->field_index);
-						cols[(*field)->field_index]->add_row(get_auto_incr() , *field);
+						if((*field)->is_null() ){
+							cols[(*field)->field_index]->erase_row(resolved);
+						}else{
+							cols[(*field)->field_index]->add_row(resolved, *field);
+						}
 						//if(flip)
 						//	bitmap_flip_bit(table->read_set, (*field)->field_index);
 					}
 				}
 			}
-
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				temp.clear();
-				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
-
-					cols[(*p)]->compose(temp);
-				}
-				temp.row = get_auto_incr() ;
-				(*x)->add(temp);
+			
+			
+			
+			/// can add it to the index as a normal new row
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){		
+				(*x)->temp.row = resolved;
+				(*x)->add((*x)->temp);					
 			}
+			
 
 			(*this).get_table().insert(get_auto_incr(), '0');
 			if(get_auto_incr() % 300000 == 0){
-				printf("%lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
-				//reduce_col_use();
-				//reduce_use();
+				printf("[TS] [INFO] %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
+				
 			}			
 			share->row_count = (*this).get_row_count();			
+			return 0;
 		}
+		/// maps and copies available data in index to read set - reports those that could not be copied
 		void read_index_key_to_fields(_SetFields& to_set, TABLE* table, nst::u32 ix, const tree_stored::CompositeStored& key,std::vector<Field*>& field_map){
 			TABLE_SHARE *share= table->s;
 			stored::index_interface::ptr index  = indexes[ix];
@@ -1989,26 +2074,27 @@ namespace tree_stored{
 						const nst::u8 * data = k.get_data();
 						longlong lval = 0;
 						to_set[(*p)] = 1;
+						uint kt = f->key_type();
 						switch(k.get_type()){						
 						case CompositeStored::I1:
 							lval = *(const nst::i8*)(data);
 							f->set_notnull();
-							f->store(lval,f->key_type()!=HA_KEYTYPE_INT8);						
+							f->store(lval,kt!=HA_KEYTYPE_INT8);						
 							break;
 						case CompositeStored::I2:
 							lval = *(const nst::i16*)(data);
 							f->set_notnull();
-							f->store(lval,f->key_type()==HA_KEYTYPE_USHORT_INT);
+							f->store(lval,kt==HA_KEYTYPE_USHORT_INT);
 							break;
 						case CompositeStored::I4:
 							lval = *(const nst::i32*)(data);
 							f->set_notnull();
-							f->store(lval,f->key_type()==HA_KEYTYPE_ULONG_INT||f->key_type()==HA_KEYTYPE_UINT24);
+							f->store(lval,kt==HA_KEYTYPE_ULONG_INT||kt==HA_KEYTYPE_UINT24);
 							break;
 						case CompositeStored::I8:
 							lval = *(const nst::i64*)(data);
 							f->set_notnull();
-							f->store(lval,f->key_type()==HA_KEYTYPE_ULONGLONG||f->key_type()==HA_KEYTYPE_ULONG_INT);
+							f->store(lval,kt==HA_KEYTYPE_ULONGLONG||kt==HA_KEYTYPE_ULONG_INT);
 							break;
 						case CompositeStored::R4:
 							f->store(*(const float*)(data));
@@ -2036,75 +2122,89 @@ namespace tree_stored{
 			}
 			
 		}
-		void write(TABLE* table){
-			write_noinc(table);
+		int write(TABLE* table){
+			int r = write_noinc(table,get_auto_incr());
 			//nst::synchronized shared((*this).share->lock);
-			(*this).share->auto_incr++;
-			
+			if(r==0)
+				(*this).share->auto_incr++;
+			return r;
 			
 		}
-
-		void erase(stored::_Rid rid, TABLE* table){
+		
+		void erase(stored::_Rid rid, TABLE* table){			
 			check_load(table);
 			if(!changed)
 			{
 				//printf("table not locked for writing\n");
 				return;
 			}
-			erase_row_index(rid);
+			erase_row_index(rid,all_changed);
 			(*this).get_table().erase(rid);
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
-				if(!(*field)->is_null() && cols[(*field)->field_index]){
+				if(cols[(*field)->field_index]){
 					cols[(*field)->field_index]->erase_row(rid);
 				}
 			}
 
 		}
-
-		void write(stored::_Rid rid, TABLE* table){
+		
+		int write(stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
 			/// erase_row_index must be called before this function
 			check_load(table);
 			if(!changed)
 			{
-				//printf("table not locked for writing\n");
-				return;
+				printf("[TS] [ERROR] table not locked for writing\n");
+				return HA_ERR_UNSUPPORTED;
 			}
-
+	
+			
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
-				if(bitmap_is_set(table->write_set, (*field)->field_index)){
-					if(!(*field)->is_null() && cols[(*field)->field_index]){
-						//bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
-						//if(flip)
-						//	bitmap_set_bit(table->read_set, (*field)->field_index);
-						cols[(*field)->field_index]->add_row(rid, *field);
-						//if(flip)
-						//	bitmap_flip_bit(table->read_set, (*field)->field_index);
+				Field * f = (*field);
+				if(change_set[f->field_index]){
+					if(f->is_null()){
+						cols[f->field_index]->erase_row(rid);
+					}else{
+						cols[f->field_index]->add_row(rid, f);
+					}					
+				}
+			}
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
+				
+				nst::u32 changed_parts = 0;
+				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
+					if(change_set[(*p)]){
+						++changed_parts;
 					}
 				}
-			}
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				temp.clear();
-				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
-					cols[(*p)]->compose_by_tree(rid, temp);
+				if(changed_parts){
+					temp.clear();
+					for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){						
+						cols[(*p)]->compose_by_tree(rid, temp);
+					}
+					//temp.add(rid);				
+					temp.row = rid;
+					(*x)->add(temp);
 				}
-				//temp.add(rid);
-				temp.row = rid;
-				(*x)->add(temp);
 			}
-
+			return 0;
 		}
 
-		void erase_row_index(stored::_Rid rid){
+		void erase_row_index(stored::_Rid rid,const std::vector<bool>& change_set){
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
+				nst::u32 parts_changed = 0;
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 					cols[(*p)]->compose_by_cache(rid, temp);
+					if(change_set[(*p)])
+						++parts_changed;
 				}
 				//temp.add(rid);
-				temp.row = rid;
-				(*x)->remove(temp);
+				if(parts_changed){
+					temp.row = rid;
+					(*x)->remove(temp);
+				}
 			}
 		}
 
@@ -2133,6 +2233,14 @@ namespace tree_stored{
 			/// TABLE_SHARE *share= table->s;
 			uint selected = 0;
 			uint total = 0;
+			uchar * base = table->field[0]->ptr;
+			uchar * other = table->record[0];
+			uchar * other1 = table->record[1];
+			if(labs(base-other) < labs(base-other1)){
+				base = other;
+			}else{
+				base = other1;
+			}
 			for (Field **field=table->field ; *field ; field++){
 				if(bitmap_is_set(table->read_set, (*field)->field_index)){
 					selected++;
@@ -2146,7 +2254,7 @@ namespace tree_stored{
 					selection_tuple selection;
 					selection.col = cols[(*field)->field_index];
 					selection.col->initialize(by_tree);
-
+					selection.base_ptr = base;
 					selection.field = (*field);
 					//selection.iter = selection.col->create_iterator(selection.col->stored_rows());
 					//selection.iter->set_by_cache();

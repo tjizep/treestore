@@ -25,6 +25,8 @@ extern "C"{
 #include <fse/fse.h>
 #include <fse/zlibh.h>
 #include "system_timers.h"
+#include <iostream>
+#define dbg_print(x,...)          do { if (true) (printf("[TS][DBG]" x "\n", __VA_ARGS__)); } while(0)
 
 namespace stx{
 
@@ -374,6 +376,20 @@ namespace stx{
 			/// inplace_compress_zlibh(t);
 			/// inplace_compress_fse(t);
 			buff = t;
+
+		}
+		static void compress_lz4(buffer_type& to, const buffer_type& from){
+			typedef char * encode_type_ref;
+
+			i32 origin = (i32)from.size();
+			/// TODO: cannot compress sizes lt 200 mb
+			to.resize(LZ4_compressBound((int)from.size())+sizeof(i32));
+			i32 cp = from.empty() ? 0 : LZ4_compress((const encode_type_ref)&from[0], (encode_type_ref)&to[sizeof(i32)], origin);
+			*((i32*)&to[0]) = origin;
+			to.resize(cp+sizeof(i32));
+			/// inplace_compress_zlibh(t);
+			/// inplace_compress_fse(t);
+			//buff = t;
 
 		}
 		static void inplace_compress_lz4(buffer_type& buff){

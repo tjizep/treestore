@@ -1090,12 +1090,12 @@ namespace stored{
 				size = leb128::read_signed(reader);
 				_resize_buffer(size);
 				u8 * end = data()+size;
-				for(u8 * d = data(); d < end; ++d,++reader){
-					*d = *reader;
-				}
-				//memcpy(data(),&(*reader),size);
+				//for(u8 * d = data(); d < end; ++d,++reader){
+				//	*d = *reader;
+				//}
+				memcpy(data(),&(*reader),size);
 					//}
-				//reader += size;
+				reader += size;
 				
 			}
 			return reader;
@@ -1115,7 +1115,7 @@ namespace stored{
 };
 namespace stored{
 	typedef NS_STORAGE::u64 _Rid;
-	static const _Rid MAX_ROWS = 0xFFFFFFFFul;
+	static const _Rid MAX_ROWS = std::numeric_limits<_Rid>::max();
 
 	typedef std::vector<_Rid > _Parts; //,sta::col_tracker<_Rid>
 	typedef stored::FTypeStored<float> FloatStored ;
@@ -1388,13 +1388,15 @@ namespace stored{
 			addDynInf();
 		}
 		void add(const stored::VarCharStored& v){
-
-			add(v.get_value(),v.get_size()-1); /// exclude the terminator
+			if(v.get_size()){
+				add(v.get_value(),v.get_size()-1); /// exclude the terminator
+			}
 		}
 		template<int L>
 		void add(const stored::StaticBlobule<true, L>& v){
-
-			add(v.get_value(),v.get_size()-1); /// exclude the terminator
+			if(v.get_size()){
+				add(v.get_value(),v.get_size()-1); /// exclude the terminator
+			}
 		}
 
 		void addTerm(const char* k, size_t s){
@@ -1729,6 +1731,7 @@ namespace stored{
 			}
 		}
 		DynamicKey& operator=(const DynamicKey& right){
+			if(this == &right) return *this;
 			if(bs < static_size && right.bs < static_size){
 				bs = right.bs;
 				memcpy(buf, right.buf, bs);
@@ -1740,7 +1743,10 @@ namespace stored{
 			row = right.row;
 			return *this;
 		}
-		DynamicKey& return_or_copy(DynamicKey& ){
+		const DynamicKey& return_or_copy(DynamicKey& ) const {
+			return *this;
+		}
+		DynamicKey& return_or_copy(DynamicKey& ) {
 			return *this;
 		}
 		inline size_t get_hash() const {
@@ -1940,17 +1946,20 @@ namespace stored{
 
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
+			if(size()==0){
+				printf("[TS] [WARNING] writing emtpty key\n");
+			}
 			buffer_type::iterator writer = w;
 			writer = leb128::write_signed(writer, row);
 			writer = leb128::write_signed(writer, size());
 
 
-			memcpy(&(*writer),data(),size());
-			writer += size();
-			//const u8 * end = data()+size();
-			/*for(const u8 * d = data(); d < end; ++d,++writer){
+			//memcpy(&(*writer),data(),size());
+			//writer += size();
+			const u8 * end = data()+size();
+			for(const u8 * d = data(); d < end; ++d,++writer){
 				*writer = *d;
-			}*/
+			}
 			return writer;
 		};
 
@@ -1958,7 +1967,7 @@ namespace stored{
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
 			if(reader != buffer.end()){
-				row = leb128::read_signed(reader);
+				row = leb128::read_unsigned64(reader,buffer.end());
 				size_t s = leb128::read_signed(reader);
 				//memcpy(_resize_buffer(s), &(*reader), s);
 				//reader += s;
@@ -2206,7 +2215,15 @@ namespace stored{
 			return *this;
 		}
 
-		DynamicKey& return_or_copy(DynamicKey& x){
+		const DynamicKey& return_or_copy(DynamicKey& x) const {
+			x.clear();
+			_FieldType f;
+			f.set_value(data);
+			x.add(f);
+			x.row = (*this).row;
+			return x;
+		}
+		DynamicKey& return_or_copy(DynamicKey& x) {
 			x.clear();
 			_FieldType f;
 			f.set_value(data);
@@ -2346,6 +2363,9 @@ namespace stored{
 			}		
 			return r;
 		}
+	private:
+		mutable nst::buffer_type pcol;
+	public:
 		/// col oriented encoding for exploiting the sort order of keys on a b-tree page		
 		void encode(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
 			bool tests = false;
@@ -2358,21 +2378,24 @@ namespace stored{
 					break;
 				}
 			}
-			nst::buffer_type col;
-			col.resize(occupants);
+			
+			pcol.resize(occupants);
+			nst::u8* col = &pcol[0];
 			store_int(writer, colls);
 			for(size_t c = 0; c < colls; ++c){
-				for(size_t k = 0; k < occupants; ++k){
-					col[k] = keys[k].col_byte(c);
-				}				
-				nst::u8 prev = 0;
+				//for(size_t k = 0; k < occupants; ++k){
+				//	col[k] = keys[k].col_byte(c);
+				//}				
+				nst::u8 tminus = 0,prev = 0;
 				for(size_t k = 0; k < occupants; ++k){										
-					nst::u8 t = col[k];						
-					col[k] -= prev;
+					tminus = keys[k].col_byte(c);
+					nst::u8 t = tminus;						
+					tminus -= prev;
+					col[k] = tminus;
 					prev = t;					
 				}
 				
-				writer = std::copy(col.begin(),col.end(), writer);
+				writer = std::copy(pcol.begin(),pcol.end(), writer);
 			}
 			if(tests){
 				nst::buffer_type::const_iterator end = writer;
@@ -2421,7 +2444,7 @@ namespace stored{
 			size_t colls = 0;
 			read_int(colls, reader);
 			for(size_t o = 0; o < occupants; ++o){
-				keys[o] = _ByteOrientedKey();
+				//keys[o] = _ByteOrientedKey();
 				keys[o].col_resize_bytes(colls);
 			}
 						
@@ -2429,9 +2452,9 @@ namespace stored{
 				
 				nst::u8 dt,d = 0;
 				
-				size_t k = 0;
-				
-				for( ;k < occupants; ++k){
+				nst::u32 k = 0;
+				nst::u32 o = occupants;
+				for( ;k < o; ++k){
 					dt =  *reader + d;
 					keys[k].col_push_byte(c, dt);
 					d = dt;
@@ -2581,7 +2604,7 @@ namespace stored{
 		inline unsigned int interpolate(const _StoredRowId &k, const _StoredRowId &first , const _StoredRowId &last, int size) const
 		{
 			if(last.get_value()>first.get_value())
-				return (size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
+				return (int)(size*(k.get_value()-first.get_value()))/(last.get_value()-first.get_value());
 			return 0;
 		}
 
@@ -3548,10 +3571,18 @@ namespace stored{
 		int ix;
 		int fields_indexed;
 		stored::_Parts parts;
-		stored::_Parts density;
-
+		stored::_Parts density;		
+		DynamicKey resolved;
 		std::string name;
-		index_interface() : destroyed(false){
+		DynamicKey temp;
+		bool do_update;
+		void set_ix(int ix){
+			this->ix = ix;
+		}
+		int get_ix(){
+			return ix;
+		}
+		index_interface() : ix(0),fields_indexed(0),destroyed(false),do_update(false){
 		}
 		virtual ~index_interface(){
 			if(destroyed)
@@ -3581,6 +3612,8 @@ namespace stored{
 		virtual void upper(index_iterator_interface& out, const DynamicKey& key)=0;
 		virtual void add(const DynamicKey& k)=0;
 		virtual void remove(const DynamicKey& k) = 0;
+
+		virtual _Rid resolve(DynamicKey& k) = 0;
 		virtual void find(index_iterator_interface& out, const DynamicKey& key) = 0;
 		virtual void from_initializer(index_iterator_interface& out, const stx::initializer_pair& ip) = 0;
 		virtual void reduce_use() = 0;

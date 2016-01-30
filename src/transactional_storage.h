@@ -895,10 +895,10 @@ namespace storage{
 			if(buffer_allocation_pool.is_near_depleted() && (*this)._use > 1024*1024*2){
 				ptrdiff_t before = get_use();
 					
-				flush_back(0.1,true);
+				flush_back(0.3,true);
 				get_session() << "PRAGMA shrink_memory;", now;
 				last_flush_time = ::os::millis();
-				printf("flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
+				//printf("[TS] [DEBUG] flushed data %lld KiB - local before %lld KiB, now %lld KiB\n", (long long)total_use/1024, (long long)before/1024, (long long)get_use()/1024);
 				
 			}
 		}
@@ -1185,8 +1185,60 @@ namespace storage{
 			//}
 			printf("[TS] [INFO] readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
 		}
-		/// copy all data to dest wether it exists or not
 
+		/// move all data to dest wether it exists or not
+		void move(sqlite_allocator& dest){
+
+			_Addresses todo;
+			get_addresses(todo);
+			if(dest.get_name() != get_name()){
+				//printf("[TX-MOvE] invalid name\n");
+			}
+			//printf("[TX MOVE] %s ver. %lld -> %lld [", dest.get_name().c_str(), (long long)get_version(), dest.get_version());
+			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
+				stream_address at = (*a);
+				//printf("%lld, ", (long long)at);
+				buffer_type &r = allocate(at, read);
+
+				buffer_type *d = &(dest.allocate(at, create));
+			
+				if((*this).get_allocated_version() <= dest.get_allocated_version()){
+					throw InvalidVersion();
+				}
+				d->swap(r);
+
+				dest.assign_version((*this).get_allocated_version());
+				complete();
+				dest.complete();
+				
+			}
+			if(!allocations.empty()){
+				//printf("[TS] [WARNING] not all addresses transferred\n");
+			}
+			//printf("]\n");
+		}
+
+		void purge(){
+			_Addresses todo;
+			get_addresses(todo);
+			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
+				stream_address at = (*a);
+				/// get rid of the data
+				if(allocations.count(at)){
+					down_use( get_block_use(allocations[at]) );
+					delete allocations[at];					
+					allocations.erase(at);
+					
+				}
+			}
+			if(!allocations.empty()){
+				printf("[TS] [WARNING] not all addresses transferred\n");
+			}
+			changed.clear();
+			versions.clear();
+		}
+		
+		/// copy all data to dest wether it exists or not
 		void copy(sqlite_allocator& dest){
 
 			_Addresses todo;
@@ -1676,7 +1728,12 @@ namespace storage{
 			}
 			return responses;
 		}
-
+		void set_order(u64 order){
+			this->order = order;
+		}
+		void set_initial(address_type initial){
+			this->initial = initial;
+		}
 		void set_transient(){
 			get_allocator().set_transient();
 		}
@@ -1698,6 +1755,16 @@ namespace storage{
 		/// copy the allocations from this
 		void copy(version_based_allocator_ref dest){
 			get_allocator().copy(dest->get_allocator());
+		}
+		/// move the allocations from this
+		void move(version_based_allocator_ref dest){
+			get_allocator().move(dest->get_allocator());
+		}
+		/// remove version and cached data
+		void purge(){
+			if((*this).allocations != nullptr){
+				get_allocator().purge();
+			}
 		}
 		void set_discard_on_finalize(){
 			discard_on_end = true;
@@ -1732,7 +1799,9 @@ namespace storage{
 		void set_allocator(storage_allocator_type_ptr allocator){
 
 			(*this).allocations = allocator;
-			(*this).get_allocator().set_version((*this).get_version());
+			if((*this).allocations != nullptr){
+				(*this).get_allocator().set_version((*this).get_version());
+			}
 
 		}
 
@@ -1746,6 +1815,9 @@ namespace storage{
 		/// sets the version of this storage
 		void set_version(version_type version){
 			(*this).version = version;
+			if((*this).allocations != nullptr){
+				(*this).get_allocator().set_version((*this).get_version());
+			}
 		}
 
 		/// notify the addition of a new reader
@@ -1872,27 +1944,28 @@ namespace storage{
 				allocated_version = get_allocator().get_allocated_version();
 				return r;
 			}
+			if((*this).allocations != nullptr){
+				if(how != create){
+					/// at this point the action can only be one of read and write
+					/// given that the block exists as a local version
+					/// if it was read previously it will change to a write
+					/// when action is copy_reads and it doesnt exist in the local then
+					/// it will be copied into the local storage
+ 					block_type& r= get_allocator().allocate(which, how);
+					if( !get_allocator().is_end(r) ){
 
-			if(how != create){
-				/// at this point the action can only be one of read and write
-				/// given that the block exists as a local version
-				/// if it was read previously it will change to a write
-				/// when action is copy_reads and it doesnt exist in the local then
-				/// it will be copied into the local storage
- 				block_type& r= get_allocator().allocate(which, how);
-				if( !get_allocator().is_end(r) ){
-
+						allocated_version = get_allocator().get_allocated_version();
+						return r;// it may be a previously written or read block
+					}
+					get_allocator().complete();
+				}else if(how == create){
+					/// the element wil not exist in any of the previous versions
+					/// and is created right here
+					block_type& r = get_allocator().allocate(which, how);
 					allocated_version = get_allocator().get_allocated_version();
-					return r;// it may be a previously written or read block
-				}
-				get_allocator().complete();
-			}else if(how == create){
-				/// the element wil not exist in any of the previous versions
-				/// and is created right here
-				block_type& r = get_allocator().allocate(which, how);
-				allocated_version = get_allocator().get_allocated_version();
 
-				return r;
+					return r;
+				}
 			}
 			if(how==create)
 				throw InvalidStorageAction();
@@ -1903,6 +1976,7 @@ namespace storage{
 				if(!(last_base->get_allocator().is_end(r))){
 					if
 					(	how == write
+					&&	(*this).allocations != nullptr
 					)
 					{
 
@@ -2117,6 +2191,8 @@ namespace storage{
 
 		storage_container storages;			/// list of versions already committed contains a min of 1 storages aftger construction
 
+		storage_container recycler;			/// recycler for used transactions
+
 		version_storage_map storage_versions;
 											/// versions of each resource already committed
 											/// used to check validity and re-aquire smart pointers
@@ -2203,7 +2279,8 @@ namespace storage{
 								throw InvalidVersion();
 							}
 
-							latest->copy((*i).get());		/// latest -> i
+							//latest->copy((*i).get());		/// latest -> i
+							latest->move((*i).get());		/// latest => i
 							latest->set_merged();	/// flagged as copied or merged
 							latest = (*i);
 
@@ -2448,11 +2525,16 @@ namespace storage{
 			if(references==0){
 				printf("WARNING: started transaction without active references\n");
 			}
-
-			version_storage_type_ptr b = std::make_shared< version_storage_type>(last_address, order, create_version(), (*this).lock);
-			storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()),true);
-			allocator->set_allocation_start(last_address);
-			b->set_allocator(allocator);
+			version_storage_type_ptr b = nullptr;
+			if(writer || recycler.empty()){
+				b = std::make_shared< version_storage_type>(last_address, order, create_version(), (*this).lock);
+				storage_allocator_type_ptr allocator = std::make_shared<storage_allocator_type>(version_namer(b->get_version(),initial->get_name()),true);
+				allocator->set_allocation_start(last_address);
+				b->set_allocator(allocator);
+			}else {
+				b = recycler.back();
+				recycler.pop_back();
+			}
 			if(writer)
 				b->unset_readonly();
 			else
@@ -2614,7 +2696,11 @@ namespace storage{
 					prev->remove_reader();
 					prev = prev->get_previous();
 				}
-
+				
+				/// purge all dirty data
+				//version->purge(); 
+				if(!writer)
+					recycler.push_back(version);
 				storage_versions.erase(transaction->get_version());
 			}
 
