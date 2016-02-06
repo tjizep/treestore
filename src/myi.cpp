@@ -28,7 +28,12 @@ extern "C" int get_l1_bs_memory_use();
 /// determine factored low memory state
 static bool is_memory_low() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.75) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.85) || allocation_pool.is_depleted();
+
+}
+static bool is_memory_mark() {
+	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.80) || allocation_pool.is_depleted();
 }
 static bool is_memory_lower() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
@@ -247,7 +252,7 @@ namespace tree_stored{
 		}
 		void create_lru(_LruTables & ordered){
 			ordered.clear();
-			if(!is_memory_low()) return;
+			if(!is_memory_mark()) return;
 			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 				
 				if((*t).second!=nullptr)
@@ -259,14 +264,14 @@ namespace tree_stored{
 		void own_reduce_col_trees(_LruTables & ordered){
 			DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			for(_LruTables::iterator t = ordered.begin(); t!= ordered.end();++t){
-				if(!is_memory_lower()) break;
+				if(!is_memory_mark()) break;
 				(*t).second->reduce_use_collum_trees();				
 			}
 		}
 		void own_reduce_index_trees(_LruTables & ordered){
 			DBUG_PRINT("info",("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			for(_LruTables::iterator t = ordered.begin(); t!= ordered.end();++t){
-				if(!is_memory_lower()) break;
+				if(!is_memory_mark()) break;
 				(*t).second->reduce_use_indexes();				
 			}
 		}
@@ -505,7 +510,7 @@ public:
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
 	
-		if(stx::memory_low_state){
+		if(stx::memory_mark_state){
 			(*this).reduce();
 		}
 
@@ -1203,7 +1208,7 @@ public:
 		return r;
 	}
 	void check_own_use(){
-		if(stx::memory_low_state){		
+		if(stx::memory_mark_state){		
 			st.reduce();		
 			if(writer_thread!=nullptr){
 				writer_thread->own_reduce();
@@ -1559,7 +1564,7 @@ public:
 	}
 	nst::u64 writes;
 	int write_row(byte * buff){
-		if(((writes%1000ll)==0) || stx::memory_low_state){
+		if(((writes%1000ll)==0) || stx::memory_mark_state){
 			check_own_use();
 			if(is_memory_low()){
 				//printf("[TS] [WARNING] could not reduce use\n");
@@ -2348,13 +2353,13 @@ namespace ts_cleanup{
 				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
 				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
 				buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor)*0.95);
-				
+				stx::memory_mark_state = is_memory_mark();
 				stx::memory_low_state = is_memory_low();
 				if(buffer_allocation_pool.is_near_full()){
 					stored::reduce_all();
 				}
 				
-				if(stx::memory_low_state){
+				if(stx::memory_mark_state){
 					//printf("[TREESTORE] reduce idle tree use\n");
 					
 					st.reduce_idle_writers();	

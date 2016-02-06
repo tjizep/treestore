@@ -1805,16 +1805,6 @@ namespace tree_stored{
 			return temp == other;
 		}
 		
-		/// returns true if temp is a prefix of other
-		bool is_temp_prefix_of(const tree_stored::CompositeStored& other){			
-			return temp.contains_prefix(other);
-		}
-
-		/// returns true if temp is a prefix of the key on the input iterator
-		bool is_temp_prefix_of(stored::index_iterator_interface& iterator){
-			const tree_stored::CompositeStored& other = iterator.get_key();
-			return is_temp_prefix_of(other);
-		}
 
 		void temp_lower
 		(	TABLE* table
@@ -2070,31 +2060,37 @@ namespace tree_stored{
 			for(stored::_Parts::iterator p = index->parts.begin(); p != index->parts.end(); ++p){
 				if(bitmap_is_set(table->read_set, (*p) )){
 					Field * f = field_map[(*p)];
-					if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
+					//if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
 						const nst::u8 * data = k.get_data();
 						longlong lval = 0;
-						to_set[(*p)] = 1;
-						uint kt = f->key_type();
+						to_set[(*p)] = 1;						
 						switch(k.get_type()){						
+						
+						case CompositeStored::UI8:
+							lval = *(const nst::u64*)(data);
+							f->set_notnull();
+							f->store(lval,true); 
+							break;
 						case CompositeStored::I1:
 							lval = *(const nst::i8*)(data);
 							f->set_notnull();
-							f->store(lval,kt!=HA_KEYTYPE_INT8);						
+							f->store(lval,false);						
 							break;
+						
 						case CompositeStored::I2:
 							lval = *(const nst::i16*)(data);
 							f->set_notnull();
-							f->store(lval,kt==HA_KEYTYPE_USHORT_INT);
+							f->store(lval,false);
 							break;
 						case CompositeStored::I4:
 							lval = *(const nst::i32*)(data);
 							f->set_notnull();
-							f->store(lval,kt==HA_KEYTYPE_ULONG_INT||kt==HA_KEYTYPE_UINT24);
+							f->store(lval,false);
 							break;
 						case CompositeStored::I8:
 							lval = *(const nst::i64*)(data);
 							f->set_notnull();
-							f->store(lval,kt==HA_KEYTYPE_ULONGLONG||kt==HA_KEYTYPE_ULONG_INT);
+							f->store(lval,false); 
 							break;
 						case CompositeStored::R4:
 							f->store(*(const float*)(data));
@@ -2109,13 +2105,31 @@ namespace tree_stored{
 							to_set[(*p)] = 0;
 							break;
 						default:
+							switch(k.get_type()){
+								case CompositeStored::UI1:
+									lval = *(const nst::u8*)(data);
+									f->set_notnull();
+									f->store(lval,true);						
+									break;
+								case CompositeStored::UI2:
+									lval = *(const nst::u16*)(data);
+									f->set_notnull();
+									f->store(lval,true);
+									break;
+						
+								case CompositeStored::UI4:
+									lval = *(const nst::u32*)(data);
+									f->set_notnull();
+									f->store(lval,true);
+									break;															
+							}
 							to_set[(*p)] = 0;
 							break;
 							
 						};
-					}else{/// complain about the field index
-						printf("[TS] [WARNING] the field index and index part index is not the same");
-					}
+					//}else{/// complain about the field index
+					//	printf("[TS] [WARNING] the field index and index part index is not the same");
+					//}
 				}
 				k.next();
 				if(!k.valid()) break;

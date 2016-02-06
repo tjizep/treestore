@@ -27,7 +27,7 @@ extern "C"{
 #include "system_timers.h"
 #include <iostream>
 #define dbg_print(x,...)          do { if (true) (printf("[TS][DBG]" x "\n", __VA_ARGS__)); } while(0)
-
+#define err_print(x,...)          do { if (true) (printf("[TS][ERR]" x "\n", __VA_ARGS__)); } while(0)
 namespace stx{
 
 	namespace storage{

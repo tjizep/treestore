@@ -183,6 +183,7 @@ namespace stx
 	typedef std::vector<idle_processor*> _idle_processors; //, sta::tracker<idle_processor*> 
 	extern _idle_processors idle_processors;
 	extern bool memory_low_state;
+	extern bool memory_mark_state;
 	static void process_idle_times(){
 		for(_idle_processors::iterator i = idle_processors.begin(); i != idle_processors.end(); ++i){
 			(*i)->idle_time();
@@ -256,7 +257,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 0,
 			interior_mul = 1,
-			keys_per_page = 192, ///192 is good for transactions, 384
+			keys_per_page = 128, ///192 is good for transactions, 384
 			caches_per_page = 4,
 			max_release = 8,
 			version_reload
@@ -585,7 +586,7 @@ namespace stx
 			inline void set_context(btree * context){				
 				if((*this).context == context) return;
 				if((*this).context != NULL && context != NULL){
-					printf("suspicious context transfer\n");
+					err_print("suspicious context transfer");
 				}
 				(*this).context = context;
 			}
@@ -654,7 +655,7 @@ namespace stx
 				(*this).w = m.w;
 				(*this).context = context;
 				if(context==NULL&&(*this).w){
-					printf("this is NULL\n");
+					err_print("[this] is NULL");
 				}
 
 				ref();
@@ -686,7 +687,7 @@ namespace stx
 						if(has_context()){
 							this->get_context()->free_node(rget(),this->get_where());										
 						}else{
-							printf("[ERROR] [TS] context does not exist\n");
+							err_print("context does not exist");
 						}
 						ptr = NULL_REF;
 					}
@@ -705,7 +706,7 @@ namespace stx
 				{
 					if(context->get_storage()->is_readonly()){
 
-						printf("ERROR: allocating new page in readonly mode\n");
+						err_print("cannot allocate new page in readonly mode");
 						throw std::exception();
 					}
 					context->get_storage()->allocate(super::w, stx::storage::create);
@@ -738,7 +739,7 @@ namespace stx
 			}
 			void change(){
 				if(version_reload && (*this).ptr != NULL_REF && (*this).is_invalid()){
-					printf("WARNING: Change should be called without an invalid member as this could mean that the operation preceding it is undone\n");
+					err_print("Change should be called without an invalid member as this could mean that the operation preceding it is undone");
 				}
 				change_before();
 			}
@@ -863,7 +864,7 @@ namespace stx
 							n->unload_next();
 						}
 					}else{
-						BTREE_PRINT("surface node reports its not a surface node\n");
+						err_print("surface node reports its not a surface node");
 					}
 
 				}
@@ -878,13 +879,13 @@ namespace stx
 							if
 							(	s->get_address() == s->get_next().get_where()
 							){
-								printf("next check failed\n");
+								err_print("next check failed");
 								return false;
 							}
 							if
 							(	s==(*this).ptr && s->get_address() != (*this).get_where()
 							){
-								printf("self address check failed\n");
+								err_print("self address check failed");
 								return false;
 							}
 						}
@@ -948,7 +949,7 @@ namespace stx
 						const _Loaded*o = static_cast<const _Loaded*>((*this).get_context()->get_loaded(super::w));
 						const _Loaded*r = static_cast<const _Loaded*>(super::ptr);
 						if(o && r != o){
-							BTREE_PRINT("different pointer to same resource\n");
+							err_print("different pointer to same resource");
 						}
 					}
 				}
@@ -961,7 +962,7 @@ namespace stx
 				if(has_context()){
 					(*p) = (*p).get_context()->load(((super*)p)->w);
 				}else{
-					printf("WARNING: no context supplied\n");
+					err_print("no context supplied");
 				}
 
 			}
@@ -973,7 +974,7 @@ namespace stx
 				if(has_context()){
 					(*p).get_context()->refresh(((super*)p)->w,rget());
 				}else{
-					printf("WARNING: no context supplied\n");
+					err_print("no context supplied");
 				}
 
 			}
@@ -986,7 +987,7 @@ namespace stx
 					(*p).get_context()->load(((super*)p)->w,rget());
 
 				}else{
-					printf("WARNING: no context supplied\n");
+					err_print("no context supplied");
 				}
 
 			}
@@ -1014,13 +1015,13 @@ namespace stx
 
 							const surface_node * n = c->get_next().rget_surface();
 							if(n->preceding.get_where() != (*this).get_where()){
-								printf("The node has invalid preceding pointer\n");
+								err_print("The node has invalid preceding pointer");
 							}
 						}
 						if(c->preceding.ptr != NULL_REF){
 							surface_node * p = c->preceding.rget_surface();
 							if(p->get_next().get_where() != (*this).get_where()){
-								printf("The node has invalid next pointer\n");
+								err_print("The node has invalid next pointer");
 							}
 						}
 					}
@@ -1029,7 +1030,7 @@ namespace stx
 			void null_check() const {
 				if(selfverify){
 					if(this->get_where()==0 && (*this).ptr != NULL_REF){
-						printf("invalid where\n");
+						err_print("invalid address");
 					}
 				}
 
@@ -1378,7 +1379,7 @@ namespace stx
 			}
 			void check_node() const {
 				if(occupants > interiorslotmax+1){
-					printf("[TS] [ERROR] page is probably corrupt\n");
+					err_print("page is probably corrupt");
 				}
 			}
 		public:
@@ -1401,7 +1402,7 @@ namespace stx
 
 			void check_deleted()const{
 				if(is_deleted!=0){
-					printf("ERROR: node is deleted\n");
+					err_print("node is deleted");
 				}
 			}
 
@@ -1784,7 +1785,7 @@ namespace stx
 			void check_next() const {
 				return;
 				if(this->get_address() > 0 && next.get_where() == this->get_address()){
-					printf("set bad next\n");
+					err_print("set bad next");
 				}
 			}
 
@@ -2088,7 +2089,7 @@ namespace stx
 				int ks = sizeof(key_type)*surfaceslotmax;
 
 				if(sa == address){
-					printf("ERROR: loading node with invalid next address\n");
+					err_print("loading node with invalid next address");
 				}
 				(*this).next.set_context(context);
 				(*this).next.set_where(sa);
@@ -2116,7 +2117,7 @@ namespace stx
 
 				if(d != bsize){
 					BTREE_ASSERT(d == buffer.size());
-					printf("[ERROR] [TS] surface nodes of invalid size\n");
+					err_print("surface nodes of invalid size");
 				}
 				(*this).sorted = (*this).get_occupants();
 				(*this).check_cache(keys());
@@ -2128,7 +2129,7 @@ namespace stx
 				||	has_typedef_attached_values<data_type>::value
 				){
 					//transfer_attached(buffer);
-					printf("transfer attached\n");
+					dbg_print("transfer attached\n");
 				}
 			}
 
@@ -2171,7 +2172,7 @@ namespace stx
 				}
 				buffer.resize(storage_use);
 				if(buffer.size() != storage_use){
-					printf("[ERROR] [TS] resize failed\n");
+					err_print("resize failed");
 				}
 				buffer_type::iterator writer = buffer.begin();
 				writer = leb128::write_signed(writer, (*this).get_occupants());
@@ -2346,7 +2347,7 @@ namespace stx
 				
 				
 				if(n->get_address() > 0 && n->get_address() == n->get_next().get_where()){
-					printf("[TS] [ERROR] saving node with recursive address\n");
+					err_print("saving node with recursive address");
 				}
 				n->save(key_interpolator(), *get_storage(), create_buffer);
 				if(lz4){
@@ -2393,7 +2394,7 @@ namespace stx
 		}
 		void save(typename btree::node* n,stream_address w){
 			if(n == NULL_REF){
-				printf("WARNING: attempting to save NULL\n");
+				err_print("attempting to save NULL");
 				return ;
 			}
 			if(get_storage()->is_readonly()){
@@ -2438,7 +2439,7 @@ namespace stx
 		bool is_valid(const node* page, stream_address w) const {
 			if (selfverify){
 				if(get_storage()->current_transaction_order() < page->get_transaction()){
-					printf("ERROR: page is probably corrupt\n");
+					err_print("page is probably corrupt - invalid transaction order");
 				}
 			}
 			if(!version_reload) return true;
@@ -2459,7 +2460,7 @@ namespace stx
 				if(parent->childid[slot].is_loaded()){
 					typename surface_node::ptr surface = parent->childid[slot];
 					if(surface->level != 0){
-						printf("WARNING: invalid level on surface\n");
+						err_print("invalid level on surface");
 					}else{
 						surface->set_slot_loader(parent.get_where(), slot);
 					}
@@ -2498,7 +2499,7 @@ namespace stx
 				if(s != nodes_loaded.end()){
 					surface_test2 =  static_cast<const surface_node*>((*s).second);
 					if(surface_test2 == surface_test1){
-						printf("multiple addresses pointing to same node");
+						err_print("multiple addresses pointing to same node");
 					}
 				}
 				
@@ -2510,7 +2511,7 @@ namespace stx
 				if(s != surfaces_loaded.end()){
 					surface_test2 =  static_cast<const surface_node*>((*s).second);
 					if(surface_test2 == surface_test1){
-						printf("multiple addresses pointing to same node (2)");
+						err_print("multiple addresses pointing to same node (2)");
 				
 					}
 				}
@@ -2524,7 +2525,7 @@ namespace stx
 
 			if(preallocated!=nullptr){
 				if(w!=preallocated->get_address()){
-					printf("WARNING: input address does not match preallocated node address\n");
+					err_print("input address does not match preallocated node address");
 					///erase_address(preallocated->get_address());
 					///erase_address(w);
 				}
@@ -2537,11 +2538,6 @@ namespace stx
 					request.clear();
 					request.push_back(std::make_pair(w,preallocated->get_version()));
 					nst::u64 response = get_storage()->get_greater_version_diff(request);
-					if(!response){
-						printf("there was no new data\n");
-					}else{
-						printf("there was data\n");
-					}
 
 				}else if(w==preallocated->get_address()){
 					
@@ -2560,7 +2556,7 @@ namespace stx
 			/// storage operation started
 			buffer_type& dangling_buffer = get_storage()->allocate(w, stx::storage::read);
 			if(get_storage()->is_end(dangling_buffer) || dangling_buffer.size() == 0){
-				printf("bad allocation at %li in %s\n",(long int)w, get_storage()->get_name().c_str());
+				err_print("bad allocation at %li in %s",(long int)w, get_storage()->get_name().c_str());
 				BTREE_ASSERT(get_storage()->is_end(dangling_buffer) && dangling_buffer.size() > 0);
 				throw std::exception();
 			}
@@ -2585,7 +2581,7 @@ namespace stx
 					static_cast<surface_node*>(preallocated)->set_slot_loader(loader, slot);
 				}else{
 					if(preallocated != nullptr){
-						printf("ERROR: page should be reassigned\n");
+						err_print("page should be reassigned");
 					}
 					s = allocate_surface(w, loader, slot);
 				}
@@ -4121,7 +4117,7 @@ namespace stx
 			if(!surfaces.empty()){
 				r = surfaces.back();
 				surfaces.pop_back();
-				//new (r) surface_node();
+				//new (r) surface_node();				
 			}
 			return r;
 		}
@@ -4186,7 +4182,7 @@ namespace stx
 			for(auto n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 				if(nodes_loaded.count((*n).first) > 0){
 					if((*n).second == NULL_REF){
-						/// printf("WARNING: cannot unlink null node\n");
+						err_print("cannot unlink null node");
 					}else {
 						t = (*n).second;
 						t.set_context(this);
@@ -4216,7 +4212,7 @@ namespace stx
 		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
 			/// ||allocation_pool.is_near_depleted()
-			if(::stx::memory_low_state){
+			if(::stx::memory_mark_state){
 				reduce_use();
 				
 			}
@@ -4227,7 +4223,7 @@ namespace stx
 		void reduce_use(){
 			flush_buffers(true);
 			free_interiors();
-			free_surfaces();
+			//free_surfaces();
 		}
 
 		void flush_buffers(bool reduce){
@@ -4303,7 +4299,7 @@ namespace stx
 				nodes_loaded[n.get_where()] = pn;
 				surfaces_loaded[n.get_where()] = pn;
 			}else{
-				printf("no address supplied\n");
+				err_print("no address supplied");
 			}
 			
 			return n;
@@ -4331,18 +4327,19 @@ namespace stx
 		}
 		inline void free_node( surface_node* n, stream_address w ){
 			if((n->refs==0 ) || n->is_orphaned()){
+				if(delete_check && n->is_deleted){
+					err_print("node has already been deleted");
+					return;
+				}
 				save(n,w);
 				if(!n->is_orphaned()){
 					nodes_loaded.erase(w);
 					surfaces_loaded.erase(w);
 				}
 
-				if(delete_check && n->is_deleted){
-					printf("ERROR: node has been deleted\n");
-				}
-
 				if(n->is_orphaned()){
 					allocation_pool.free<surface_node>(n);
+					//recycle(n);
 				}else {
 					//recycle(n);
 					allocation_pool.free<surface_node>(n);
@@ -4355,7 +4352,7 @@ namespace stx
 
 		void orphan_node(typename btree::node* n){
 			if(n == NULL_REF) {
-				printf("WARNING: received a NULL reference\n");
+				err_print("received a NULL reference");
 				return;
 			}
 			if (n->issurfacenode())
@@ -4392,10 +4389,10 @@ namespace stx
 				if(!n->is_orphaned()){
 					nodes_loaded.erase(w);
 					if(surfaces_loaded.count(w)){
-						printf("ERROR: node cannot be both surface and interior unless its the root node\n");
+						err_print("node cannot be both surface and interior unless its the root node");
 					}
 					if(interiors_loaded.count(w)==0){
-						printf("ERROR: node was not registered in the interior list\n");
+						err_print("node was not registered in the interior list");
 					}
 					interiors_loaded.erase(w);
 				}
@@ -4577,8 +4574,11 @@ namespace stx
 			for(auto n = nodes_loaded.begin(); n != nodes_loaded.end(); ++n){
 				BTREE_ASSERT((*n).second==NULL_REF);
 				BTREE_ASSERT((*n).second->refs==0);
-
-				orphan_node((*n).second);
+				if((*n).second->refs==0){
+					err_print("A node is still registered and has no references");
+				}else{
+					orphan_node((*n).second); /// some iterators probably has this node
+				}
 			}
 
 		}

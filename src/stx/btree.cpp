@@ -1,5 +1,6 @@
 #include "btree.h"
 bool stx::memory_low_state = false;
+bool stx::memory_mark_state = false;
 stx::_idle_processors stx::idle_processors;
 
 #include "stx/storage/pool.h"

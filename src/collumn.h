@@ -306,7 +306,7 @@ namespace collums{
 				if(reduced!=0) return; /// nothing happened since last reduce
 				if(versioned_pages.empty()) return;
 				nst::synchronized l(this->lock);
-				if(!stx::memory_low_state){
+				if(!stx::memory_mark_state){
 					return;
 				}
 				
@@ -597,11 +597,11 @@ namespace collums{
 			last_loaded = nullptr;
 
 			stored_page::ptr page;
-			auto i = pages.find(address);
-			///if(!pages.get(address,page)){
-			if(i != pages.end()){
-				page = (*i).second;
-			}else{
+			//auto i = pages.find(address);
+			if(!pages.get(address,page)){
+			//if(i != pages.end()){
+			//	page = (*i).second;
+			//}else{
 				page = load_page(address);
 				if(page!=local_page){
 					pages[address] = page;
@@ -646,6 +646,7 @@ namespace collums{
 				return (*this);
 			}
 			iterator& operator++(){
+				/// TODO: not skipping erased values
 				++pos;
 				return (*this);
 			}
@@ -821,7 +822,7 @@ namespace collums{
 		
 		void flush(){
 			flush_buffers();
-			if(stx::memory_low_state){
+			if(stx::memory_mark_state){
 				clear_cache();
 				version_control->reduce();
 			}
@@ -841,6 +842,8 @@ namespace collums{
 		void reload(){
 			//if(!get_storage().is_readonly()){
 				clear_cache();
+				get_storage().get_boot_value(largest,2) ;
+				get_storage().get_boot_value(_size,3);
 			//}
 		}
 		void unshare(){

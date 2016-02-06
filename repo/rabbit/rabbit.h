@@ -1023,10 +1023,12 @@ namespace rabbit{
 			_Bt exists;
 			_Bt bsize;
 			void set_index(){
-				const _Segment& s = hc->get_segment(pos);
-				exists = s.exists;
-				index = hc->get_segment_index(pos);
-				bsize =  hc->config.BITS_SIZE;
+				if(hc != nullptr){
+					const _Segment& s = hc->get_segment(pos);
+					exists = s.exists;
+					index = hc->get_segment_index(pos);
+					bsize =  hc->config.BITS_SIZE;
+				}
 			}
 			void check_index(){
 
@@ -1110,9 +1112,11 @@ namespace rabbit{
 			_Bt index;
 			_Bt exists;
 			void set_index(){
-				const _Segment& s = hc->get_segment(pos);
-				exists = s.exists;
-				index = hc->get_segment_index(pos);
+				if(hc != nullptr){
+					const _Segment& s = hc->get_segment(pos);
+					exists = s.exists;
+					index = hc->get_segment_index(pos);
+				}
 			}
 			void check_index(){
 
@@ -1185,7 +1189,8 @@ namespace rabbit{
 	protected:
 		/// the default config for each hash instance
 		rabbit_config default_config;
-
+		key_compare key_c;
+		allocator_type alloc;
 
 		double recalc_growth_factor(size_type elements)  {
 			return 1.8;
@@ -1200,35 +1205,47 @@ namespace rabbit{
 		}
 
 		typename hash_kernel::ptr current;
+		inline void create_current(){
+			if(current==nullptr)
+				
+				set_current(std::make_shared<hash_kernel>(key_c,alloc));
+		}
 	public:
 		float load_factor() const{
+			if(current==nullptr) return 0;
 			return current->load_factor();
 		}
 		size_type bucket_count() const {
+			if(current==nullptr) return 0;
 			return current->bucket_count();
 		}
 		size_type bucket_size ( size_type n ) const{
+			if(current==nullptr) return 0;
 			return current->bucket_size ( n );
 		}
 		float max_load_factor() const {
+			if(current==nullptr) 1;
 			return current->max_load_factor();
 		}
 
 		void max_load_factor ( float z ){
+			create_Current();
 			current->max_load_factor(z);
 		}
 		bool empty() const {
+			if(current==nullptr) return true;
 			return current->size() == 0;
 		}
 		void reserve(size_type atleast){
-
+			create_current();
 			rehash((size_type)((double)atleast*current->get_resize_factor()));
 		}
 		void resize(size_type atleast){
-
+			create_current();
 			rehash((size_type)((double)atleast*current->get_resize_factor()));
 		}
 		void rehash(size_type to_){
+			create_current();
 			rabbit_config config;
 			size_type to = std::max<size_type>(to_, config.MIN_EXTENT);
 			/// can cause oom e because of recursive rehash'es
@@ -1283,6 +1300,7 @@ namespace rabbit{
 		void clear(){
 			if(current!=nullptr)
 				current->clear();
+			current = nullptr;
 			///set_current(std::make_shared<hash_kernel>());
 		}
 
@@ -1290,12 +1308,12 @@ namespace rabbit{
 			set_current(std::make_shared<hash_kernel>(compare, allocator));
 		}
 
-		basic_unordered_map() {
-			set_current(std::make_shared<hash_kernel>());
+		basic_unordered_map() :current(nullptr) {
+			//
 		}
 
-		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) {
-			clear(compare,allocator);
+		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) : key_c(compare),alloc(allocator){
+			
 		}
 
 		basic_unordered_map(const basic_unordered_map& right) {
@@ -1333,19 +1351,24 @@ namespace rabbit{
 		}
 
 		key_equal key_eq() const {
-			return (this->current->eq_f);
+			if(current!=null)
+				return (this->current->eq_f);
+			return key_equal();
 		}
 		iterator insert(const _K& k,const _V& v){
+			create_current();
 			(*this)[k] = v;
 			return iterator(this, current->last_modified);
 		}
 
 		iterator insert(const std::pair<_K,_V>& p){
+
 			return iterator(this, insert(p.first, p.second));
 		}
 		/// generic template copy
 		template<class _Iter>
 		iterator insert(_Iter start, _Iter _afterLast){
+			create_current();
 			for(_Iter i = start; i != _afterLast; ++i){
 				insert((*i).first, (*i).second);
 			}
@@ -1353,17 +1376,22 @@ namespace rabbit{
 		}
 		/// fast getter that doesnt use iterators and doesnt change the table without letting you know
 		bool get(const _K& k, _V& v) const {
-			return (*this).current->get(k,v);
+			if(current!=nullptr)
+				return (*this).current->get(k,v);
+			return false;
 		}
 		/// throws a exception when value could not match the key
 		const _V& at(const _K& k) const {
+			if(current == nullptr) throw std::exception();
 			return (*this).current->at(k);
 		}
 		_V& at(const _K& k) {
+			create_current();
 			return (*this).current->at(k);
 		}
 
 		_V& operator[](const _K& k){
+			create_current();
 			_V *rv = current->subscript(k);
 			while(rv == nullptr){
 				this->rehash();
@@ -1372,13 +1400,14 @@ namespace rabbit{
 			return *rv;
 		}
 		size_type erase(const _K& k){
+			if(current==nullptr) return size_type();
 			//if(current->is_small()){
 			//	rehash(1);
 			//}
 			return current->erase(k);
 		}
 
-		size_type erase(iterator i){
+		size_type erase(iterator i){			
 			return erase((*i).first);
 		}
 
@@ -1387,26 +1416,35 @@ namespace rabbit{
 		}
 
 		size_type count(const _K& k) const {
+			if(current == nullptr)return size_type();
 			return current->count(k);
 		}
 
 		iterator find(const _K& k) const {
+			if(current == nullptr) return iterator(this,size_type());
+
 			return iterator(this, current->find(k));
 		}
 
 		iterator begin() const {
+			if(current==nullptr)return iterator(this,size_type());
 			return iterator(this, current->begin());
 		}
 		iterator end() const {
+			if(current==nullptr)return iterator(this,size_type());
 			return iterator(this, current->end());
 		}
+
 		const_iterator cbegin() const {
+			if(current==nullptr)return const_iterator(this,size_type());
 			return const_iterator(this, current->begin());
 		}
 		const_iterator cend() const {
+			if(current==nullptr)return iterator(this,size_type());
 			return const_iterator(this, current->end());
 		}
 		size_type size() const {
+			if(current==nullptr)return size_type();
 			return current->size();
 		}
 	};

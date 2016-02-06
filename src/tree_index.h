@@ -51,7 +51,7 @@ namespace tree_stored{
 		typedef stored::byte_col_encoder<index_key,int> interpolator_type;
 		stored::abstracted_storage storage;
 		////, std::less<index_key>,interpolator_type
-		typedef stx::btree_set< index_key, stored::abstracted_storage, std::less<index_key>, interpolator_type> _IndexMap;
+		typedef stx::btree_set< index_key, stored::abstracted_storage, std::less<index_key> ,interpolator_type> _IndexMap; ///
 		typedef typename _IndexMap::iterator iterator_type;
 		typedef typename _IndexMap::const_iterator const_iterator_type;
 		typedef typename ::iterator::ImplIterator<_IndexMap> IndexIterator;
