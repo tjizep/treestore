@@ -251,16 +251,32 @@ namespace stored{
 			return get_transaction().is_readonly();
 		}
 
+		/// merge the changed data to the underlying storage
+		/// the transaction is not destroyed and may continue writing
+		
+		bool merge(){
+			bool r = false;
+			if(_transaction != NULL){
+				r = get_allocations().merge(_transaction);				
+			}			
+			return r;
+		}
 		/// a kind of auto commit - by starting the transaction immediately after initialization
 
 		bool commit(){
 			bool r = false;
 			if(_transaction != NULL){
-				r = get_allocations().commit(_transaction);
-				_transaction = NULL;
-				(*this).order = 0;
+				if((*this).writer){
+					r = get_allocations().merge(_transaction);
+				}else{
+					r = get_allocations().commit(_transaction);
+					_transaction = NULL;
+					(*this).order = 0;
+				}
+			}else{
+				(*this).writer = false;
 			}
-			(*this).writer = false;
+			
 			return r;
 		}
 
@@ -361,13 +377,15 @@ namespace stored{
 	bool abstracted_tx_begin_1(bool read, _Storage& storage){
 		bool write = !read;
 		if(write){
-			bool r = storage.stale();
+			/// only start the writing transaction when reading or idle
+			bool r = false;
+			if(!storage.is_transacted() || storage.is_readonly()){
+				
+				storage.begin(write);
+				r = true;
+			}
 
-			if(r)
-				storage.rollback();
-			storage.begin(write);
-
-			return !r;
+			return r;
 		}
 		else
 		{

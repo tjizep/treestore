@@ -83,7 +83,8 @@ namespace stx{
 					remove_buffer_use(bytes);
 				};
 			};
-			static const bool heap_for_small_data = true;
+			static const bool heap_for_small_data = false;
+			static const bool heap_alloc_check = false;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
 			template <class T>
@@ -374,7 +375,7 @@ namespace stx{
 
 				static const u64 MAX_ALLOCATION_SIZE = 25600000000000ll;
 				static const u64 USED_PERIOD = 1000000000ll;
-				static const u64 MIN_ALLOCATION_SIZE = 16ll;
+				static const u64 MIN_ALLOCATION_SIZE = 8ll;
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
 				pool_shared * shared;
 				u64 last_full_flush;
@@ -448,11 +449,12 @@ namespace stx{
 				}
 				void erase_lru(){
 					bool full_flush = false;
-					if(::os::millis() > last_full_flush  + 180000){
-						last_full_flush = ::os::millis() ;
-						printf("[TS] [INFO] Pool full flush of unused memory\n");
+					if(clock > last_full_flush  + 18000){
+						last_full_flush = last_full_flush; //::os::millis() ;
+						inf_print("Pool full flush of unused memory");
 						full_flush = true;
 					}
+					if((clock & 16) != 0) return;
 					if(shared->used > 0 && (full_flush || (shared->allocated + shared->used) < shared->max_pool_size)){
 						return;
 					}
@@ -502,7 +504,7 @@ namespace stx{
 				{
 					//unlocked_pool::max_pool_size = max_pool_size;
 					this->id = ++(shared->instances);
-					printf("[INFO] [TS] creating unlocked pool\n");
+					inf_print("creating unlocked pool");
 					setup_dh();
 					last_full_flush = ::os::millis();
 
@@ -562,7 +564,12 @@ namespace stx{
 						result = current.back();
 						current.pop_back();
 						shared->used -= (size + overhead());
-						
+						if(heap_alloc_check){
+							if(((u8*)result.data)[size-1] != (u8)((result.data)-1)){
+								err_print("freed memory has been overwritten or allocated");
+							}
+						}
+												
 					}else{						
 						result.ti = &ti;
 						result.is_new = true;
@@ -595,21 +602,23 @@ namespace stx{
 						size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
 						_Bucket &current =  get_bucket(size,false);
 						_Allocated allocated((u8*)data, ti);
-						if(requested < size){
-							if(((u8*)data)[requested] != (u8)data){
-								printf("[TS] [ERROR] memory has been overwritten or deallocated\n");
-							}else{
-								((u8*)data)[requested] = ((u8)data)-1;
-							}
+						if(heap_alloc_check){
+							if(requested < size){
+								if(((u8*)data)[requested] != (u8)data){
+									err_print("memory has been overwritten or deallocated");
+								}
 
-						}
-						if(requested+1 < size){
-							if(((u8*)data)[requested+1] != (u8)size){
-								printf("[TS] [ERROR] memory has been overwritten or deallocated\n");
-							}else{
-								((u8*)data)[requested+1] = (u8)(size-1);
 							}
+							if(requested+1 < size){
+								if(((u8*)data)[requested+1] != (u8)size){
+									err_print("memory has been overwritten or deallocated");
+								}
+							}
+						
+							memset((u8*)data,'F',MIN_ALLOCATION_SIZE);
+							((u8*)data)[size-1] = (u8)((u8*)(data)-1);						
 						}
+						
 						allocated.is_new = false;
 						current.push_back(allocated);
 						shared->used += (size + overhead());

@@ -25,9 +25,8 @@ extern "C"{
 #include <fse/fse.h>
 #include <fse/zlibh.h>
 #include "system_timers.h"
-#include <iostream>
-#define dbg_print(x,...)          do { if (true) (printf("[TS][DBG]" x "\n", __VA_ARGS__)); } while(0)
-#define err_print(x,...)          do { if (true) (printf("[TS][ERR]" x "\n", __VA_ARGS__)); } while(0)
+
+
 namespace stx{
 
 	namespace storage{
@@ -369,7 +368,8 @@ namespace stx{
 
 			i32 origin = (i32)buff.size();
 			/// TODO: cannot compress sizes lt 200 mb
-			t.resize(LZ4_compressBound((int)buff.size())+sizeof(i32));
+			size_t dest_size = LZ4_compressBound((int)buff.size())+sizeof(i32);
+			if(t.size() < dest_size) t.resize(dest_size);
 			i32 cp = buff.empty() ? 0 : LZ4_compress((const encode_type_ref)&buff[0], (encode_type_ref)&t[sizeof(i32)], origin);
 			*((i32*)&t[0]) = origin;
 			t.resize(cp+sizeof(i32));

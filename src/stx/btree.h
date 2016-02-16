@@ -257,7 +257,7 @@ namespace stx
 			bytes_per_page = 4096, /// this isnt currently used but could be
 			max_scan = 0,
 			interior_mul = 1,
-			keys_per_page = 128, ///192 is good for transactions, 384
+			keys_per_page = 192, ///192 is good for transactions, 384
 			caches_per_page = 4,
 			max_release = 8,
 			version_reload
@@ -4212,7 +4212,7 @@ namespace stx
 		/// checks if theres a low memory state and release written pages
 		void check_low_memory_state(){
 			/// ||allocation_pool.is_near_depleted()
-			if(::stx::memory_mark_state){
+			if(::stx::memory_low_state){
 				reduce_use();
 				
 			}

@@ -65,6 +65,10 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <vector>
 #include <Poco/Types.h>
 #include <Poco/UUID.h>
+/// files that use these macros need to include <iostream> or <stdio.h>
+#define dbg_print(x,...)          do { if (true) (printf("[TS][DBG]" x "\n", __VA_ARGS__)); } while(0)
+#define err_print(x,...)          do { if (true) (printf("[TS][ERR]" x "\n", __VA_ARGS__)); } while(0)
+#define inf_print(x,...)          do { if (true) (printf("[TS][INF]" x "\n", __VA_ARGS__)); } while(0)
 namespace stx{
 	namespace storage{
 		/// unsigned integer primitive types

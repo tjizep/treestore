@@ -67,25 +67,19 @@
   </Binaries>
   <Reports>
     <Report>
-      <Path>mysql160202.vspx</Path>
+      <Path>mysql160214.vspx</Path>
     </Report>
     <Report>
-      <Path>mysql160203.vspx</Path>
+      <Path>mysql160214(1).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql160204.vspx</Path>
+      <Path>mysql160214(2).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql160204(1).vspx</Path>
+      <Path>mysql160214(3).vspx</Path>
     </Report>
     <Report>
-      <Path>mysql160204(2).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160205.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160205(1).vspx</Path>
+      <Path>mysql160216.vspx</Path>
     </Report>
   </Reports>
   <Launches>

@@ -394,6 +394,13 @@ namespace storage{
 			block_descriptor(version_type version) : clock(0), mod(read), use(0), compressed(false), version(version){
 				//add_buffer_use(sizeof(*this));
 			}
+			void clear(version_type version){
+				clock = 0;
+				mod = read;
+				compressed = false;
+				(*this).version = version;
+				block.clear();
+			}
 			block_descriptor(const block_descriptor& right) {
 				//add_buffer_use(sizeof(*this));
 				*this  = right;
@@ -436,7 +443,7 @@ namespace storage{
 		typedef std::vector<block_descriptor*, sta::buffer_pool_alloc_tracker<block_descriptor*> > _Descriptors;				
 		typedef ns_umap::unordered_map<address_type, ref_block_descriptor, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type> > _Allocations;
 		typedef std::unordered_set<address_type, rabbit::rabbit_hash<address_type>, std::equal_to<address_type>, sta::buffer_pool_alloc_tracker<address_type>  > _Changed;
-		
+		typedef std::set<address_type> _Addresses;
 	private:
 		/// per instance members
 		Poco::AtomicCounter references;
@@ -452,7 +459,7 @@ namespace storage{
 
 		_Allocations allocations;	/// the live unflushed allocations		
 
-		_Changed changed;			/// a list of addresses which changed during the current transaction
+		//_Changed changed;			/// a list of addresses which changed during the current transaction
 
 		address_type next;			/// next virtual address to allocate
 
@@ -509,6 +516,8 @@ namespace storage{
 		//sixsided::transacted_blocks<block_type>
 		red::client_allocator_proxy lego;		
 									/// file blocks
+
+		_Descriptors recycled;		/// recycled blocks
 
 		typename _Allocations::iterator finder;
 
@@ -635,6 +644,9 @@ namespace storage{
 				(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
 			}
 
+		}
+		inline bool has_session() const {
+			return _session != nullptr;
 		}
 		/// open the connection if its closed
 
@@ -875,10 +887,14 @@ namespace storage{
 
 					down_use( get_block_use((*b).second) );
 					delete (*b).second;
+
 				}
 				if(mods == 0 && get_use() <= (before*factor)){
 					break;
 				}
+			}
+			if(release){
+				clear_recycler();
 			}
 			get_session() << "PRAGMA shrink_memory;", now;
 			if(write_all){
@@ -911,6 +927,37 @@ namespace storage{
 			}
 
 			return r;
+		}
+		void clear_recycler(){
+			while(!recycled.empty()){
+				ref_block_descriptor r = nullptr;
+				r = recycled.back();
+				recycled.pop_back();				
+				down_use( get_block_use(r) );
+				delete r;
+			}
+		}
+		ref_block_descriptor create_block(const address_type& which){
+			ref_block_descriptor r = nullptr;
+			if(!recycled.empty()){
+				r = recycled.back();
+				r->clear(version_off(which));
+				recycled.pop_back();
+			}else{
+				r = new block_descriptor(version_off(which));
+			}
+			
+			return r;
+		}
+		void recycle_block(const address_type& at, ref_block_descriptor block){
+			up_use(reflect_block_use(block)); /// update to correctly reflect						
+			
+			if(allocations.erase(at)==1){
+				recycled.push_back(block);			
+			}else{
+				down_use( get_block_use(block) );
+				delete block;
+			}
 		}
 		bool find_block(const address_type& which, ref_block_descriptor& result){
 			
@@ -955,13 +1002,13 @@ namespace storage{
 							allocated_version = version_off(which);
 							return read_block;
 						}
-						result = new block_descriptor(version_off(which));
+						result = create_block(which);
 						result->block.insert(result->block.begin(), current_block.begin(), current_block.end());
 						allocations[which] = result;
 						
 					}else if(how == create)
 					{
-						result = new block_descriptor(version_off(which));
+						result = create_block(which);
 						allocations[which] = result;
 						next = std::max<address_type>(which, next);
 
@@ -981,7 +1028,7 @@ namespace storage{
 
 				which = ++next;
 				//printf("[CREATE ADDRESS] %lld %s\n", (long long)which, get_name().c_str());
-				result = new block_descriptor(version_off(which)); //std::make_shared<block_descriptor>();
+				result = create_block(which); //std::make_shared<block_descriptor>();
 				allocations[which] = result;
 				result->set_storage_action(create);
 
@@ -1083,8 +1130,22 @@ namespace storage{
 			(*this).version = version;
 		}
 		/// get the list of addresses stored
-		typedef std::set<stream_address, std::less<stream_address>, sta::buffer_pool_alloc_tracker<stream_address> > _Addresses;
-
+		
+		void get_addresses(_Allocations& out){
+			synchronized s(lock);
+			if(_session != nullptr){
+				_SQLAddresses addresses;
+				get_session() << "select a1 from " << (*this).table_name << " ;" , into(addresses), now;
+				for(_SQLAddresses::iterator sa = addresses.begin(); sa != addresses.end(); ++sa){
+					out[(stream_address)(*sa)] = nullptr;
+				}
+			}
+			for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
+				out[(stream_address)(*a).first] = (*a).second;
+			}
+			/// out contains a unique list of addresses in this allocator
+		}
+		
 		void get_addresses(_Addresses& out){
 			synchronized s(lock);
 			if(_session != nullptr){
@@ -1095,7 +1156,7 @@ namespace storage{
 				}
 			}
 			for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
-				out.insert((stream_address)(*a).first);
+				out.insert((stream_address)(*a)) ;
 			}
 			/// out contains a unique list of addresses in this allocator
 		}
@@ -1185,36 +1246,62 @@ namespace storage{
 			//}
 			printf("[TS] [INFO] readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
 		}
-
+		
 		/// move all data to dest wether it exists or not
 		void move(sqlite_allocator& dest){
 
-			_Addresses todo;
+			_Allocations todo;
 			get_addresses(todo);
+			nst::u64 unloaded = 0;
 			if(dest.get_name() != get_name()){
 				//printf("[TX-MOvE] invalid name\n");
 			}
 			//printf("[TX MOVE] %s ver. %lld -> %lld [", dest.get_name().c_str(), (long long)get_version(), dest.get_version());
-			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
-				stream_address at = (*a);
+			for(_Allocations::iterator a = todo.begin(); a != todo.end(); ++a){
+				stream_address at = a.get_key();
+				ref_block_descriptor current = a.get_value();
 				//printf("%lld, ", (long long)at);
-				buffer_type &r = allocate(at, read);
-
-				buffer_type *d = &(dest.allocate(at, create));
-			
-				if((*this).get_allocated_version() <= dest.get_allocated_version()){
-					throw InvalidVersion();
-				}
-				d->swap(r);
-
-				dest.assign_version((*this).get_allocated_version());
-				complete();
-				dest.complete();
 				
-			}
+				if(current!=nullptr){
+					buffer_type &r = current->block;
+					buffer_type *d = &(dest.allocate(at, create));
+					version_type allocated_version = current->version;
+					
+					if(allocated_version <= dest.get_allocated_version()){
+						throw InvalidVersion();
+					}
+					d->swap(r);	
+					dest.assign_version(allocated_version);
+					dest.complete();
+					versions.erase(at);
+					recycle_block(at,current);
+				}else{
+					++unloaded; 
+					buffer_type &r = allocate(at, read);
+					buffer_type *d = &(dest.allocate(at, create));
+			
+					if((*this).get_allocated_version() <= dest.get_allocated_version()){
+						throw InvalidVersion();
+					}
+					d->swap(r);				
+					dest.assign_version((*this).get_allocated_version());
+					complete();
+					dest.complete();
+					versions.erase(at);
+					if(find_block(at, current)){
+						recycle_block(at,current);
+					}
+				}
+				
+			}			
 			if(!allocations.empty()){
-				//printf("[TS] [WARNING] not all addresses transferred\n");
+				printf("[TS] [WARNING] not all addresses transferred\n");
 			}
+			changes = 0;
+			versions.clear();
+			(*this).set_transient();
+			(*this).rollback();
+			
 			//printf("]\n");
 		}
 
@@ -1234,7 +1321,8 @@ namespace storage{
 			if(!allocations.empty()){
 				printf("[TS] [WARNING] not all addresses transferred\n");
 			}
-			changed.clear();
+			//changed.clear();
+			changes = 0;
 			versions.clear();
 		}
 		
@@ -1416,12 +1504,22 @@ namespace storage{
 					get_stmt = nullptr;
 					exists_stmt = nullptr;
 					_session = nullptr;
+					pool_string npath = get_storage_path() + name + extension;
+					if(transient){
+						using Poco::File;
+						File df ( npath.c_str() );					
+						if(df.exists()){
+							df.remove(false);
+						}
+						(*this).is_new = true;
+					}
 				}
 				for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
 					up_use( reflect_block_use((*a).second) );
 					down_use( get_block_use((*a).second) );
 					delete (*a).second;
 				}
+				clear_recycler();
 				allocations.clear();
 				versions.clear();
 				if(lego.is_open()) 
@@ -1630,12 +1728,38 @@ namespace storage{
 
 		void rollback(){
 			syncronized ul(lock);
-			if(transacted){
-				get_session() << "rollback;", now;
-				if(lego.is_open()) lego.rollback();
+			if(has_session()){
+				if(transacted){
+					get_session() << "rollback;", now;
+					if(lego.is_open()) lego.rollback();
+				}
+				get_session() << "PRAGMA shrink_memory;", now;
+				insert_stmt = nullptr;
+				get_stmt = nullptr;
+				exists_stmt = nullptr;
+				_session = nullptr;
+				pool_string npath = get_storage_path() + name + extension;
+				if(transient){
+					using Poco::File;
+					File df ( npath.c_str() );					
+					if(df.exists()){
+						df.remove(false);
+					}
+					(*this).is_new = true;
+				}
 			}
-			get_session() << "PRAGMA shrink_memory;", now;
+			for(typename _Allocations::iterator a = allocations.begin(); a!=allocations.end(); ++a){
+				up_use( reflect_block_use((*a).second) );
+				down_use( get_block_use((*a).second) );
+				delete (*a).second;
+			}			
+			if(!allocations.empty()) 
+				allocations.clear();
+			if(!versions.empty()) 
+				versions.clear();
+			changes = 0;
 			transacted = false;
+			
 		}
 		void reduce(){
 			if(transient) return;
@@ -2654,7 +2778,82 @@ namespace storage{
 			}
 			return true;
 		}
+		/// finish a version and merge it to storage
+		/// the merge is coordinated with other mvcc storages
+		/// via the journal
+		/// the version may be merged with dependent previous versions
+		/// returns true if the merge could take place
+		bool merge(version_storage_type* transaction){
+			//if(treestore_current_mem_use > treestore_max_mem_use){
+			if(buffer_allocation_pool.is_near_depleted()){
+				stored::reduce_all();
+			}
+			bool writer = !transaction->is_readonly();
+			if(!writer){
+				printf("WARNNIG: cannot commit: this is not a writing transaction\n");
+				throw InvalidTransactionType();
+			}
+			if (!recovery)		/// dont journal during recovery
+					transaction->journal((*this).initial->get_name());
+			{
+				syncronized _sync(*lock);
 
+				if(active_transactions == 0){
+					discard(transaction);
+					printf("WARNNIG: cannot commit: no more active transactions\n");
+					throw InvalidWriterOrder();
+
+					// return false;
+				}
+				//printf("[COMMIT MVCC] [%s] %lld at v. %lld\n", transaction->get_allocator().get_name().c_str(), (long long)transaction->get_allocator().get_version());
+
+				if(writer && transaction->modified() && transaction->get_order() < order){
+					discard(transaction);
+					printf("WARNNIG: invalid writer order\n");
+					throw InvalidWriterOrder();
+
+
+				}
+				
+				
+
+				version_storage_type_ptr version = storage_versions.at(transaction->get_version());
+
+				if(version == nullptr){
+					throw InvalidVersion();
+				}
+
+
+				last_address = std::max<address_type>(last_address, version->last());
+
+				version_storage_type_ptr prev = version->get_previous();
+				if(prev==nullptr)
+					throw WriterConsistencyViolation();
+				if(prev != storages.back()){
+					throw ConcurrentWriterError();
+				}
+				if(storages.empty()){
+					throw WriterConsistencyViolation();
+				}
+				version->move(storages.back().get());
+
+				++order;			/// increment committed transaction count
+				
+				transaction->set_order(order);
+				
+				storage_versions.erase(version->get_version());
+
+				transaction->set_version(create_version());
+
+				storage_versions[version->get_version()] = version;
+									/// it needs a higher version
+				
+			}
+			if(writer){
+				//get_single_writer_lock().unlock();
+			}
+			return true;
+		}
 		/// discard a new version similar to rollback
 
 		void discard(version_storage_type* transaction){

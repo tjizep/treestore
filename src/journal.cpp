@@ -49,6 +49,7 @@ private:
 	nst::u64 last_synch;
 	nst::u64 last_check;
 	participants_type participants;
+	std::vector<nst::u8> journal_buffer;
 public:
 	static const std::ios_base::openmode o_mode = std::ios::binary|std::ios::app;
 	journal_state()
@@ -81,14 +82,26 @@ private:
 		log_entry entry;
 		entry.sequence = ++sequence;
 		entry.command = command;
-		entry.name_size = name.size();
+		entry.name_size = name.length();
 		entry.address = address;
 		entry.buffer_size = buffer.size();
-
-		writer.writeRaw((const char*)&entry,sizeof(entry));
-		writer.writeRaw(name);
+		const nst::u8* start = (const nst::u8*)&entry;
+		size_t jstart = journal_buffer.size();
+		journal_buffer.resize(jstart + sizeof(entry) + name.length() + buffer.size());
+		memcpy(journal_buffer.data() + jstart, &entry, sizeof(entry));		
+		jstart += sizeof(entry);
+		memcpy(journal_buffer.data() + jstart, name.data(), name.length());
+		jstart += name.length();
+		//writer.writeRaw((const char*)&entry,sizeof(entry));
+		//writer.writeRaw(name);
 		if(!buffer.empty())
-			writer.writeRaw((const char*)&buffer[0], buffer.size() );
+			memcpy(journal_buffer.data() + jstart,buffer.data(), buffer.size());
+
+		if(journal_buffer.size() > 4000000){
+			writer.writeRaw((const char*)journal_buffer.data(), journal_buffer.size() );
+			journal_buffer.clear();
+		}
+			//writer.writeRaw((const char*)&buffer[0], buffer.size() );
 		/// else if(!(command == nst::JOURNAL_COMMIT || command == nst::JOURNAL_TEMP_INFO)) 	printf("the journal buffer is empty\n");
 	}
 	void compact()
@@ -117,7 +130,15 @@ public:
 		add_entry(command, writer, name, address, buffer);
 
 	}
+	void flush_buffer(){
+		
+		nst::synchronized s(jlock);
 
+		if(journal_buffer.size() > 0){				
+			writer.writeRaw((const char*)journal_buffer.data(), journal_buffer.size() );
+			journal_buffer.clear();
+		}
+	}
 	struct _Command{
 		nst::u64 sequence;
 		Poco::UInt32 command;
@@ -255,7 +276,7 @@ public:
 		if(last_synch != sequence){
 
 			add_entry(nst::JOURNAL_COMMIT, "commit", 0, nst::buffer_type()); /// marks a commit boundary
-
+			flush_buffer();
 			writer.flush();
 			journal_ostr.flush();
 			journal_ostr.rdbuf()->pubsync();
@@ -345,9 +366,14 @@ namespace storage{
 	void journal::log(const pool_string &name, const pool_string& jtype, stream_address sa){
 		log_journal(name.c_str(), jtype.c_str(), sa);
 	}
+	/// flush the write buffer
+
+	void flush_buffer(){
+		js().flush_buffer();
+	}
 
 	/// adds a journal entry written to disk
-
+	
 	void journal::add_entry(Poco::UInt32 command, const pool_string &name, long long address, const buffer_type& buffer){
 		js().add_entry(command, name.c_str(), address, buffer);
 	}

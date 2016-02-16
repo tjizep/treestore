@@ -28,12 +28,12 @@ extern "C" int get_l1_bs_memory_use();
 /// determine factored low memory state
 static bool is_memory_low() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.85) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.80) || allocation_pool.is_depleted();
 
 }
 static bool is_memory_mark() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.80) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55) || allocation_pool.is_depleted();
 }
 static bool is_memory_lower() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
@@ -298,9 +298,10 @@ namespace tree_stored{
 		void own_reduce(){
 			//return;
 			_LruTables ordered;
-			create_lru(ordered);
-			own_reduce_col_trees(ordered);
+			create_lru(ordered);			
 			own_reduce_index_trees(ordered);
+			own_reduce_col_trees(ordered);			
+			
 			if(calc_total_use() > treestore_max_mem_use){
 				own_reduce_col_caches(ordered);
 			}
@@ -510,7 +511,7 @@ public:
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
 	
-		if(stx::memory_mark_state){
+		if(stx::memory_low_state){
 			(*this).reduce();
 		}
 
@@ -1208,7 +1209,7 @@ public:
 		return r;
 	}
 	void check_own_use(){
-		if(stx::memory_mark_state){		
+		if(stx::memory_low_state){		
 			st.reduce();		
 			if(writer_thread!=nullptr){
 				writer_thread->own_reduce();
@@ -1564,7 +1565,7 @@ public:
 	}
 	nst::u64 writes;
 	int write_row(byte * buff){
-		if(((writes%1000ll)==0) || stx::memory_mark_state){
+		if(((writes%1000ll)==0) || stx::memory_low_state){
 			check_own_use();
 			if(is_memory_low()){
 				//printf("[TS] [WARNING] could not reduce use\n");
@@ -2362,7 +2363,7 @@ namespace ts_cleanup{
 				if(stx::memory_mark_state){
 					//printf("[TREESTORE] reduce idle tree use\n");
 					
-					st.reduce_idle_writers();	
+					//st.reduce_idle_writers();	
 				}
 				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 					printf
