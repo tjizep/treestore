@@ -375,7 +375,7 @@ namespace stx{
 
 				static const u64 MAX_ALLOCATION_SIZE = 25600000000000ll;
 				static const u64 USED_PERIOD = 1000000000ll;
-				static const u64 MIN_ALLOCATION_SIZE = 8ll;
+				static const u64 MIN_ALLOCATION_SIZE = 16ll;
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
 				pool_shared * shared;
 				u64 last_full_flush;
@@ -448,28 +448,20 @@ namespace stx{
 					return msize;
 				}
 				void erase_lru(){
-					bool full_flush = false;
-					if(clock > last_full_flush  + 18000){
-						last_full_flush = last_full_flush; //::os::millis() ;
-						inf_print("Pool full flush of unused memory");
-						full_flush = true;
-					}
-					if((clock & 16) != 0) return;
-					if(shared->used > 0 && (full_flush || (shared->allocated + shared->used) < shared->max_pool_size)){
+					
+					double MB = 1024.0*1024.0;
+					inf_print("There are %lld buckets with %.4g of %.4g total max %.4g MB",(*this).buckets.size(),(double)shared->used/MB,(double)(shared->allocated + shared->used)/MB,(double)shared->max_pool_size/MB);
+					if(shared->allocated + shared->used < shared->max_pool_size){
 						return;
 					}
-
-					//if (this->allocated < ( shared->max_pool_size/shared->instances)) return;
-
-					///if(((++shared->current) % shared->instances) != this->id) return;
-					
-					u64 todo = shared->allocated + shared->used - shared->max_pool_size;
-					while(shared->used > 0 && (full_flush||(shared->allocated + shared->used) > shared->max_pool_size)){
+					u64 target_used = shared->used - shared->used/8;
+					/// && ((shared->allocated + shared->used) > shared->max_pool_size)
+					while(shared->used > target_used){
 						size_t lru_size = find_lru_size();
 						if(lru_size < MAX_ALLOCATION_SIZE){
 							_Clocked &clocked = (*this).buckets[lru_size];						
 							if(clocked.size == lru_size){
-								while((shared->allocated + shared->used) > shared->max_pool_size){
+								while(shared->used > target_used){
 									_Allocated allocated = clocked.bucket.back();
 									///torelease.push_back(allocated);
 									delete allocated.data;
@@ -479,9 +471,9 @@ namespace stx{
 									if(clocked.bucket.empty())
 										break;
 								}
-								/// printf("removed lru pool buckets %lld from size %lld\n",(long long)required,(long long)lru_size);
+								//inf_print("removed %lld from lru pool ",(long long)target_used);
 							}else{
-								printf("Error in lru pool buckets %lld\n",(long long)lru_size);
+								err_print("Error in lru pool buckets %lld",(long long)lru_size);
 								
 								return;
 							}
@@ -506,7 +498,7 @@ namespace stx{
 					this->id = ++(shared->instances);
 					inf_print("creating unlocked pool");
 					setup_dh();
-					last_full_flush = ::os::millis();
+					last_full_flush = clock;
 
 				}
 
@@ -514,6 +506,7 @@ namespace stx{
 				}
 
 				void check_lru(){
+					if((clock & (1<<20)-1) != 0) return;
 					erase_lru();
 				}
 				

@@ -28,16 +28,16 @@ extern "C" int get_l1_bs_memory_use();
 /// determine factored low memory state
 static bool is_memory_low() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.80) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.750);// || allocation_pool.is_depleted();
 
 }
 static bool is_memory_mark() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55);// || allocation_pool.is_depleted();
 }
 static bool is_memory_lower() {
 	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55) || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55);// || allocation_pool.is_depleted();
 }
 /// accessors for journal stats
 void set_treestore_journal_size(nst::u64 ns){
