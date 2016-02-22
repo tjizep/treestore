@@ -1208,7 +1208,7 @@ namespace rabbit{
 		inline void create_current(){
 			if(current==nullptr)
 				
-				set_current(std::make_shared<hash_kernel>(key_c,alloc));
+				set_current(std::allocate_shared<hash_kernel>(alloc,key_c,alloc));
 		}
 	public:
 		float load_factor() const{
@@ -1250,7 +1250,7 @@ namespace rabbit{
 			size_type to = std::max<size_type>(to_, config.MIN_EXTENT);
 			/// can cause oom e because of recursive rehash'es
 
-			typename hash_kernel::ptr rehashed = std::make_shared<hash_kernel>();
+			typename hash_kernel::ptr rehashed = std::allocate_shared<hash_kernel>(alloc);
 			size_type extent = current->get_extent();
 			size_type new_extent = to;
 			try{
@@ -1273,7 +1273,7 @@ namespace rabbit{
 							}
 						}else{
 
-							rehashed = make_shared<hash_kernel>();
+							rehashed = std::allocate_shared<hash_kernel>(alloc);
 							new_extent = (size_type)(new_extent * recalc_growth_factor(rehashed->elements)) + 1;
 							rehashed->resize_clear(new_extent);
 							rehashed->mf = (*this).current->mf;
@@ -1301,11 +1301,11 @@ namespace rabbit{
 			if(current!=nullptr)
 				current->clear();
 			current = nullptr;
-			///set_current(std::make_shared<hash_kernel>());
+			///set_current(std::allocate_shared<hash_kernel>(alloc));
 		}
 
 		void clear(const key_compare& compare,const allocator_type& allocator){
-			set_current(std::make_shared<hash_kernel>(compare, allocator));
+			set_current(std::allocate_shared<hash_kernel>(allocator,compare, allocator));
 		}
 
 		basic_unordered_map() :current(nullptr) {
@@ -1336,7 +1336,7 @@ namespace rabbit{
 		}
 
 		basic_unordered_map& operator=(const basic_unordered_map& right){
-			(*this).set_current(std::make_shared<hash_kernel>());
+			(*this).set_current(std::allocate_shared<hash_kernel>(alloc));
 			(*this).reserve(right.size());
 			const_iterator e = right.end();
 			for(const_iterator c = right.begin(); c!=e;++c){

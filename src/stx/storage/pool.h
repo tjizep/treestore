@@ -340,7 +340,7 @@ namespace stx{
 			};
 
 			/// memory allocator overlay to improve allocation speed
-			class unlocked_pool{
+			class inner_pool{
 			public:
 				/// types
 				struct _Allocated{
@@ -366,6 +366,11 @@ namespace stx{
 
 					_Bucket bucket;
 				};
+
+				struct thread_instance{
+					std::vector<std::pair<void *, size_t>> alloc_pairs;
+					std::vector<std::pair<void *, size_t>> free_pairs;
+				};
 				
 				typedef rabbit::unordered_map<size_t, _Clocked> _Buckets;
 				
@@ -379,13 +384,13 @@ namespace stx{
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
 				pool_shared * shared;
 				u64 last_full_flush;
-				u64 clock;
-				u64 allocated;
+				u64 clock;				
 				u64 used_period;
 				u64 id;
+				u64 last_allocation;
+				u64 last_allocation_row;
 				_Buckets buckets;
-
-
+				Poco::Mutex lock;
 			protected:
 				/// methods
 				void update_min_used(_Clocked &clocked){
@@ -451,6 +456,7 @@ namespace stx{
 					
 					double MB = 1024.0*1024.0;
 					inf_print("There are %lld buckets with %.4g of %.4g total max %.4g MB",(*this).buckets.size(),(double)shared->used/MB,(double)(shared->allocated + shared->used)/MB,(double)shared->max_pool_size/MB);
+					return;
 					if(shared->allocated + shared->used < shared->max_pool_size){
 						return;
 					}
@@ -464,8 +470,7 @@ namespace stx{
 								while(shared->used > target_used){
 									_Allocated allocated = clocked.bucket.back();
 									///torelease.push_back(allocated);
-									delete allocated.data;
-									this->allocated -= lru_size + overhead();
+									delete allocated.data;									
 									shared->used -= lru_size + overhead();
 									clocked.bucket.pop_back();
 									if(clocked.bucket.empty())
@@ -484,17 +489,34 @@ namespace stx{
 						}
 					}					
 				}
+				thread_instance*get_thread_instance(){
+					static thread_local thread_instance* instance= nullptr;
+					if(instance==nullptr){
+						instance = new thread_instance;
+					}
+					return instance;
+				}
 				
+				void _free_type(void * data, size_t size){
+					_Bucket &current =  get_bucket(size,false);
+					_Allocated allocated((u8*)data, typeid(u8));						
+					allocated.is_new = false;
+					current.push_back(allocated);
+					shared->used += (size + overhead());
+					(*this).shared->allocated -= (size + overhead());
+					release_overflow();					
+				}
 
 			public:
 
-				unlocked_pool(pool_shared* shared)
+				inner_pool(pool_shared* shared)
 				:	shared(shared)
-				,	clock(0)				
-				,	allocated(0)
+				,	clock(0)								
 				,	used_period(0)
+				,	last_allocation(0)
+				,	last_allocation_row(0)
 				{
-					//unlocked_pool::max_pool_size = max_pool_size;
+					//inner_pool::max_pool_size = max_pool_size;
 					this->id = ++(shared->instances);
 					inf_print("creating unlocked pool");
 					setup_dh();
@@ -502,7 +524,7 @@ namespace stx{
 
 				}
 
-				~unlocked_pool(){
+				~inner_pool(){
 				}
 
 				void check_lru(){
@@ -534,21 +556,49 @@ namespace stx{
 				size_t overhead() const throw(){
 					return sizeof(void*);
 				}
-
-				_Allocated allocate_type(size_t requested, const std::type_info& ti) {
+				void bucket_2_thread(thread_instance* thread, _Bucket &current, size_t size){
+					
+					u64 moved = 0;
+					while(thread->alloc_pairs.size() < 16 && current.size()){
+						_Allocated result = current.back();
+						thread->alloc_pairs.push_back(std::make_pair(result.data,size));
+						moved += (size + overhead());
+						current.pop_back();
+					}
+					shared->allocated += moved;		
+					shared->used -= moved;
+				}
+				_Allocated allocate_type(size_t requested, const std::type_info& ) {
 
 					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
-						this->allocated += requested + overhead() ;
+
 						shared->allocated += requested + overhead() ;
 						u8 * a = new u8[requested];
 						//memset(a,0,requested);
-						_Allocated result(a,ti);
+						_Allocated result(a,typeid(u8));
 						result.is_new = true;
 
 						return result;
 					}
-					size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
+					size_t size = requested + (MIN_ALLOCATION_SIZE - (requested % MIN_ALLOCATION_SIZE));
+					thread_instance* instance = get_thread_instance();
+					if(!instance->alloc_pairs.empty()){
+						if(instance->alloc_pairs.back().second == size){
+							_Allocated result((u8*)instance->alloc_pairs.back().first,typeid(u8)) ;
+							instance->alloc_pairs.pop_back();															
+							return result;
+						}					
+					}
 					_Allocated result ;
+					
+					synchronized lck(lock);
+					
+					if(last_allocation == size){
+						last_allocation_row++;						
+					}else{
+						last_allocation_row = 0;
+						last_allocation = size;
+					}
 
 					_Bucket &current =  get_bucket(size);
 
@@ -557,6 +607,12 @@ namespace stx{
 						result = current.back();
 						current.pop_back();
 						shared->used -= (size + overhead());
+						if(last_allocation_row > 35){
+							free_vect(instance->alloc_pairs);
+							bucket_2_thread(instance,current,size);
+						}
+						
+
 						if(heap_alloc_check){
 							if(((u8*)result.data)[size-1] != (u8)((result.data)-1)){
 								err_print("freed memory has been overwritten or allocated");
@@ -564,63 +620,69 @@ namespace stx{
 						}
 												
 					}else{						
-						result.ti = &ti;
+						result.ti = &typeid(u8);
 						result.is_new = true;
 						result.data = new u8[size];
 						
 					}
-					if(requested < size){
-						result.data[requested] = (u8)result.data;
+					
+					
+
+					if(heap_alloc_check){
+						if(requested < size){
+							result.data[requested] = (u8)result.data;
+						}
+						if(requested+1 < size){
+							result.data[requested+1] = (u8)size;
+						}
 					}
-					if(requested+1 < size){
-						result.data[requested+1] = (u8)size;
-					}
-					this->allocated += size + overhead();
 					shared->allocated += size + overhead();					
+
 					release_overflow();
+										
 					return result;
 				}
 				void free(void * data, size_t requested){
-					free_type(typeid(u8),data,requested);
+					free_type(data,requested);
 				}
-				void free_type(const std::type_info& ti, void * data, size_t requested){
+				void free_vect(std::vector<std::pair<void *,size_t>>& v){
 					
+					while(!v.empty()){
+						_free_type(v.back().first,v.back().second);
+						v.pop_back();
+					}
+				}
+				void free_type(void * data, size_t requested){
 					if(heap_for_small_data){// && requested < MAX_SMALL_ALLOCATION_SIZE){
-						shared->allocated -= requested + overhead();
-						this->allocated -= requested + overhead();
+						shared->allocated -= requested + overhead();					
 						delete data;
 						return;
 					}
-					{
-						size_t size = requested + (MIN_ALLOCATION_SIZE-(requested % MIN_ALLOCATION_SIZE));
-						_Bucket &current =  get_bucket(size,false);
-						_Allocated allocated((u8*)data, ti);
-						if(heap_alloc_check){
-							if(requested < size){
-								if(((u8*)data)[requested] != (u8)data){
-									err_print("memory has been overwritten or deallocated");
-								}
+					size_t size = requested + (MIN_ALLOCATION_SIZE - (requested % MIN_ALLOCATION_SIZE));
+					if(heap_alloc_check){
+						if(requested < size){
+							if(((u8*)data)[requested] != (u8)data){
+								err_print("memory has been overwritten or deallocated");
+							}
 
+						}
+						if(requested+1 < size){
+							if(((u8*)data)[requested+1] != (u8)size){
+								err_print("memory has been overwritten or deallocated");
 							}
-							if(requested+1 < size){
-								if(((u8*)data)[requested+1] != (u8)size){
-									err_print("memory has been overwritten or deallocated");
-								}
-							}
-						
-							memset((u8*)data,'F',MIN_ALLOCATION_SIZE);
-							((u8*)data)[size-1] = (u8)((u8*)(data)-1);						
 						}
 						
-						allocated.is_new = false;
-						current.push_back(allocated);
-						shared->used += (size + overhead());
-						(*this).shared->allocated -= (size + overhead());
-						(*this).allocated -= (size + overhead());
+						memset((u8*)data,'F',MIN_ALLOCATION_SIZE);
+						((u8*)data)[size-1] = (u8)((u8*)(data)-1);						
 					}
-					release_overflow();
-					
+					thread_instance* instance = get_thread_instance();
+					instance->free_pairs.push_back(std::make_pair(data, size));
+					if(instance->free_pairs.size() > 16){
+						synchronized l(lock);
+						free_vect(instance->free_pairs);
+					}
 				}
+				
 
 				/// returns true if the pool is depleted
 				bool is_depleted() const {
@@ -662,53 +724,32 @@ namespace stx{
 					return reinterpret_cast<T*>(potential);
 				}
 				template<typename T>
-				void free(T* v){
-					
-					free_type(typeid(T), v, sizeof(T));
+				void free(T* v){					
+					free_type(v, sizeof(T));
 				}
 
 			};
 			class pool{
 			protected:				
-				struct thread_instance{
-					pool* instance;
-					unlocked_pool* per_thread_pool;
-				};
-				typedef std::vector<thread_instance> thread_instances;								
+								
 				pool_shared shared;
-				Poco::FastMutex lock;
-				unlocked_pool* unlocked;
+				
+				inner_pool* inner;
 			public:
-				pool(u64 max_pool_size) : unlocked (nullptr){					
+				pool(u64 max_pool_size) : inner (nullptr){					
 					set_max_pool_size(max_pool_size);
-					unlocked = new unlocked_pool(&shared);
+					inner = new inner_pool(&shared);
 				}
 
 				~pool(){
 
 				}
-				const unlocked_pool& get_pool() const {
+				const inner_pool& get_pool() const {
 					return const_cast<pool*>(this)->get_pool() ;
 				}
-				unlocked_pool& get_pool(){
+				inner_pool& get_pool(){
 					//if(unlocked)
-					return *unlocked;
-					if(false){
-						static thread_local thread_instances* instances= nullptr;
-						if(instances==nullptr){
-							instances = new thread_instances;
-						}
-						for(thread_instances::iterator i = instances->begin(); i != instances->end(); ++i){
-							if((*i).instance==this){
-								return *((*i).per_thread_pool);
-							}
-						}
-						thread_instance instance;
-						instance.instance = this;
-						instance.per_thread_pool = new unlocked_pool(&shared);
-						instances->push_back(instance);					
-						return *(instance.per_thread_pool);
-					}
+					return *inner;
 					
 				}
 				size_t get_allocated() const {
@@ -728,21 +769,13 @@ namespace stx{
 					return get_pool().get_total_allocated();
 				}
 				void * allocate(size_t requested){					
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						return get_pool().allocate(requested);
-					}else 
-						return get_pool().allocate(requested);
-					
+					return get_pool().allocate(requested);					
 				}
-
+				
 
 				void free(void * data, size_t requested){
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						get_pool().free(data, requested);
-					}else 
-						get_pool().free(data, requested);
+					
+					get_pool().free(data, requested);
 				}
 
 				/// return true if the give size bytes can be allocated
@@ -773,51 +806,23 @@ namespace stx{
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
-					T* r;					
-										
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						r = get_pool().allocate<T>();					
-					}else{						
-						r = get_pool().allocate<T>();					
-					}
-					
-				
+					T* r = get_pool().allocate<T>();										
 					return r;
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
-					T* r;					
-						
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						r = get_pool().allocate<T,_Context>(context);
-					}else{
-						r = get_pool().allocate<T,_Context>(context);								
-					}
-					
-					
+					T* r = get_pool().allocate<T,_Context>(context);
 					return r;
 				}
 				template<typename T>
 				inline void free(T* v){
 					if(!v) return;
-					v->~T();					
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						get_pool().free<T>(v);
-					}else{
-						get_pool().free<T>(v);
-					}
+					v->~T();	
+					free_ns<T>(v);					
 				}
 				template<typename T>
-				inline void free_ns(T* v){
-					if(!heap_for_small_data){
-						f_synchronized l(lock);
-						get_pool().free<T>(v);				
-					}else{						
-						get_pool().free<T>(v);				
-					}
+				inline void free_ns(T* v){					
+					get_pool().free<T>(v);									
 				}
 			};
 		};
