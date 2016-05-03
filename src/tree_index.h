@@ -59,7 +59,7 @@ namespace tree_stored{
 
 		class index_iterator_impl : public stored::index_iterator_interface{
 		private:
-			stored::DynamicKey returned;
+			stored::StandardDynamicKey returned;
 		public:
 			///for quick type check
 			IndexIterator value;
@@ -89,9 +89,12 @@ namespace tree_stored{
 			nst::u64 count(const index_iterator_interface& in) {
 				return value.count(((index_iterator_impl&)in).value);
 			};
-			stored::DynamicKey& get_key() {
+			stored::StandardDynamicKey& get_key() {
 				return value.get_key().return_or_copy(returned);
 			};
+			stored::BareKey get_bare_key(){
+				return value.get_key().get_bare(returned);
+			}
 			void set_end(index_iterator_interface& in) {
 				value.set_end(((index_iterator_impl&)in).value);
 			}
@@ -255,7 +258,7 @@ namespace tree_stored{
 			dbg_print("no key found",index.size());
 			return std::make_pair(empty,false);
 		}
-		bool find_key( stored::DynamicKey& k) const {
+		bool find_key( stored::StandardDynamicKey& k) const {
 			index_key f = k;
 			typename _IndexMap::const_iterator i = index.lower_bound(f);
 			if(i != index.end()){				
@@ -550,7 +553,7 @@ namespace tree_stored{
 		}
 		void add(const tree_stored::CompositeStored& k){
 			if(k.size()==0){
-				printf("[TS] [WARNING] inserting empty key\n");
+				err_print("add empty key");
 			}
 			index.add(k, 0);
 		}

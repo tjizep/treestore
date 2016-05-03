@@ -54,11 +54,26 @@ namespace stored{
 		r->engage();
 		return r;
 	}
+	void reduce_aged(){
+		nst::synchronized ll(m);
+		nst::u64 reduced = 0;
+		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
+			if(buffer_allocation_pool.is_near_depleted()){
+				if((*a).second->get_age() > 15000 && (*a).second->transactions_away() == 0){				
+					(*a).second->reduce();
+					reduced++;
+				}
+			}
+		}
+		inf_print("reduced %lld aged block storages",reduced);
+	}
 	void reduce_all(){
 
 		nst::synchronized ll(m);
+		
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
-			(*a).second->reduce();
+			if(buffer_allocation_pool.is_near_depleted())
+				(*a).second->reduce();
 		}
 	}
 }; //stored

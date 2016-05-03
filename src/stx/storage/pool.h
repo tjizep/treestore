@@ -19,8 +19,10 @@
 
 #include <typeinfo>
 #include <unordered_map>
+
 extern void add_btree_totl_used(ptrdiff_t added);
 extern void remove_btree_totl_used(ptrdiff_t added);
+extern char	treestore_use_internal_pool;
 #ifdef _MSC_VER
 #define thread_local __declspec(thread)
 #endif
@@ -82,8 +84,7 @@ namespace stx{
 				void remove(size_t bytes){
 					remove_buffer_use(bytes);
 				};
-			};
-			static const bool heap_for_small_data = false;
+			};			
 			static const bool heap_alloc_check = false;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
@@ -330,6 +331,7 @@ namespace stx{
 					max_pool_size = 0;
 					instances = 0;
 					current = 0;
+					
 				}
 				u64 max_pool_size;
 
@@ -337,8 +339,82 @@ namespace stx{
 				std::atomic<u64> used;				
 				std::atomic<u64> instances;
 				std::atomic<u64> current;
+				
 			};
+			typedef std::vector<void*> _ThreadAlloc;
+			struct _ThreadSizeAlloc{
+				_ThreadSizeAlloc() : accesses(0){
+				}
+				size_t accesses;
+				_ThreadAlloc buckets;
+				_ThreadAlloc & access(){
+					++accesses;
+					return buckets;
+				}
+			};
+				
+			typedef rabbit::unordered_map<size_t,_ThreadSizeAlloc*> _ThreadAllocPtrMap;
+			
+			class inner_pool;
+			struct thread_instance{
+				thread_instance(pool_shared* shared) : total_buckets(0),shared(shared){
+				}
+				pool_shared * shared;
+				u64 total_buckets;
+				_ThreadAllocPtrMap alloc_pairs;
+				_ThreadAllocPtrMap active_pairs;
+				size_t eviction_size(){
+					size_t f = 0xFFFFFFFFFFFFFFll,s = 0;
+					for(auto a = this->active_pairs.begin(); a != this->active_pairs.end(); ++a){
+						auto & bucket = *(a.get_value());
+						
+						if(!bucket.buckets.empty() && bucket.accesses < f){
+							f = bucket.accesses;
+							s = a.get_key();
+						}
+					}
+					return s;
+				}
+				
+				size_t overhead() const throw(){
+					return sizeof(void*);
+				}
 
+				void evict(size_t size){
+					
+					_ThreadSizeAlloc* r = nullptr;
+					if(active_pairs.get(size,r)){
+						u64 removed = r->buckets.size();
+						while(!r->buckets.empty()){
+							
+							//free_pairs.push_back(std::make_pair(r->buckets.back(),size));
+							delete r->buckets.back(); //,size
+							(*this).shared->allocated -= (size + overhead());
+
+							r->buckets.pop_back();
+						}
+						total_buckets-=removed;
+						active_pairs.erase(size);
+					}
+					
+				}
+				_ThreadAlloc & access(size_t size){
+					_ThreadSizeAlloc* r = nullptr;
+					if(active_pairs.get(size,r)){
+					}else{
+						if(!alloc_pairs.get(size,r)){
+							r = new _ThreadSizeAlloc();
+							alloc_pairs[size] = r;
+						}
+						active_pairs[size] = r;
+					}					
+					return r->access();
+				}
+				std::vector<std::pair<void *, size_t>> free_pairs;
+			};
+			
+			extern size_t get_thread_instance_count();
+			extern thread_instance* get_thread_instance(const inner_pool* src);			
 			/// memory allocator overlay to improve allocation speed
 			class inner_pool{
 			public:
@@ -366,11 +442,6 @@ namespace stx{
 
 					_Bucket bucket;
 				};
-
-				struct thread_instance{
-					std::vector<std::pair<void *, size_t>> alloc_pairs;
-					std::vector<std::pair<void *, size_t>> free_pairs;
-				};
 				
 				typedef rabbit::unordered_map<size_t, _Clocked> _Buckets;
 				
@@ -380,8 +451,9 @@ namespace stx{
 
 				static const u64 MAX_ALLOCATION_SIZE = 25600000000000ll;
 				static const u64 USED_PERIOD = 1000000000ll;
-				static const u64 MIN_ALLOCATION_SIZE = 16ll;
+				static const u64 MIN_ALLOCATION_SIZE = 32ll;
 				static const u64 MAX_SMALL_ALLOCATION_SIZE = MIN_ALLOCATION_SIZE*4ll;
+				static const u64 MAX_THREAD_BUCKETS = 5000;
 				pool_shared * shared;
 				u64 last_full_flush;
 				u64 clock;				
@@ -389,8 +461,11 @@ namespace stx{
 				u64 id;
 				u64 last_allocation;
 				u64 last_allocation_row;
+				u64 threads;
 				_Buckets buckets;
 				Poco::Mutex lock;
+				
+				
 			protected:
 				/// methods
 				void update_min_used(_Clocked &clocked){
@@ -410,14 +485,6 @@ namespace stx{
 					return current;
 				}
 
-
-
-				void setup_dh(){
-#ifdef _MSC_VER
-					///buckets.set_empty_key(MAX_ALLOCATION_SIZE+1);
-					///buckets.set_deleted_key(MAX_ALLOCATION_SIZE+2);
-#endif
-				}
 
 				typedef std::vector<size_t> _Empties;
 				_Empties empties;
@@ -440,9 +507,9 @@ namespace stx{
 							}else{
 								++row;
 							}
-							if(row > 16 && msize < MAX_ALLOCATION_SIZE){ // if theres more than 16 in a row just stop its ok
-								break;
-							}
+							//if(row > 16 && msize < MAX_ALLOCATION_SIZE){ // if theres more than 16 in a row just stop its ok
+							//	break;
+							//}
 						}
 
 					}
@@ -455,12 +522,12 @@ namespace stx{
 				void erase_lru(){
 					
 					double MB = 1024.0*1024.0;
-					inf_print("There are %lld buckets with %.4g of %.4g total max %.4g MB",(*this).buckets.size(),(double)shared->used/MB,(double)(shared->allocated + shared->used)/MB,(double)shared->max_pool_size/MB);
-					return;
 					if(shared->allocated + shared->used < shared->max_pool_size){
 						return;
 					}
-					u64 target_used = shared->used - shared->used/8;
+					inf_print("%lld sizes;%.4g used;%.4g allocated;%.4g total; max %.4g MB",(*this).buckets.size(),(double)shared->used/MB,(double)shared->allocated/MB,(double)(shared->allocated + shared->used)/MB,(double)shared->max_pool_size/MB);
+					
+					u64 target_used =  shared->used/16;
 					/// && ((shared->allocated + shared->used) > shared->max_pool_size)
 					while(shared->used > target_used){
 						size_t lru_size = find_lru_size();
@@ -489,13 +556,7 @@ namespace stx{
 						}
 					}					
 				}
-				thread_instance*get_thread_instance(){
-					static thread_local thread_instance* instance= nullptr;
-					if(instance==nullptr){
-						instance = new thread_instance;
-					}
-					return instance;
-				}
+				
 				
 				void _free_type(void * data, size_t size){
 					_Bucket &current =  get_bucket(size,false);
@@ -504,9 +565,12 @@ namespace stx{
 					current.push_back(allocated);
 					shared->used += (size + overhead());
 					(*this).shared->allocated -= (size + overhead());
-					release_overflow();					
+					
 				}
-
+				void check_lru(){
+					
+					erase_lru();
+				}
 			public:
 
 				inner_pool(pool_shared* shared)
@@ -515,23 +579,25 @@ namespace stx{
 				,	used_period(0)
 				,	last_allocation(0)
 				,	last_allocation_row(0)
+				,	threads(0)
 				{
 					//inner_pool::max_pool_size = max_pool_size;
 					this->id = ++(shared->instances);
-					inf_print("creating unlocked pool");
-					setup_dh();
+					inf_print("creating unlocked pool");					
 					last_full_flush = clock;
 
 				}
 
 				~inner_pool(){
 				}
-
-				void check_lru(){
-					if((clock & (1<<20)-1) != 0) return;
-					erase_lru();
+				void check_overflow(){
+					synchronized lck(lock);
+					check_lru();
 				}
 				
+				pool_shared * get_shared(){
+					return this->shared;
+				}
 				size_t get_allocated() const {
 					return (*this).shared->allocated;
 				}
@@ -548,29 +614,37 @@ namespace stx{
 
 					return (*this).shared->allocated + (*this).shared->used;
 				}
+
 				void * allocate(size_t requested){
 
 					_Allocated result = allocate_type(requested, typeid(u8));
 					return result.data;
 				}
+
 				size_t overhead() const throw(){
 					return sizeof(void*);
 				}
+
 				void bucket_2_thread(thread_instance* thread, _Bucket &current, size_t size){
-					
 					u64 moved = 0;
-					while(thread->alloc_pairs.size() < 16 && current.size()){
-						_Allocated result = current.back();
-						thread->alloc_pairs.push_back(std::make_pair(result.data,size));
-						moved += (size + overhead());
+					u64 copied = 0;
+					u64 start = current.size();					
+					u64 max_copy = std::min<u64>( MAX_THREAD_BUCKETS - thread->total_buckets,start/(2 * get_thread_instance_count()));
+					auto& alloc_pairs = thread->access(size);
+					while(copied < max_copy){ // 
+						_Allocated result = current.back();						
+						alloc_pairs.push_back(result.data);												
 						current.pop_back();
+						++copied;
 					}
+					moved = copied * (size + overhead());
+					thread->total_buckets += copied;
 					shared->allocated += moved;		
 					shared->used -= moved;
 				}
 				_Allocated allocate_type(size_t requested, const std::type_info& ) {
 
-					if(heap_for_small_data) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
+					if(treestore_use_internal_pool == FALSE) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
 
 						shared->allocated += requested + overhead() ;
 						u8 * a = new u8[requested];
@@ -581,18 +655,46 @@ namespace stx{
 						return result;
 					}
 					size_t size = requested + (MIN_ALLOCATION_SIZE - (requested % MIN_ALLOCATION_SIZE));
-					thread_instance* instance = get_thread_instance();
-					if(!instance->alloc_pairs.empty()){
-						if(instance->alloc_pairs.back().second == size){
-							_Allocated result((u8*)instance->alloc_pairs.back().first,typeid(u8)) ;
-							instance->alloc_pairs.pop_back();															
-							return result;
-						}					
+					//instance = get_thread_instance();
+					thread_instance* instance = get_thread_instance(this);
+					if(instance!=nullptr){
+						
+						auto &alloc_pairs = instance->access(size);
+						if(!alloc_pairs.empty()){
+							void* pos = alloc_pairs.back();								
+							alloc_pairs.pop_back();	
+							--instance->total_buckets;
+							++clock;
+							_Allocated result((u8*)pos,typeid(u8)) ;																						
+							if(alloc_pairs.empty()){
+								instance->evict(size);
+							}
+							if(heap_alloc_check){
+								if(requested < size){
+									result.data[requested] = (u8)result.data;
+								}
+								if(requested+1 < size){
+									result.data[requested+1] = (u8)size;
+								}
+							}
+							return result;																
+						}else{
+							//instance->evict(size);
+						}
+						while(instance->total_buckets > MAX_THREAD_BUCKETS - 1){
+							size_t s = instance->eviction_size();
+							instance->evict(s);							
+						}
 					}
 					_Allocated result ;
 					
 					synchronized lck(lock);
+					if(instance!=nullptr){
+						if(instance->free_pairs.size() > 16){
 					
+							free_vect(instance->free_pairs);
+						}
+					}
 					if(last_allocation == size){
 						last_allocation_row++;						
 					}else{
@@ -607,27 +709,20 @@ namespace stx{
 						result = current.back();
 						current.pop_back();
 						shared->used -= (size + overhead());
-						if(last_allocation_row > 35){
-							free_vect(instance->alloc_pairs);
+						if(instance!=nullptr){
+							
 							bucket_2_thread(instance,current,size);
 						}
-						
-
 						if(heap_alloc_check){
 							if(((u8*)result.data)[size-1] != (u8)((result.data)-1)){
 								err_print("freed memory has been overwritten or allocated");
 							}
-						}
-												
+						}												
 					}else{						
 						result.ti = &typeid(u8);
 						result.is_new = true;
-						result.data = new u8[size];
-						
+						result.data = new u8[size];						
 					}
-					
-					
-
 					if(heap_alloc_check){
 						if(requested < size){
 							result.data[requested] = (u8)result.data;
@@ -637,13 +732,21 @@ namespace stx{
 						}
 					}
 					shared->allocated += size + overhead();					
-
-					release_overflow();
-										
+														
 					return result;
+				}
+				bool check(const void * data, size_t requested) const {
+					 return check_allocation(data, requested);
 				}
 				void free(void * data, size_t requested){
 					free_type(data,requested);
+				}
+				void free_vect(std::vector<void *>& v,size_t size){
+					
+					while(!v.empty()){
+						_free_type(v.back(),size);
+						v.pop_back();
+					}
 				}
 				void free_vect(std::vector<std::pair<void *,size_t>>& v){
 					
@@ -652,8 +755,27 @@ namespace stx{
 						v.pop_back();
 					}
 				}
+				bool check_allocation(const void * data, size_t requested) const {
+					if(heap_alloc_check){
+						size_t size = requested + (MIN_ALLOCATION_SIZE - (requested % MIN_ALLOCATION_SIZE));
+						if(requested < size){
+							if(((const u8*)data)[requested] != (u8)data){
+								err_print("memory has been overwritten or deallocated");
+								return false;
+							}
+
+						}
+						if(requested+1 < size){
+							if(((const u8*)data)[requested+1] != (u8)size){
+								err_print("memory has been overwritten or deallocated");
+								return false;
+							}
+						}
+					}
+					return true;
+				}
 				void free_type(void * data, size_t requested){
-					if(heap_for_small_data){// && requested < MAX_SMALL_ALLOCATION_SIZE){
+					if(treestore_use_internal_pool == FALSE){// && requested < MAX_SMALL_ALLOCATION_SIZE){
 						shared->allocated -= requested + overhead();					
 						delete data;
 						return;
@@ -675,7 +797,7 @@ namespace stx{
 						memset((u8*)data,'F',MIN_ALLOCATION_SIZE);
 						((u8*)data)[size-1] = (u8)((u8*)(data)-1);						
 					}
-					thread_instance* instance = get_thread_instance();
+					thread_instance* instance = get_thread_instance(this);
 					instance->free_pairs.push_back(std::make_pair(data, size));
 					if(instance->free_pairs.size() > 16){
 						synchronized l(lock);
@@ -697,14 +819,14 @@ namespace stx{
 
 					return ( ( shared->used + shared->allocated )  >= shared->max_pool_size ) && ( shared->allocated > (shared->max_pool_size*0.1) );
 				}
-				void release_overflow(){					
-					check_lru();					
-				}
+				
 				/// returns true if the pool is nearing depletion
 				bool is_near_depleted() const {
 					return ( shared->allocated >= 0.95*shared->max_pool_size ) ;
 				}
-
+				u64 get_max_pool_size() const {
+					return shared->max_pool_size;
+				}
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
@@ -735,6 +857,8 @@ namespace stx{
 				pool_shared shared;
 				
 				inner_pool* inner;
+
+				
 			public:
 				pool(u64 max_pool_size) : inner (nullptr){					
 					set_max_pool_size(max_pool_size);
@@ -743,6 +867,9 @@ namespace stx{
 
 				~pool(){
 
+				}
+				void set_special(){
+					
 				}
 				const inner_pool& get_pool() const {
 					return const_cast<pool*>(this)->get_pool() ;
@@ -768,7 +895,11 @@ namespace stx{
 
 					return get_pool().get_total_allocated();
 				}
-				void * allocate(size_t requested){					
+				u64 get_max_pool_size() const {
+					return get_pool().get_max_pool_size();
+				}
+				void * allocate(size_t requested){		
+					
 					return get_pool().allocate(requested);					
 				}
 				
@@ -802,26 +933,35 @@ namespace stx{
 				bool is_near_depleted() const {
 					return get_pool().is_near_depleted();
 				}
-				
+				bool check(const void * data, size_t requested) const{
+					return get_pool().check(data, requested);
+				}
+				void check_overflow(){
+					get_pool().check_overflow();
+				}
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
+					
 					T* r = get_pool().allocate<T>();										
 					return r;
 				}
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
+				
 					T* r = get_pool().allocate<T,_Context>(context);
 					return r;
 				}
 				template<typename T>
 				inline void free(T* v){
+					
 					if(!v) return;
 					v->~T();	
 					free_ns<T>(v);					
 				}
 				template<typename T>
 				inline void free_ns(T* v){					
+					
 					get_pool().free<T>(v);									
 				}
 			};

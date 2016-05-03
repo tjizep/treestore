@@ -2309,7 +2309,7 @@ namespace stx
 				if(lz4){
 					inplace_compress_lz4(buffer,temp_compress);
 				}else{
-					inplace_compress_zlib(buffer);
+					//inplace_compress_zlib(buffer);
 				}
 				n->s = loaded;
 				//n->set_modified(false);
@@ -2351,13 +2351,14 @@ namespace stx
 				}
 				n->save(key_interpolator(), *get_storage(), create_buffer);
 				if(lz4){
-					inplace_compress_lz4(create_buffer,temp_compress);
+					compress_lz4(temp_compress,create_buffer);
 				}else{
-					inplace_compress_zlib(create_buffer);
+					//inplace_compress_zlib(create_buffer);
 				}
 				n->s = loaded;
-				buffer_type &allocated = get_storage()->allocate(w,stx::storage::create);
-				allocated.swap(create_buffer);
+				buffer_type full(temp_compress);
+				buffer_type &allocated = get_storage()->allocate(w,stx::storage::create);	
+				allocated.swap(full);
 				get_storage()->complete();
 				stats.changes++;
 			}
@@ -2857,6 +2858,13 @@ namespace stx
 				assign_pointers();
 				return *this;
 			}
+
+			inline iterator& operator= (const iterator& other)  {
+				currnode = other.currnode;
+				current_slot = other.current_slot;
+				assign_pointers();
+				return *this;
+			}
 			/// returns true if the iterator is invalid
 			inline bool invalid() const {
 				return (!currnode.has_context() || currnode.get_where()==0);
@@ -3347,6 +3355,10 @@ namespace stx
 				: currnode(it.currnode), current_slot(it.current_slot)
 			{ }
 
+			inline reverse_iterator& operator=(const reverse_iterator& other){
+				currnode = other.currnode;
+				current_slot = other.current_slot;
+			}
 			/// Dereference the iterator, this is not a value_type& because key and
 			/// value are not stored together
 			inline reference operator*() const

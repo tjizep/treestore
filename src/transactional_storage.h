@@ -86,10 +86,11 @@ namespace storage_workers{
 };
 namespace stored{
     extern void reduce_all();
+	extern void reduce_aged();
 };
 namespace stx{
 namespace storage{
-
+	extern u64 get_lr_timer();
 	typedef std::basic_string<char, std::char_traits<char>, sta::buffer_pool_alloc_tracker<char> > pool_string;
 
 	extern Poco::UInt64 ptime;
@@ -522,6 +523,9 @@ namespace storage{
 		typename _Allocations::iterator finder;
 
 		nst::u64 file_size;			/// file storage size
+		
+		nst::u64 timer;				/// timer - time when last allocation took place
+
 		ptrdiff_t get_block_use(const block_descriptor& v){
 			return v.block.capacity() + sizeof(block_type)+32; /// the 32 is for the increase in the allocations table
 		}
@@ -905,10 +909,11 @@ namespace storage{
 
 		
 		void check_use(){			
-
+			if(!transient) return;
 			
 			//if(treestore_current_mem_use > treestore_max_mem_use){
 			if(buffer_allocation_pool.is_near_depleted() && (*this)._use > 1024*1024*2){
+				inf_print("reduce transient block cache use - %s",this->get_name().c_str());
 				ptrdiff_t before = get_use();
 					
 				flush_back(0.3,true);
@@ -978,6 +983,7 @@ namespace storage{
 		block_type & _allocate(address_type& which, storage_action how){
 			
 			lock.lock();
+			touch();
 			check_use();
 			if(how != read)
 				++((*this).changes);
@@ -1051,7 +1057,7 @@ namespace storage{
 				update_versions(currently_active) = version;
 				result->version = version;
 			}else if(currently_active){
-				printf("[WARNING] version not set\n");
+				err_print("version not set");
 			}
 		}
 		version_type has_version(address_type which){
@@ -1191,7 +1197,7 @@ namespace storage{
 			if(!is_all_loaded){
 				if
 				(	treestore_block_read_ahead==TRUE
-				&&	buffer_allocation_pool.can_allocate(this->file_size)
+				&&	(buffer_allocation_pool.get_total_allocated() + allocation_pool.get_total_allocated() + this->file_size) < treestore_max_mem_use 
 				){											
 					///TODO: opportunistically read until memory exhausted
 					nst::u64 start = 0;
@@ -1199,8 +1205,8 @@ namespace storage{
 					read_ahead(start, remaining); /// read until end
 					
 					is_all_loaded = true;
-				}else if(treestore_block_read_ahead==TRUE && !buffer_allocation_pool.can_allocate(this->file_size)){
-					printf("[TS] [WARING] cannot block read-ahead because insufficient memory\n");
+				}else if(treestore_block_read_ahead==TRUE){
+					inf_print("[WARING] cannot block read-ahead because insufficient memory");
 
 				}
 			}
@@ -1214,7 +1220,7 @@ namespace storage{
 			size_t ts = os::millis(),tst = os::millis();
 			
 			typedef std::shared_ptr<block_request> block_request_ptr;
-			printf("[TS] [INFO] readahead %s starting %lld s\n", get_name().c_str(),(long long)count);
+			inf_print("readahead %s starting %lld s", get_name().c_str(),(long long)count);
 			//while(blocks < count){
 				block_request_ptr block = std::make_shared<block_request>();
 				block->start = start;
@@ -1240,11 +1246,11 @@ namespace storage{
 				}
 				start = block->addresses.back();
 				if(os::millis() - ts > 1000){
-					printf("read %s %lld\n ", get_name().c_str(), (long long)start);
+					inf_print("read %s %lld\n ", get_name().c_str(), (long long)start);
 					ts = os::millis();
 				}
 			//}
-			printf("[TS] [INFO] readahead %s complete %.4g s\n", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
+			inf_print("readahead %s complete %.4g s", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
 		}
 		
 		/// move all data to dest wether it exists or not
@@ -1295,7 +1301,7 @@ namespace storage{
 				
 			}			
 			if(!allocations.empty()){
-				printf("[TS] [WARNING] not all addresses transferred\n");
+				err_print("not all addresses transferred");
 			}
 			changes = 0;
 			versions.clear();
@@ -1394,7 +1400,7 @@ namespace storage{
 		,	is_read_cache(true)			/// the read cache defaults to active
 		,	result(nullptr)				///	save the last result after allocate is called to improve safety
 		,	file_size(0)				/// no file size initialy
-
+		,	timer(get_lr_timer())
 					/// if true the data files are deleted on destruction
 
 		{
@@ -1466,6 +1472,14 @@ namespace storage{
 
 	public:
 
+		/// touch 
+		void touch(){
+			this->timer = get_lr_timer();
+		}
+		/// return the time since this object was used
+		u64 get_age() const {
+			return get_lr_timer() - this->timer;
+		}
 		/// transient: true;
 
 		void set_transient(){
@@ -1690,6 +1704,7 @@ namespace storage{
 
 		void commit(){
 			syncronized ul(lock);
+			touch();
 			if(transacted){
 				flush_back(0.8, false, false); /// write all changes to disk or pigeons etc.
 			}
@@ -1767,6 +1782,14 @@ namespace storage{
 			syncronized ul(lock);
 			//if(modified()) return;
 			
+			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
+			if((*this)._use > 1024*1024*1)
+				flush_back(0.45,true);
+			get_session() << "PRAGMA shrink_memory;", now;
+		}
+		void reduce_perm(){
+			if(transient) return;
+			syncronized ul(lock);
 			//printf("reducing%sstorage %s\n",modified() ? " modified " : " ", get_name().c_str());
 			if((*this)._use > 1024*1024*1)
 				flush_back(0.45,true);
@@ -2038,7 +2061,7 @@ namespace storage{
 		void check_global_use(){
 			//if(treestore_current_mem_use > treestore_max_mem_use*0.85){
 			if(buffer_allocation_pool.is_near_depleted()){
-				stored::reduce_all();
+				//stored::reduce_all();
 			}
 		}
 
@@ -2054,8 +2077,7 @@ namespace storage{
 		/// if [how] is read and readonly is on the an InvalidStorageAction is thrown
 
 		/// TODODONE: set previously committed versions to read only
-		block_type & allocate(address_type& which, storage_action how){
-			//check_global_use();
+		block_type & allocate(address_type& which, storage_action how){			
 			last_base = nullptr;
 			(*lock).lock();
 			(*this).allocated_version = version_type();
@@ -2326,6 +2348,8 @@ namespace storage{
 		bool recovery;						/// flags recovery mode so that journal isnt used
 
 		bool journal_synching;				/// the journal is synching and transaction state should be kept
+
+		u64 timer;							/// the timer value for age calculation
 	private:
 		void save_recovery_info(){
 			if(storages.size() > 1){
@@ -2490,6 +2514,7 @@ namespace storage{
 		,   lock(std::make_shared<Poco::Mutex>())
 		,	recovery(false)
 		,	journal_synching(false)
+		,	timer(get_lr_timer())
 		{
 			//initial->engage();
 			delete_temp_files_of(initial->get_name());
@@ -2538,13 +2563,20 @@ namespace storage{
 
 		virtual ~mvcc_coordinator(){
 			if(references != 0)
-				printf("WARNING: non zero references\n");
+				err_print("non zero references on destruction");
 
 			journal::get_instance().release_participant(this);
 
 			initial->release();
 		}
-
+		/// set the timer value to current
+		void touch(){
+			this->initial->touch();
+		}
+		/// the time since last operation ocurred
+		u64 get_age() const {
+			return this->initial->get_age(); 
+		}
 		/// return the storage size of the initial storage
 		nst::u64 get_storage_size() const {			
 			return this->initial->get_storage_size();			
@@ -2606,7 +2638,7 @@ namespace storage{
 
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
-				(*c)->get_allocator().reduce();
+				(*c)->get_allocator().reduce_perm();
 
 			}
 
@@ -2638,16 +2670,17 @@ namespace storage{
 
 
 			syncronized _sync(*lock);
+			touch();
 			/// TODODONE: reuse an existing unmerged transaction - possibly share unmerged transactions
 			/// TODODONE: lazy create unmerged transactions only when a write occurs
 			/// TODO: optimize mergeable transactions
 			/// TODODONE: merge unused transactions into single transaction
 			if(writer && writing_transactions){
-				printf("WARNNIG: writing transaction already active\n");
+				err_print("writing transaction already active");
 				throw InvalidWriterOrder();
 			}
 			if(references==0){
-				printf("WARNING: started transaction without active references\n");
+				err_print("started transaction without active references");
 			}
 			version_storage_type_ptr b = nullptr;
 			if(writer || recycler.empty()){
@@ -2711,20 +2744,17 @@ namespace storage{
 		/// returns true if the commit could take place
 		bool commit(version_storage_type* transaction){
 			//if(treestore_current_mem_use > treestore_max_mem_use){
-			if(buffer_allocation_pool.is_near_depleted()){
-				stored::reduce_all();
-			}
 			bool writer = !transaction->is_readonly();
 			if(!writer){
-				printf("WARNNIG: cannot commit: this is not a writing transaction\n");
+				err_print("cannot commit: this is not a writing transaction");
 				throw InvalidTransactionType();
 			}
 			{
 				syncronized _sync(*lock);
-
+				touch();
 				if(active_transactions == 0){
 					discard(transaction);
-					printf("WARNNIG: cannot commit: no more active transactions\n");
+					err_print("cannot commit: no more active transactions");
 					throw InvalidWriterOrder();
 
 					// return false;
@@ -2733,7 +2763,7 @@ namespace storage{
 
 				if(writer && transaction->modified() && transaction->get_order() < order){
 					discard(transaction);
-					printf("WARNNIG: invalid writer order\n");
+					err_print("invalid writer order");
 					throw InvalidWriterOrder();
 
 
@@ -2784,23 +2814,20 @@ namespace storage{
 		/// the version may be merged with dependent previous versions
 		/// returns true if the merge could take place
 		bool merge(version_storage_type* transaction){
-			//if(treestore_current_mem_use > treestore_max_mem_use){
-			if(buffer_allocation_pool.is_near_depleted()){
-				stored::reduce_all();
-			}
+			
 			bool writer = !transaction->is_readonly();
 			if(!writer){
-				printf("WARNNIG: cannot commit: this is not a writing transaction\n");
+				err_print("cannot commit: this is not a writing transaction\n");
 				throw InvalidTransactionType();
 			}
 			if (!recovery)		/// dont journal during recovery
 					transaction->journal((*this).initial->get_name());
 			{
 				syncronized _sync(*lock);
-
+				touch();
 				if(active_transactions == 0){
 					discard(transaction);
-					printf("WARNNIG: cannot commit: no more active transactions\n");
+					err_print("cannot commit: no more active transactions\n");
 					throw InvalidWriterOrder();
 
 					// return false;
@@ -2809,7 +2836,7 @@ namespace storage{
 
 				if(writer && transaction->modified() && transaction->get_order() < order){
 					discard(transaction);
-					printf("WARNNIG: invalid writer order\n");
+					err_print("invalid writer order\n");
 					throw InvalidWriterOrder();
 
 
@@ -2865,8 +2892,7 @@ namespace storage{
 			{
 				synchronized _sync(*lock);
 				if(active_transactions==0){
-					printf("WARNNIG: cannot rollback: no active transactions away\n");
-
+					err_print("cannot rollback: no active transactions away");
 				}
 				if(writer)
 					--writing_transactions;
@@ -2921,7 +2947,7 @@ namespace storage{
 
 			synchronized _sync(*lock);
 
-
+			touch();
 			for(typename storage_container::iterator c = storages.begin(); c != storages.end(); ++c)
 			{
 				(*c)->set_permanent();

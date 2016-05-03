@@ -36,7 +36,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define _TREE_STORED_H_CEP2013_
 //#include "collumn.h"
 namespace tree_stored{
-	typedef stored::DynamicKey CompositeStored;
+	typedef stored::StandardDynamicKey CompositeStored;
 	
 };
 #endif

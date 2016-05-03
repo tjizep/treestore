@@ -714,6 +714,7 @@ namespace stored{
 		_BufferSize bytes;// bytes within dyn or static buffer
 		_BufferSize size;// bytes used
 		NS_STORAGE::u8 buf[_ConstSize];
+		
 		//const NS_STORAGE::u8* attached;
 		inline NS_STORAGE::u8 *extract_ptr(){
 			return (NS_STORAGE::u8*)(*(size_t*)(buf));
@@ -723,7 +724,7 @@ namespace stored{
 		}
 		inline bool is_static() const {
 			//if(attached!=nullptr) return false;
-			return (bytes <= _ConstSize);
+			return (bytes <= _ConstSize); /// <= ???
 		}
 		NS_STORAGE::u8* data(){
 			null_check();
@@ -749,20 +750,22 @@ namespace stored{
 			memcpy(buf, &d, sizeof(NS_STORAGE::i8*));
 		}
 		void null_check() const {
+		}
+		void _null_check() const {
 			if(!this){
-				printf("[ERROR] [TS] Invalid Blob object\n");
+				err_print("Invalid Blob object");
 			}
 			if(bytes == 0){
-				printf("[ERROR] [TS] Invalid Blob object size\n");
+				err_print("Invalid Blob object size");
 			}
 
 		}
 		NS_STORAGE::u8* dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
 			null_check();
 			using namespace NS_STORAGE;
-			if(mnbytes > max_buffersize){
-				printf("[TS] [WARNING] large buffer\n");
-			}
+			//if(mnbytes > max_buffersize){
+			//	err_print("large buffer");
+			//}
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffersize);
 			NS_STORAGE::u8 * nbuf = (NS_STORAGE::u8*)allocation_pool.allocate(nbytes); ///new NS_STORAGE::u8 [nbytes]; //
 			//add_col_use(nbytes);
@@ -1128,9 +1131,51 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false,32> BlobStored;
-	typedef stored::Blobule<true, 32> VarCharStored;
+	typedef stored::Blobule<false, sizeof(NS_STORAGE::u8*)> BlobStored;
+	typedef stored::Blobule<true, sizeof(NS_STORAGE::u8*)> VarCharStored;
+	
+	class BareKey{
+	public:
+		typedef nst::u8* _Data;
+		typedef _Rid row_type ;
+		typedef NS_STORAGE::u32 _BufferSize;
+	protected:
+		_Data d;
+		_BufferSize bs;
+		
+	public:
+		row_type row;
+		BareKey() : bs(0),row(0),d(nullptr){
+		}
+		BareKey(_Data d, _BufferSize s, row_type r) : bs(s),row(r),d(d){
+		}
+		BareKey(const BareKey& other){
+			*this = other;			
+		}
+		~BareKey(){
+		}
+		
+		void resize(_BufferSize s,_Data data){
+			this->bs = s;
+			this->d = data;
+		}
 
+		_BufferSize size() const {
+			return bs;
+		}
+		
+		const _Data data() const{
+			return d;
+		}
+		
+		BareKey& operator=(const BareKey& other){
+			bs = other.bs;
+			d = other.d;
+			row = other.row;
+		}
+
+	};
+	template<int _StaticSize>
 	class DynamicKey{
 	public:
 
@@ -1150,7 +1195,7 @@ namespace stored{
 
 		};
 
-		typedef std::vector<nst::u8, sta::pool_alloc_tracker<nst::u8> > _Data;
+		typedef nst::u8* _Data;
 
 		static const size_t MAX_BYTES = 2048;
 
@@ -1160,53 +1205,69 @@ namespace stored{
 
 	protected:
 
-		static const size_t static_size = sizeof(_Data) + 34;
+		static const size_t static_size = sizeof(_Data)+_StaticSize;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
 		nst::u8 buf[static_size];
 		_BufferSize bs;// bytes used
-
-		inline _Data& __get_Data(){
-			return *(_Data*)&buf[0];
+		_BufferSize cap;
+		inline bool is_static() const {
+			return cap <= static_size;
 		}
-		inline const _Data& __get_Data() const {
-			return *(const _Data*)&buf[0];
+		inline bool is_dynamic() const {
+			return !(cap <= static_size);
 		}
-		inline nst::u8* data(){
-			if(bs==static_size)
-				return &(__get_Data())[0];
-			return &buf[0];
+		inline _Data extract_ptr(){
+			return (_Data)(*(size_t*)(buf));
 		}
-		inline const nst::u8* data() const{
-			if(bs==static_size)
-				return &(__get_Data())[0];
-			return &buf[0];
+		inline const _Data extract_ptr() const {
+			return (const _Data)(*(const size_t*)(buf));
 		}
-		inline nst::u8* _resize_buffer(size_t mnbytes){
-
+		
+		void set_ptr(const _Data nbuf){
+			_Data d = const_cast<_Data>(nbuf);
+			if(sizeof(buf) < sizeof(_Data)){
+				err_print("not enough space");
+			}
+			memcpy(buf, &d, sizeof(_Data));
+		}
+		
+		void set_ptr(const NS_STORAGE::i8* nbuf){
+			_Data d = const_cast<NS_STORAGE::i8*>(nbuf);
+			memcpy(buf, &d, sizeof(NS_STORAGE::i8*));
+		}
+		_Data dyn_resize_buffer(NS_STORAGE::u8* r,size_t mnbytes){
+			NS_STORAGE::u8 * nbuf = r;
+			using namespace NS_STORAGE;
+			const size_t ex = 64ll;
+			if(mnbytes > cap){
+				size_t nbytes = mnbytes; // ((mnbytes/ex)*ex)+ex;		
+				//if(nbytes < mnbytes){
+				//	err_print("Invalid resize size");
+				//}
+				nbuf = (NS_STORAGE::u8*)allocation_pool.allocate(nbytes); ///new NS_STORAGE::u8 [nbytes]; //
+				memcpy(nbuf, r, std::min<size_t>(nbytes, cap));
+				if(is_dynamic()){
+					allocation_pool.free(r,cap);
+				}
+				set_ptr(nbuf);
+				cap = (u32)nbytes;
+			}					
+			return nbuf;
+		}
+		_Data _resize_buffer(size_t mnbytes){
 			using namespace NS_STORAGE;
 			size_t nbytes = std::min<size_t>(mnbytes, max_buffer_size);
-			if(nbytes >= static_size){
-				if(bs < static_size){
-					nst::u8 tbuf[static_size];
-					memcpy(tbuf, buf, static_size);
-					new (&__get_Data()) _Data(nbytes);
-					memcpy(__get_Data().data(), tbuf, static_size);
-					bs = static_size;
-				}
-			}else if(bs < static_size){
-				bs = (_BufferSize)nbytes;
-			}else if(bs != static_size){
-				printf("[TS] [ERROR] invalid key buffer size\n");
+			_Data r = data();
+			if(nbytes > static_size){
+				r = dyn_resize_buffer(r,nbytes);
 			}
-
-			if(bs==static_size){
-				__get_Data().resize(nbytes);
-			}
-
-			return data();
+			bs = (u32)nbytes;	
+			
+			return r;
 		}
-		NS_STORAGE::u8* _append( size_t count ){
+		
+		_Data _append( size_t count ){
 			size_t os = size();
 			NS_STORAGE::u8* r = _resize_buffer( os + count ) + os;
 
@@ -1270,14 +1331,40 @@ namespace stored{
 	public:
 		row_type row;
 	public:
+		BareKey get_bare() const {
+			return BareKey((BareKey::_Data)data(),(BareKey::_BufferSize)bs,row);
+		}
+		template<int _StaticSize>
+		BareKey get_bare(DynamicKey<_StaticSize>& ) const {
+			return get_bare();
+		}
+		inline nst::u8* data(){
+			if(is_static())
+				return &buf[0];
+			
+			_Data r = extract_ptr();		
+			return r;
+		}
+		inline const nst::u8* data() const{
+			if(is_static())
+				return &buf[0];
+			const _Data r = extract_ptr();			
+			
+			return r;
+			
+		}
+		void verify() const {
+			iterator k = this->begin();
+			while(k.valid()){
+				k.next();
+			}
+		}
 		size_t total_bytes_allocated() const {
-			if(bs==static_size)
-				return sizeof(*this) + __get_Data().capacity();
-			return sizeof(*this);
+			if(is_static())				
+				return sizeof(*tkhis);
+			return sizeof(*this) + cap;
 		}
 		int size() const {
-			if(bs==static_size)
-				return (int)__get_Data().size();
 			return bs;
 		}
 		/// 2nd level
@@ -1410,17 +1497,12 @@ namespace stored{
 		void clear(){
 
 			row = 0;
-			if(bs==static_size){
-				__get_Data().clear();
-			}else{
-				bs = 0;
-				//memset(buf, 0,sizeof(buf));
-			}
+			bs = 0;
 		}
 
 		~DynamicKey(){
-			if(bs==static_size){
-				__get_Data().~_Data();
+			if(is_dynamic()){
+				allocation_pool.free(extract_ptr(),cap);
 			}
 			//bs = 0;
 			//row = 0;
@@ -1428,21 +1510,31 @@ namespace stored{
 
 		DynamicKey():
 			bs(0),
-			row(0)
+			row(0),
+			cap(static_size)
 		{
 			//memset(buf, 0,sizeof(buf));
 		}
-
+		template<int _InStaticSize>		
+		DynamicKey(const DynamicKey<_InStaticSize>& right):
+			bs(0),
+			row(0),
+			cap(static_size)
+		{			
+			*this = right;
+		}
+		
 		DynamicKey(const DynamicKey& right):
 			bs(0),
-			row(0)
-		{
-			//memset(buf, 0,sizeof(buf));
+			row(0),
+			cap(static_size)
+		{			
 			*this = right;
 		}
 
 		/// returns true if this is a prefix of the other key
-		inline bool is_prefix(const DynamicKey& other) const {
+		template<int _InStaticSize>	
+		inline bool is_prefix(const DynamicKey<_InStaticSize>& other) const {
 			if( other.size() < size() ) return false; /// this cannot be a prefix of something smaller
 
 			int r = memcmp(data(), other.data(), size() );
@@ -1453,7 +1545,10 @@ namespace stored{
 			const nst::u8 *ld;
 			nst::u32 s;			
 			nst::u32 ll;
-
+			iterator(const BareKey& other) : s(other.size()),ld(other.data()),ll(0){
+			}
+			iterator(const DynamicKey& other) : s(other.size()),ld(other.data()),ll(0){
+			}
 			iterator(const nst::u8 *ld,nst::u32 s) : s(s),ld(ld),ll(0){				
 			}
 			iterator(const iterator&  right) {
@@ -1476,7 +1571,8 @@ namespace stored{
 			inline nst::u32 get_length() const {
 				if(!valid()) return 0;
 				nst::u32 l = 0;
-				switch(get_type()){
+				int t = get_type();
+				switch(t){
 				case DynamicKey::I1 :
 				case DynamicKey::UI1 :
 					l=sizeof(nst::i8);
@@ -1506,7 +1602,11 @@ namespace stored{
 					l = ll+ls;
 								   }
 					break;
+				case DynamicKey::KEY_MAX:
+					l = sizeof(nst::u8);
+					break;
 				default:
+					err_print("unknown type in index key");
 					break;
 				};	
 				return l;
@@ -1515,7 +1615,8 @@ namespace stored{
 			inline nst::u32 get_data_length() const {
 				if(!valid()) return 0;
 				nst::u32 l = 0;
-				switch(get_type()){
+				int t = get_type();
+				switch(t){
 				case DynamicKey::UI1 :
 				case DynamicKey::I1 :
 					l=sizeof(nst::i8);
@@ -1541,14 +1642,18 @@ namespace stored{
 				case DynamicKey::S:										
 					l = *(const nst::i16*)(ld+sizeof(nst::u8));								
 					break;
+				case DynamicKey::KEY_MAX:
+					l = sizeof(nst::u8);
+					break;
 				default:
+					err_print("unknown type in index key");
 					break;
 				};	
 				return l;
 			}
 			
 			inline bool valid() const {
-				if(ll >= size()) return false;				
+				if(ll >= this->size()) return false;				
 				return true;
 			}
 			
@@ -1606,7 +1711,11 @@ namespace stored{
 					l = ll+ls;
 								   }
 					break;
+				case DynamicKey::KEY_MAX:
+					l = sizeof(nst::u8);
+					break;
 				default:
+					err_print("unknown type in index key");
 					break;
 				};				
 				ld += l; // increments buffer
@@ -1651,7 +1760,7 @@ namespace stored{
 			row = 0;
 			_resize_buffer(to-sizeof(row));
 			if(size() != to-sizeof(row)){
-				printf("resize error\n");
+				err_print("resize error\n");
 			}
 		}
 
@@ -1704,25 +1813,55 @@ namespace stored{
 				data()[which - sizeof(row)] = v;
 			}
 		}
+		template<int _InStaticSize>
+		DynamicKey& operator=(const DynamicKey<_InStaticSize>& right){
+			if((void *)this == (void*)&right) return *this;
+			if(bs < static_size && right.size() < static_size){
+				bs = right.size();
+				memcpy(buf, right.data(), bs);
+			}else{
+				_resize_buffer(right.size());
+				
+				memcpy(data(), right.data(), right.size());
+			}
+			
+			row = right.row;
+			
+			return *this;
+		}
+	
 		DynamicKey& operator=(const DynamicKey& right){
-			if(this == &right) return *this;
+			if((void *)this == (void*)&right) return *this;
 			if(bs < static_size && right.bs < static_size){
 				bs = right.bs;
-				memcpy(buf, right.buf, bs);
+				memcpy(buf, right.data(), bs);
 			}else{
 				_resize_buffer(right.size());
 				memcpy(data(), right.data(), right.size());
-
 			}
 			row = right.row;
+			
 			return *this;
 		}
-		const DynamicKey& return_or_copy(DynamicKey& ) const {
+		template<int _InStaticSize>
+		const DynamicKey<_InStaticSize>& return_or_copy(DynamicKey<_InStaticSize>& s) const {
+			s = *this;
+			return s;
+		}
+		template<int _InStaticSize>
+		DynamicKey<_InStaticSize>& return_or_copy(DynamicKey<_InStaticSize>& s) {
+			s = *this;
+			return s;
+		}
+		
+		const DynamicKey& return_or_copy(DynamicKey& s) const {			
 			return *this;
 		}
-		DynamicKey& return_or_copy(DynamicKey& ) {
+		
+		DynamicKey& return_or_copy(DynamicKey& s) {
 			return *this;
 		}
+
 		inline size_t get_hash() const {
 			size_t r = 0;
 			MurmurHash3_x86_32(data(), size(), 0, &r);
@@ -1801,14 +1940,17 @@ namespace stored{
 				case DynamicKey::KEY_MAX:
 					l = 1;					
 					break;
+				default:
+					err_print("unknown key type");
+					break;
 				};
 				ld += l;
 				lt = *ld;
 			};
 			return true;
 		}
-
-		bool operator<(const DynamicKey& right) const {
+		template<int _InStaticSize>	
+		bool operator<(const DynamicKey<_InStaticSize>& right) const {
 
 			/// partitions the order in a hierarchy
 			const nst::u8 *ld = data();
@@ -1921,7 +2063,9 @@ namespace stored{
 							return false;
 						else r = 0;
 						break;
-					
+					default:
+						err_print("unknown key type");
+						break;
 					};
 				};
 				if( r != 0 ) break;
@@ -1942,8 +2086,8 @@ namespace stored{
 				return size() < right.size();
 			return (row < right.row);
 		}
-
-		inline bool operator!=(const DynamicKey& right) const {
+		template<int _InStaticSize>
+		inline bool operator!=(const DynamicKey<_InStaticSize>& right) const {
 			if(size() != right.size()) return true;
 			int r = memcmp(data(), right.data(), size());
 			if(r != 0) return true;
@@ -1994,6 +2138,8 @@ namespace stored{
 			return reader;
 		};
 	};
+	typedef DynamicKey<42> StandardDynamicKey;
+
 	template<typename _FieldType>
 	class PrimitiveDynamicKey{
 	public:
@@ -2193,13 +2339,15 @@ namespace stored{
 		{
 			*this = right;
 		}
-		PrimitiveDynamicKey(const DynamicKey& right)
+		template<int _StaticSize>
+		PrimitiveDynamicKey(const DynamicKey<_StaticSize>& right)
 
 		{
 			row =right.row;
 			right.p_decode(data);
 		}
-		inline bool left_equal_key(const DynamicKey& right) const {
+		template<int _StaticSize>
+		inline bool left_equal_key(const DynamicKey<_StaticSize>& right) const {
 			_DataType rdata;
 			right.p_decode(rdata);
 			return data == rdata;
@@ -2222,14 +2370,25 @@ namespace stored{
 			row = right.row;
 			return *this;
 		}
-
-		PrimitiveDynamicKey& operator=(const DynamicKey& right){
+		template<int _StaticSize>
+		PrimitiveDynamicKey& operator=(const DynamicKey<_StaticSize>& right){
 			row =right.row;
 			right.p_decode(data);
 			return *this;
 		}
 
-		const DynamicKey& return_or_copy(DynamicKey& x) const {
+		template<int _StaticSize>
+		BareKey get_bare(DynamicKey<_StaticSize>& x) const {
+			x.clear();
+			_FieldType f;
+			f.set_value(data);
+			x.add(f);
+			x.row = (*this).row;
+			return x.get_bare();
+		}
+		
+		template<int _StaticSize>
+		const DynamicKey<_StaticSize>& return_or_copy(DynamicKey<_StaticSize>& x) const {
 			x.clear();
 			_FieldType f;
 			f.set_value(data);
@@ -2237,7 +2396,8 @@ namespace stored{
 			x.row = (*this).row;
 			return x;
 		}
-		DynamicKey& return_or_copy(DynamicKey& x) {
+		template<int _StaticSize>
+		DynamicKey<_StaticSize>& return_or_copy(DynamicKey<_StaticSize>& x) {
 			x.clear();
 			_FieldType f;
 			f.set_value(data);
@@ -2298,7 +2458,7 @@ namespace stored{
 			_FieldType f;
 			f.set_value(data);
 
-			DynamicKey s;
+			StandardDynamicKey s;
 			s.add(f);
 			s.row = (*this).row;
 			return s.stored();
@@ -2307,7 +2467,7 @@ namespace stored{
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
 			_FieldType f;
-			DynamicKey s;
+			StandardDynamicKey s;
 			f.set_value((*this).data);
 			s.add(f);
 			s.row = (*this).row;
@@ -2317,7 +2477,7 @@ namespace stored{
 		NS_STORAGE::buffer_type::const_iterator read(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::buffer_type::const_iterator r) {
 			using namespace NS_STORAGE;
 			buffer_type::const_iterator reader = r;
-			DynamicKey s;
+			StandardDynamicKey s;
 			reader = s.read(buffer, reader);
 			s.p_decode(data);
 			row = s.row;
@@ -2384,8 +2544,8 @@ namespace stored{
 		mutable std::vector<nst::u8*> data_col;
 		mutable std::vector<_IntCodeType> int_col;
 	public:
-
-		void encode(nst::buffer_type::iterator& writer, const DynamicKey* keys, size_t occupants) const {
+		template<int _StaticSize>
+		void encode(nst::buffer_type::iterator& writer, const DynamicKey<_StaticSize>* keys, size_t occupants) const {
 			bool tests = false;
 			nst::buffer_type::const_iterator reader = writer;
 			size_t colls = keys[0].col_bytes();			
@@ -2425,11 +2585,15 @@ namespace stored{
 				}
 			
 				writer = std::copy(pcol.begin(),pcol.end(), writer);
-			}						
+			}	
 			if(tests){
+				for(size_t k = 0; k < occupants; ++k){
+					keys[k].verify();
+				}
+			
 				nst::buffer_type::const_iterator end = writer;
 				
-				std::vector<DynamicKey> test_keys;
+				std::vector<DynamicKey<_StaticSize>> test_keys;
 				test_keys.resize(occupants);
 				nst::buffer_type buffer;
 				buffer.insert(buffer.begin(), reader, end);
@@ -2438,14 +2602,14 @@ namespace stored{
 				size_t ltest = r_test - buffer.begin();
 				size_t rtest = end - reader;
 				if(ltest != rtest){
-					printf("[ERROR] [TS] Read length does not verify %lld != %lld\n", (long long)ltest,(long long)rtest);
+					err_print("Read length does not verify %lld != %lld\n", (long long)ltest,(long long)rtest);
 				}
 				if(ltest != encoded_size(keys,occupants)){
-					printf("[ERROR] [TS] Read length does not verify with encoded size %lld != %lld\n", (long long)ltest,(long long)encoded_size(keys,occupants));
+					err_print("Read length does not verify with encoded size %lld != %lld\n", (long long)ltest,(long long)encoded_size(keys,occupants));
 				}
 				for(size_t k = 0; k < occupants; ++k){
 					if(test_keys[k] != keys[k]){
-						printf("houston we have a problem\n");
+						err_print("keys dont compare");
 					}
 				}
 			}
@@ -2524,7 +2688,8 @@ namespace stored{
 			result += size_int(colls) + (occupants*colls);			
 			return result;
 		}
-		void dddecode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,DynamicKey* keys, size_t occupants) const {
+		template<int _StaticSize>
+		void dddecode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,DynamicKey<_StaticSize>* keys, size_t occupants) const {
 			size_t colls = 0;
 			read_int(colls, reader);
 			data_col.resize(occupants);
@@ -2564,7 +2729,8 @@ namespace stored{
 				++crow;
 			}
 		}
-		size_t encoded_size(const DynamicKey* keys, size_t occupants) const {
+		template<int _StaticSize>
+		size_t encoded_size(const DynamicKey<_StaticSize>* keys, size_t occupants) const {
 			
 			size_t colls = keys[0].col_bytes();
 			size_t result = 0;		
@@ -2582,7 +2748,8 @@ namespace stored{
 			result += (occupants*colls);
 			return result;
 		}
-		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,DynamicKey* keys, size_t occupants) const {
+		template<int _StaticSize>
+		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,DynamicKey<_StaticSize>* keys, size_t occupants) const {
 			size_t colls = 0;
 			read_int(colls, reader);
 			for(size_t o = 0; o < occupants; ++o){
@@ -2615,7 +2782,7 @@ namespace stored{
 					++reader;
 				}		
 			}
-		}
+					}
 		template<typename _ByteOrientedKey>
 		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
 			size_t colls = 0;
@@ -3736,7 +3903,8 @@ namespace stored{
 		virtual void first() = 0;
 		virtual void last() = 0;
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;
-		virtual DynamicKey& get_key() = 0;
+		virtual BareKey get_bare_key() = 0;
+		virtual StandardDynamicKey& get_key() = 0;
 		virtual void set_end(index_iterator_interface& in) = 0;
 
 	};
@@ -3749,9 +3917,9 @@ namespace stored{
 		int fields_indexed;
 		stored::_Parts parts;
 		stored::_Parts density;		
-		DynamicKey resolved;
+		StandardDynamicKey resolved;
 		std::string name;
-		DynamicKey temp;
+		StandardDynamicKey temp;
 		bool do_update;
 		void set_ix(int ix){
 			this->ix = ix;
@@ -3766,7 +3934,7 @@ namespace stored{
 				printf("destroyed index already\n");
 			destroyed = true;
 		};
-		virtual const DynamicKey *predict(index_iterator_interface& io, DynamicKey& q)=0;
+		virtual const StandardDynamicKey *predict(index_iterator_interface& io, StandardDynamicKey& q)=0;
 		virtual void cache_it(index_iterator_interface& io)=0;
 		virtual bool is_unique() const = 0;
 		virtual void set_col_index(int ix)= 0;
@@ -3784,14 +3952,14 @@ namespace stored{
 
 		virtual void first(index_iterator_interface& out)=0;
 		
-		virtual void lower_(index_iterator_interface& out,const DynamicKey& key)=0;
-		virtual void lower(index_iterator_interface& out,const DynamicKey& key)=0;
-		virtual void upper(index_iterator_interface& out, const DynamicKey& key)=0;
-		virtual void add(const DynamicKey& k)=0;
-		virtual void remove(const DynamicKey& k) = 0;
+		virtual void lower_(index_iterator_interface& out,const StandardDynamicKey& key)=0;
+		virtual void lower(index_iterator_interface& out,const StandardDynamicKey& key)=0;
+		virtual void upper(index_iterator_interface& out, const StandardDynamicKey& key)=0;
+		virtual void add(const StandardDynamicKey& k)=0;
+		virtual void remove(const StandardDynamicKey& k) = 0;
 
-		virtual _Rid resolve(DynamicKey& k) = 0;
-		virtual void find(index_iterator_interface& out, const DynamicKey& key) = 0;
+		virtual _Rid resolve(StandardDynamicKey& k) = 0;
+		virtual void find(index_iterator_interface& out, const StandardDynamicKey& key) = 0;
 		virtual void from_initializer(index_iterator_interface& out, const stx::initializer_pair& ip) = 0;
 		virtual void reduce_use() = 0;
 

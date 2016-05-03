@@ -1,5 +1,6 @@
 #include "Poco/Mutex.h"
 #include "system_timers.h"
+#include <stx/storage/types.h>
 
 typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;
 static Poco::Mutex& get_stats_lock(){
@@ -8,6 +9,52 @@ static Poco::Mutex& get_stats_lock(){
 }
 namespace stx{
 namespace storage{
+	class low_resource_timer{
+		class timer_worker : public Poco::Runnable{
+		private:
+			u64 timer_val;
+		public:
+			timer_worker() : timer_val(0){
+			}
+			void run(){
+				inf_print("timer is running");
+				while(Poco::Thread::current()->isRunning()){
+					Poco::Thread::sleep(50);
+					timer_val = os::millis();
+				}
+			}
+			u64 get_timer() const {
+				return this->timer_val;
+			}
+		};
+	private:
+		Poco::Thread timer_thread;
+		timer_worker worker;
+	public:
+		low_resource_timer() : timer_thread("ts:timer_thread"){
+			try{
+				timer_thread.start(worker);
+			}catch(Poco::Exception &e){
+				err_print("Could not start timer thread : %s\n",e.name());
+			}
+		}
+		u64 get_timer() const {
+			return this->worker.get_timer();
+		}
+		~low_resource_timer(){
+			try{
+				inf_print("joining tx timer");
+				timer_thread.join();
+
+			}catch(Poco::Exception &e){
+				err_print("Could not stop timer thread : %s\n",e.name());
+			}
+		}
+	};
+	static low_resource_timer lrt;
+	u64 get_lr_timer(){
+		return lrt.get_timer();
+	}
 	Poco::Mutex& get_single_writer_lock(){
 		static Poco::Mutex swl;
 		return swl;
@@ -26,14 +73,14 @@ namespace storage{
 	extern void add_total_use(long long added){
 		syncronized l(get_stats_lock());
 		if(added < 0){
-			printf("adding neg val\n");
+			err_print("adding neg val");
 		}
 		total_use += added;
 	}
 	extern void remove_total_use(long long removed){
 		syncronized l(get_stats_lock());
 		if(removed > total_use){
-			printf("removing more than added\n");
+			err_print("removing more than added");
 		}
 		total_use -= removed;
 	}

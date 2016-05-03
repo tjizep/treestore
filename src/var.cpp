@@ -27,6 +27,7 @@ char		treestore_reduce_storage_use_on_unlock = TRUE;
 char		treestore_use_primitive_indexes = TRUE;
 char		treestore_block_read_ahead = FALSE;
 char		treestore_resolve_values_from_index = FALSE;
+char		treestore_use_internal_pool = TRUE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -134,4 +135,10 @@ static MYSQL_SYSVAR_BOOL(resolve_values_from_index, treestore_resolve_values_fro
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "resolve values from index first before consulting columns"
   "Default is false",
+  NULL, NULL, TRUE);
+
+static MYSQL_SYSVAR_BOOL(use_internal_pool, treestore_use_internal_pool,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "use the internal pool to improve concurrency"
+  "Default is true",
   NULL, NULL, TRUE);

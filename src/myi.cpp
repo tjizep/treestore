@@ -24,19 +24,20 @@ static std::atomic<nst::u64> total_locks = 0;
 static std::atomic<nst::u64> total_threads_locked = 0;
 static Poco::Mutex mut_total_locks;
 static Poco::Mutex mut_concurrency;
+static double tree_factor = 0.9;
 extern "C" int get_l1_bs_memory_use();
 /// determine factored low memory state
-static bool is_memory_low() {
-	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.750);// || allocation_pool.is_depleted();
+static bool is_memory_low(double tree_factor) {
+	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.85);// || allocation_pool.is_depleted();
 
 }
-static bool is_memory_mark() {
-	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55);// || allocation_pool.is_depleted();
+static bool is_memory_mark(double tree_factor) {
+	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.83);// || allocation_pool.is_depleted();
 }
-static bool is_memory_lower() {
-	double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+static bool is_memory_lower(double tree_factor) {
+	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
 	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55);// || allocation_pool.is_depleted();
 }
 /// accessors for journal stats
@@ -140,7 +141,7 @@ namespace tree_stored{
 		,	_is_writer(_is_writer)		
 		,	first_throttled(false)
 		{
-		    printf("[TS] [INFO] create tree thread\n");
+		    inf_print("create tree thread");
 			created_tid = Poco::Thread::currentTid();
 			DBUG_PRINT("info",("tree thread %ld created\n", created_tid));
 			DBUG_PRINT("info",(" *** Tree Store (eyore) mem use configured to %lld MB\n",treestore_max_mem_use/(1024*1024L)));
@@ -198,7 +199,7 @@ namespace tree_stored{
 			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 				delete (*t).second;
 			}
-			printf("[TS] [INFO] cleared %lld tables\n", (NS_STORAGE::lld)tables.size());
+			inf_print("cleared %lld tables", (NS_STORAGE::lld)tables.size());
 			tables.clear();
 		}
 
@@ -234,7 +235,7 @@ namespace tree_stored{
 		void release(TABLE *table_arg, const std::string& path){
 
 			if(!locks){
-				printf("[TS] [ERROR] no locks to release\n");
+				err_print("no locks to release");
 				return;
 			}
 
@@ -252,26 +253,26 @@ namespace tree_stored{
 		}
 		void create_lru(_LruTables & ordered){
 			ordered.clear();
-			if(!is_memory_mark()) return;
+			//if(!is_memory_mark()) return;
 			for(_Tables::iterator t = tables.begin(); t!= tables.end();++t){
 				
 				if((*t).second!=nullptr)
 					ordered[(*t).second->get_clock()] = (*t).second;
 				else
-					printf("[TS] [ERROR] table entry %s is NULL\n", (*t).first.c_str());
+					err_print("table entry %s is NULL", (*t).first.c_str());
 			}
 		}
 		void own_reduce_col_trees(_LruTables & ordered){
 			DBUG_PRINT("info", ("reducing idle thread collums %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			for(_LruTables::iterator t = ordered.begin(); t!= ordered.end();++t){
-				if(!is_memory_mark()) break;
+				//if(!is_memory_mark(tree_factor)) break;
 				(*t).second->reduce_use_collum_trees();				
 			}
 		}
 		void own_reduce_index_trees(_LruTables & ordered){
 			DBUG_PRINT("info",("reducing idle thread indexes %.4g MiB\n",(double)stx::storage::total_use/(1024.0*1024.0)));
 			for(_LruTables::iterator t = ordered.begin(); t!= ordered.end();++t){
-				if(!is_memory_mark()) break;
+				//if(!is_memory_mark(tree_factor)) break;
 				(*t).second->reduce_use_indexes();				
 			}
 		}
@@ -308,7 +309,7 @@ namespace tree_stored{
 		}
 
 		void reduce_col_trees(){
-			return;
+			
 			if(!locks){
 				_LruTables ordered;
 				create_lru(ordered);
@@ -326,7 +327,7 @@ namespace tree_stored{
 					if((*t).second)
 						(*t).second->reduce_use_collum_trees_only();
 					else
-						printf("[TS] [ERROR] table entry %s is NULL\n", (*t).first.c_str());
+						err_print("table entry %s is NULL", (*t).first.c_str());
 				}
 			}
 
@@ -357,26 +358,7 @@ namespace tree_stored{
 			}
 
 		}
-		public:
-		void check_use_col_trees(){
-			//if(calc_total_use() > treestore_max_mem_use){
-
-				reduce_col_trees();
-			//}
-		}
-		void check_use_col_caches(){
-
-			if(calc_total_use() > treestore_max_mem_use){
-				reduce_col_caches();
-			}
-
-		}
-		void check_use_indexes(){
-			//if(calc_total_use() > treestore_max_mem_use){
-
-				reduce_index_trees();
-			//}
-		}
+		
 	};
 }
 
@@ -466,7 +448,7 @@ public:
 	}
 	void release_thread(tree_stored::tree_thread * tt){
 		if(tt==NULL){
-			printf("[TS] [ERROR] Invalid argument to release thread\n");
+			err_print("Invalid argument to release thread");
 			return ;
 		}
 		NS_STORAGE::syncronized ul(tlock);
@@ -478,7 +460,7 @@ public:
 			}
 		}
 		//threads.push_back(tt);
-		printf("WARNING: thread returned which is not registered\n");
+		err_print("thread returned which is not registered\n");
 		DBUG_PRINT("info",("added {%lld} t resources\n", (NS_STORAGE::u64)threads.size()));
 	}
 
@@ -501,7 +483,7 @@ public:
 		if(r == NULL){
 			r = new tree_stored::tree_thread();
 			threads.push_back(r);
-			printf("[TS] [INFO] added thread %lu\n", (unsigned long)threads.size());
+			inf_print("added thread %lu", (unsigned long)threads.size());
 		}
 		r->set_used();
 		DBUG_PRINT("info",("{%lld} t resources \n", (NS_STORAGE::u64)threads.size()));
@@ -511,16 +493,13 @@ public:
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
 	
-		if(stx::memory_low_state){
-			(*this).reduce();
+		if(stx::memory_mark_state){
+
 		}
 
 	}
-	void reduce_all(){
-		(*this).reduce();
-	}
 	void release_idle_trees(){
-		return;
+		
 		NS_STORAGE::syncronized ul(tlock);
 		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
 			if(!(*t)->get_used())/// this should ignore busy threads
@@ -531,40 +510,8 @@ public:
 				}
 		}
 	}
-	void reduce(){
-		
-	}
-
-	void _reduce(){
-		return;
-		NS_STORAGE::syncronized ul(tlock);
-		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if(!(*t)->get_used())/// this should ignore busy threads
-				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
-					(*t)->check_use_col_trees();
-		}
-		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if(!(*t)->get_used())/// this should ignore busy threads
-				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
-					(*t)->check_use_indexes();
-		}
-		for(_Threads::iterator t = threads.begin(); t != threads.end() && calc_total_use() > treestore_max_mem_use; ++t){
-			if(!(*t)->get_used())/// this should ignore busy threads
-				if ((*t)->get_created_tid() != Poco::Thread::currentTid())
-					(*t)->check_use_col_caches();
-		}
-		//if(calc_total_use() > treestore_max_mem_use){
-			for(_Threads::iterator t = threads.begin(); t != threads.end(); ++t){
-
-				if ((*t)->get_created_tid() == Poco::Thread::currentTid()){
-					(*t)->check_use_col_trees();
-					(*t)->check_use_col_caches();
-					(*t)->check_use_indexes();
-					break;
-				}
-			}
-		//}
-	}
+	
+	
 public:
 	void check_journal(){
 
@@ -585,8 +532,8 @@ void print_read_lookups(){
 			if(ltime){
 				double use = (double) calc_total_use();
 				double twitch = 500.0 * units::MB;
-				printf
-				(   "[TS] [INFO] read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g %s in %lld trees)\n"
+				inf_print
+				(   "read_lookups %lld/s hh %lld hp %lld (total: %lld - btt %.4g %s in %lld trees)"
 				,   (nst::lld)read_lookups-std::min<NS_STORAGE::u64>(read_lookups, last_read_lookups)
 				,   (nst::lld)hash_hits
 				,   (nst::lld)hash_predictions
@@ -628,7 +575,7 @@ tree_stored::tree_thread * new_thread_from_thd(TABLE* table, THD* thd,const std:
 		}
 	}
 	if(*stpp == NULL){
-		printf("[TS] [ERROR] the thread thd is NULL\n");
+		err_print("the thread thd is NULL");
 	}
 	return *stpp;
 }
@@ -653,7 +600,7 @@ tree_stored::tree_thread* updated_thread_from_thd(THD* thd, const std::string& p
 class ha_treestore: public handler{
 public:
 
-	static const int TREESTORE_MAX_KEY_LENGTH = stored::DynamicKey::MAX_BYTES;
+	static const int TREESTORE_MAX_KEY_LENGTH = stored::StandardDynamicKey::MAX_BYTES;
 	std::string path;
 	tree_stored::tree_table::ptr tt;
 	tree_stored::tree_table::_TableMap::iterator r;
@@ -993,7 +940,7 @@ public:
 		tt = get_thread()->compose_table(table,this->path);
 		tt->check_load(table);
 		
-		printf("[TS] [INFO] open tt %s\n", table->alias);
+		inf_print("open tt %s", table->alias);
 		tt->rollback();
 		return 0;
 	}
@@ -1069,7 +1016,7 @@ public:
 			try{
 				std::string next = name + extenstion;
 				if(stored::erase_abstracted_storage(next)){
-					printf("[TS] [INFO] renaming %s\n",next.c_str());
+					inf_print("renaming %s",next.c_str());
 					nst::delete_temp_files_of(next.c_str());
 					File df (next);
 					if(df.exists()){
@@ -1080,7 +1027,7 @@ public:
 					r = HA_ERR_TABLE_EXIST;
 				}
 			}catch(std::exception& ){
-				printf("[TS] [ERROR] could not rename table file %s\n", name.c_str());
+				err_print("could not rename table file %s", name.c_str());
 				r = HA_ERR_NO_SUCH_TABLE;
 			}
 			///
@@ -1094,14 +1041,14 @@ public:
 				File df (nxt);
 				if(df.exists()){
 					std::string renamed = to + &nxt[from.length()];
-					printf("[TS] [INFO] renaming %s to %s\n",nxt.c_str(),renamed.c_str());
+					inf_print("renaming %s to %s",nxt.c_str(),renamed.c_str());
 					df.moveTo(renamed);
 				}
 			}else{
 				r = HA_ERR_TABLE_EXIST;
 			}
 		}catch(std::exception& ){
-			printf("[TS] [ERROR] could not rename table file %s\n", from.c_str());
+			err_print("could not rename table file %s", from.c_str());
 			r = HA_ERR_TABLE_EXIST;
 
 		}
@@ -1133,7 +1080,7 @@ public:
 			try{
 				std::string next = name + extenstion;
 				if(stored::erase_abstracted_storage(next)){
-					printf("[TS] [INFO] deleting %s\n",next.c_str());
+					inf_print("deleting %s",next.c_str());
 					nst::delete_temp_files_of(next.c_str());
 					File df (next);
 					if(df.exists()){
@@ -1141,7 +1088,7 @@ public:
 					}
 				}
 			}catch(std::exception& ){
-				printf("[TS] [ERROR] could not delete table file %s\n", name.c_str());
+				err_print("could not delete table file %s", name.c_str());
 				r = HA_ERR_TABLE_EXIST;
 
 			}
@@ -1152,7 +1099,7 @@ public:
 			using Poco::Path;
 			std::string nxt = name + extenstion;
 			if(stored::erase_abstracted_storage(nxt)){
-				printf("[TS] [INFO] deleting %s\n",nxt.c_str());
+				inf_print("deleting %s",nxt.c_str());
 				File df (nxt);
 				if(df.exists()){
 					df.remove();
@@ -1161,7 +1108,7 @@ public:
 				r = HA_ERR_TABLE_EXIST;
 			}
 		}catch(std::exception& ){
-			printf("[TS] [ERROR] could not delete table file %s\n", name);
+			err_print("could not delete table file %s", name);
 			r = HA_ERR_TABLE_EXIST;
 
 		}
@@ -1185,7 +1132,7 @@ public:
 	}
 	int close(void){
 		DBUG_PRINT("info",("closing tt %s\n", table->alias));
-		printf("[TS] [INFO] closing tt %s\n", table->alias);
+		inf_print("closing tt %s", table->alias);
 		clear_selection(this->_selection_state);
 		r_stop.clear();
 		r.clear();
@@ -1209,8 +1156,8 @@ public:
 		return r;
 	}
 	void check_own_use(){
-		if(stx::memory_low_state){		
-			st.reduce();		
+		if(stx::memory_mark_state){		
+
 			if(writer_thread!=nullptr){
 				writer_thread->own_reduce();
 			}else{
@@ -1224,7 +1171,7 @@ public:
 		
 		DBUG_ENTER("::external_lock");
 		if(table == NULL){
-			printf("[TS] [ERROR] table cannot be locked - invalid argument\n");
+			err_print("table cannot be locked - invalid argument");
 			return 0;
 		}
 		bool writer = false;
@@ -1248,15 +1195,15 @@ public:
 
 				}
 				if(high_mem){
-					stored::reduce_all();
+					//stored::reduce_all();
 				}
 
 			}
 		}
 		if(treestore_print_lox){
 			if (lock_type == F_RDLCK || lock_type == F_WRLCK || lock_type == F_UNLCK)
-				printf
-				(	"[TS] [INFO] [%s]l %s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g MB\n"
+				inf_print
+				(	"[%s]l %s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g MB"
 				,	lock_type == F_UNLCK ? "-":"+"
 				,	table->s->normalized_path.str
 				,	(double)calc_total_use()/units::MB
@@ -1331,14 +1278,14 @@ public:
 					
 
 				/// for testing
-				//st.reduce_all();
+				
 				if(high_mem){
 					//stored::reduce_all();
 				}
 				
 				if(treestore_print_lox){
-					printf
-					(	"[TS] [INFO] %s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g / %.4g MB\n"
+					inf_print
+					(	"%s m:T%.4g b%.4g c%.4g [s]%.4g t%.4g pc%.4g pool %.4g / %.4g MB"
 					,	"transaction complete"
 					,	(double)calc_total_use()/units::MB
 					,	(double)nst::buffer_use/units::MB
@@ -1540,7 +1487,7 @@ public:
 		table->status = 0;
 		resolve_selection(this->_selection_state.last_resolved,this->_selection_state);
 		if((this->_selection_state.last_resolved % 1000000) == 0){
-			printf("[INFO] [TS] resolved %lld rows in table %s\n", (long long)this->_selection_state.last_resolved,table->s->path.str);
+			inf_print("resolved %lld rows in table %s", (long long)this->_selection_state.last_resolved,table->s->path.str);
 		}
 		++((*this).r);
 		DBUG_RETURN(0);
@@ -1565,11 +1512,9 @@ public:
 	}
 	nst::u64 writes;
 	int write_row(byte * buff){
-		if(((writes%1000ll)==0) || stx::memory_low_state){
+		if(((writes%1000ll)==0) || stx::memory_mark_state){
 			check_own_use();
-			if(is_memory_low()){
-				//printf("[TS] [WARNING] could not reduce use\n");
-			}
+		
 		}
 		++writes;
 		ha_statistic_increment(&SSV::ha_write_count);
@@ -1779,6 +1724,13 @@ public:
 	{
 		return input.row;
 	}
+	inline stored::_Rid key_to_rid
+	(	uint ax
+	,	const stored::BareKey& input
+	)
+	{
+		return input.row;
+	}
 	void rebase_selection_io(byte* io,_SelectionState& selection_state){
 		selection_state.rebase_selection_io(io);
 	}
@@ -1817,8 +1769,8 @@ public:
 
 		}
 	}
-	
-	void resolve_selection_from_index(uint ax, _SelectionState &selection_state, const tree_stored::CompositeStored& iinfo, bool use_index = true){
+	template<typename _KeyType>
+	void resolve_selection_from_index(uint ax, _SelectionState &selection_state, const _KeyType& iinfo, bool use_index = true){
 
 		using namespace NS_STORAGE;
 		
@@ -1838,7 +1790,10 @@ public:
 	}
 	
 	void resolve_selection_from_index(uint ax,  _SelectionState& selection_state, stored::index_iterator_interface * current_iterator, bool use_index = true) {
-		const tree_stored::CompositeStored &iinfo = current_iterator->get_key();
+		const stored::StandardDynamicKey &iinfo = current_iterator->get_key();
+		if(iinfo.row == 0){			
+			err_print("invalid key");
+		}
 		resolve_selection_from_index(ax, selection_state, iinfo, use_index);
 	}
 
@@ -2212,7 +2167,7 @@ void start_calculating();
 
 void test_suffix_array(){
 
-	printf("testing suffix array encoding\n");
+	inf_print("testing suffix array encoding");
 	std::ifstream t("suffix_test.dat");
 	t.seekg(0, std::ios::end);
 	size_t size = t.tellg();
@@ -2250,12 +2205,12 @@ int treestore_db_init(void *p)
 						sizeof(HeapFragValue))
 	)
 	{
-		printf("[TS] [INFO]  *** Tree Store (eyore) using low fragmentation heap\n");
+		inf_print("*** Tree Store (eyore) using low fragmentation heap");
 	}else{
-		printf("[TS] [WARN]  *** Tree Store (eyore) NOT using low fragmentation heap\n");
+		inf_print("*** Tree Store (eyore) NOT using low fragmentation heap");
 	}
 #endif
-	printf("[TS] [INFO]  *** Tree Store (eyore) starting memuse configured to %lld MB\n",treestore_max_mem_use/(1024*1024L));
+	inf_print("*** Tree Store (eyore) starting memuse configured to %lld MB",treestore_max_mem_use/(1024*1024L));
 	DBUG_ENTER("treestore_db_init");
 	initialize_loggers();
 	Poco::Data::SQLite::Connector::registerConnector();
@@ -2268,7 +2223,7 @@ int treestore_db_init(void *p)
 	treestore_hton->create = treestore_create_handler;
 	treestore_hton->flags= HTON_CAN_RECREATE; ///HTON_ALTER_NOT_SUPPORTED | HTON_NO_PARTITION
 
-	printf("[TS] [INFO] Start cleaning \n");
+	inf_print("Start cleaning");
 
 	start_cleaning();
 	start_calculating();
@@ -2304,6 +2259,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(contact_points),
   MYSQL_SYSVAR(red_address),
   MYSQL_SYSVAR(resolve_values_from_index),
+  MYSQL_SYSVAR(use_internal_pool),
   NULL
 };
 
@@ -2340,34 +2296,78 @@ extern void start_red(const nst::u64& id);
 namespace ts_cleanup{
 	class print_cleanup_worker : public Poco::Runnable{
 	public:
+
 		void run(){
 			stx::memory_low_state = false;
 			start_red(0);
 			nst::u64 last_print_size = calc_total_use();
+			nst::u64 last_print_time = os::millis();
 			/// DEBUG: nst::u64 last_check_size = calc_total_use();
-			double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+			double min_tree_factor = treestore_column_cache_factor;
+			double factor_decr = 0.1;
+			double tree_factor = 1 - factor_decr;
+			
+			allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
+			buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor));
+			buffer_allocation_pool.set_special();
+			nst::u64 last_total_encoded = buffer_allocation_pool.get_allocated();
+			nst::u64 last_up_encoded = 0ll;
 			while(Poco::Thread::current()->isRunning()){
-				if(stx::memory_low_state){
-					Poco::Thread::sleep(50);
-				}else Poco::Thread::sleep(treestore_cleanup_time);
-				/// int j = int();
-				/// DEBUG: nst::u64 pool_used = allocation_pool.get_used();
-				allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
-				buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor)*0.95);
-				stx::memory_mark_state = is_memory_mark();
-				stx::memory_low_state = is_memory_low();
-				if(buffer_allocation_pool.is_near_full()){
-					stored::reduce_all();
+				//if(stx::memory_low_state) Poco::Thread::sleep(50);
+				Poco::Thread::sleep(treestore_cleanup_time);
+				nst::u64 total_encoded = buffer_allocation_pool.get_allocated();
+				nst::u64 total_decoded = allocation_pool.get_allocated();
+				nst::u64 target_encoded = (treestore_max_mem_use*(1-tree_factor));
+				/// if tree factor becomes smaller the encoded memory becomes more - goes up
+				bool up = (tree_factor > factor_decr) && (total_encoded > last_total_encoded) && buffer_allocation_pool.is_near_depleted();
+				/// if tree factor becomes larger the encoded memory becomes less - goes down
+				bool down = (tree_factor < (1.0 - factor_decr)) && (total_encoded < (last_total_encoded - last_total_encoded/8)) && (total_encoded < (target_encoded-target_encoded/8));				
+				last_total_encoded = total_encoded;	
+				if( down || up ){					
+
+					nst::i64 sign = up ? 1ll : -1ll;
+					double tf = tree_factor;
+					total_encoded = std::min<nst::u64>(treestore_max_mem_use,buffer_allocation_pool.get_allocated());					
+					if(up){
+						double up_delta = (double)(buffer_allocation_pool.get_allocated() - last_up_encoded)/(double)treestore_max_mem_use;
+						inf_print("up delta :%.4g ", up_delta);
+						tree_factor = std::max<double>(min_tree_factor, tree_factor - up_delta);					
+						last_up_encoded = total_encoded;
+					}else{
+						tree_factor = std::max<double>(min_tree_factor, 1.0 - ((double)(total_encoded)/(double)treestore_max_mem_use));					
+					}
+					
+					inf_print("set encoded/decoded ratio to:%.4g from: %.4g, direction is %s", tree_factor, tf, up ? "up" : "down");
+					
+					allocation_pool.set_max_pool_size(treestore_max_mem_use*tree_factor);
+					buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor));					
 				}
 				
-				if(stx::memory_mark_state){
-					//printf("[TREESTORE] reduce idle tree use\n");
-					
+				buffer_allocation_pool.check_overflow();
+				allocation_pool.check_overflow();
+				
+				stx::memory_mark_state = is_memory_mark(tree_factor);
+				stx::memory_low_state = is_memory_low(tree_factor);
+				if(stx::memory_low_state || stx::memory_mark_state){
+					inf_print("reduce idle tree use");
 					//st.reduce_idle_writers();	
+					st.release_idle_trees();
 				}
-				if(llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
-					printf
-					(	"[TS] [INFO] [%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu\n"
+				if(stx::memory_low_state || stx::memory_mark_state || buffer_allocation_pool.is_near_depleted()){ 
+					stored::reduce_aged();
+					if(buffer_allocation_pool.is_near_depleted()){ 
+						stored::reduce_all();
+					}
+				}
+				if(buffer_allocation_pool.is_near_full()){
+					//
+				}
+				
+				if(os::millis() - last_print_time > 5000 || 
+					llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
+
+					inf_print
+					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu f%.4g"
 					,	"o"
 					,	""
 					,	(double)calc_total_use()/units::MB
@@ -2380,8 +2380,10 @@ namespace ts_cleanup{
 					,	(double)(allocation_pool.get_total_allocated()+buffer_allocation_pool.get_total_allocated())/units::MB					
 					//,	(double)allocation_pool.get_allocated()/units::MB
 					,	(unsigned long)st.get_thread_count() 
+					,	tree_factor
 					);
 					last_print_size = calc_total_use();
+					last_print_time = os::millis();
 				}
 			}
 		}
@@ -2392,7 +2394,7 @@ namespace ts_cleanup{
 		try{
 			cleanup_thread.start(the_worker);
 		}catch(Poco::Exception &e){
-			printf("[TS] [ERROR] Could not start cleanup thread : %s\n",e.name());
+			err_print("Could not start cleanup thread : %s\n",e.name());
 		}
 	}
 };
@@ -2405,5 +2407,44 @@ void start_calculating(){
 }
 
 #include <stx/storage/pool.h>
+
 nst::allocation::pool allocation_pool(2*1024ll*1024ll*1024ll);
 nst::allocation::pool buffer_allocation_pool(2*1024ll*1024ll*1024ll);
+
+namespace stx{
+namespace storage{
+namespace allocation{
+	Poco::Mutex lock;
+	size_t threads = 0;
+	
+	thread_local thread_instance* std_instance = nullptr;
+	thread_local thread_instance* buff_instance = nullptr;
+
+	size_t get_thread_instance_count(){
+		return threads;
+	}
+	thread_instance* get_variable(thread_instance** variable,pool_shared * shared){
+		thread_instance* result = *variable;
+		if(*variable==nullptr){
+			synchronized inst(lock);
+			if(*variable==nullptr){
+				threads++;
+				*variable = new thread_instance(shared);
+				result = *variable;
+			}
+		}
+		return result;
+	}
+	thread_instance* get_thread_instance(const nst::allocation::inner_pool* src){
+		if(src == &(allocation_pool.get_pool())){
+			return get_variable(&std_instance, allocation_pool.get_pool().get_shared());			
+		}else{			
+			return get_variable(&buff_instance, allocation_pool.get_pool().get_shared());
+		}
+		
+	}
+};
+};
+};
+
+

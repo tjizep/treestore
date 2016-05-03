@@ -178,10 +178,10 @@ namespace tree_stored{
 		template<typename BlobType>
 		CONVERSION_NOINLINE_
 		void tfset(stored::_Rid row, Field * f, const BlobType& b){
-			if(b.get_size()==0){
-				printf("[TS] [WARNING] invalid source varchar buffer supplied\n");
-				return;
-			}
+			//if(b.get_size()==0){
+			//	printf("[TS] [WARNING] invalid source varchar buffer supplied\n");
+			//	return;
+			//}
 			enum_field_types et = f->type();
 			char * ptr = (char *)f->ptr;
 			bool fast_varchar = true;
@@ -303,7 +303,7 @@ namespace tree_stored{
 		}
 		
 		/// direct getters into the composite type for indexes
-        typedef stored::DynamicKey CompositeStored;
+        typedef stored::StandardDynamicKey CompositeStored;
 		inline void fadd(CompositeStored& to, stored::FloatStored &fs, Field * f, const uchar*, uint flags){
 			to.addf4((float)f->val_real());
 

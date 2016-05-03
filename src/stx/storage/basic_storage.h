@@ -422,8 +422,9 @@ namespace stx{
 				/// decompress_fse(buff, input);
 				i32 d = *((i32*)&buff[0]) ;
 				if(decoded.size() < d){
-					decoded.reserve(d);
-					decoded.resize(d);
+					i32 rs = d; //std::max<i32>(d,256000);
+					decoded.reserve(rs);
+					decoded.resize(rs);
 				}
 				LZ4_decompress_fast((const encode_type_ref)&buff[sizeof(i32)],(encode_type_ref)&decoded[0],d);
 				return d;

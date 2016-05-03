@@ -193,7 +193,7 @@ namespace collums{
 				size_t d = reader - buffer.begin();
 
 				if(d != bsize){					
-					printf("[ERROR] [TS] page has invalid size\n");
+					err_print("page has invalid size");
 				}
 			}
 			
@@ -215,7 +215,7 @@ namespace collums{
 				}
 				buffer.resize(storage_use);
 				if(buffer.size() != storage_use){
-					printf("[ERROR] [TS] resize failed\n");
+					err_print("resize failed");
 				}
 				buffer_type::iterator writer = buffer.begin();				
 				writer = leb128::write_signed(writer, encoded_value_size);			
@@ -233,7 +233,7 @@ namespace collums{
 				}
 				size_type d = writer - buffer.begin();
 				if(d > storage_use){
-					printf("[ERROR] [TS] array page encoding failed\n");
+					err_print("array page encoding failed");
 				}
 				
 				modified = false;
@@ -321,10 +321,10 @@ namespace collums{
 				for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
 					stored_page_ptr page = p.get_value();
 					if(page->get_references() == 0){
-						printf("[TS] [SEVERE] [ERROR] inconsistent memory previously visited page or page invalid\n");
+						err_print("inconsistent memory previously visited page or page invalid");
 					}
 					if(page->get_references() == 1 && page->is_modified()){
-						printf("[TS] [SEVERE] [ERROR] inconsistent memory page state\n");
+						err_print("inconsistent memory page state");
 					}
 					if(page->get_references() == 1 && !page->is_modified()){
 						page->reset_references();
@@ -345,21 +345,21 @@ namespace collums{
 					versioned_pages.erase((*r));
 				}
 				if(versioned_pages.size() != old-released.size()){
-					printf("[TS] [SEVERE] [ERROR] inconsistent memory\n");
+					err_print("inconsistent memory");
 				}
 				this->reduced = 1 ;
 			}
 			/// add the page to version control
 			bool add(stored_page_ptr p){
 				if(p->get_references() < 1){
-					printf("[TS] [ERROR] page has invalid reference count\n");
+					err_print("page has invalid reference count");
 				}
 				address_version location = std::make_pair(p->get_address(), p->get_version());				
 				nst::synchronized l(this->lock);
 				if(versioned_pages.count(location)==0){					
 					p->ref();/// reference for pages collection			
 					if(p->is_modified()){
-						printf("[TS] [ERROR] page added as modified\n");
+						err_print("page added as modified");
 					}
 					versioned_pages[location] = p;			
 					this->reduced = 0;
@@ -381,7 +381,7 @@ namespace collums{
 				if(r != nullptr){
 					address_version location = std::make_pair(r->get_address(), r->get_version());	
 					if(location != query){
-						printf("[TS] [ERROR] the retrieved version does not match the query\n");
+						err_print("the retrieved version does not match the query");
 					}
 					r->ref(); 
 					this->reduced = 0;
@@ -417,7 +417,7 @@ namespace collums{
 		};
 
 		/// the page map
-		typedef rabbit::unordered_map<size_type, stored_page_ptr> page_map_type;
+		typedef rabbit::unordered_map<size_type, stored_page_ptr, rabbit::rabbit_hash<size_type>, std::equal_to<size_type>, sta::pool_alloc_tracker<size_type>> page_map_type;
 	private:
 		/// keeps cached pages
 		mutable page_map_type pages;
@@ -472,23 +472,23 @@ namespace collums{
 				return;
 			}
 			if(page->get_address()==0){
-				printf("[TS] [ERROR] array page has no address\n");
+				err_print("array page has no address");
 				return;
 			}
 			using namespace stx::storage;
 			//if(version_control->has(page)){
 			//	if(page->get_references() < 2){
-			//		printf("[TS] [ERROR] array page is under referenced\n");
-			//	}				
-				
+			//		err_print("array page is under referenced");
+			//	}								
 			//}
 			version_control->release(page);
 			stream_address w = page->get_address();
 			//temp_encode.clear();
 			page->save(encoder, get_storage(), temp_encode);		
 			compress_lz4(temp_compress,temp_encode);	
+			buffer_type swapped(temp_compress);
 			buffer_type &buffer = get_storage().allocate(w, stx::storage::create);
-			buffer = temp_compress;
+			buffer.swap(swapped);
 			page->set_version(get_storage().get_allocated_version());
 								
 			get_storage().complete();
@@ -506,7 +506,7 @@ namespace collums{
 				stored_page_ptr page = (*p).second;
 				if(page == local_page){
 					if(page->is_modified()){
-						printf("[TS] [ERROR] local page not saved");
+						err_print("local page not saved");
 					}
 					page->set_address(0);
 				}else{
@@ -591,10 +591,10 @@ namespace collums{
 		
 		stored_page_ptr get_page(size_type which) const {
 			size_type address = (which / page_size) + 128;
-			if(last_loaded && last_loaded->get_address()==address){
-				return last_loaded;
-			}
-			last_loaded = nullptr;
+			//if(last_loaded && last_loaded->get_address()==address){
+				//return last_loaded;
+			//}
+			//last_loaded = nullptr;
 
 			stored_page::ptr page;
 			//auto i = pages.find(address);
@@ -679,21 +679,21 @@ namespace collums{
 
 			inline const data_type& value() const {
 				if(h==nullptr){
-					printf("[TS] [ERROR] h is null\n");
+					err_print("h is null");
 				}
 				return h->resolve(pos);
 			}
 
 			inline data_type& data(){
 				if(h==nullptr){
-					printf("[TS] [ERROR] h is null\n");
+					err_print("h is null");
 				}
 				return h->resolve(pos);
 			}
 
 			inline const data_type& data() const {
 				if(h==nullptr){
-					printf("[TS] [ERROR] h is null\n");
+					err_print("h is null");
 				}
 				return h->resolve(pos);
 			}
@@ -1082,7 +1082,7 @@ namespace collums{
 			}
 			void nullify(_Rid row){
 				if(row < rows_start){
-					printf("ERROR: invalid row\n");
+					err_print("invalid row");
 					return;
 				}
 				nst::u8 & flags = (*this).flags[row-rows_start];
@@ -1119,7 +1119,7 @@ namespace collums{
 			_Stored& get(_Rid row)  {
 				_Rid at = row - rows_start;
 				if(data_size <= at){
-					printf("ERROR invalid data size or row\n");
+					err_print("invalid data size or row");
 				}
 				if(encoded.good()){
 
@@ -1131,7 +1131,7 @@ namespace collums{
 
 				_Rid at = row - rows_start;
 				if(data_size <= at){
-					printf("ERROR invalid data size or row\n");
+					err_print("invalid data size or row");
 				}
 				if(encoded.good()){
 
@@ -1200,7 +1200,7 @@ namespace collums{
 
 						(*this).set_data(kv, c.data());
 						if(kv <start){
-							printf("ERROR: kv invalid\n");
+							err_print("kv invalid");
 						}
 						prev = kv;
 					}
@@ -1295,7 +1295,7 @@ namespace collums{
 						}
 						_Rid r = c.key().get_value();
 						if(r <= test){
-							printf("WARNING: bad order in table detected\n");
+							err_print("bad order in column");
 						}
 						test = r;
 						(*this).encoded.set(r-start, c.data());
@@ -1709,7 +1709,7 @@ namespace collums{
 		void flush(){
 			if(modified)
 			{
-				printf("flushing %s\n", storage.get_name().c_str());
+				inf_print("column flushing %s", storage.get_name().c_str());
 				col.flush_buffers();
 				//col.reduce_use();
 				storage.commit();
@@ -1828,7 +1828,7 @@ namespace collums{
 
 
 	static void test_ints(){
-		typedef stored::DynamicKey _Sk;
+		typedef stored::StandardDynamicKey _Sk;
 		typedef std::map<_Sk, int> _TestMap;
 		int mv = 1000000;
 		_TestMap tm;

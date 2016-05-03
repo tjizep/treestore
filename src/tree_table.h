@@ -568,22 +568,26 @@ namespace tree_stored{
 		virtual void compose_by_tree(stored::_Rid r, CompositeStored & to){
 			const _Fieldt& field = col.seek_by_tree(r);
 			to.add(field);
+			
 		}
 		virtual void compose_by_cache(stored::_Rid r, CompositeStored & to){
 			const _Fieldt& field = col.seek_by_cache(r);
 			to.add(field);
+			
 		}
 
 		virtual void compose(CompositeStored & to, Field* f){
 			/// possibly also use , const uchar * ptr, uint flags
 			convertor.fget(temp, f, NULL, 0);/// convert into temp
 			to.add(temp); /// append to destination
+			
 		}
 		
 		virtual void compose(CompositeStored & to, Field* f, const uchar * ptr, uint flags){
 			//convertor.fget(temp, f, ptr, flags);
 			//to.add(temp.get_value());// TODO: due to this interface, BLOBS are impossible in indexes
 			convertor.fadd(to,temp,f,ptr,flags);
+
 		}
 
 		virtual bool equal(stored::_Rid row, Field* f){
@@ -973,7 +977,29 @@ namespace tree_stored{
 				}
 
 				if(!field_primitive){
-					index = new tree_index<stored::DynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+					size_t key_size = 0;
+					for (j= 0; j < pos->usable_key_parts; j++){
+						Field *field = pos->key_part[j].field;// the jth field in the key
+						size_t field_size = field->pack_length_in_rec();
+						key_size += field_size;
+
+					}
+					key_size+=pos->usable_key_parts;
+					//index = new tree_index<stored::StandardDynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+					if(index==nullptr){
+						const size_t min_key_size0 = sizeof(stored::DynamicKey<0>);
+						const size_t min_key_size = sizeof(stored::DynamicKey<0>::_Data);
+						if(key_size <= min_key_size){
+							index = new tree_index<stored::DynamicKey<0>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+						}else if(key_size <= min_key_size + 8){
+							index = new tree_index<stored::DynamicKey<8>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+						}else if(key_size <= min_key_size + 16){
+							index = new tree_index<stored::DynamicKey<16>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+						}else {
+							index = new tree_index<stored::StandardDynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+						}
+					}
+
 				}
 
 				index->set_col_index(i);
@@ -1207,7 +1233,7 @@ namespace tree_stored{
 				
 				
 				stored::index_interface::ptr index = (*this).indexes[i];
-				printf("[TS] [INFO] Calculating cardinality of index parts for %s\n",(*this).indexes[i]->name.c_str());
+				inf_print("Calculating cardinality of index parts for %s",(*this).indexes[i]->name.c_str());
 				
 				const _Rid step_size = 8;
 				const _Rid rows = get_row_count();
@@ -1221,6 +1247,7 @@ namespace tree_stored{
 					nst::u32 u = 0;
 					stored::_Parts::iterator pbegin = index->parts.begin();
 					stored::_Parts::iterator pend = index->parts.end();
+					
 					//for(;u<uniques.size();){ ///
 						ir.clear();
 						for(stored::_Parts::iterator p = pbegin; p != pend; ++p){
@@ -1239,7 +1266,7 @@ namespace tree_stored{
 					if(!uniques[0].empty()) den = sample/uniques[0].size(); //(*u).size() ;/// accurate to the nearest page
 					if(den > 1) den = den * 5;
 					
-					printf("[TS] [INFO] Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
+					inf_print("Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
 					index->push_density(den);
 					index->reduce_use();
 					partx++;
@@ -1629,12 +1656,11 @@ namespace tree_stored{
 						field->ptr = (uchar *)ptr;
 						if(pi->null_bit)
 							field->ptr++;
-						cols[field->field_index]->compose(temp, field, field->ptr, 0);
-
+						cols[field->field_index]->compose(temp, field, field->ptr, 0);						
 					}
 					field->ptr = okey;
 				}else{
-					if(bound==0xffffffff){
+					if(bound==stored::MAX_ROWS){
 						temp.addInf();
 					}
 					//else
@@ -1752,7 +1778,7 @@ namespace tree_stored{
 				indexes[ax]->end(r);
 				return ;
 			}
-			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
+			_compose_query(table, stored::MAX_ROWS, ax, key, key_l, key_map);
 			indexes[ax]->upper(r, temp);
 
 		}
@@ -1771,7 +1797,7 @@ namespace tree_stored{
 				indexes[ax]->end(r);
 				return ;
 			}
-			_compose_query(table, 0xFFFFFFFFul, ax, key, key_l, key_map);
+			_compose_query(table, stored::MAX_ROWS, ax, key, key_l, key_map);
 			indexes[ax]->upper(r,temp);
 
 		}
@@ -2051,20 +2077,22 @@ namespace tree_stored{
 			return 0;
 		}
 		/// maps and copies available data in index to read set - reports those that could not be copied
-		void read_index_key_to_fields(_SetFields& to_set, TABLE* table, nst::u32 ix, const tree_stored::CompositeStored& key,std::vector<Field*>& field_map){
+		template<typename _KeyType>
+		void read_index_key_to_fields(_SetFields& to_set, TABLE* table, nst::u32 ix, const _KeyType& key,std::vector<Field*>& field_map){
 			TABLE_SHARE *share= table->s;
 			stored::index_interface::ptr index  = indexes[ix];
 			Field **fields =share->field ;
 			
-			tree_stored::CompositeStored::iterator k = key.begin();
+			stored::StandardDynamicKey::iterator k = key;
 			for(stored::_Parts::iterator p = index->parts.begin(); p != index->parts.end(); ++p){
 				if(bitmap_is_set(table->read_set, (*p) )){
 					Field * f = field_map[(*p)];
 					//if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
 						const nst::u8 * data = k.get_data();
 						longlong lval = 0;
-						to_set[(*p)] = 1;						
-						switch(k.get_type()){						
+						to_set[(*p)] = 1;		
+						int kt = k.get_type();
+						switch(kt){						
 						
 						case CompositeStored::UI8:
 							lval = *(const nst::u64*)(data);
@@ -2105,7 +2133,7 @@ namespace tree_stored{
 							to_set[(*p)] = 0;
 							break;
 						default:
-							switch(k.get_type()){
+							switch(kt){
 								case CompositeStored::UI1:
 									lval = *(const nst::u8*)(data);
 									f->set_notnull();
@@ -2122,8 +2150,11 @@ namespace tree_stored{
 									f->set_notnull();
 									f->store(lval,true);
 									break;															
-							}
-							to_set[(*p)] = 0;
+								default:
+									to_set[(*p)] = 0;
+									break;		
+							};
+							
 							break;
 							
 						};

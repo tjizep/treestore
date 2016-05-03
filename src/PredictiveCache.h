@@ -122,6 +122,7 @@ namespace tree_stored{
 		/// this function gets called for every missed prediction
 		/// thereby 'adapting' to changing workloads
 		void store(const BasicIterator & iter){
+			/// this converts from primitive to dynamic key types
 			this->temp = const_cast<BasicIterator&>(iter).key().return_or_copy(this->rval);
 			this->temp.row = 0;
 			keys[this->temp] = iter;			
