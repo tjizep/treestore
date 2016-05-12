@@ -82,7 +82,7 @@ namespace iterator{
 			return i;
 		}
 		void set_end(const ImplIterator& the_end){
-			//iend.clear();
+			iend.clear();
 			iend = the_end.i;
 			//check();
 		}

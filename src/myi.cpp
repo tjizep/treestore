@@ -390,12 +390,14 @@ public:
 	static_threads() {
 	}
 	void reduce_idle_writers(){
-		///nst::synchronized s(tlock);
+		//nst::synchronized s(tlock);
 		for(_Writers::iterator w = writers.begin(); w != writers.end(); ++w){
 			tree_stored::tree_thread* writer = (*w).second;
 			if(!writer->get_used()){
 				NS_STORAGE::syncronized ul(writer->writer_lock);
-				writer->own_reduce();
+				if(!writer->get_used()){
+					writer->own_reduce();
+				}
 			}
 		}
 	}
@@ -2311,7 +2313,7 @@ namespace ts_cleanup{
 			buffer_allocation_pool.set_max_pool_size(treestore_max_mem_use*(1-tree_factor));
 			buffer_allocation_pool.set_special();
 			nst::u64 last_total_encoded = buffer_allocation_pool.get_allocated();
-			nst::u64 last_up_encoded = 0ll;
+			
 			while(Poco::Thread::current()->isRunning()){
 				//if(stx::memory_low_state) Poco::Thread::sleep(50);
 				Poco::Thread::sleep(treestore_cleanup_time);
@@ -2322,6 +2324,7 @@ namespace ts_cleanup{
 				bool up = (tree_factor > factor_decr) && (total_encoded > last_total_encoded) && buffer_allocation_pool.is_near_depleted();
 				/// if tree factor becomes larger the encoded memory becomes less - goes down
 				bool down = (tree_factor < (1.0 - factor_decr)) && (total_encoded < (last_total_encoded - last_total_encoded/8)) && (total_encoded < (target_encoded-target_encoded/8));				
+				nst::u64 last_up_encoded = last_total_encoded;
 				last_total_encoded = total_encoded;	
 				if( down || up ){					
 
@@ -2329,10 +2332,9 @@ namespace ts_cleanup{
 					double tf = tree_factor;
 					total_encoded = std::min<nst::u64>(treestore_max_mem_use,buffer_allocation_pool.get_allocated());					
 					if(up){
-						double up_delta = (double)(buffer_allocation_pool.get_allocated() - last_up_encoded)/(double)treestore_max_mem_use;
-						inf_print("up delta :%.4g ", up_delta);
-						tree_factor = std::max<double>(min_tree_factor, tree_factor - up_delta);					
-						last_up_encoded = total_encoded;
+						double up_delta = (double)(2.0*(buffer_allocation_pool.get_allocated() - last_up_encoded))/(double)treestore_max_mem_use;
+						inf_print("up delta :%.4g ", up_delta/units::MB);
+						tree_factor = std::max<double>(min_tree_factor, tree_factor - up_delta);								
 					}else{
 						tree_factor = std::max<double>(min_tree_factor, 1.0 - ((double)(total_encoded)/(double)treestore_max_mem_use));					
 					}
@@ -2348,15 +2350,17 @@ namespace ts_cleanup{
 				
 				stx::memory_mark_state = is_memory_mark(tree_factor);
 				stx::memory_low_state = is_memory_low(tree_factor);
-				if(stx::memory_low_state || stx::memory_mark_state){
-					inf_print("reduce idle tree use");
-					//st.reduce_idle_writers();	
-					st.release_idle_trees();
-				}
-				if(stx::memory_low_state || stx::memory_mark_state || buffer_allocation_pool.is_near_depleted()){ 
-					stored::reduce_aged();
-					if(buffer_allocation_pool.is_near_depleted()){ 
-						stored::reduce_all();
+				if(!(up || down)){
+					if(stx::memory_low_state || stx::memory_mark_state){
+						inf_print("reduce idle tree use");
+						st.reduce_idle_writers();	
+						st.release_idle_trees();
+					}
+					if(stx::memory_low_state || stx::memory_mark_state || buffer_allocation_pool.is_near_depleted()){ 
+						stored::reduce_aged();
+						if(buffer_allocation_pool.is_near_depleted()){ 
+							stored::reduce_all();
+						}
 					}
 				}
 				if(buffer_allocation_pool.is_near_full()){
@@ -2367,17 +2371,17 @@ namespace ts_cleanup{
 					llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 
 					inf_print
-					(	"[%s]l %s m:T%.4g b%.4g c%.4g pc%.4g stl%.4g  pool: %.4g / %.4g MB, tr:%lu f%.4g"
-					,	"o"
-					,	""
+					(	" m:T%.4g b%.4g c%.4g pc%.4g stl%.4g pl. %.4g/%.4g, %.4g/%.4g MB, tr:%lu f%.4g"
 					,	(double)calc_total_use()/units::MB
 					,	(double)(nst::buffer_use+buffer_allocation_pool.get_allocated())/units::MB
 					,	(double)nst::col_use/units::MB
 					
 					,	(double)total_cache_size/units::MB
 					,	(double)nst::stl_use/units::MB
-					,	(double)(allocation_pool.get_used()+buffer_allocation_pool.get_used())/units::MB
-					,	(double)(allocation_pool.get_total_allocated()+buffer_allocation_pool.get_total_allocated())/units::MB					
+					,	(double)(allocation_pool.get_used())/units::MB
+					,	(double)(allocation_pool.get_total_allocated())/units::MB					
+					,	(double)(buffer_allocation_pool.get_used())/units::MB
+					,	(double)(buffer_allocation_pool.get_total_allocated())/units::MB					
 					//,	(double)allocation_pool.get_allocated()/units::MB
 					,	(unsigned long)st.get_thread_count() 
 					,	tree_factor
