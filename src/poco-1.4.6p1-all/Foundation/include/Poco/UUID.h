@@ -139,6 +139,9 @@ public:
 		/// Returns true iff the UUID is nil (in other words,
 		/// consists of all zeros).
 
+	bool hasTime() const ;
+		/// returns true if the time is set
+
 	static const UUID& null();
 		/// Returns a null/nil UUID.
 
@@ -226,6 +229,10 @@ inline bool UUID::isNull() const
 	return compare(null()) == 0;
 }
 
+inline bool UUID::hasTime() const
+{
+	return (_timeLow || _timeMid);
+}
 
 inline void swap(UUID& u1, UUID& u2)
 {

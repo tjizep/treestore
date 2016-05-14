@@ -1190,8 +1190,8 @@ namespace storage{
 		}
 		
 		void load_all(){			
-			if(treestore_column_cache!=0) 
-				return;
+			//if(treestore_column_cache!=0) 
+			//	return;
 			synchronized s(lock);
 			/// check if this file can be loaded
 			if(!is_all_loaded){

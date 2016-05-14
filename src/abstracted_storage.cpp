@@ -66,7 +66,8 @@ namespace stored{
 				}
 			//}
 		}
-		inf_print("reduced %lld aged block storages",reduced);
+		if(reduced)
+			inf_print("reduced %lld aged block storages",reduced);
 	}
 	void reduce_all(){
 

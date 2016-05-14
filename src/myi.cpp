@@ -34,7 +34,7 @@ static bool is_memory_low(double tree_factor) {
 }
 static bool is_memory_mark(double tree_factor) {
 	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
-	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.83);// || allocation_pool.is_depleted();
+	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.60);// || allocation_pool.is_depleted();
 }
 static bool is_memory_lower(double tree_factor) {
 	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
@@ -673,7 +673,10 @@ public:
 	tree_stored::tree_thread* get_thread(){
 		return new_thread_from_thd(NULL,ha_thd(), this->path, false);
 	}
-	
+	tree_stored::tree_table::ptr get_reader_tree_table(){
+		tree_stored::tree_thread* thread = st.reuse_thread();
+		return thread->compose_table((*this).table, this->path);
+	}
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
 			tt = get_thread()->compose_table((*this).table, this->path);
@@ -877,7 +880,12 @@ public:
 
 	double scan_time()
 	{
-		return((double) (std::max<nst::u64>(1, get_tree_table()->table_size())/2048));/*assume an average page size of 8192 bytes*/
+		try{
+			return((double) (std::max<nst::u64>(1, get_reader_tree_table()->table_size())/2048));/*assume an average page size of 8192 bytes*/
+		}catch(tree_stored::InvalidTablePointer&){
+			err_print("invalid table pointer");
+		}
+		return 1.0f;
 	}
 	/// from InnoDB
 	double read_time(uint index, uint ranges, ha_rows rows)
@@ -896,12 +904,15 @@ public:
 		}
 		/* Assume that the read time is proportional to the scan time for all
 		rows + at most one seek per range. */
+		try{
+			time_for_scan = scan_time();
+		
+			if ((total_rows =  get_reader_tree_table()->shared_row_count()) < rows) {
 
-		time_for_scan = scan_time();
-
-		if ((total_rows =  get_tree_table()->row_count()) < rows) {
-
-			return(time_for_scan);
+				return(time_for_scan);
+			}
+		}catch(tree_stored::InvalidTablePointer&){
+			err_print("invalid table pointer");
 		}
 
 		return(ranges + (double) rows / (double) total_rows * time_for_scan);
@@ -2351,8 +2362,8 @@ namespace ts_cleanup{
 				stx::memory_mark_state = is_memory_mark(tree_factor);
 				stx::memory_low_state = is_memory_low(tree_factor);
 				if(!(up || down)){
-					if(stx::memory_low_state || stx::memory_mark_state){
-						inf_print("reduce idle tree use");
+					if(stx::memory_low_state ){ //|| stx::memory_mark_state
+						if(stx::memory_low_state ) inf_print("reduce idle tree use");
 						st.reduce_idle_writers();	
 						st.release_idle_trees();
 					}

@@ -514,6 +514,7 @@ namespace collums{
 				}
 			}
 			pages.clear();
+			local_page->set_address(0);
 			version_control->notify_modify();
 		}
 		nst::_VersionRequests version_req;
@@ -536,7 +537,8 @@ namespace collums{
 		}
 		/// load a page from an address 
 		stored_page_ptr load_page(size_type address) const {
-			bool mem_low = (treestore_column_cache != 0) && get_storage().is_readonly();
+			bool mem_low = false;//(treestore_column_cache != 0 && !stx::memory_mark_state) && get_storage().is_readonly();
+			
 			stored_page_ptr page = nullptr;
 			if(true){ ///get_storage().is_local()
 				version_type current_version = get_page_version(address);
@@ -561,7 +563,7 @@ namespace collums{
 				//version_control->reduce();
 			}
 			if(mem_low){
-				page = local_page;
+				page = local_page;				
 			}else {
 				page = allocate_page(); 
 			}			
@@ -595,7 +597,9 @@ namespace collums{
 				//return last_loaded;
 			//}
 			//last_loaded = nullptr;
-
+			if(local_page->get_address() == address){
+				return local_page;
+			}
 			stored_page::ptr page;
 			//auto i = pages.find(address);
 			if(!pages.get(address,page)){
@@ -858,7 +862,7 @@ namespace collums{
 	template<class _StoredType>
 	struct col_policy_type{
 		bool load(size_t max_size) const{
-			return max_size < 128;
+			return max_size < 512;
 		}
 	};
 	template<>
@@ -1468,7 +1472,9 @@ namespace collums{
 		}
 
 		void load_cache(){
-			if(!col_policy.load(max_size) || treestore_column_cache==FALSE || lazy) return;
+			return; 
+			//if(!col_policy.load(max_size) || lazy) 
+			//treestore_column_cache==FALSE || 
 			if(pages==nullptr && max_row_id > 0){
 				using namespace stored;
 				pages = load_cache(storage.get_name(),max_row_id); ///= new _CachePages(); ///
@@ -1540,9 +1546,9 @@ namespace collums{
 		,	sampler(0)
 		,	max_size(max_size)
 		{
-			if(!col_policy.load(max_size) || treestore_column_cache==FALSE ){
+			//if(!col_policy.load(max_size) || treestore_column_cache==FALSE ){
 				this->storage.load_all();
-			}
+			//}
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -1629,7 +1635,7 @@ namespace collums{
 				if(page->available){
 					page->loading = true;
 					nst::u64 bytes_used = MAX_PAGE_SIZE * (sizeof(_StoredEntry) + 1);
-					if(	allocation_pool.get_allocated() > treestore_max_mem_use*treestore_column_cache_factor*0.85 || !allocation_pool.can_allocate(bytes_used) ){
+					if(	stx::memory_mark_state){
 						page->unload();
 						page->loading = false;
 
@@ -1639,6 +1645,7 @@ namespace collums{
 						storage.set_read_cache(true);
 						page->loaded = true;
 						page->loading = false;
+						
 					}
 					return nullptr;
 
@@ -1671,7 +1678,7 @@ namespace collums{
 
 		inline _Stored& seek_by_cache(_Rid row)  {
 			
-			if(col_policy.load(max_size) && treestore_column_cache && !lazy){
+			if(false){/// treestore_column_cache&& col_policy.load(max_size) && !lazy
 				_CachePage * page = nullptr;
 				if(has_cache()){
 					_Rid i = row % MAX_PAGE_SIZE;					

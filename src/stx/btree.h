@@ -2437,6 +2437,7 @@ namespace stx
 			}
 			return load(w, nullptr, loader, slot) ;
 		}
+		nst::version_type empty_version;
 		bool is_valid(const node* page, stream_address w) const {
 			if (selfverify){
 				if(get_storage()->current_transaction_order() < page->get_transaction()){
@@ -2446,7 +2447,7 @@ namespace stx
 			if(!version_reload) return true;
 
 			if(page != NULL_REF){
-				if(page->get_version() == nst::version_type()) return true;
+				if(!page->get_version().hasTime()) return true;
 				return get_storage()->current_transaction_order() == page->get_transaction();
 			}
 			return false;

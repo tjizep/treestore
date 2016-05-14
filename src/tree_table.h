@@ -991,6 +991,10 @@ namespace tree_stored{
 						const size_t min_key_size = sizeof(stored::DynamicKey<0>::_Data);
 						if(key_size <= min_key_size){
 							index = new tree_index<stored::DynamicKey<0>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
+						}else if(key_size <= min_key_size + 2){
+							index = new tree_index<stored::DynamicKey<2>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );						
+						}else if(key_size <= min_key_size + 4){
+							index = new tree_index<stored::DynamicKey<4>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );						
 						}else if(key_size <= min_key_size + 8){
 							index = new tree_index<stored::DynamicKey<8>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 						}else if(key_size <= min_key_size + 16){
@@ -2256,14 +2260,17 @@ namespace tree_stored{
 		stored::_Rid row_count() const {
 			return get_table().size();
 		}
-		
+
+		stored::_Rid shared_row_count() const {
+			return share->row_count;
+		}
 		
 		stored::_Rid table_size() const {
 			stored::_Rid r = 0;
 			for(_Collumns::const_iterator c = cols.begin();c != cols.end(); ++c){
 				r += (*c)->field_size();
 			}
-			return row_count()*r;
+			return share->row_count*r;
 		}
 		stored::index_interface* get_index_interface(int at){
 			return indexes[at];
