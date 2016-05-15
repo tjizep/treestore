@@ -28,16 +28,16 @@ static double tree_factor = 0.9;
 extern "C" int get_l1_bs_memory_use();
 /// determine factored low memory state
 static bool is_memory_low(double tree_factor) {
-	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	
 	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.85);// || allocation_pool.is_depleted();
 
 }
 static bool is_memory_mark(double tree_factor) {
-	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	
 	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.60);// || allocation_pool.is_depleted();
 }
 static bool is_memory_lower(double tree_factor) {
-	//double tree_factor = treestore_column_cache_factor; //treestore_column_cache ? 0.1: 0.5;
+	
 	return (allocation_pool.get_allocated() > treestore_max_mem_use*tree_factor*0.55);// || allocation_pool.is_depleted();
 }
 /// accessors for journal stats
@@ -2251,7 +2251,10 @@ int treestore_done(void *p)
 
 	return 0;
 }
-
+//MYSQL_SYSVAR(predictive_hash),
+//MYSQL_SYSVAR(column_cache),
+//MYSQL_SYSVAR(column_encoded),
+  
 static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(max_mem_use),
   MYSQL_SYSVAR(current_mem_use),
@@ -2259,10 +2262,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(journal_lower_max),
   MYSQL_SYSVAR(journal_upper_max),
   MYSQL_SYSVAR(efficient_text),
-  MYSQL_SYSVAR(column_cache),
-  MYSQL_SYSVAR(column_encoded),
   MYSQL_SYSVAR(column_cache_factor),
-  MYSQL_SYSVAR(predictive_hash),
   MYSQL_SYSVAR(reduce_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_index_tree_use_on_unlock),
   MYSQL_SYSVAR(reduce_storage_use_on_unlock),

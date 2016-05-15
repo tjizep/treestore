@@ -1715,6 +1715,18 @@ namespace tree_stored{
 			return current.left_equal_key(temp);
 
 		}
+		void query2temp
+		(	TABLE* table
+		,	uint ax
+		,	const uchar *key
+		,	uint key_l
+		,	uint key_map
+		
+		){
+			check_load(table);
+			stored::index_interface::ptr ix =  indexes[ax];			
+			_compose_query_nb(table, 0ull, ax, key, key_l, key_map);
+		}
 
 		const CompositeStored* predict_sequential
 		(	TABLE* table
@@ -1733,11 +1745,6 @@ namespace tree_stored{
 			}
 			_compose_query_nb(table, 0ull, ax, key, key_l, key_map);
 
-			if( ix->is_unique() && treestore_predictive_hash == TRUE ){
-
-				return ix->predict(out, temp);
-
-			}
 			return NULL;
 		}
 
@@ -1852,15 +1859,23 @@ namespace tree_stored{
 			}
 
 			ix->lower_(out, temp);
-			if(!changed){
-				if(treestore_predictive_hash == TRUE && ix->is_unique() && out.valid()){
-					ix->cache_it(out);
-
-				}
-			}
 
 		}
 
+		const tree_stored::CompositeStored& temp_resolve
+		(	TABLE* table
+		,	uint ax
+		,	const uchar *key
+		,	uint key_l
+		,	uint key_map		
+		){
+			check_load(table);
+			stored::index_interface::ptr ix =  indexes[ax];
+
+			ix->resolve(temp);
+			return temp;
+
+		}
 		void compose_query_lower_r
 		(	stored::index_iterator_interface& r
 		,	TABLE* table

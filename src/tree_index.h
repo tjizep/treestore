@@ -171,6 +171,7 @@ namespace tree_stored{
 			}
 		};
 	private:
+		typedef rabbit::unordered_map<index_key, typename _IndexMap::iterator::initializer_pair, stored::fields_hash<index_key> > _IteratorLookup;
 		_IndexMap index;
 		typename _IndexMap::iterator the_end;
 		bool modified;
@@ -179,6 +180,7 @@ namespace tree_stored{
 		unsigned int wid;
 		index_key empty;
 		mutable index_key rval;
+		_IteratorLookup iter_cache;
 	private:
 		void destroy_loader(){
 			if(loader != nullptr){
@@ -245,19 +247,19 @@ namespace tree_stored{
 		}
 
 		void lower_(IndexIterator& out,  const index_key& k){
-			out.set(index.lower_bound(k),the_end,index);
+			typename _IndexMap::iterator i;
+			i = index.lower_bound(k);				
+			out.set(i,the_end,index);
 		}
 
 		std::pair<const index_key&,bool> lower_key( const index_key& k) const {
-			dbg_print("Index size %lld\n",index.size());
 			typename _IndexMap::const_iterator i = index.lower_bound(k);
 			if(i != index.end()){				
-				dbg_print("found key row %lld\n",i.key().row);
 				return std::make_pair(i.key(),true);
 			}
-			dbg_print("no key found",index.size());
 			return std::make_pair(empty,false);
 		}
+
 		bool find_key( stored::StandardDynamicKey& k) const {
 			index_key f = k;
 			typename _IndexMap::const_iterator i = index.lower_bound(f);
@@ -382,76 +384,13 @@ namespace tree_stored{
 		Poco::Mutex plock;
 	private:
 		typedef typename ColIndex::iterator_type _BasicIterator;
-		typedef predictive_cache<typename ColIndex::iterator_type> _PredictiveCache;
 
-
-
-		typedef std::vector<eraser_interface*> _ErasorList;
-		typedef std::shared_ptr<_ErasorList> _ErasorListPtr;
-		typedef std::unordered_map<std::string, std::shared_ptr<_ErasorList>> _ECaches;
-		_ECaches* get_erasers(){
-			static _ECaches pc;
-			return &pc;
-		}
-
-		void register_eraser(std::string name,eraser_interface* er){
-			stx::storage::syncronized ul(plock);
-			_ECaches * erasers = get_erasers();
-			_ECaches::iterator e = erasers->find(name);
-			_ErasorListPtr elist;
-			if(e == erasers->end()){
-				elist = std::make_shared<_ErasorList>();
-				(*erasers)[name] = elist;
-			}else{
-				elist = (*e).second;
-			}
-			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
-				if((*el) == er){
-					return;
-				}
-			}
-			elist->push_back(er);
-		}
-
-		void unregister_eraser(std::string name,eraser_interface* er){
-			stx::storage::syncronized ul(plock);
-			_ECaches * erasers = get_erasers();
-			_ECaches::iterator e = erasers->find(name);
-			_ErasorListPtr elist;
-			if(e == erasers->end()){
-				elist = std::make_shared<_ErasorList>();
-				(*erasers)[name] = elist;
-			}else{
-				elist = (*e).second;
-			}
-			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
-				if((*el) == er){
-					elist->erase(el,el);
-					return;
-				}
-			}
-
-		}
-		void send_erase(const std::string &name,const CompositeStored& input){
-			stx::storage::syncronized ul(plock);
-			_ECaches * erasers = get_erasers();
-			_ECaches::iterator e = erasers->find(name);
-			_ErasorListPtr elist;
-			if(e == erasers->end()){
-				return;
-			}else{
-				elist = (*e).second;
-			}
-			for(_ErasorList::iterator el = elist->begin(); el != elist->end(); ++el){
-				(*el)->erase(input);
-			}
-		}
+		
 		stored::_Rid get_rid(const CompositeStored& input){
 			return input.row;
 
 		}
-		_PredictiveCache cache;
-
+		
 		ColIndex index;
 		typedef typename ColIndex::index_iterator_impl iterator_impl_type;
 		typedef rabbit::unordered_map<nst::u64,std::shared_ptr<iterator_impl_type>> _IteratorInstances;
@@ -484,10 +423,10 @@ namespace tree_stored{
 		}
 
 
-		stored::_Rid predictor;
+		
 		bool unique;
 		tree_index(std::string name, bool unique)
-		:	index(name)	, predictor(0), unique(unique)
+		:	index(name)	, unique(unique)
 		{
 			//cache = get_pcache(name);
 			//register_eraser(name, &cache);
@@ -498,19 +437,6 @@ namespace tree_stored{
 			/// index.get_storage().release();
 		}
 
-		const CompositeStored *predict(stored::index_iterator_interface& io, CompositeStored& q){
-
-			return cache.predict_row(predictor,((typename ColIndex::index_iterator_impl&)io).value.get_i(),q);
-
-		}
-		void cache_it(stored::index_iterator_interface& io){
-			if(unique){
-
-				cache.store(((typename ColIndex::index_iterator_impl&)io).value.get_i());
-			
-			}
-
-		}
 		bool is_unique() const {
 			return unique;
 		}
@@ -575,7 +501,6 @@ namespace tree_stored{
 		}
 		void reduce_use(){
 			index.reduce_use();
-			cache.clear();
 		}
 
 		void begin(bool read,bool shared){

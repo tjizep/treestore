@@ -554,8 +554,8 @@ public:
 	}
 
 	/// restore an iterator from an initializer pair
-	void restore_iterator(iterator& out, const typename iterator::initializer_pair& init){
-		out.from_initializer(tree, init);
+	bool restore_iterator(iterator& out, const typename iterator::initializer_pair& init){
+		return out.from_initializer(tree, init);
 	}
 public:
     // *** Public Erase Functions

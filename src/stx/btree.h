@@ -2842,16 +2842,25 @@ namespace stx
 
 			/// iterator constructing pair
 			template<typename _MapType>
-			inline void from_initializer(_MapType& context, const initializer_pair& init)  {
+			inline bool from_initializer(_MapType& context, const initializer_pair& init)  {
 				currnode.realize(init.first,&context);
-				current_slot = init.second;
-				assign_pointers();
+				if(current_slot < currnode->get_occupants()){
+					current_slot = init.second;					
+					assign_pointers();
+					return true;
+				}
+				return false;
 			}
 
-			inline void from_initializer(const initializer_pair& init)  {
+			inline bool from_initializer(const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());
-				current_slot = init.second;
-				assign_pointers();
+				if(current_slot < currnode->get_occupants()){
+					current_slot = init.second;
+					assign_pointers();
+					return true;
+				}
+				return false;
+				
 			}
 			inline iterator& operator= (const initializer_pair& init)  {
 				currnode.realize(init.first,currnode.get_context());

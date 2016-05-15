@@ -65,38 +65,6 @@
       </PostinstrumentEvent>
     </Binary>
   </Binaries>
-  <Reports>
-    <Report>
-      <Path>mysql160509.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160512.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160512(1).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160512(2).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160512(3).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160512(4).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160513.vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160513(1).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160513(2).vspx</Path>
-    </Report>
-    <Report>
-      <Path>mysql160513(3).vspx</Path>
-    </Report>
-  </Reports>
   <Launches>
     <Binary>
       <Path>..\..\bin\mysql-5.6.13-winx64\bin\mysql.exe</Path>

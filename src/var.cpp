@@ -15,12 +15,9 @@ char* 		treestore_red_address = new char[400];
 /// new transactions are throttled to reduce concurrency
 long long	treestore_max_thread_concurrency = 7;
 
-double		treestore_column_cache_factor = 0.5;
+double		treestore_column_cache_factor = 0.1;
 my_bool		treestore_efficient_text = FALSE;
 
-char		treestore_column_cache = TRUE;
-char		treestore_column_encoded = TRUE;
-char		treestore_predictive_hash = TRUE;
 char		treestore_reduce_tree_use_on_unlock = FALSE;
 char		treestore_reduce_index_tree_use_on_unlock = FALSE;
 char		treestore_reduce_storage_use_on_unlock = TRUE;
@@ -66,29 +63,10 @@ static MYSQL_SYSVAR_BOOL(efficient_text, treestore_efficient_text,
   "Default is false",
   NULL, NULL, FALSE);
 
-static MYSQL_SYSVAR_BOOL(column_cache, treestore_column_cache,
-  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
-  "enables or disables collumn cache"
-  "Default is true (enabled)",
-  NULL, NULL, TRUE);
-
 static MYSQL_SYSVAR_DOUBLE(column_cache_factor, treestore_column_cache_factor,
   PLUGIN_VAR_RQCMDARG,
   "The size the journal reaches before the journal export is attempted",
   NULL, NULL, 0.5, 0.01, 0.99, 0.4);
-
-
-static MYSQL_SYSVAR_BOOL(predictive_hash, treestore_predictive_hash,
-  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
-  "enables or disables predictive hash cache"
-  "Default is true (enabled)",
-  NULL, NULL, TRUE);
-
-static MYSQL_SYSVAR_BOOL(column_encoded, treestore_column_encoded,
-  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
-  "enables or disables column compression"
-  "Default is true (enabled)",
-  NULL, NULL, TRUE);
 
 static MYSQL_SYSVAR_BOOL(reduce_tree_use_on_unlock, treestore_reduce_tree_use_on_unlock,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
