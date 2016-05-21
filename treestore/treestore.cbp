@@ -6,7 +6,7 @@
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
 		<Build>
-			<Target title="Debug x64">
+			<Target title="Debug Win32">
 				<Option output="treestore" prefix_auto="1" extension_auto="1" />
 				<Option type="3" />
 				<Option compiler="gcc" />
@@ -17,21 +17,57 @@
 					<Add option="-D_DEBUG" />
 					<Add option="-D_WINDOWS" />
 					<Add option="-D_USRDLL" />
+					<Add option="-DTREESTORE_EXPORTS" />
+				</Compiler>
+			</Target>
+			<Target title="ReleaseDebug Win32">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-DNDEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
+					<Add option="-DTREESTORE_EXPORTS" />
+				</Compiler>
+			</Target>
+			<Target title="ReleaseDebug x64">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-DDEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
 					<Add option="-D_CRT_SECURE_NO_WARNINGS" />
 					<Add option="-DPOCO_STATIC" />
 					<Add option="-DTREESTORE_EXPORTS" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Foundation/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Util/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/SQLite/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/sql" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/sql" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/regex" />
-					<Add directory="$(CPP_REPO)/lz4-r101" />
-					<Add directory="$(CPP_REPO)/zlib-1.2.8" />
-					<Add directory="/home/liz/Desktop/treestore/treestore/../src" />
+					<Add option="-D__SSSE3__" />
+					<Add option="-D__SSE4_1__" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Foundation/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Util/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/SQLite/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Net/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/libbinlogevents/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/libbinlogevents/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/libbinlogevents/export" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/regex" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/lz4-r101" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/zlib-1.2.8" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src" />
 				</Compiler>
 				<Linker>
 					<Add library="kernel32.lib" />
@@ -46,9 +82,73 @@
 					<Add library="uuid.lib" />
 					<Add library="odbc32.lib" />
 					<Add library="odbccp32.lib" />
-					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\sql\Release\mysqld.lib" />
-					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\libservices\Release\mysqlservices.lib" />
+					<Add library="IPHLPAPI.lib" />
+					<Add library="Psapi.lib" />
+					<Add library="ws2_32.lib" />
+					<Add library="Userenv.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql/Release/mysqld.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/libservices/Release/mysqlservices.lib" />
 					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/lib64" />
+					<Add directory="$(CPP_REPO)/boost_1_57_0/stage/lib" />
+				</Linker>
+			</Target>
+			<Target title="Debug x64">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-D_DEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
+					<Add option="-D_CRT_SECURE_NO_WARNINGS" />
+					<Add option="-D_SCL_SECURE_NO_WARNINGS" />
+					<Add option="-DPOCO_STATIC" />
+					<Add option="-DTREESTORE_EXPORTS" />
+					<Add option="-D__SSSE3__" />
+					<Add option="-D__SSE4_1__" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Foundation/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Util/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/SQLite/include" />
+					<Add directory="$(CPP_REPO)/cassandra/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/regex" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/lz4-r101" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/zlib-1.2.8" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/FastPFor/msvc/getopt" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/FastPFor/headers" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/sparsehash-2.0.2/src/windows" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/sparsehash-2.0.2/src/" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src" />
+				</Compiler>
+				<Linker>
+					<Add library="kernel32.lib" />
+					<Add library="user32.lib" />
+					<Add library="gdi32.lib" />
+					<Add library="winspool.lib" />
+					<Add library="comdlg32.lib" />
+					<Add library="advapi32.lib" />
+					<Add library="shell32.lib" />
+					<Add library="ole32.lib" />
+					<Add library="oleaut32.lib" />
+					<Add library="uuid.lib" />
+					<Add library="odbc32.lib" />
+					<Add library="odbccp32.lib" />
+					<Add library="IPHLPAPI.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql/Release/mysqld.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/libservices/Release/mysqlservices.lib" />
+					<Add library="$(CPP_REPO)/libuv/static/lib/libuv.lib" />
+					<Add library="$(CPP_REPO)/cassandra/lib/cassandra_static.lib" />
+					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/lib64" />
+					<Add directory="$(CPP_REPO)/cassandra/lib" />
 				</Linker>
 			</Target>
 			<Target title="Release x64">
@@ -63,20 +163,31 @@
 					<Add option="-D_WINDOWS" />
 					<Add option="-D_USRDLL" />
 					<Add option="-D_CRT_SECURE_NO_WARNINGS" />
-					<Add option="-DPOCO_STATIC" />
 					<Add option="-DTREESTORE_EXPORTS" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Foundation/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Util/include" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/Data/SQLite/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/sql" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/sql" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/bld/include" />
-					<Add directory="$(CPP_REPO)/mysql-5.6.13/regex" />
-					<Add directory="$(CPP_REPO)/lz4-r101" />
-					<Add directory="$(CPP_REPO)/zlib-1.2.8" />
-					<Add directory="/home/liz/Desktop/treestore/treestore/../src" />
+					<Add option="-DPOCO_STATIC" />
+					<Add option="-DSQLite_EXPORTS" />
+					<Add option="-DFoundation_EXPORTS" />
+					<Add option="-DData_EXPORTS" />
+					<Add option="-D__SSSE3__" />
+					<Add option="-D__SSE4_1__" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Foundation/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Util/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Data/SQLite/include" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src/poco-1.4.6p1-all/Net/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/libbinlogevents/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/bld/libbinlogevents/include" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/libbinlogevents/export" />
+					<Add directory="$(CPP_REPO)/$(MYSQL_VERSION)/regex" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/lz4-r101" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../repo/zlib-1.2.8" />
+					<Add directory="C:/dev/cpp_all/treestore/treestore/../src" />
 				</Compiler>
 				<Linker>
 					<Add library="kernel32.lib" />
@@ -91,290 +202,169 @@
 					<Add library="uuid.lib" />
 					<Add library="odbc32.lib" />
 					<Add library="odbccp32.lib" />
-					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\sql\Release\mysqld.lib" />
-					<Add library="$(CPP_REPO)\mysql-5.6.13\bld\libservices\Release\mysqlservices.lib" />
-					<Add directory="$(CPP_REPO)/poco-1.4.6p1-all/lib64" />
+					<Add library="IPHLPAPI.lib" />
+					<Add library="Psapi.lib" />
+					<Add library="ws2_32.lib" />
+					<Add library="Userenv.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/sql/Release/mysqld.lib" />
+					<Add library="$(CPP_REPO)/$(MYSQL_VERSION)/bld/libservices/Release/mysqlservices.lib" />
+					<Add directory="$(CPP_REPO)/boost_1_57_0/stage/lib" />
 				</Linker>
+			</Target>
+			<Target title="Release Win32">
+				<Option output="treestore" prefix_auto="1" extension_auto="1" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option createDefFile="1" />
+				<Option createStaticLib="1" />
+				<Compiler>
+					<Add option="-DWIN32" />
+					<Add option="-DNDEBUG" />
+					<Add option="-D_WINDOWS" />
+					<Add option="-D_USRDLL" />
+					<Add option="-DTREESTORE_EXPORTS" />
+				</Compiler>
 			</Target>
 		</Build>
 		<Unit filename="../../repo/lz4-r101/lz4.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/adler32.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/compress.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/crc32.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/deflate.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/infback.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/inffast.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/inflate.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/inftrees.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/trees.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/uncompr.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
 		<Unit filename="../../repo/zlib-1.2.8/zutil.c">
 			<Option compilerVar="CC" />
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
 		</Unit>
-		<Unit filename="../src/MurmurHash3.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../repo/fse/fse.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/MurmurHash3.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../repo/fse/zlibh.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/NotificationQueueWorker.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/MurmurHash3.cpp" />
+		<Unit filename="../src/MurmurHash3.h" />
+		<Unit filename="../src/NotificationQueueWorker.h" />
+		<Unit filename="../src/PredictiveCache.h" />
+		<Unit filename="../src/abstracted_storage.cpp" />
+		<Unit filename="../src/abstracted_storage.h" />
+		<Unit filename="../src/bit_symbols.h" />
+		<Unit filename="../src/cassandras.h" />
+		<Unit filename="../src/collumn.cpp" />
+		<Unit filename="../src/collumn.h" />
+		<Unit filename="../src/conversions.h" />
+		<Unit filename="../src/fields.cpp" />
+		<Unit filename="../src/fields.h" />
+		<Unit filename="../src/iterator.h" />
+		<Unit filename="../src/journal.cpp" />
+		<Unit filename="../src/myi.cpp" />
+		<Unit filename="../src/myi.h" />
+		<Unit filename="../src/persist_tree.cpp" />
+		<Unit filename="../src/poco-1.4.6p1-all/Data/SQLite/src/sqlite3.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/PredictiveCache.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_chartables.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/abstracted_storage.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_compile.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/abstracted_storage.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_exec.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/collumn.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_fullinfo.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/collumn.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_globals.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/conversions.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_maketables.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/fields.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_newline.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/fields.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_ord2utf8.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/myi.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_study.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/myi.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_tables.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/stx/btree">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_try_flipped.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/stx/btree.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_ucd.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/stx/btree_map">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_valid_utf8.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/stx/btree_map.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
+		<Unit filename="../src/poco-1.4.6p1-all/Foundation/src/pcre_xclass.c">
+			<Option compilerVar="CC" />
 		</Unit>
-		<Unit filename="../src/stx/btree_multimap">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/stx/btree_multimap.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/stx/btree_multiset">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/stx/btree_multiset.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/stx/btree_set">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/stx/btree_set.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/transactional_storage.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/transactional_storage.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/tree_index.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/tree_stored.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="../src/tree_table.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="dllmain.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="targetver.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="treestore.cpp">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
-		<Unit filename="treestore.h">
-			<Option target="Debug x64" />
-			<Option target="Debug Win32" />
-			<Option target="Release Win32" />
-			<Option target="Release x64" />
-		</Unit>
+		<Unit filename="../src/red_includes.h" />
+		<Unit filename="../src/rednode.cpp" />
+		<Unit filename="../src/rednode.h" />
+		<Unit filename="../src/rednode_cassandra.h" />
+		<Unit filename="../src/rednode_file.h" />
+		<Unit filename="../src/rednode_storage.h" />
+		<Unit filename="../src/simple_storage.h" />
+		<Unit filename="../src/stx/btree" />
+		<Unit filename="../src/stx/btree.cpp" />
+		<Unit filename="../src/stx/btree.h" />
+		<Unit filename="../src/stx/btree_map" />
+		<Unit filename="../src/stx/btree_map.h" />
+		<Unit filename="../src/stx/btree_multimap" />
+		<Unit filename="../src/stx/btree_multimap.h" />
+		<Unit filename="../src/stx/btree_multiset" />
+		<Unit filename="../src/stx/btree_multiset.h" />
+		<Unit filename="../src/stx/btree_set" />
+		<Unit filename="../src/stx/btree_set.h" />
+		<Unit filename="../src/stx/storage/basic_storage.h" />
+		<Unit filename="../src/stx/storage/pool.h" />
+		<Unit filename="../src/stx/storage/types.h" />
+		<Unit filename="../src/suffix_array.h" />
+		<Unit filename="../src/system_timers.h" />
+		<Unit filename="../src/transactional_storage.cpp" />
+		<Unit filename="../src/transactional_storage.h" />
+		<Unit filename="../src/tree_index.h" />
+		<Unit filename="../src/tree_stored.h" />
+		<Unit filename="../src/tree_table.h" />
+		<Unit filename="dllmain.cpp" />
+		<Unit filename="targetver.h" />
+		<Unit filename="treestore.h" />
 		<Extensions>
 			<code_completion />
+			<envvars />
 			<debugger />
 		</Extensions>
 	</Project>

@@ -144,7 +144,7 @@ namespace rabbit{
 	template<typename _Ht>
 	struct rabbit_hash{
 		unsigned long operator()(const _Ht& k) const{
-			return (unsigned long)(size_t)std::hash<_Ht>() (k);
+			return (unsigned long)(size_t) std::hash<_Ht>()(k); ///
 		};
 	};
 	template<>
@@ -1014,7 +1014,7 @@ namespace rabbit{
 		}; /// hash_kernel
 		public:
 		struct iterator{
-			typedef std::shared_ptr<hash_kernel> kernel_ptr;
+			typedef hash_kernel* kernel_ptr;
 			const basic_unordered_map* h;
 			kernel_ptr hc;
 			size_type pos;
@@ -1046,7 +1046,7 @@ namespace rabbit{
 
 			}
 			iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current;
+				 hc = h->current.get();
 				 set_index();
 			}
 			iterator(const iterator& r){
@@ -1106,7 +1106,7 @@ namespace rabbit{
 
 		struct const_iterator{
 		private:
-			typedef std::shared_ptr<hash_kernel> kernel_ptr;
+			typedef hash_kernel* kernel_ptr;
 			const basic_unordered_map* h;
 			mutable kernel_ptr hc;
 			_Bt index;
@@ -1136,7 +1136,7 @@ namespace rabbit{
 
 			}
 			const_iterator(const basic_unordered_map* h, size_type pos): h(h),pos(pos){
-				 hc = h->current;
+				 hc = h->current.get();
 				 set_index();
 			}
 			const_iterator(const iterator& r){
@@ -1207,7 +1207,7 @@ namespace rabbit{
 		typename hash_kernel::ptr current;
 		inline void create_current(){
 			if(current==nullptr)
-				
+
 				set_current(std::allocate_shared<hash_kernel>(alloc,key_c,alloc));
 		}
 	public:
@@ -1229,7 +1229,7 @@ namespace rabbit{
 		}
 
 		void max_load_factor ( float z ){
-			create_Current();
+			create_current();
 			current->max_load_factor(z);
 		}
 		bool empty() const {
@@ -1313,7 +1313,7 @@ namespace rabbit{
 		}
 
 		basic_unordered_map(const key_compare& compare,const allocator_type& allocator) : key_c(compare),alloc(allocator){
-			
+
 		}
 
 		basic_unordered_map(const basic_unordered_map& right) {
@@ -1351,7 +1351,7 @@ namespace rabbit{
 		}
 
 		key_equal key_eq() const {
-			if(current!=null)
+			if(current!=nullptr)
 				return (this->current->eq_f);
 			return key_equal();
 		}
@@ -1407,7 +1407,7 @@ namespace rabbit{
 			return current->erase(k);
 		}
 
-		size_type erase(iterator i){			
+		size_type erase(iterator i){
 			return erase((*i).first);
 		}
 
