@@ -2139,8 +2139,8 @@ namespace stx
 
 			void save(key_interpolator interp, storage_type &storage, buffer_type& buffer) const {
 				using namespace stx::storage;
-				nst::i32 encoded_key_size = interp.encoded_size(keys(), (*this).get_occupants());
-				nst::i32 encoded_value_size = interp.encoded_values_size(values(), (*this).get_occupants());
+				nst::i32 encoded_key_size = (nst::i32 )interp.encoded_size(keys(), (*this).get_occupants());
+				nst::i32 encoded_value_size = (nst::i32 )interp.encoded_values_size(values(), (*this).get_occupants());
 				if(!interp.encoded(btree::allow_duplicates)){
 					encoded_key_size = 0;
 				}
