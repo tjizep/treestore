@@ -612,6 +612,8 @@ public:
 	typedef tree_stored::_Selection  _Selection;
 	typedef tree_stored::_SetFields  _SetFields;
 	typedef std::vector<Field*> _FieldMap;
+	stored::_Rid counter;
+
 	struct _SelectionState{
 		_SelectionState() : last_resolved(0){
 		}
@@ -680,8 +682,9 @@ public:
 	tree_stored::tree_table::ptr get_tree_table(){
 		if(tt==NULL){
 			tt = get_thread()->compose_table((*this).table, this->path);
+			tt->check_load((*this).table);
 		}
-		tt->check_load((*this).table);
+		
 		return tt;
 	}
 
@@ -699,6 +702,7 @@ public:
 	}
 
 	void initialize_selection(_SelectionState &selection_state,uint keynr){
+		counter=0;
 		clear_selection(selection_state);
 		selection_state.selected = get_tree_table()->create_output_selection(table);
 		if(keynr < get_tree_table()->get_indexes().size()){
@@ -1459,7 +1463,10 @@ public:
 	int rnd_next(byte *buf){
 
 		DBUG_ENTER("rnd_next");
-		check_own_use();
+		if(counter&255==0){
+			check_own_use();
+		}
+		++counter;
 		if((*this).r == (*this).r_stop){
 			get_tree_table()->pop_all_conditions();
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
@@ -1939,7 +1946,10 @@ public:
 		return index_read_idx_map(buf, keynr, key, keypart_map, find_flag);
 	}
 	int index_next(byte * buf) {
-		check_own_use();
+		if(counter&1023==0){
+			check_own_use();
+		}
+		++counter;
 		int r = HA_ERR_END_OF_FILE;
 		get_index_iterator().next();
 		table->status = STATUS_NOT_FOUND;

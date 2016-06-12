@@ -60,9 +60,9 @@ namespace stored{
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
 			//if(buffer_allocation_pool.is_near_depleted()){ //
 				if((*a).second->get_age() > 15000 && (*a).second->transactions_away() <= 1){				
-					(*a).second->reduce();
-					(*a).second->touch();
-					reduced++;
+					//(*a).second->reduce();
+					//(*a).second->touch();
+					//reduced++;
 				}
 			//}
 		}

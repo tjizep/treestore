@@ -418,6 +418,7 @@ namespace collums{
 
 		/// the page map
 		typedef rabbit::unordered_map<size_type, stored_page_ptr, rabbit::rabbit_hash<size_type>, std::equal_to<size_type>, sta::pool_alloc_tracker<size_type>> page_map_type;
+		//typedef std::unordered_map<size_type, stored_page_ptr, std::hash<size_type>, std::equal_to<size_type>, sta::pool_alloc_tracker<size_type>> page_map_type;
 	private:
 		/// keeps cached pages
 		mutable page_map_type pages;
@@ -601,11 +602,11 @@ namespace collums{
 				return local_page;
 			}
 			stored_page::ptr page;
-			//auto i = pages.find(address);
-			if(!pages.get(address,page)){
-			//if(i != pages.end()){
-			//	page = (*i).second;
-			//}else{
+			auto i = pages.find(address);
+			//if(!pages.get(address,page)){
+			if(i != pages.end()){
+				page = (*i).second;
+			}else{
 				page = load_page(address);
 				if(page!=local_page){
 					pages[address] = page;
