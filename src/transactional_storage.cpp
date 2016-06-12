@@ -12,16 +12,52 @@ namespace storage{
 	class low_resource_timer{
 		class timer_worker : public Poco::Runnable{
 		private:
+			bool started;
+			bool stopped;
 			u64 timer_val;
 		public:
-			timer_worker() : timer_val(0){
+			timer_worker() : timer_val(0),started(false),stopped(true){
+			}
+			void cancel(){
+				started = false;
+			}
+			bool is_started() const {
+				return started;
+			}
+			void wait_start(){
+				while(!started){
+					try{
+						Poco::Thread::sleep(50);
+					}catch(Poco::Exception &){
+						inf_print("stop interrupted");
+					}
+				}
+			}
+			void stop(){
+				cancel();
+				while(!stopped){
+					try{
+						Poco::Thread::sleep(50);
+					}catch(Poco::Exception &){
+						inf_print("stop interrupted");
+					}
+				}
 			}
 			void run(){
-				inf_print("timer is running");
-				while(Poco::Thread::current()->isRunning()){
-					Poco::Thread::sleep(50);
-					timer_val = os::millis();
+				stopped = false;
+				started = true;
+				
+				timer_val = os::millis();
+				try{
+					while(is_started()){
+						Poco::Thread::sleep(50);
+						timer_val = os::millis();
+					}
+				}catch(Poco::Exception &){
+					inf_print("timer interrupted");
 				}
+				inf_print("timer is canceled");
+				stopped = true;
 			}
 			u64 get_timer() const {
 				return this->timer_val;
@@ -34,6 +70,7 @@ namespace storage{
 		low_resource_timer() : timer_thread("ts:timer_thread"){
 			try{
 				timer_thread.start(worker);
+				//worker.wait_start();
 			}catch(Poco::Exception &e){
 				err_print("Could not start timer thread : %s\n",e.name());
 			}
@@ -43,8 +80,9 @@ namespace storage{
 		}
 		~low_resource_timer(){
 			try{
-				inf_print("joining tx timer");
-				timer_thread.join();
+				if(worker.is_started()){
+					worker.stop();
+				}
 
 			}catch(Poco::Exception &e){
 				err_print("Could not stop timer thread : %s\n",e.name());

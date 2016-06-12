@@ -2177,6 +2177,8 @@ extern int pt_test();
 extern int linitialize();
 void start_cleaning();
 void start_calculating();
+void stop_cleaning();
+void stop_calculating();
 
 void test_suffix_array(){
 
@@ -2247,8 +2249,10 @@ int treestore_db_init(void *p)
 
 int treestore_done(void *p)
 {
+	stop_cleaning();
+	stop_calculating();
 	clear_info_tables();
-
+	
 	return 0;
 }
 //MYSQL_SYSVAR(predictive_hash),
@@ -2308,9 +2312,32 @@ extern void start_red(const nst::u64& id);
 
 namespace ts_cleanup{
 	class print_cleanup_worker : public Poco::Runnable{
+	private:
+		bool started;
+		bool stopped;
 	public:
+		
+		print_cleanup_worker():started(false),stopped(true){
+		}
+		bool is_started() const {
+			return started;
+		}
+		void wait_start(){
+			while(!started){
+				Poco::Thread::sleep(50);
+			}
+		}
+		void stop(){
 
+			started = false;			
+			while(!stopped){
+				Poco::Thread::sleep(50);
+			}
+				
+		}
 		void run(){
+			stopped = false;
+			started = true;
 			stx::memory_low_state = false;
 			start_red(0);
 			nst::u64 last_print_size = calc_total_use();
@@ -2325,7 +2352,7 @@ namespace ts_cleanup{
 			buffer_allocation_pool.set_special();
 			nst::u64 last_total_encoded = buffer_allocation_pool.get_allocated();
 
-			while(Poco::Thread::current()->isRunning()){
+			while(started){
 				//if(stx::memory_low_state) Poco::Thread::sleep(50);
 				Poco::Thread::sleep(treestore_cleanup_time);
 				nst::u64 total_encoded = buffer_allocation_pool.get_allocated();
@@ -2401,6 +2428,10 @@ namespace ts_cleanup{
 					last_print_time = os::millis();
 				}
 			}
+			
+			inf_print("stopped cleanup worker");
+			started = false;
+			stopped = true;
 		}
 	};
 	static print_cleanup_worker the_worker;
@@ -2408,19 +2439,29 @@ namespace ts_cleanup{
 	static void start(){
 		try{
 			cleanup_thread.start(the_worker);
+			//the_worker.wait_start();
+			inf_print("started cleanup worker");
 		}catch(Poco::Exception &e){
 			err_print("Could not start cleanup thread : %s\n",e.name());
 		}
+	}
+	static void stop(){
+		the_worker.stop();
+		cleanup_thread.join();
 	}
 };
 void start_cleaning(){
 	ts_cleanup::start();
 }
-
+void stop_cleaning(){
+	ts_cleanup::stop();
+}
 void start_calculating(){
 	/// ts_info::start();
 }
-
+void stop_calculating(){
+	//ts_info::stop();
+}
 #include <stx/storage/pool.h>
 
 nst::allocation::pool allocation_pool(2*1024ll*1024ll*1024ll);

@@ -96,7 +96,7 @@ static MYSQL_SYSVAR_BOOL(block_read_ahead, treestore_block_read_ahead,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "read ahead block storage until block memory is exhausted"
   "Default is false",
-  NULL, NULL, TRUE);
+  NULL, NULL, FALSE);
 
 
 static MYSQL_SYSVAR_STR(contact_points,treestore_contact_points,

@@ -1372,9 +1372,9 @@ static Poco::Thread chat_thread("red:chat_thread");
 
 static void start(){
 	try{
-		red_println("Starting red storage thread... ");
-		server_thread.start(block);
-		chat_thread.start(chat);
+		//red_println("Starting red storage thread... ");
+		//server_thread.start(block);
+		//chat_thread.start(chat);
 	}catch(Poco::Exception &e){
 		red_error("Could not start red storage thread : %s",e.name());
 	}

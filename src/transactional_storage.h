@@ -1206,7 +1206,7 @@ namespace storage{
 					
 					is_all_loaded = true;
 				}else if(treestore_block_read_ahead==TRUE){
-					inf_print("[WARING] cannot block read-ahead because insufficient memory");
+					inf_print("cannot block read-ahead because insufficient memory");
 
 				}
 			}
