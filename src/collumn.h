@@ -74,7 +74,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 128,//192,348
+			page_size = 256,//192,348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -136,11 +136,25 @@ namespace collums{
 				nst::u8 bit = b & 7;
 				return ((v >> bit) & (nst::u8)1ul);
 			}
-
+			/// erases an entry
+			void erase(size_type which){
+				set_exists(which,false);
+			}
+			/// this function takes an page untranslated address - which
+			bool is_exists_row(size_type row) const {
+				size_type b = row;
+				nst::u8 v = exists[b>>3];// 8 == 1<<3,/8 >>3
+				nst::u8 bit = b & 7;
+				return ((v >> bit) & (nst::u8)1ul);
+			}
 			data_type& get(size_type which) {				
 				return values[which % page_size];
 			}
-			
+			data_type* pget(size_type which) {				
+				if(is_exists(which))
+					return &values[which % page_size];
+				return nullptr;
+			}
 			const data_type& get(size_type which) const {
 				return values[which % page_size];
 			}
@@ -186,7 +200,8 @@ namespace collums{
 					encoder.decode_values(buffer, reader, (*this).values, page_size);
 				}else{
 					for(size_type v = 0; v < page_size; ++v){
-						storage.retrieve(buffer, reader, values[v]);
+						if(is_exists_row(v))
+							storage.retrieve(buffer, reader, values[v]);
 					}
 				}
 
@@ -202,7 +217,7 @@ namespace collums{
 					
 				using namespace stx::storage;
 				size_type storage_use = 0;
-				nst::i32 encoded_value_size = encoder.encoded_values_size((*this).values, page_size);
+				nst::i32 encoded_value_size = 0 ;//encoder.encoded_values_size((*this).values, page_size);
 				storage_use += leb128::signed_size(encoded_value_size);				
 				storage_use += page_size/8;
 				if(encoded_value_size > 0){
@@ -210,7 +225,8 @@ namespace collums{
 				}else{
 					encoded_value_size = 0;
 					for(size_type v = 0; v < page_size; ++v){
-						storage_use += storage.store_size(values[v]);
+						if(is_exists_row(v))
+							storage_use += storage.store_size(values[v]);
 					}
 				}
 				buffer.resize(storage_use);
@@ -226,9 +242,10 @@ namespace collums{
 					
 				if(encoded_value_size > 0 ){
 					encoder.encode_values(buffer, writer, (*this).values, page_size);
-				}else{
+				}else{					
 					for(size_type v = 0; v < page_size; ++v){
-						storage.store(writer, values[v]);
+						if(is_exists_row(v))
+							storage.store(writer, values[v]);
 					}
 				}
 				size_type d = writer - buffer.begin();
@@ -621,6 +638,14 @@ namespace collums{
 			size_type h = key;
 			return get_page(h)->get(h);
 		}
+		data_type* presolve(size_type key){
+			size_type h = key;
+			return get_page(h)->pget(h);
+		}
+		bool is_exists(size_type key) const {
+			size_type h = key;
+			return get_page(h)->is_exists(h);
+		}
 		const data_type& resolve(size_type key) const {
 			size_type h = key;
 			return get_page(h)->get(h);
@@ -681,6 +706,10 @@ namespace collums{
 			inline data_type& value(){
 				return h->resolve(pos);
 			}
+			/// returns nullptr when value does not exist
+			inline data_type* ref_value(){
+				return h->presolve(pos);
+			}
 
 			inline const data_type& value() const {
 				if(h==nullptr){
@@ -694,6 +723,9 @@ namespace collums{
 					err_print("h is null");
 				}
 				return h->resolve(pos);
+			}
+			inline bool is_exists(){
+				return h->is_exists(pos);
 			}
 
 			inline const data_type& data() const {
@@ -760,6 +792,27 @@ namespace collums{
 			clear_cache();
 			free_page(local_page);
 		}
+		std::pair<iterator, bool> erase(const key_type&  key){
+			size_t h = key.get_hash();
+			if(h <= largest){
+				if(h > 0)
+					largest = std::min<size_type>(largest, h-1);
+				if(get_storage().is_readonly()){
+					get_page(h);
+				}else{
+					stored_page::ptr page = get_page(h);
+					if(page->is_exists(h)){
+						--_size;
+					}					
+					page->erase(h);
+					modified_pages[h] = page;
+					return std::make_pair(iterator(this, key.get_hash()), true);
+				}
+					
+			}
+			std::pair<iterator, bool> r = std::make_pair(iterator(this, key.get_hash()), false);
+			return r;
+		}
 		std::pair<iterator, bool> insert(const key_type&  key, const data_type& value){
 			//if(stx::memory_low_state){
 			//	flush();
@@ -809,8 +862,6 @@ namespace collums{
 		}
 		iterator begin() const {
 			return iterator(this, 0);
-		}
-		void erase(size_type key){
 		}
 		bool count(size_type key) {
 			return false;
@@ -1049,9 +1100,13 @@ namespace collums{
 		_Stored& seek_by_tree(_Rid row) {
 
 			if(ival != cend){
-				++ival;
+				++ival;				
 				if(ival != cend && ival.key().get_value() == row){
-					return ival.data();
+					_Stored* val = ival.ref_value();
+					if(val!=nullptr){
+						return *val;
+					}else 
+						return empty;
 				}
 			}
 			//if(allocation_pool.is_near_depleted())
@@ -1063,7 +1118,11 @@ namespace collums{
 			{
 				return empty;
 			}
-			return ival.data();
+			_Stored* val = ival.ref_value();
+			if(val!=nullptr){
+				return *val;
+			}else
+				return empty;
 		}
 
 		inline _Stored& seek_by_cache(_Rid row)  {

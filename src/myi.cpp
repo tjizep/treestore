@@ -1427,7 +1427,7 @@ public:
 		return false;
 	}
 #if 0
-#endif
+
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
 		if(push_cond(acon,nullptr))
@@ -1439,6 +1439,7 @@ public:
 
 
 	};
+#endif
 	void cond_pop(){
 		get_tree_table()->pop_condition();
 	}
@@ -1463,7 +1464,7 @@ public:
 	int rnd_next(byte *buf){
 
 		DBUG_ENTER("rnd_next");
-		if(counter&255==0){
+		if((counter&255)==0){
 			check_own_use();
 		}
 		++counter;
@@ -1946,7 +1947,7 @@ public:
 		return index_read_idx_map(buf, keynr, key, keypart_map, find_flag);
 	}
 	int index_next(byte * buf) {
-		if(counter&1023==0){
+		if((counter&1023)==0){
 			check_own_use();
 		}
 		++counter;
