@@ -1427,7 +1427,7 @@ public:
 		return false;
 	}
 #if 0
-
+#endif
 	/// call by MySQL to advertise push down conditions
 	const Item *cond_push(const Item *acon) {
 		if(push_cond(acon,nullptr))
@@ -1439,7 +1439,7 @@ public:
 
 
 	};
-#endif
+
 	void cond_pop(){
 		get_tree_table()->pop_condition();
 	}

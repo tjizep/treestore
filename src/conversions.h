@@ -455,10 +455,13 @@ namespace tree_stored{
 
 					break;
 				case Item::STRING_ITEM:
+					{
 					sv = ((Item_string*)val)->val_str(&attribute);
 					/// truncate query strings which may be longer than the field - if another kind of error happens the item will copy an empty string
-					conversion->store(sv->ptr(), std::min<uint>(conversion->data_length(), sv->length()),sv->charset());
+					uint l = std::min<uint>(conversion->field_length, sv->length());
+					conversion->store(sv->ptr(), l,sv->charset());
 					fget(b,conversion,NULL,0);
+					}
 					break;
 				default:
 					break;
