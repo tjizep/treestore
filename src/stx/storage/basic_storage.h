@@ -30,6 +30,7 @@ extern "C"{
 namespace stx{
 
 	namespace storage{
+	
 		namespace allocation{
 			template <class T>
 			class pool_alloc_tracker : public base_tracker<T>{
@@ -376,6 +377,39 @@ namespace stx{
 			/// inplace_compress_zlibh(t);
 			/// inplace_compress_fse(t);
 			buff = t;
+
+		}
+		static void compress_lz4_fast(buffer_type& to, const buffer_type& from){
+			typedef char * encode_type_ref;
+			static const i32 max_static = 8192;
+
+			i32 origin = (i32)from.size();
+			/// TODO: cannot compress sizes lt 200 mb
+			i32 tcl = LZ4_compressBound((int)from.size())+sizeof(i32);
+			encode_type_ref to_ref;
+			
+			char s_buf[max_static];
+			if(tcl < max_static){
+				to_ref = s_buf;
+			}else{
+				/// TODO: use a pool allocator directly
+				to_ref = new char[tcl];
+			}
+			i32 cp = from.empty() ? 0 : LZ4_compress((const encode_type_ref)&from[0], (encode_type_ref)&to_ref[sizeof(i32)], origin);
+			*((i32*)&to_ref[0]) = origin;
+			if(to.empty()){
+				to.~buffer_type();
+				new (&to) buffer_type((const u8*)to_ref,((const u8*)to_ref)+(cp+sizeof(i32)));
+			}else{
+				to.resize(cp+sizeof(i32));
+				memcpy(&to[0], to_ref,to.size());
+			}
+			if(tcl >= max_static){
+				delete to_ref;
+			}
+			/// inplace_compress_zlibh(t);
+			/// inplace_compress_fse(t);
+			//buff = t;
 
 		}
 		static void compress_lz4(buffer_type& to, const buffer_type& from){

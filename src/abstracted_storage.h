@@ -48,7 +48,7 @@ namespace nst = stx::storage;
 typedef std::set<std::string> _LockList;
 extern _LockList& get_locklist();
 namespace stored{
-
+	
 	typedef NS_STORAGE::sqlite_allocator<NS_STORAGE::stream_address, NS_STORAGE::buffer_type> _BaseAllocator;
 	typedef NS_STORAGE::mvcc_coordinator<_BaseAllocator> _Allocations;
 

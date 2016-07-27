@@ -291,20 +291,20 @@
     <ClInclude Include="treestore.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\repo\lz4-r101\lz4.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\adler32.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\compress.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\crc32.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\deflate.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\infback.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inffast.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inflate.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inftrees.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\trees.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\uncompr.c" />
-    <ClCompile Include="..\..\repo\zlib-1.2.8\zutil.c" />
     <ClCompile Include="..\repo\fse\fse.c" />
     <ClCompile Include="..\repo\fse\zlibh.c" />
+    <ClCompile Include="..\repo\lz4-r101\lz4.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\adler32.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\compress.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\crc32.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\deflate.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\infback.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\inffast.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\inflate.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\inftrees.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\trees.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\uncompr.c" />
+    <ClCompile Include="..\repo\zlib-1.2.8\zutil.c" />
     <ClCompile Include="..\src\abstracted_storage.cpp" />
     <ClCompile Include="..\src\collumn.cpp" />
     <ClCompile Include="..\src\fields.cpp" />

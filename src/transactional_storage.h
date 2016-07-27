@@ -909,11 +909,12 @@ namespace storage{
 
 		
 		void check_use(){			
+			/// this may cause problems
 			if(!transient) return;
 			
 			//if(treestore_current_mem_use > treestore_max_mem_use){
 			if(buffer_allocation_pool.is_near_depleted() && (*this)._use > 1024*1024*2){
-				inf_print("reduce transient block cache use - %s",this->get_name().c_str());
+				if(transient) inf_print("reduce transient block cache use - %s",this->get_name().c_str());
 				ptrdiff_t before = get_use();
 					
 				flush_back(0.3,true);
@@ -2350,6 +2351,9 @@ namespace storage{
 		bool journal_synching;				/// the journal is synching and transaction state should be kept
 
 		u64 timer;							/// the timer value for age calculation
+
+		version_storage_type* writing_transaction;
+											/// the single writing transaction
 	private:
 		void save_recovery_info(){
 			if(storages.size() > 1){
@@ -2515,6 +2519,7 @@ namespace storage{
 		,	recovery(false)
 		,	journal_synching(false)
 		,	timer(get_lr_timer())
+		,	writing_transaction(nullptr)
 		{
 			//initial->engage();
 			delete_temp_files_of(initial->get_name());
@@ -2709,6 +2714,7 @@ namespace storage{
 				if(writer){
 					++writing_transactions;
 					writing_transaction_thread = Poco::Thread::currentTid();
+					writing_transaction = b.get();
 				}
 			}else{
 
@@ -2820,6 +2826,10 @@ namespace storage{
 				err_print("cannot commit: this is not a writing transaction\n");
 				throw InvalidTransactionType();
 			}
+			if(transaction != writing_transaction){
+				err_print("cannot commit: this is not the previously given writing transaction\n");
+				throw InvalidWriterOrder();
+			}
 			if (!recovery)		/// dont journal during recovery
 					transaction->journal((*this).initial->get_name());
 			{
@@ -2838,12 +2848,8 @@ namespace storage{
 					discard(transaction);
 					err_print("invalid writer order\n");
 					throw InvalidWriterOrder();
-
-
 				}
 				
-				
-
 				version_storage_type_ptr version = storage_versions.at(transaction->get_version());
 
 				if(version == nullptr){

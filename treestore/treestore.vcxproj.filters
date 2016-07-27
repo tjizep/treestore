@@ -146,9 +146,6 @@
     <ClCompile Include="..\src\myi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\repo\lz4-r101\lz4.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\MurmurHash3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -157,39 +154,6 @@
     </ClCompile>
     <ClCompile Include="..\src\fields.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\adler32.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\compress.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\crc32.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\deflate.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\infback.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inffast.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inflate.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\inftrees.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\trees.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\uncompr.c">
-      <Filter>Source Files\zlib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\repo\zlib-1.2.8\zutil.c">
-      <Filter>Source Files\zlib</Filter>
     </ClCompile>
     <ClCompile Include="..\src\abstracted_storage.cpp">
       <Filter>Source Files</Filter>
@@ -256,6 +220,42 @@
     </ClCompile>
     <ClCompile Include="..\src\rednode.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\adler32.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\compress.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\crc32.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\deflate.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\infback.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\inffast.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\inflate.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\inftrees.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\trees.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\lz4-r101\lz4.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\uncompr.c">
+      <Filter>Source Files\zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\repo\zlib-1.2.8\zutil.c">
+      <Filter>Source Files\zlib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -71,8 +71,8 @@ private:
 
 	struct log_entry{
 		long long sequence;
-		long long command;
-		long long name_size;
+		long command;
+		long name_size;
 		long long address;
 		long long buffer_size;
 	};

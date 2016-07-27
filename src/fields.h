@@ -1127,8 +1127,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, 3*sizeof(NS_STORAGE::u8*)> BlobStored;
-	typedef stored::Blobule<true,3*sizeof(NS_STORAGE::u8*)> VarCharStored;
+	typedef stored::Blobule<false, sizeof(NS_STORAGE::u8*)> BlobStored;
+	typedef stored::Blobule<true, sizeof(NS_STORAGE::u8*)> VarCharStored;
 	
 	class BareKey{
 	public:

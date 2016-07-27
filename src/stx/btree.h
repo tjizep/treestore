@@ -2349,14 +2349,10 @@ namespace stx
 				if(n->get_address() > 0 && n->get_address() == n->get_next().get_where()){
 					err_print("saving node with recursive address");
 				}
+				buffer_type full;
 				n->save(key_interpolator(), *get_storage(), create_buffer);
-				if(lz4){
-					compress_lz4(temp_compress,create_buffer);
-				}else{
-					//inplace_compress_zlib(create_buffer);
-				}
-				n->s = loaded;
-				buffer_type full(temp_compress);
+				compress_lz4_fast(full, create_buffer);				
+				n->s = loaded;				
 				buffer_type &allocated = get_storage()->allocate(w,stx::storage::create);	
 				allocated.swap(full);
 				get_storage()->complete();

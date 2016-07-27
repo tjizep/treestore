@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <CPP_REPO>C:\dev\cpp_all\repo</CPP_REPO>
+    <CPP_REPO>F:\repo</CPP_REPO>
     <MYSQL_VERSION>mysql-5.6.20</MYSQL_VERSION>
   </PropertyGroup>
   <PropertyGroup />
@@ -10,6 +10,7 @@
   <ItemGroup>
     <BuildMacro Include="CPP_REPO">
       <Value>$(CPP_REPO)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
     <BuildMacro Include="MYSQL_VERSION">
       <Value>$(MYSQL_VERSION)</Value>

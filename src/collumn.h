@@ -74,7 +74,7 @@ namespace collums{
 		
 	protected:
 		enum{
-			page_size = 256,//192,348
+			page_size = 128,//192,348
 			use_pool_allocator = 1
 		};
 		struct stored_page{
@@ -217,7 +217,7 @@ namespace collums{
 					
 				using namespace stx::storage;
 				size_type storage_use = 0;
-				nst::i32 encoded_value_size = 0 ;//encoder.encoded_values_size((*this).values, page_size);
+				nst::i32 encoded_value_size = encoder.encoded_values_size((*this).values, page_size);
 				storage_use += leb128::signed_size(encoded_value_size);				
 				storage_use += page_size/8;
 				if(encoded_value_size > 0){
@@ -503,8 +503,8 @@ namespace collums{
 			stream_address w = page->get_address();
 			//temp_encode.clear();
 			page->save(encoder, get_storage(), temp_encode);		
-			compress_lz4(temp_compress,temp_encode);	
-			buffer_type swapped(temp_compress);
+			buffer_type swapped;
+			compress_lz4_fast(swapped,temp_encode);				
 			buffer_type &buffer = get_storage().allocate(w, stx::storage::create);
 			buffer.swap(swapped);
 			page->set_version(get_storage().get_allocated_version());

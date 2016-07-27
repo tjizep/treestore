@@ -1045,7 +1045,7 @@ namespace tree_stored{
 		std::string path;
 		_TableMap * table;
 		shared_data * share;
-		
+		bool writing;
 	public:
 		void get_calculated_info(table_info& calc){
 			nst::synchronized _s(tt_info_copy_lock);			
@@ -1070,7 +1070,12 @@ namespace tree_stored{
 			return this->path;
 		}
 
-		tree_table(TABLE *table_arg, const std::string& path)
+		/// return the writing state of table
+		const bool is_writing() const {
+			return this->writing;
+		}
+
+		tree_table(TABLE *table_arg, const std::string& path, bool writing = false)
 		:	changed(false)				
 		,	locks(0)
 		,	last_lock_time(os::micros())
@@ -1083,6 +1088,7 @@ namespace tree_stored{
 		,	calculating_statistics(false)
 		,	clock(++table_clock)
 		,	share(nullptr)
+		,	writing(writing)
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1323,6 +1329,14 @@ namespace tree_stored{
 		}
 
 		void begin(bool read,bool shared = true){
+			if(read && is_writing()){
+				err_print("table is not opened for reading");
+				return;
+			}
+			if(!read && !is_writing()){
+				err_print("table is not opened for writing");
+				return;
+			}
 			changed = !read;
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->begin(read,shared);
@@ -1952,6 +1966,9 @@ namespace tree_stored{
 		/// aquire lock and resources
 		void lock(bool writer)
 		{
+			if(writer != is_writing()){
+				err_print("the table r/w state does not match with lock requested");
+			}
 			if(locks++ == 0){
 				changed = writer;
 				if(changed)
@@ -1969,6 +1986,41 @@ namespace tree_stored{
 
 
 		public:
+
+		void commit(Poco::Mutex* p2_lock = NULL){
+			if(changed)
+			{
+				//inf_print("comitting transaction");
+				commit1();/// this phase does all the encoding
+
+				/// locks so that all the storages can commit atomically allowing
+				/// other transactions to start on the same version
+				/// synchronized _s(*p2_lock);
+
+				commit2(p2_lock);
+				if(calc_total_use() > treestore_max_mem_use){
+					///stored::reduce_all();
+				}					
+
+				changed = false;
+			}else
+			{
+				bool rolling = true; //treestore_reduce_tree_use_on_unlock;
+				//if
+				//(	//::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
+					//||	
+					// calc_total_use() > treestore_max_mem_use*0.7f
+					//||  rolling
+				//)
+				if(os::micros() - last_lock_time > 45000){
+					if(storage.stale()){
+						rollback();
+					}
+				}else 
+					rollback();/// relieves the version load when new data is added to the collums
+			}
+		}
+
 		/// release locks and resources
 		void unlock(Poco::Mutex* p2_lock = NULL)
 		{
@@ -1978,35 +2030,7 @@ namespace tree_stored{
 			}
 
 			if(--locks == 0){
-				if(changed)
-				{
-					commit1();/// this phase does all the encoding
-
-					/// locks so that all the storages can commit atomically allowing
-					/// other transactions to start on the same version
-					/// synchronized _s(*p2_lock);
-
-					commit2(p2_lock);
-					if(calc_total_use() > treestore_max_mem_use){
-						///stored::reduce_all();
-					}					
-					changed = false;
-				}else
-				{
-					bool rolling = true; //treestore_reduce_tree_use_on_unlock;
-					//if
-					//(	//::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-						//||	
-						// calc_total_use() > treestore_max_mem_use*0.7f
-						//||  rolling
-					//)
-					if(os::micros() - last_lock_time > 45000){
-						if(storage.stale()){
-							rollback();
-						}
-					}else 
-						rollback();/// relieves the version load when new data is added to the collums
-				}
+				
 				last_unlock_time = os::micros();
 			}
 		}
@@ -2014,12 +2038,12 @@ namespace tree_stored{
 		int write_noinc(TABLE* table,_Rid auto_row){			
 			error_index  = nullptr;
 			check_load(table);
-			if(!changed)
+			if(!is_writing())
 			{
-				printf("[TS] [ERROR] table not locked for writing\n");
+				err_print("table not locked for writing");
 				return HA_ERR_UNSUPPORTED;
 			}
-
+			changed = true;
 			if(auto_row == stored::MAX_ROWS){
 				return HA_ERR_UNSUPPORTED;
 			}
@@ -2089,7 +2113,7 @@ namespace tree_stored{
 
 			(*this).get_table().insert(get_auto_incr(), '0');
 			if(get_auto_incr() % 300000 == 0){
-				printf("[TS] [INFO] %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
+				inf_print(" %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
 				
 			}			
 			share->row_count = (*this).get_row_count();			
@@ -2187,6 +2211,15 @@ namespace tree_stored{
 			
 		}
 		int write(TABLE* table){
+			if(!is_writing()){
+				err_print("writing to read only table");
+				return HA_ERR_UNSUPPORTED;
+			}
+			if(!changed)
+			{
+				err_print("writing to unlocked table");
+				return HA_ERR_UNSUPPORTED;
+			}
 			int r = write_noinc(table,get_auto_incr());
 			//nst::synchronized shared((*this).share->lock);
 			if(r==0)
@@ -2196,10 +2229,15 @@ namespace tree_stored{
 		}
 		
 		void erase(stored::_Rid rid, TABLE* table){			
+			if(!is_writing()){
+				err_print("writing to read only table");
+				return;
+			}
+			
 			check_load(table);
 			if(!changed)
 			{
-				//printf("table not locked for writing\n");
+				err_print("writing to unlocked table");
 				return;
 			}
 			erase_row_index(rid,all_changed);
@@ -2214,11 +2252,15 @@ namespace tree_stored{
 		}
 		
 		int write(stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
+			if(!is_writing()){
+				err_print("writing to read only table");
+				return -1;
+			}		
 			/// erase_row_index must be called before this function
 			check_load(table);
 			if(!changed)
 			{
-				printf("[TS] [ERROR] table not locked for writing\n");
+				err_print("attempting write to not locked table");
 				return HA_ERR_UNSUPPORTED;
 			}
 	
@@ -2256,6 +2298,16 @@ namespace tree_stored{
 		}
 
 		void erase_row_index(stored::_Rid rid,const std::vector<bool>& change_set){
+			if(!is_writing()){
+				err_print("writing to read only table");
+				return;
+
+			}
+			if(!changed)
+			{
+				err_print("attempting write to unlocked table");
+				return;
+			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
 				nst::u32 parts_changed = 0;
