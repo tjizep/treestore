@@ -733,14 +733,14 @@ namespace tree_stored{
 	};
 
 	typedef std::string _SetFields; ///indicates which fields have been set by index
-	typedef std::vector<selection_tuple> _Selection;
+	typedef std::vector<selection_tuple, sta::buffer_pool_alloc_tracker<selection_tuple>> _Selection;
 	/// this class translates errors and behaviour into internal data structures without
 	/// exposing them to mysql shenanigans
 	class tree_table{
 	public:
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
 		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
-		typedef std::vector<abstract_conditional_iterator::ptr> _Conditional;
+		typedef std::vector<abstract_conditional_iterator::ptr, sta::buffer_pool_alloc_tracker<selection_tuple>> _Conditional;
 		///, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator
 		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;

@@ -28,7 +28,7 @@ extern char	treestore_use_internal_pool;
 #endif
 namespace stx{
 	namespace storage{
-
+		namespace unordered = rabbit;
 		typedef Poco::ScopedLockWithUnlock<Poco::Mutex> synchronized;
 		typedef Poco::ScopedLockWithUnlock<Poco::FastMutex> f_synchronized;
 		typedef Poco::ScopedTryLock<Poco::Mutex> synchronizing;
@@ -353,7 +353,7 @@ namespace stx{
 				}
 			};
 				
-			typedef rabbit::unordered_map<size_t,_ThreadSizeAlloc*> _ThreadAllocPtrMap;
+			typedef unordered::unordered_map<size_t,_ThreadSizeAlloc*> _ThreadAllocPtrMap;
 			
 			class inner_pool;
 			struct thread_instance{
@@ -366,11 +366,11 @@ namespace stx{
 				size_t eviction_size(){
 					size_t f = 0xFFFFFFFFFFFFFFll,s = 0;
 					for(auto a = this->active_pairs.begin(); a != this->active_pairs.end(); ++a){
-						auto & bucket = *(a.get_value());
+						auto &bucket = *(a->second);
 						
 						if(!bucket.buckets.empty() && bucket.accesses < f){
 							f = bucket.accesses;
-							s = a.get_key();
+							s = a->first;
 						}
 					}
 					return s;
@@ -383,7 +383,9 @@ namespace stx{
 				void evict(size_t size){
 					
 					_ThreadSizeAlloc* r = nullptr;
-					if(active_pairs.get(size,r)){
+					auto e = active_pairs.find(size);
+					if(e != active_pairs.end()){
+						r = e->second;
 						u64 removed = r->buckets.size();
 						while(!r->buckets.empty()){
 							
@@ -399,15 +401,21 @@ namespace stx{
 					
 				}
 				_ThreadAlloc & access(size_t size){
-					_ThreadSizeAlloc* r = nullptr;
-					if(active_pairs.get(size,r)){
-					}else{
-						if(!alloc_pairs.get(size,r)){
+					_ThreadSizeAlloc* r = nullptr;					
+					auto si = active_pairs.find(size);
+					if(si == active_pairs.end()){
+						auto ai = alloc_pairs.find(size);
+						if(ai != alloc_pairs.end()){
+							r = ai->second;
+						}else{
 							r = new _ThreadSizeAlloc();
 							alloc_pairs[size] = r;
 						}
 						active_pairs[size] = r;
-					}					
+					}else{
+						r = si->second;
+					}
+					
 					return r->access();
 				}
 				std::vector<std::pair<void *, size_t>> free_pairs;
@@ -443,7 +451,7 @@ namespace stx{
 					_Bucket bucket;
 				};
 				
-				typedef rabbit::unordered_map<size_t, _Clocked> _Buckets;
+				typedef unordered::unordered_map<size_t, _Clocked> _Buckets;
 				
 			
 			protected:
@@ -495,14 +503,14 @@ namespace stx{
 					size_t row = 0;
 					empties.clear();
 					for(_Buckets::iterator b = (*this).buckets.begin(); b != (*this).buckets.end(); ++b){
-						if(b.get_value().bucket.empty()){/// skip empty buckets
-							empties.push_back(b.get_key());
+						if(b->second.bucket.empty()){/// skip empty buckets
+							empties.push_back(b->first);
 						}else{
 
-							if( b.get_value().clock < mclock){
+							if( b->second.clock < mclock){
 								row = 0;
-								mclock = b.get_value().clock;
-								msize = b.get_key();								
+								mclock = b->second.clock;
+								msize = b->first;								
 								
 							}else{
 								++row;

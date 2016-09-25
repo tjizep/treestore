@@ -65,6 +65,11 @@
       </PostinstrumentEvent>
     </Binary>
   </Binaries>
+  <Reports>
+    <Report>
+      <Path>mysql160806.vspx</Path>
+    </Report>
+  </Reports>
   <Launches>
     <Binary>
       <Path>..\..\bin\mysql-5.6.13-winx64\bin\mysql.exe</Path>

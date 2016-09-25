@@ -966,8 +966,13 @@ namespace storage{
 			}
 		}
 		bool find_block(const address_type& which, ref_block_descriptor& result){
-			
-			return allocations.get(which,result);
+			auto a = allocations.find(which);
+			if(a!=allocations.end()){
+				result = a->second;
+				return true;
+			}
+			return false;
+			//allocations.get(which,result)
 			
 			if(false){
 				typename _Allocations::iterator fr = allocations.find(which);
@@ -1087,9 +1092,9 @@ namespace storage{
 				///versions.get((*v).first,ver);
 				/// TODO: IF there are intermittent crashes or corruptions this is the first place to look
 				if(!found){
-					//_Versions::iterator fv = versions.find((*v).first);
-					if(versions.get((*v).first,ver)){
-						//ver = (*fv).second;						
+					_Versions::iterator fv = versions.find((*v).first);
+					if(fv != versions.end()){ //versions.get((*v).first,ver)
+						ver = (*fv).second;						
 						found = true;
 					}
 				}
@@ -1265,8 +1270,8 @@ namespace storage{
 			}
 			//printf("[TX MOVE] %s ver. %lld -> %lld [", dest.get_name().c_str(), (long long)get_version(), dest.get_version());
 			for(_Allocations::iterator a = todo.begin(); a != todo.end(); ++a){
-				stream_address at = a.get_key();
-				ref_block_descriptor current = a.get_value();
+				stream_address at = a->first;
+				ref_block_descriptor current = a->second;
 				//printf("%lld, ", (long long)at);
 				
 				if(current!=nullptr){
@@ -2278,7 +2283,7 @@ namespace storage{
 
 		typedef std::shared_ptr<version_storage_type> version_storage_type_ptr;
 
-		typedef std::vector<version_storage_type_ptr> storage_container;
+		typedef std::vector<version_storage_type_ptr, sta::buffer_pool_alloc_tracker<version_storage_type_ptr>> storage_container;
 
 		typedef ns_umap::unordered_map<version_type, version_storage_type_ptr,rabbit::rabbit_hash<version_type>, std::equal_to<version_type>, sta::buffer_pool_alloc_tracker<version_type> > version_storage_map;
 

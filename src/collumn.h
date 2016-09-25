@@ -197,7 +197,7 @@ namespace collums{
 					++reader;
 				}
 				if(encoded_value_size > 0){
-					encoder.decode_values(buffer, reader, (*this).values, page_size);
+					encoder.decode_values_row(buffer, reader, (*this).values, page_size);
 				}else{
 					for(size_type v = 0; v < page_size; ++v){
 						if(is_exists_row(v))
@@ -241,7 +241,7 @@ namespace collums{
 				}
 					
 				if(encoded_value_size > 0 ){
-					encoder.encode_values(buffer, writer, (*this).values, page_size);
+					encoder.encode_values_row(buffer, writer, (*this).values, page_size);
 				}else{					
 					for(size_type v = 0; v < page_size; ++v){
 						if(is_exists_row(v))

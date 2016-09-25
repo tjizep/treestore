@@ -1127,8 +1127,8 @@ namespace stored{
 	typedef stored::IntTypeStored<NS_STORAGE::u32> UIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::i64> LongIntStored;
 	typedef stored::IntTypeStored<NS_STORAGE::u64> ULongIntStored;
-	typedef stored::Blobule<false, sizeof(NS_STORAGE::u8*)> BlobStored;
-	typedef stored::Blobule<true, sizeof(NS_STORAGE::u8*)> VarCharStored;
+	typedef stored::Blobule<false, sizeof(NS_STORAGE::u8*)*1> BlobStored;
+	typedef stored::Blobule<true, sizeof(NS_STORAGE::u8*)*1> VarCharStored;
 	
 	class BareKey{
 	public:
@@ -2541,6 +2541,64 @@ namespace stored{
 		mutable std::vector<_IntCodeType> int_col;
 	public:
 		template<int _StaticSize>
+		void encode_row(nst::buffer_type::iterator& writer, const DynamicKey<_StaticSize>* keys, size_t occupants) const {
+			bool tests = false;
+			nst::buffer_type::const_iterator reader = writer;
+			size_t colls = keys[0].col_bytes();			
+
+			for(size_t k = 1; k < occupants; ++k){
+				if(colls != keys[k].col_bytes()){
+					colls = 0;
+					break;
+				}
+			}			
+			pcol.resize(colls*sizeof(_IntCodeType));
+			store_int(writer, colls);
+			size_t int_colls = colls - (colls % sizeof(_IntCodeType));
+			for(size_t k = 0; k < occupants; ++k){
+				for(size_t c = 0; c < colls/sizeof(_IntCodeType); ++c){
+					_IntCodeType* col = reinterpret_cast<_IntCodeType*>(&pcol[0]);					
+					col[c] = keys[k].col_int<_IntCodeType>(c);					
+				}
+				writer = std::copy(pcol.begin(), pcol.end(), writer);
+			}
+			pcol.resize(occupants);
+			nst::u8* col = &pcol[0];
+			for(size_t k = 0; k < occupants; ++k){
+				for(size_t c = int_colls; c < colls; ++c){
+					col[c] = keys[k].col_byte(c);					
+				}	
+				writer = std::copy(pcol.begin(),pcol.end(), writer);
+			}
+			if(tests){
+				for(size_t k = 0; k < occupants; ++k){
+					keys[k].verify();
+				}
+			
+				nst::buffer_type::const_iterator end = writer;
+				
+				std::vector<DynamicKey<_StaticSize>> test_keys;
+				test_keys.resize(occupants);
+				nst::buffer_type buffer;
+				buffer.insert(buffer.begin(), reader, end);
+				nst::buffer_type::const_iterator r_test = buffer.begin();
+				decode_row(buffer, r_test, &test_keys[0], occupants);
+				size_t ltest = r_test - buffer.begin();
+				size_t rtest = end - reader;
+				if(ltest != rtest){
+					err_print("Read length does not verify %lld != %lld\n", (long long)ltest,(long long)rtest);
+				}
+				if(ltest != encoded_size(keys,occupants)){
+					err_print("Read length does not verify with encoded size %lld != %lld\n", (long long)ltest,(long long)encoded_size(keys,occupants));
+				}
+				for(size_t k = 0; k < occupants; ++k){
+					if(test_keys[k] != keys[k]){
+						err_print("keys dont compare");
+					}
+				}
+			}
+		}
+		template<int _StaticSize>
 		void encode(nst::buffer_type::iterator& writer, const DynamicKey<_StaticSize>* keys, size_t occupants) const {
 			bool tests = false;
 			nst::buffer_type::const_iterator reader = writer;
@@ -2669,6 +2727,56 @@ namespace stored{
 			
 		}
 		template<typename _ByteOrientedKey>
+		void encode_row(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
+			bool tests = false;
+			nst::buffer_type::const_iterator reader = writer;
+			size_t colls = keys[0].col_bytes();			
+
+			for(size_t k = 1; k < occupants; ++k){
+				if(colls != keys[k].col_bytes()){
+					colls = 0;
+					break;
+				}
+			}
+			
+			pcol.resize(colls);
+			nst::u8* col = &pcol[0];
+			store_int(writer, colls);
+			for(size_t k = 0; k < occupants; ++k){										
+				const _ByteOrientedKey& key = keys[k];
+				for(size_t c = 0; c < colls; ++c){
+					nst::u8 t = key.col_byte(c);
+					col[c] = t;					
+				}				
+				writer = std::copy(pcol.begin(),pcol.end(), writer);
+			}
+			if(tests){
+				nst::buffer_type::const_iterator end = writer;
+				
+				std::vector<_ByteOrientedKey> test_keys;
+				test_keys.resize(occupants);
+				nst::buffer_type buffer;
+				buffer.insert(buffer.begin(), reader, end);
+				nst::buffer_type::const_iterator r_test = buffer.begin();
+				decode_row(buffer, r_test, &test_keys[0], occupants);
+				size_t ltest = r_test - buffer.begin();
+				size_t rtest = end - reader;
+				if(ltest != rtest){
+					printf("[ERROR] [TS] Read length does not verify %lld != %lld\n", (long long)ltest,(long long)rtest);
+				}
+				if(ltest != encoded_size(keys,occupants)){
+					printf("[ERROR] [TS] Read length does not verify with encoded size %lld != %lld\n", (long long)ltest,(long long)encoded_size(keys,occupants));
+				}
+				for(size_t k = 0; k < occupants; ++k){
+					if(test_keys[k] != keys[k]){
+						printf("houston we have a problem\n");
+					}
+				}
+			}
+			
+			
+		}
+		template<typename _ByteOrientedKey>
 		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
 			
 			size_t colls = keys[0].col_bytes();
@@ -2778,7 +2886,7 @@ namespace stored{
 					++reader;
 				}		
 			}
-					}
+		}
 		template<typename _ByteOrientedKey>
 		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
 			size_t colls = 0;
@@ -2801,6 +2909,54 @@ namespace stored{
 					++reader;
 				}
 		
+			}
+		}
+		template<typename _ByteOrientedKey>
+		void decode_row(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
+			size_t colls = 0;
+			read_int(colls, reader);
+			for(size_t o = 0; o < occupants; ++o){
+				//keys[o] = _ByteOrientedKey();
+				keys[o].col_resize_bytes(colls);
+			}				
+			nst::u8 d = 0;				
+			nst::u32 k = 0;
+			nst::u32 o = occupants;
+			for( ;k < o; ++k){
+				for(size_t c = 0; c < colls; ++c){				
+					d =  *reader ;
+					keys[k].col_push_byte(c, d);					
+					++reader;
+				}		
+			}
+		}
+		template<int _StaticSize>
+		void decode_row(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,DynamicKey<_StaticSize>* keys, size_t occupants) const {
+			size_t colls = 0;
+			read_int(colls, reader);
+			for(size_t o = 0; o < occupants; ++o){				
+				keys[o].col_resize_bytes(colls);
+			}
+						
+									
+			_IntCodeType d = 0;				
+			nst::u32 k = 0;
+			nst::u32 o = occupants;
+			for( ;k < o; ++k){
+				for(size_t c = 0; c < colls/sizeof(_IntCodeType); ++c){		
+					d = *((const _IntCodeType*)&(*reader));
+					keys[k].col_push_int(c, d);					
+					reader+=sizeof(_IntCodeType);
+				}		
+			}
+
+			nst::u32 k = 0;
+			nst::u32 o = occupants;
+			for( ;k < o; ++k){
+				for(size_t c = colls - (colls % sizeof(_IntCodeType)); c < colls; ++c){						
+					keys[k].col_push_byte(c, *reader);					
+					++reader;
+				}		
 			}
 		}
 	};
@@ -2841,6 +2997,10 @@ namespace stored{
 		void encode(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
 			encoder.encode(writer, keys, occupants);			
 		}
+		// doesnt do any symbol wise col reordering
+		void encode_row(nst::buffer_type::iterator& writer, const _ByteOrientedKey* keys, size_t occupants) const {
+			encoder.encode_row(writer, keys, occupants);			
+		}
 
 		size_t encoded_size(const _ByteOrientedKey* keys, size_t occupants) const {
 			return encoder.encoded_size(keys, occupants);						
@@ -2849,6 +3009,11 @@ namespace stored{
 		void decode(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
 			encoder.decode(buffer, reader, keys, occupants);			
 		}
+
+		void decode_row(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_ByteOrientedKey* keys, size_t occupants) const {
+			encoder.decode_row(buffer, reader, keys, occupants);			
+		}
+		
 		inline bool can(const _ByteOrientedKey &first , const _ByteOrientedKey &last, int size) const
 		{
 			return false ;
@@ -2897,10 +3062,20 @@ namespace stored{
 
 			value_encoder.decode(buffer, reader, values, occupants);
 		}
+		/// delegate row wize value decoder
+		void decode_values_row(const nst::buffer_type& buffer, nst::buffer_type::const_iterator& reader,_Stored* values, count_t occupants) {
+
+			value_encoder.decode_row(buffer, reader, values, occupants);
+		}
 		/// delegate value encoder
 		void encode_values(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
 
 			value_encoder.encode(writer, values, occupants);
+		}
+
+		void encode_values_row(nst::buffer_type& buffer, nst::buffer_type::iterator& writer,const _Stored* values, count_t occupants) const {
+
+			value_encoder.encode_row(writer, values, occupants);
 		}
 		/// delegate value encoder
 		size_t encoded_values_size(const _Stored* values, count_t occupants) {
