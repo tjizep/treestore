@@ -133,7 +133,13 @@ namespace iterator{
 			check();
 			return r;
 		}
-
+		void erase(){
+			if(map!=nullptr){
+				get_map().erase(i.key());
+			}else{
+				err_print("index map not set");
+			}
+		}
 		const key_type& get_key() const{
 			return i.key();
 		}

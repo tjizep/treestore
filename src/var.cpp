@@ -24,7 +24,7 @@ char		treestore_reduce_storage_use_on_unlock = TRUE;
 char		treestore_use_primitive_indexes = TRUE;
 char		treestore_block_read_ahead = FALSE;
 char		treestore_resolve_values_from_index = FALSE;
-char		treestore_use_internal_pool = TRUE;
+char		treestore_use_internal_pool = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -39,7 +39,7 @@ static MYSQL_SYSVAR_LONGLONG(journal_upper_max, treestore_journal_upper_max,
 static MYSQL_SYSVAR_LONGLONG(journal_size, treestore_journal_size,
   PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
   "The current journal size",
-  NULL, NULL, 1*1024*1024*1024LL, 128*1024*1024LL, LONGLONG_MAX, 1024*1024LL);
+  NULL, NULL, 0LL, 0LL, LONGLONG_MAX, 1024LL);
 
 static MYSQL_SYSVAR_LONGLONG(cleanup_time, treestore_cleanup_time,
   PLUGIN_VAR_RQCMDARG|PLUGIN_VAR_READONLY,
@@ -119,4 +119,4 @@ static MYSQL_SYSVAR_BOOL(use_internal_pool, treestore_use_internal_pool,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "use the internal pool to improve concurrency"
   "Default is true",
-  NULL, NULL, TRUE);
+  NULL, NULL, FALSE);

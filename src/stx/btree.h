@@ -1548,7 +1548,7 @@ namespace stx
 			/// performs a lower bound mapping using a couple of techniques simultaneously
 
 			template<typename key_compare, typename key_interpolator >
-			inline int find_lower(key_compare key_less,key_interpolator interp, const key_type* keys, const key_type& key) const {
+			inline int find_lower(key_compare key_less,const key_interpolator &interp, const key_type* keys, const key_type& key) const {
 				check_node();
 				int o = get_occupants() ;
 				if (o  == 0) return 0;
@@ -1677,7 +1677,7 @@ namespace stx
 			}
 
 			template<typename key_compare,typename key_interpolator >
-			inline int find_lower(key_compare key_less, key_interpolator interp, const key_type& key) const
+			inline int find_lower(key_compare key_less, const key_interpolator &interp, const key_type& key) const
 			{
 				return node::find_lower(key_less, interp, keys(), key);
 
@@ -1933,7 +1933,7 @@ namespace stx
 			}
 
 			template< typename key_compare, typename key_interpolator >
-			inline int find_lower(key_compare key_less, key_interpolator interp, const key_type& key) const
+			inline int find_lower(key_compare key_less, const key_interpolator &interp, const key_type& key) const
 			{
 				//this->sort(get_context()->stats, key_less);
 

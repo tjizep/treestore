@@ -288,7 +288,7 @@ namespace collums{
 			
 			bool has(stored_page_ptr page){
 				//
-				//nst::synchronized l(this->lock);
+				nst::synchronized l(this->lock);
 				address_version location = std::make_pair(page->get_address(), page->get_version());
 				if(versioned_pages.count(location)){
 					return true;
@@ -336,7 +336,7 @@ namespace collums{
 				typedef std::vector<address_version> _Released;
 				_Released released;
 				for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
-					stored_page_ptr page = p.get_value();
+					stored_page_ptr page = p->second;
 					if(page->get_references() == 0){
 						err_print("inconsistent memory previously visited page or page invalid");
 					}
@@ -351,7 +351,7 @@ namespace collums{
 							delete page;
 						}
 						
-						released.push_back(p.get_key());
+						released.push_back(p->first);
 					}
 					if(released.size() > versioned_pages.size() / 8){
 						break;
@@ -559,13 +559,12 @@ namespace collums{
 			
 			stored_page_ptr page = nullptr;
 			if(true){ ///get_storage().is_local()
-				version_type current_version = get_page_version(address);
-				page = version_control->check_out(address, current_version);
+				version_type current_version = get_page_version(address);			
+				page = version_control->check_out(address, current_version);				
 				if(page){	/// check out refs the page			
 					return page;
 				}
 			}
-			
 			/// storage operation started
 			nst::stream_address w = address;
 			/// the dangling buffer is not copied
@@ -573,7 +572,6 @@ namespace collums{
 			if(get_storage().is_end(dangling_buffer) || dangling_buffer.size() == 0){
 				
 			}
-			
 			/// TODO: if there is shortage of ram first try getting a page from version control
 			if(mem_low ){				
 				//clear_cache();
@@ -591,13 +589,10 @@ namespace collums{
 			//	current_version = get_page_version(address);
 			//	printf("[TS] [ERROR] the current version is invalid - does not match allocated version\n");
 			//}
-			
 			size_t load_size = nst::r_decompress_lz4(temp_decompress, dangling_buffer );
 			get_storage().complete(); /// storage operation complete
-			
 			page->load(encoder, get_storage(), temp_decompress, load_size);
 			page->set_version(version);
-			
 			if(!mem_low){
 				page->ref();/// for this
 				if(version_control->add(page)){				
@@ -781,6 +776,7 @@ namespace collums{
 		,	largest(0)
 		,	_size(0)
 		{
+			pages.set_logarithmic(1);
 			local_page = allocate_page();
 			last_loaded = nullptr;
 			version_control = get_shared().get_context(storage.get_name());

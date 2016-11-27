@@ -255,7 +255,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\repo\rabbit\rabbit.h" />
     <ClInclude Include="..\src\abstracted_storage.h" />
     <ClInclude Include="..\src\bit_symbols.h" />
     <ClInclude Include="..\src\cassandras.h" />

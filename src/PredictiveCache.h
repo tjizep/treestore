@@ -36,7 +36,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #define _PREDICTIVECACHE_H_CEP2013_
 
 //#include "tree_stored.h"
-#include <rabbit/rabbit.h>
+
 #include "fields.h"
 extern NS_STORAGE::u64 hash_hits;
 extern NS_STORAGE::u64 hash_predictions;

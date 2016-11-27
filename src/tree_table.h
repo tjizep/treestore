@@ -575,7 +575,7 @@ namespace tree_stored{
 			to.add(field);
 			
 		}
-
+		/// purely provide conversion for from mysql field to composite stored
 		virtual void compose(CompositeStored & to, Field* f){
 			/// possibly also use , const uchar * ptr, uint flags
 			convertor.fget(temp, f, NULL, 0);/// convert into temp
@@ -734,13 +734,15 @@ namespace tree_stored{
 
 	typedef std::string _SetFields; ///indicates which fields have been set by index
 	typedef std::vector<selection_tuple, sta::buffer_pool_alloc_tracker<selection_tuple>> _Selection;
+	
 	/// this class translates errors and behaviour into internal data structures without
 	/// exposing them to mysql shenanigans
 	class tree_table{
 	public:
 		typedef stored::IntTypeStored<stored::_Rid> _StoredRowId;
-		typedef stored::IntTypeStored<unsigned char> _StoredRowFlag;
+		typedef stored::IntTypeStored<stored::_Rid> _StoredRowFlag;
 		typedef std::vector<abstract_conditional_iterator::ptr, sta::buffer_pool_alloc_tracker<selection_tuple>> _Conditional;
+		typedef rabbit::unordered_map<nst::u32,nst::u32> _PrimaryKeyDef;
 		///, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator
 		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
@@ -903,16 +905,21 @@ namespace tree_stored{
 			KEY *pos;
 			TABLE_SHARE *share= table_arg->s;
 			pos = table_arg->key_info;
+			this->primary_key = share->primary_key;
 			//std::string path = share->path.str;
 			for (i= 0; i < share->keys; i++,pos++){//all the indexes in the table ?
 				std::string index_name = path + INDEX_SEP() + pos->name;
 				stored::index_interface::ptr index = nullptr;
 				bool field_primitive =false;
 				if(treestore_use_primitive_indexes && pos->usable_key_parts==1){
+					Field *field = pos->key_part[0].field;// the jth field in the key
+					
 					field_primitive = true;
-					Field **field = &(pos->key_part[0].field);// the jth field in the key
-					ha_base_keytype bt = (*field)->key_type();
-
+					ha_base_keytype bt = field->key_type();
+					if(this->primary_key == i){
+						pk_def[field->field_index] = this->primary_key;
+					}
+					
 					switch(bt){
 						case HA_KEYTYPE_END:
 							// ERROR ??
@@ -982,6 +989,9 @@ namespace tree_stored{
 						Field *field = pos->key_part[j].field;// the jth field in the key
 						size_t field_size = field->pack_length_in_rec();
 						key_size += field_size;
+						if(this->primary_key == i){
+							pk_def[field->field_index] = this->primary_key;
+						}
 
 					}
 					key_size+=pos->usable_key_parts;
@@ -1035,6 +1045,11 @@ namespace tree_stored{
 		table_info calculated_info;
 		nst::u64 clock;
 		std::vector<bool> all_changed;
+		_PrimaryKeyDef pk_def;
+		nst::u32 primary_key;
+		/// state variables tied to thread
+		_TableMap::iterator r;
+		_TableMap::iterator r_stop;
     public:
         _Conditional conditional;
 		abstract_conditional_iterator::ptr rcond;
@@ -1047,6 +1062,12 @@ namespace tree_stored{
 		shared_data * share;
 		bool writing;
 	public:
+		bool has_primary_key() const {
+			return this->primary_key < MAX_KEY;
+		}
+		nst::u32 get_primary_key() const {
+			return this->primary_key;
+		}
 		void get_calculated_info(table_info& calc){
 			nst::synchronized _s(tt_info_copy_lock);			
 			(*this).calculated_info.row_count = share->row_count;
@@ -1089,6 +1110,7 @@ namespace tree_stored{
 		,	clock(++table_clock)
 		,	share(nullptr)
 		,	writing(writing)
+		,	primary_key(MAX_KEY)
 		{
 			{
 				nst::synchronized sync(shared_lock);
@@ -1330,11 +1352,11 @@ namespace tree_stored{
 
 		void begin(bool read,bool shared = true){
 			if(read && is_writing()){
-				err_print("table is not opened for reading");
+				err_print("table is not opened for reading [%s]",this->path.c_str());
 				return;
 			}
 			if(!read && !is_writing()){
-				err_print("table is not opened for writing");
+				err_print("table is not opened for writing [%s]",this->path.c_str());
 				return;
 			}
 			changed = !read;
@@ -1381,6 +1403,8 @@ namespace tree_stored{
 		}
 
 		void rollback(){
+			this->r.clear();
+			this->r_stop.clear();
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->rollback();
 
@@ -1936,17 +1960,26 @@ namespace tree_stored{
 			return last_unlock_time;
 		}
 		_Rid get_row_count(){
+			if(has_primary_key()){
+				return indexes[get_primary_key()]->size();
+			}
 			return get_table().size();
 		}
 		_Rid get_max_row_id_from_table(){
 			_Rid r = 0;
 			
-			
 			if(share->row_count == 0){
-				_TableMap::iterator t = get_table().end();			
-				if(!get_table().empty()){				
-					--t;
-					r = t.key().get_value();				
+				if(has_primary_key()){
+					_TableMap::iterator t = get_table().find(get_primary_key());			
+					if(t!=get_table().end()){
+						r = t.data().get_value();
+					}
+				}else{
+					_TableMap::iterator t = get_table().end();			
+					if(!get_table().empty()){				
+						--t;
+						r = t.key().get_value();				
+					}
 				}
 			
 				nst::synchronized shared(share->lock);
@@ -2022,17 +2055,18 @@ namespace tree_stored{
 		}
 
 		/// release locks and resources
-		void unlock(Poco::Mutex* p2_lock = NULL)
+		int unlock(Poco::Mutex* p2_lock = NULL)
 		{
 			if(locks==0){
-				printf("too many unlocks \n");
-				return;
+				err_print("too many unlocks");
+				return 0;
 			}
 
 			if(--locks == 0){
 				
 				last_unlock_time = os::micros();
 			}
+			return locks;
 		}
 		stored::index_interface *error_index;
 		int write_noinc(TABLE* table,_Rid auto_row){			
@@ -2085,7 +2119,10 @@ namespace tree_stored{
 			
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
-				if(bitmap_is_set(table->write_set, (*field)->field_index)){
+				if
+				(	bitmap_is_set(table->write_set, (*field)->field_index) 				
+				)
+				{
 					if(cols[(*field)->field_index]){
 						/// TODO: set read set
 						//bool flip = !bitmap_is_set(table->read_set, (*field)->field_index);
@@ -2110,8 +2147,11 @@ namespace tree_stored{
 				(*x)->add((*x)->temp);					
 			}
 			
-
-			(*this).get_table().insert(get_auto_incr(), '0');
+			if(has_primary_key()){
+				(*this).get_table()[get_primary_key()] = get_auto_incr();
+			}else{
+				(*this).get_table().insert(get_auto_incr(), 0);
+			}
 			if(get_auto_incr() % 300000 == 0){
 				inf_print(" %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
 				
@@ -2212,12 +2252,12 @@ namespace tree_stored{
 		}
 		int write(TABLE* table){
 			if(!is_writing()){
-				err_print("writing to read only table");
+				err_print("writing to read only table [%s]",this->path.c_str());				
 				return HA_ERR_UNSUPPORTED;
 			}
 			if(!changed)
 			{
-				err_print("writing to unlocked table");
+				err_print("writing to unlocked table [%s]",this->path.c_str());				
 				return HA_ERR_UNSUPPORTED;
 			}
 			int r = write_noinc(table,get_auto_incr());
@@ -2228,7 +2268,7 @@ namespace tree_stored{
 			
 		}
 		
-		void erase(stored::_Rid rid, TABLE* table){			
+		void erase(stored::index_iterator_interface& iterator,stored::_Rid rid, TABLE* table){			
 			if(!is_writing()){
 				err_print("writing to read only table");
 				return;
@@ -2240,8 +2280,9 @@ namespace tree_stored{
 				err_print("writing to unlocked table");
 				return;
 			}
-			erase_row_index(rid,all_changed);
-			(*this).get_table().erase(rid);
+			erase_row_index(iterator,rid,all_changed);
+			if(!has_primary_key())
+				(*this).get_table().erase(rid);
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
 				if(cols[(*field)->field_index]){
@@ -2251,16 +2292,16 @@ namespace tree_stored{
 
 		}
 		
-		int write(stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
+		int update(stored::index_iterator_interface& iterator,stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
 			if(!is_writing()){
-				err_print("writing to read only table");
-				return -1;
+				err_print("writing to read only table");				
+				return HA_ERR_UNSUPPORTED;
 			}		
 			/// erase_row_index must be called before this function
 			check_load(table);
 			if(!changed)
 			{
-				err_print("attempting write to not locked table");
+				err_print("attempting write to not locked table");				
 				return HA_ERR_UNSUPPORTED;
 			}
 	
@@ -2289,6 +2330,7 @@ namespace tree_stored{
 					for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){						
 						cols[(*p)]->compose_by_tree(rid, temp);
 					}
+					
 					//temp.add(rid);				
 					temp.row = rid;
 					(*x)->add(temp);
@@ -2297,7 +2339,7 @@ namespace tree_stored{
 			return 0;
 		}
 
-		void erase_row_index(stored::_Rid rid,const std::vector<bool>& change_set){
+		void erase_row_index(stored::index_iterator_interface& iterator, stored::_Rid rid,const std::vector<bool>& change_set){
 			if(!is_writing()){
 				err_print("writing to read only table");
 				return;
@@ -2305,11 +2347,12 @@ namespace tree_stored{
 			}
 			if(!changed)
 			{
-				err_print("attempting write to unlocked table");
+				err_print("attempting erase on unlocked table");
 				return;
 			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
+				
 				nst::u32 parts_changed = 0;
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 					cols[(*p)]->compose_by_cache(rid, temp);
@@ -2318,13 +2361,20 @@ namespace tree_stored{
 				}
 				//temp.add(rid);
 				if(parts_changed){
-					temp.row = rid;
-					(*x)->remove(temp);
+					if((*x)->get_ix() == this->primary_key){
+						iterator.erase();
+					}else{
+						temp.row = rid;
+						(*x)->remove(temp);
+					}
 				}
 			}
 		}
 
 		stored::_Rid row_count() const {
+			if(has_primary_key()){
+				return indexes[get_primary_key()]->size();
+			}
 			return get_table().size();
 		}
 
@@ -2401,7 +2451,34 @@ namespace tree_stored{
 			}
 			return r;
 		}
+		
+		void init_iterators(){
+			(*this).r = this->get_table().begin();
+			(*this).r_stop = this->get_table().end();
 
+		}
+		bool is_table_end(){
+			return (*this).r == (*this).r_stop;
+		}
+		void move_iterator(stored::_Rid c){
+			(*this).r =  this->get_table().lower_bound(c);
+		}
+		bool iterate_r_conditions(_Rid c){
+			while((*this).r.key().get_value() < c ){
+				++((*this).r);
+				if((*this).r == (*this).r_stop){
+					this->pop_all_conditions();
+					return false;
+				}
+			}
+			return true;
+		}
+		_Rid get_r_value(){
+			return (*this).r.key().get_value();
+		}
+		void iterate_r(){
+			++((*this).r);
+		}
 		typedef tree_table * ptr;
 	};
 

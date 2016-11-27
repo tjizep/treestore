@@ -364,20 +364,21 @@ namespace tree_stored{
 				err_print("table not locked in this thread %s",path.c_str());
 				return;
 			}
-			bool locked_as = lock_table[path];
-			lock_table.erase(path);
+			bool locked_as = lock_table[path];			
+			
 			auto ti = tables.find(path);
 
 			if(ti != tables.end()){
-				tree_table::ptr t = (*ti).second;
-			
+				tree_table::ptr t = ti->second;			
 				if(t == NULL ){
 					err_print("released table never composed");
 				}else{
 					if(t->is_writing() != locked_as){
 						err_print("table modify type not same as lock");
 					}
-					t->unlock();
+					if(0 == t->unlock()){
+						lock_table.erase(path);
+					}
 				}				
 			}else{
 				///table probably deleted
@@ -505,11 +506,12 @@ public:
 	typedef rabbit::unordered_map<std::string,std::shared_ptr<Poco::Mutex>> _WriterLocks;
 private:
 	mutable Poco::Mutex tlock;
+	mutable Poco::Mutex plock;
 	_Writers writers;
 	_WriterLocks locks;
 	Poco::Mutex* get_write_lock(const std::string &path){
 		std::shared_ptr<Poco::Mutex> result = nullptr;
-
+		NS_STORAGE::syncronized s(plock);
 		auto w = locks.find(path);
 		if(w == locks.end()){
 			result = std::make_shared<Poco::Mutex>();
@@ -649,8 +651,7 @@ public:
 	static const int TREESTORE_MAX_KEY_LENGTH = stored::StandardDynamicKey::MAX_BYTES;
 	std::string path;
 	tree_stored::tree_table::ptr tt;
-	tree_stored::tree_table::_TableMap::iterator r;
-	tree_stored::tree_table::_TableMap::iterator r_stop;
+	
 	stored::_Rid row;
 
 	typedef tree_stored::_Selection  _Selection;
@@ -986,10 +987,25 @@ public:
 			)
 		&&	create_info->auto_increment_value > 0
 		){
-			tt = get_thread()->compose_table(t,n,false);
-			tt->begin(false);
+			bool writer = false;
+			tree_stored::tree_thread* thread = st.get_thread();
+			if(thread==NULL){
+				err_print("could not allocate thread");
+				DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
+			}
+			
+			tree_stored::tree_table::ptr tt = thread->lock(t, t->s->path.str, writer);
+			if(tt==NULL){
+				err_print("could not lock table");
+				DBUG_RETURN(HA_ERR_READ_ONLY_TRANSACTION);
+			}
 			tt->reset_auto_incr(create_info->auto_increment_value);
-			tt->rollback();
+			
+			thread->release(table,t->s->path.str);
+			thread->rollback();					
+			//st.release_writer(thread);
+			
+			
 		}
 
 		this->path = n;
@@ -1197,12 +1213,18 @@ public:
 	int delete_all_rows(){
 		return truncate();
 	}
+	void clear_state(){
+		clear_selection(this->_selection_state);
+		this->tt = nullptr;
+		tt = NULL;
+		current_index = NULL;
+		current_index_iterator = NULL;
+		locked_thd = NULL;
+	}
 	int close(void){
 		DBUG_PRINT("info",("closing tt %s\n", table->alias));
 		inf_print("closing tt %s", table->alias);
-		clear_selection(this->_selection_state);
-		r_stop.clear();
-		r.clear();
+		clear_selection(this->_selection_state);	
 		if(tt!= NULL)
 			tt->clear();
 		tt = NULL;
@@ -1326,7 +1348,9 @@ public:
 			
 			check_tree_table();
 			(*this).tt = thread->lock(table, this->path, writer);
-
+			if((*this).tt == nullptr){
+				DBUG_RETURN(HA_ERR_READ_ONLY_TRANSACTION);
+			}
 			if(writer)
 				(*this).writer_thread = thread;
 			else
@@ -1347,13 +1371,13 @@ public:
 				}
 				
 				clear_selection(this->_selection_state);
-				r_stop.clear();
-				r.clear();
 				if(is_autocommit){
 					if(this->locked_thd != thd){
 						err_print("locked thd not equal to current thd");
 					}else{
+						//this->current_index_iterator = NULL;
 						thread_commit(ht,thd);
+						//this->clear_state();
 					}									
 				}
 				this->locked_thd = NULL;
@@ -1505,6 +1529,13 @@ public:
 	}
 	// tscan 3
 	int rnd_init(bool scan){
+		if(get_tree_table()->has_primary_key()){
+			int r = this->index_init(get_tree_table()->get_primary_key(),true);			
+			current_index->first(get_index_iterator());
+			get_index_iterator().first();
+		
+			return r;
+		}
 		row = 0;
 		tt = NULL;
 		st.check_use();
@@ -1513,27 +1544,44 @@ public:
 		this->_selection_state.last_resolved = 0;
 
 		initialize_selection(this->_selection_state,get_tree_table()->get_indexes().size());
-		(*this).r = get_tree_table()->get_table().begin();
-		(*this).r_stop = get_tree_table()->get_table().end();
-
+		get_tree_table()->init_iterators();
 
 		return 0;
 	}
 	// tscan 4
 
 	int rnd_next(byte *buf){
-
+		
 		DBUG_ENTER("rnd_next");
 		if((counter&255)==0){
 			check_own_use();
 		}
 		++counter;
-		if((*this).r == (*this).r_stop){
+
+		if(get_tree_table()->has_primary_key()){
+			int r = HA_ERR_END_OF_FILE;
+			stored::index_iterator_interface & current_iterator = get_index_iterator();
+			if(current_iterator.valid()){
+				ha_statistic_increment(&SSV::ha_read_rnd_next_count);
+				r = 0;
+				table->status = 0;
+				
+				rebase_selection_io(buf,this->_selection_state);
+				resolve_selection_from_index(active_index,this->_selection_state,current_iterator);
+				restore_selection_io(this->_selection_state);				
+				current_iterator.next();
+			
+				
+			}
+			DBUG_RETURN(r);
+		}
+		
+		if(get_tree_table()->is_table_end()){
 			get_tree_table()->pop_all_conditions();
 			DBUG_RETURN(HA_ERR_END_OF_FILE);
 		}
 
-		this->_selection_state.last_resolved = (*this).r.key().get_value();
+		this->_selection_state.last_resolved = (*this).get_tree_table()->get_r_value();
 		stored::_Rid c = tree_stored::abstract_conditional_iterator::NoRecord;
 		while(c != this->_selection_state.last_resolved){
 			/// get the next record that matches
@@ -1548,20 +1596,16 @@ public:
 
 			if(c > this->_selection_state.last_resolved + 20){
 
-				(*this).r =  get_tree_table()->get_table().lower_bound(c);
+				get_tree_table()->move_iterator(c);
 
 			}else{
 
-				while((*this).r.key().get_value() < c ){
-					++((*this).r);
-					if((*this).r == (*this).r_stop){
-						get_tree_table()->pop_all_conditions();
-						DBUG_RETURN(HA_ERR_END_OF_FILE);
-					}
+				if(!get_tree_table()->iterate_r_conditions(c)){
+					DBUG_RETURN(HA_ERR_END_OF_FILE);
 				}
 			}
 			/// c == last_resolved
-			this->_selection_state.last_resolved = (*this).r.key().get_value();
+			this->_selection_state.last_resolved = (*this).get_tree_table()->get_r_value();
 		}
 
 		ha_statistic_increment(&SSV::ha_read_rnd_next_count);
@@ -1570,14 +1614,14 @@ public:
 		if((this->_selection_state.last_resolved % 1000000) == 0){
 			inf_print("resolved %lld rows in table %s", (long long)this->_selection_state.last_resolved,table->s->path.str);
 		}
-		++((*this).r);
+		get_tree_table()->iterate_r();
 		DBUG_RETURN(0);
 	}
 
 	int delete_row(const byte *buf){
 		ha_statistic_increment(&SSV::ha_delete_count);
 
-		get_tree_table()->erase(this->_selection_state.last_resolved, (*this).table);
+		get_tree_table()->erase(get_index_iterator(),this->_selection_state.last_resolved, (*this).table);
 
 
 		return 0;
@@ -1752,10 +1796,10 @@ public:
 		ha_statistic_increment(&SSV::ha_update_count);
 		calculate_change_set(old_data, new_data);
 		/// TODO: check if any indexes are affected before doing this
-		get_tree_table()->erase_row_index(this->_selection_state.last_resolved,change_set);/// remove old index entries
+		get_tree_table()->erase_row_index(get_index_iterator(),this->_selection_state.last_resolved,change_set);/// remove old index entries
 		/// the write set will contain the new values
 
-		get_tree_table()->write(this->_selection_state.last_resolved, (*this).table, change_set); /// write row and create indexes
+		get_tree_table()->update(get_index_iterator(),this->_selection_state.last_resolved, (*this).table, change_set); /// write row and create indexes
 
 		return 0;
 	}
@@ -2193,12 +2237,13 @@ static int thread_commit(handlerton *hton, THD *thd){
 	if(thread != NULL){
 		bool writing = thread->is_writing();		
 		thread->commit();		
-		thread->clear();
+		thread->clear();		
+		st.release_writer(thread);
+		thd_set_ha_data(thd, hton, nullptr);
 		if(writing){			
 			NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage - second phase						
 		}
-		st.release_writer(thread);
-		thd_set_ha_data(thd, hton, nullptr);
+		
 		
 	}else{
 		err_print("could not find transaction context");

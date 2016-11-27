@@ -980,7 +980,7 @@ namespace red{
 		void unlock_all(){
 			std::vector<address_type> addresses;
 			for(auto b = get_versions().begin(); b != get_versions().end(); ++b){
-				addresses.push_back(b.get_key());				
+				addresses.push_back(b->first);				
 			}
 			red_println("[SERVER] unlocking %lld addresses",addresses.size());
 			for(auto a = addresses.begin(); a != addresses.end(); ++a){
@@ -1132,7 +1132,7 @@ namespace red{
 					if(this->invalid_versions == 0){
 						alloc->begin();
 						for(auto b = buffers.begin(); b != buffers.end(); ++b){
-							alloc->set(b.get_key(),this->writer_version,*(b.get_value().get()));
+							alloc->set(b->first,this->writer_version,*(b->second.get()));
 						}
 						red_println("[SERVER] [%lld] start commit",this->id);
 						alloc->commit();
@@ -1151,7 +1151,7 @@ namespace red{
 					//synchronized context(alloc->get_lock());
 					if(this->invalid_versions == 0){
 						for(auto b = buffers.begin(); b != buffers.end(); ++b){
-							alloc->set(b.get_key(),this->writer_version,*(b.get_value().get()));
+							alloc->set(b->first,this->writer_version,*(b->second.get()));
 						}					
 					}else{				
 						red_println("[SERVER] [%lld] received invalid versions ->rollback",this->id);

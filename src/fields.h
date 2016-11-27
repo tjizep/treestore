@@ -403,10 +403,10 @@ namespace stored{
 
 		void null_check() const {
 			if(!this){
-				printf("[ERROR] [TS] Invalid Blob object\n");
+				err_print("Invalid Blob object");
 			}
 			if(size > _ConstSize){
-				printf("[ERROR] [TS] Invalid Static Blob object size\n");
+				err_print("Invalid Static Blob object size");
 			}
 
 		}
@@ -415,7 +415,7 @@ namespace stored{
 
 			_BufferSize extra = end_term ? 1 : 0;
 			if((size + count + extra) > _ConstSize){
-				printf("[WARNING] [TS] Attempt to set Invalid Static Blob object size\n");
+				err_print("[WARNING] Attempt to set Invalid Static Blob object size");
 			}else{
 
 				memcpy(data()+size,v,count);
@@ -1200,7 +1200,36 @@ namespace stored{
 		typedef NS_STORAGE::u16 _BufferSize;
 
 	protected:
-
+		inline nst::u32 check_type(int t) const {
+				
+				switch(t){
+				case DynamicKey::I1 :
+				case DynamicKey::UI1 :
+					break;
+				case DynamicKey::I2:
+				case DynamicKey::UI2:
+					break;
+				case DynamicKey::I4:
+				case DynamicKey::UI4:
+					break;
+				case DynamicKey::I8 :
+				case DynamicKey::UI8 :
+					break;
+				case DynamicKey::R4 :
+					break;
+				case DynamicKey::R8 :
+					break;
+				case DynamicKey::S:					
+					break;
+				case DynamicKey::KEY_MAX:
+					break;
+				default:
+					
+					return 0;
+					break;
+				};	
+				return 1;
+			}
 		static const size_t static_size = sizeof(_Data)+_StaticSize;
 		static const size_t max_buffer_size = 1 << (sizeof(_BufferSize) << 3);
 
@@ -1603,51 +1632,13 @@ namespace stored{
 					break;
 				default:
 					err_print("unknown type in index key");
+					return 0;
 					break;
 				};	
 				return l;
 			}
 			
-			inline nst::u32 get_data_length() const {
-				if(!valid()) return 0;
-				nst::u32 l = 0;
-				int t = get_type();
-				switch(t){
-				case DynamicKey::UI1 :
-				case DynamicKey::I1 :
-					l=sizeof(nst::i8);
-					break;
-				case DynamicKey::UI2:
-				case DynamicKey::I2:
-					l = sizeof(nst::i16);
-					break;
-				case DynamicKey::UI4:
-				case DynamicKey::I4:
-					l = sizeof(nst::i32);
-					break;
-				case DynamicKey::UI8 :
-				case DynamicKey::I8 :
-					l = sizeof(nst::i64);
-					break;
-				case DynamicKey::R4 :
-					l = sizeof(float);
-					break;
-				case DynamicKey::R8 :
-					l = sizeof(double);
-					break;
-				case DynamicKey::S:										
-					l = *(const nst::i16*)(ld+sizeof(nst::u8));								
-					break;
-				case DynamicKey::KEY_MAX:
-					l = sizeof(nst::u8);
-					break;
-				default:
-					err_print("unknown type in index key");
-					break;
-				};	
-				return l;
-			}
-			
+						
 			inline bool valid() const {
 				if(ll >= this->size()) return false;				
 				return true;
@@ -1712,6 +1703,7 @@ namespace stored{
 					break;
 				default:
 					err_print("unknown type in index key");
+					return 0;
 					break;
 				};				
 				ld += l; // increments buffer
@@ -1955,6 +1947,7 @@ namespace stored{
 			nst::u8 rt = *rd;
 
 			int r = 0,l=0,ll=0;
+			
 			while(lt == rt){
 				++ld;
 				++rd;
@@ -2101,7 +2094,7 @@ namespace stored{
 		NS_STORAGE::buffer_type::iterator store(NS_STORAGE::buffer_type::iterator w) const {
 			using namespace NS_STORAGE;
 			if(size()==0){
-				printf("[TS] [WARNING] writing emtpty key\n");
+				err_print("[WARNING] writing emtpty key");
 			}
 			buffer_type::iterator writer = w;
 			writer = leb128::write_signed(writer, row);
@@ -2129,13 +2122,17 @@ namespace stored{
 				for(u8 * d = data(); d < end; ++d,++reader){
 					*d = *reader;
 				}
+				//nst::u32 parts = count_parts();
+				//if(!parts){
+				//	err_print("invalid parts count");
+				//}
 			}
 
 			return reader;
 		};
 	};
 	typedef DynamicKey<42> StandardDynamicKey;
-
+	typedef DynamicKey<256> LargeDynamicKey;
 	template<typename _FieldType>
 	class PrimitiveDynamicKey{
 	public:
@@ -3143,6 +3140,7 @@ namespace stored{
 		virtual bool previous() = 0;
 		virtual void first() = 0;
 		virtual void last() = 0;
+		virtual void erase() = 0;
 		virtual nst::u64 count(const index_iterator_interface& in) = 0;
 		virtual BareKey get_bare_key() = 0;
 		virtual StandardDynamicKey& get_key() = 0;
@@ -3162,6 +3160,7 @@ namespace stored{
 		std::string name;
 		StandardDynamicKey temp;
 		bool do_update;
+		
 		void set_ix(int ix){
 			this->ix = ix;
 		}
@@ -3218,7 +3217,7 @@ namespace stored{
 
 		virtual void clear_cache() = 0;
 		virtual void reduce_cache() = 0;
-
+		virtual _Rid size() = 0;
 		typedef index_interface * ptr;
 	};
 

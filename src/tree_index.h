@@ -74,6 +74,9 @@ namespace tree_stored{
 			bool invalid() const {
 				return value.invalid();
 			};
+			void erase(){
+				value.erase();
+			}
 			void next() {
 				value.next();
 			};
@@ -99,7 +102,7 @@ namespace tree_stored{
 				value.set_end(((index_iterator_impl&)in).value);
 			}
 
-		};
+		};///index_iterator_impl
 
 
 		class IndexLoader : public asynchronous::AbstractWorker
@@ -169,7 +172,7 @@ namespace tree_stored{
 				flush_key_buffer();
 				--loaders_away;
 			}
-		};
+		};///IndexLoader
 	private:
 		typedef rabbit::unordered_map<index_key, typename _IndexMap::iterator::initializer_pair, stored::fields_hash<index_key> > _IteratorLookup;
 		_IndexMap index;
@@ -232,6 +235,10 @@ namespace tree_stored{
 		}
 
 		void scan(){
+		}
+
+		_Rid size() const {
+			return index.size();
 		}
 
 		std::string get_name() const {
@@ -309,7 +316,7 @@ namespace tree_stored{
 				}
 			}
 		}
-
+		
 		void remove(const index_key& k){
 			modified = true;
 			index.erase(k);
@@ -534,6 +541,9 @@ namespace tree_stored{
 		}
 		void reduce_cache(){
 
+		}
+		_Rid size() {
+			return index.size();
 		}
 		typedef tree_index* ptr;
 	};

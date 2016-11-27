@@ -233,7 +233,7 @@ namespace red{
 
 		void evict_mem_buffers(){
 			for(_BufferMap::iterator b = buffers.begin(); b!=buffers.end();++b){
-				b.get_value() = nullptr;
+				(*b).second = nullptr;
 			}
 		}
 		
