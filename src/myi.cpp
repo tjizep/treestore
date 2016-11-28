@@ -1621,7 +1621,7 @@ public:
 	int delete_row(const byte *buf){
 		ha_statistic_increment(&SSV::ha_delete_count);
 
-		get_tree_table()->erase(get_index_iterator(),this->_selection_state.last_resolved, (*this).table);
+		get_tree_table()->erase(this->_selection_state.last_resolved, (*this).table);
 
 
 		return 0;
@@ -1796,10 +1796,10 @@ public:
 		ha_statistic_increment(&SSV::ha_update_count);
 		calculate_change_set(old_data, new_data);
 		/// TODO: check if any indexes are affected before doing this
-		get_tree_table()->erase_row_index(get_index_iterator(),this->_selection_state.last_resolved,change_set);/// remove old index entries
+		get_tree_table()->erase_row_index(this->_selection_state.last_resolved,change_set);/// remove old index entries
 		/// the write set will contain the new values
 
-		get_tree_table()->update(get_index_iterator(),this->_selection_state.last_resolved, (*this).table, change_set); /// write row and create indexes
+		get_tree_table()->update(this->_selection_state.last_resolved, (*this).table, change_set); /// write row and create indexes
 
 		return 0;
 	}

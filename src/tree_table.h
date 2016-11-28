@@ -2268,7 +2268,7 @@ namespace tree_stored{
 			
 		}
 		
-		void erase(stored::index_iterator_interface& iterator,stored::_Rid rid, TABLE* table){			
+		void erase(stored::_Rid rid, TABLE* table){			
 			if(!is_writing()){
 				err_print("writing to read only table");
 				return;
@@ -2280,7 +2280,7 @@ namespace tree_stored{
 				err_print("writing to unlocked table");
 				return;
 			}
-			erase_row_index(iterator,rid,all_changed);
+			erase_row_index(rid,all_changed);
 			if(!has_primary_key())
 				(*this).get_table().erase(rid);
 			/// TABLE_SHARE *share= table->s;
@@ -2292,7 +2292,7 @@ namespace tree_stored{
 
 		}
 		
-		int update(stored::index_iterator_interface& iterator,stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
+		int update(stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
 			if(!is_writing()){
 				err_print("writing to read only table");				
 				return HA_ERR_UNSUPPORTED;
@@ -2339,7 +2339,7 @@ namespace tree_stored{
 			return 0;
 		}
 
-		void erase_row_index(stored::index_iterator_interface& iterator, stored::_Rid rid,const std::vector<bool>& change_set){
+		void erase_row_index(stored::_Rid rid,const std::vector<bool>& change_set){
 			if(!is_writing()){
 				err_print("writing to read only table");
 				return;
@@ -2361,12 +2361,8 @@ namespace tree_stored{
 				}
 				//temp.add(rid);
 				if(parts_changed){
-					if((*x)->get_ix() == this->primary_key){
-						iterator.erase();
-					}else{
-						temp.row = rid;
-						(*x)->remove(temp);
-					}
+					temp.row = rid;
+					(*x)->remove(temp);					
 				}
 			}
 		}
