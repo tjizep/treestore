@@ -517,7 +517,8 @@ namespace collums{
 			const_cast<paged_vector*>(this)->clear_cache();
 		}
 		void clear_cache(){
-			
+			if(last_loaded)
+				last_loaded->unref();
 			last_loaded = nullptr;
 			if(pages.empty()) return;
 			for(page_map_type::iterator p = pages.begin(); p != pages.end();++p){
@@ -606,10 +607,12 @@ namespace collums{
 		
 		stored_page_ptr get_page(size_type which) const {
 			size_type address = (which / page_size) + 128;
-			//if(last_loaded && last_loaded->get_address()==address){
-				//return last_loaded;
-			//}
-			//last_loaded = nullptr;
+			if(last_loaded && last_loaded->get_address()==address){
+				return last_loaded;
+			}
+			if(last_loaded)
+				last_loaded->unref();
+			last_loaded = nullptr;
 			if(local_page->get_address() == address){
 				return local_page;
 			}
@@ -625,6 +628,7 @@ namespace collums{
 				}
 			}
 			last_loaded = page;
+			last_loaded->ref();
 			return page;
 		}
 
