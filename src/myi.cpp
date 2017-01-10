@@ -758,9 +758,8 @@ public:
 		_SelectionState() : last_resolved(0){
 		}
 		tree_stored::_Selection selected;// direct selection filter
-		_FieldMap field_map;
-		typedef unsigned long _FMapType;
-		_FMapType fields_set;
+		_FieldMap field_map;	
+		_SetFields fields_set;
 		stored::_Rid last_resolved;
 
 		void clear_output_selection(){
@@ -784,7 +783,9 @@ public:
 				}
 			}
 		}
-
+		void init_fields_set(int cnt){
+			fields_set.resize(cnt);
+		}
 		void restore_selection_io(){
 			_Selection::iterator s = this->selected.begin();
 			for(; s != this->selected.end(); ++s){
@@ -795,15 +796,16 @@ public:
 				sel.restore_ptr();
 			}
 		}
-		void clear_fields_set(size_t cnt){
-			fields_set = _FMapType();			
+		void clear_fields_set(){
+			for(int c= 0; c < fields_set.size(); ++c){
+				fields_set[c] = false;
+			}
 		}
 		void set_field(int index, bool f){
-			_FMapType m = ((_FMapType)1) << index;// the bit mask
-			fields_set ^= (-f ^ fields_set) & m;
+			fields_set[index] = f;
 		}
-		bool is_field_set(_FMapType bit) const {
-			return ((fields_set >> bit) & (_FMapType)1ul);
+		bool is_field_set(int index) const {
+			return fields_set[index];
 		}
 	};
 	_SelectionState _selection_state;
@@ -853,9 +855,10 @@ public:
 		selection_state.clear_output_selection();
 	}
 
-	void initialize_selection(_SelectionState &selection_state,uint keynr){
+	void initialize_selection(_SelectionState &selection_state,uint keynr,size_t col_count){
 		counter=0;
 		clear_selection(selection_state);
+		selection_state.init_fields_set(get_tree_table()->get_col_count());
 		selection_state.selected = get_tree_table()->create_output_selection(table);
 		if(keynr < get_tree_table()->get_indexes().size()){
 			create_selection_map(selection_state);
@@ -863,8 +866,8 @@ public:
 	}
 
 	void clear_fields_set(_SelectionState& selection_state){
-		nst::u32 cnt = get_tree_table()->get_col_count();
-		selection_state.clear_fields_set(cnt);
+		
+		selection_state.clear_fields_set();
 	}
 
 	ha_treestore
@@ -1657,7 +1660,7 @@ public:
 
 		this->_selection_state.last_resolved = 0;
 
-		initialize_selection(this->_selection_state,get_tree_table()->get_indexes().size());
+		initialize_selection(this->_selection_state,get_tree_table()->get_indexes().size(),get_tree_table()->get_col_count());
 		get_tree_table()->init_iterators();
 
 		return 0;
@@ -1947,7 +1950,7 @@ public:
 
 		tt = NULL;
 
-		initialize_selection(this->_selection_state,keynr);
+		initialize_selection(this->_selection_state,keynr,get_tree_table()->get_col_count());
 		current_index = get_tree_table()->get_index_interface(handler::active_index);
 		current_index_iterator = current_index->get_index_iterator((nst::u64)this);
 		//readset_covered = get_tree_table()->read_set_covered_by_index(table, active_index, this->_selection_state);
@@ -2148,7 +2151,7 @@ public:
 		tree_stored::tree_table::ptr tt =  get_tree_table();
 		_Selection selected;
 
-		initialize_selection(this->_selection_state,keynr);
+		initialize_selection(this->_selection_state,keynr,tt->get_col_count());
 
 		int r = basic_index_read_idx_map(buf, keynr, key, keypart_map, find_flag,get_tree_table()->get_index_interface(keynr),this->_selection_state);
 

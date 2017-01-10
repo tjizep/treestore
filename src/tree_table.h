@@ -794,7 +794,7 @@ namespace tree_stored{
 		}
 	};
 
-	typedef std::string _SetFields; ///indicates which fields have been set by index
+	typedef std::vector<char> _SetFields; ///indicates which fields have been set by index
 	typedef std::vector<selection_tuple, sta::buffer_pool_alloc_tracker<selection_tuple>> _Selection;
 	
 	/// this class translates errors and behaviour into internal data structures without
