@@ -2350,8 +2350,8 @@ namespace tree_stored{
 			return 0;
 		}
 		/// maps and copies available data in index to read set - reports those that could not be copied
-		template<typename _KeyType>
-		void read_index_key_to_fields(_SetFields& to_set, TABLE* table, nst::u32 ix, const _KeyType& key,std::vector<Field*>& field_map){
+		template<typename _KeyType,typename _SelectionType>
+		void read_index_key_to_fields(_SelectionType& to_set, TABLE* table, nst::u32 ix, const _KeyType& key,std::vector<Field*>& field_map){
 			TABLE_SHARE *share= table->s;
 			stored::index_interface::ptr index  = indexes[ix];
 			Field **fields =share->field ;
@@ -2363,7 +2363,7 @@ namespace tree_stored{
 					//if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
 						const nst::u8 * data = k.get_data();
 						longlong lval = 0;
-						to_set[(*p)] = 1;		
+						to_set.set_field((*p),true);		
 						int kt = k.get_type();
 						switch(kt){						
 						
@@ -2403,7 +2403,7 @@ namespace tree_stored{
 							f->store(*(const double*)(data));					
 							break;
 						case CompositeStored::S:
-							to_set[(*p)] = 0;
+							to_set.set_field((*p),false);
 							break;
 						default:
 							switch(kt){
@@ -2424,7 +2424,7 @@ namespace tree_stored{
 									f->store(lval,true);
 									break;															
 								default:
-									to_set[(*p)] = 0;
+									to_set.set_field((*p),false);
 									break;		
 							};
 							

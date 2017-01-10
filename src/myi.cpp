@@ -759,7 +759,8 @@ public:
 		}
 		tree_stored::_Selection selected;// direct selection filter
 		_FieldMap field_map;
-		_SetFields fields_set;
+		typedef unsigned long _FMapType;
+		_FMapType fields_set;
 		stored::_Rid last_resolved;
 
 		void clear_output_selection(){
@@ -793,6 +794,16 @@ public:
 				}
 				sel.restore_ptr();
 			}
+		}
+		void clear_fields_set(size_t cnt){
+			fields_set = _FMapType();			
+		}
+		void set_field(int index, bool f){
+			_FMapType m = ((_FMapType)1) << index;// the bit mask
+			fields_set ^= (-f ^ fields_set) & m;
+		}
+		bool is_field_set(_FMapType bit) const {
+			return ((fields_set >> bit) & (_FMapType)1ul);
 		}
 	};
 	_SelectionState _selection_state;
@@ -853,12 +864,7 @@ public:
 
 	void clear_fields_set(_SelectionState& selection_state){
 		nst::u32 cnt = get_tree_table()->get_col_count();
-		selection_state.fields_set.resize(cnt);
-		//memset(&selection_state.fields_set[0],0,selection_state.fields_set.size());
-		char * set = &(selection_state.fields_set[0]);
-		for(nst::u32 s = 0; s < cnt; ++s){
-			set[s] = 0;
-		}
+		selection_state.clear_fields_set(cnt);
 	}
 
 	ha_treestore
@@ -922,8 +928,8 @@ public:
 			tree_stored::tree_table::ptr ts = thread->start((*this).table, this->path, thread->is_writing());				
 			if(ts->should_calc()){
 				
-				ts->calc_density();		
-				
+				ts->calc_density();					
+				inf_print("calculating stats [%s] table size %lld",this->path.c_str(),(nst::u64)tt.table_size);
 			}
 			ts->get_calculated_info(tt);
 			thread->release(this->path);			
@@ -1978,7 +1984,7 @@ public:
 		for(; s != selection_state.selected.end(); ++s){
 			const tree_stored::selection_tuple & sel = (*s);
 			nst::u32 findex = sel.field->field_index;
-			if(0==selection_state.fields_set[findex]){
+			if(!selection_state.is_field_set(findex)){
 				sel.col->seek_retrieve(row,sel.field);
 			}
 
@@ -2013,7 +2019,7 @@ public:
 		if(use_index && treestore_resolve_values_from_index==TRUE){
 			if( get_tree_table()->read_set_covered_by_index(table, active_index, selection_state.selected) ){
 				clear_fields_set(selection_state);
-				get_tree_table()->read_index_key_to_fields(selection_state.fields_set,table,ax,iinfo,selection_state.field_map);
+				get_tree_table()->read_index_key_to_fields(selection_state,table,ax,iinfo,selection_state.field_map);
 				resolve_selection_with_index(row,selection_state);
 				return;
 			}
