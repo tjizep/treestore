@@ -35,7 +35,7 @@ THE SOFTWARE.
 /// it uses linear probing for the first level of fallback and then a overflow area or secondary hash
 
 #ifdef _MSC_VER
-	#define RABBIT_NOINLINE_PRE //_declspec(noinline)
+	#define RABBIT_NOINLINE_PRE _declspec(noinline)
 	#define RABBIT_NOINLINE_
 #else
 	#define RABBIT_NOINLINE_PRE
@@ -928,10 +928,22 @@ namespace rabbit{
 			size_type begin() const {
 				if(elements==0)
 					return end();
-				size_type pos = 0;
-				while(!exists_(pos)){
-					++pos;
 
+				size_type pos = 0;
+				_Bt index = 0;
+
+				const _Bt bits_size = config.BITS_SIZE;
+				size_type e = end();
+				while(pos < e){
+					const _Segment &seg = get_segment(pos);
+					index = get_segment_index(pos);
+					if(seg.exists == 0){
+						pos += bits_size;
+					}else{
+						if(seg.is_exists(index))
+							break;
+						++pos;
+					}
 				}
 				return pos ;
 			}

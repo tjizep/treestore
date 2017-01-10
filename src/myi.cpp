@@ -112,7 +112,12 @@ namespace ts_info{
 	void perform_active_stats();
 	void perform_active_stats(const std::string table);
 };
+
+
 namespace tree_stored{
+	class tree_thread;
+	void lock_writer(tree_stored::tree_thread* thread,const std::string &path);
+	void commit_writer(tree_stored::tree_thread* thread);
 
 	typedef std::map<std::string, tree_table::ptr> _Tables;
 	typedef std::map<nst::u64,tree_table::ptr> _LruTables;
@@ -166,6 +171,7 @@ namespace tree_stored{
 		_LockTable lock_table;
 		_Tables read_tables;
 		_Tables tables;
+
 		void remove_from_read_tables(const std::string& name){
 			auto i = read_tables.find(name);
 			if(i != read_tables.end()){
@@ -182,6 +188,7 @@ namespace tree_stored{
 				t = new tree_table(table_arg,name);
 				t->check_load(table_arg);
 				read_tables[name] = t;
+				get_writing_table(table_arg,name); /// make sure theres a writer for every new reader - so that generated statistics can be saved
 			}else{
 				t = i->second;
 			}
@@ -269,7 +276,31 @@ namespace tree_stored{
 			}
 			tables.clear();			
 		}
-		tree_table::ptr compose_table(TABLE *table_arg, const std::string& name){			
+		void save_stats(){
+			_Tables writers;
+			{
+				nst::synchronized s(get_wt_lock());
+				writers = get_writing_tables(); /// lock snapshot 
+			}
+
+			for(_Tables::iterator t = writers.begin(); t!= writers.end();++t){
+				auto table = (*t).second;
+
+				if(table->get_locks() == 0 && (table->should_save_stats() )){
+					///|| table->should_calc()
+					auto writing_table = start(table,true);
+					if(writing_table!=nullptr){									
+						table->save_stats();
+						release(table->get_path());
+						tree_stored::commit_writer(this);
+						break;
+					}					
+					
+				}
+			}
+			
+		}
+		tree_table::ptr compose_table(const std::string& name){			
 			tree_table::ptr t = tables[name];
 			if(t == NULL ){
 				err_print("Fatal: used table has not been locked");
@@ -315,10 +346,31 @@ namespace tree_stored{
 				}
 			}
 		}
-
-		tree_table::ptr  lock(TABLE *table_arg, const std::string& path, bool writer){
-			tree_table::ptr result = NULL;
+		tree_table::ptr start(tree_table::ptr table, bool writer){
 			
+			tree_table::ptr result = table;
+			
+			if(result == NULL) return result;
+			if(writer != result->is_writing()){				
+				err_print("changing of lock type not supported");
+				return nullptr;				
+			}
+			if(writer)
+				lock_writer(this,table->get_path());			
+
+			tables[table->get_path()] = result;
+			lock_table[table->get_path()] = writer;
+			
+			result->lock(writer);
+			read_lookups = 0;
+			++locks;
+			return result;
+		}
+		tree_table::ptr start(TABLE *table_arg, const std::string &part, bool writer){
+			std::string path = part;
+			tree_table::ptr result = NULL;
+			if(writer)
+				lock_writer(this,path);
 			//synchronized _s(p2_lock);
 			result = tables[path];
 			lock_table[path] = writer;
@@ -340,6 +392,7 @@ namespace tree_stored{
 			++locks;
 			return result;
 		}
+
 		void commit_table(const std::string& path){
 			bool locked_as = lock_table[path];
 			lock_table.erase(path);
@@ -354,7 +407,7 @@ namespace tree_stored{
 					t->commit();
 			}
 		}
-		void release(TABLE *table_arg, const std::string& path){
+		void release(const std::string &path){
 
 			if(!locks){
 				err_print("no locks to release");
@@ -495,13 +548,12 @@ namespace tree_stored{
 		}
 
 	};
-}
-
-
+}; // tree_stored
 
 
 class static_threads{
 public:
+	
 	typedef rabbit::unordered_map<Poco::Thread::TID,tree_stored::tree_thread*> _Writers;
 	typedef rabbit::unordered_map<std::string,std::shared_ptr<Poco::Mutex>> _WriterLocks;
 private:
@@ -551,6 +603,13 @@ public:
 			}
 		}
 	}
+	void save_idle_writers_stats(){
+		//nst::synchronized s(tlock);
+		
+		tree_stored::tree_thread* writer = get_thread();				
+		writer->save_stats();								
+		
+	}
 	tree_stored::tree_thread *get_thread(){
 		
 		Poco::Thread::TID curt = Poco::Thread::currentTid();
@@ -562,7 +621,8 @@ public:
 		nst::synchronized sr(writer->reduce_lock);		
 		writer->set_used();
 		return writer;
-	}
+	}	
+
 	void lock_writer(tree_stored::tree_thread* writer, const std::string& path){
 		Poco::Mutex* write_lock = get_write_lock(path);
 		
@@ -574,9 +634,13 @@ public:
 	}
 	/// should happen only once when all the locks are discounted
 	bool release_writer(tree_stored::tree_thread * w){
-		w->unlock_writelocks();
-		w->set_unused();
-		return true;
+		if(w->get_used()){
+			w->unlock_writelocks();
+			w->set_unused();
+			return true;
+		}else{
+			return false;
+		}
 		
 	}
 	void remove_table(const std::string &name){
@@ -594,6 +658,7 @@ public:
 		
 	}
 
+	
 	void check_use(){
 		/// TODO: this isnt safe yet (reducing another threads memory use)
 
@@ -614,9 +679,39 @@ public:
 		//	(*t)->check_journal();
 		//}
 	}
+	bool commit(tree_stored::tree_thread * thread){
+		if(thread != NULL){
+			if(thread->get_locks()==0){
+				bool writing = thread->is_writing();	
+				if(writing){
+					thread->commit();		
+					
+					thread->clear();		
+					if(writing){			
+						NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage - second phase						
+					}
+					release_writer(thread);				
+					
+				}else{
+				
+				}				
+			}else{
+				wrn_print("lock references to tables must be released before committing a thread(thread::release(table))");
+			}
+		}
+		return true;
+	}
 };
 
 static static_threads st;
+namespace tree_stored{
+	void lock_writer(tree_stored::tree_thread* thread,const std::string &path){
+		st.lock_writer(thread, path);
+	}
+	void commit_writer(tree_stored::tree_thread* thread){
+		st.commit(thread);
+	}
+};
 
 void print_read_lookups(){
 }
@@ -809,15 +904,30 @@ public:
 		}
 		if (which & HA_STATUS_ERRKEY) {
 			if(get_tree_table()->error_index!=nullptr)
-				errkey = get_tree_table()->error_index->get_ix();
+				errkey = get_tree_table()->error_index->get_ix();			
 			if(which == HA_STATUS_ERRKEY)
 				return 0;
+			//if(which && HA_STATUS_NO_LOCK)
+			//	return 0;
 		}
-		tree_stored::tree_table * ts = get_info_table((*this).table,this->path);
+		
+		tree_stored::tree_thread * thread = st.get_thread();
+		
+		
 		tree_stored::table_info tt ;
-		ts_info::perform_active_stats(this->path);
-		ts->get_calculated_info(tt);
-
+		if(thread->is_writing()){
+			tree_stored::tree_table::ptr ts = thread->compose_table((*this).table, this->path, thread->is_writing());				
+			ts->get_calculated_info(tt);
+		}else{
+			tree_stored::tree_table::ptr ts = thread->start((*this).table, this->path, thread->is_writing());				
+			if(ts->should_calc()){
+				
+				ts->calc_density();		
+				
+			}
+			ts->get_calculated_info(tt);
+			thread->release(this->path);			
+		}
 		if (which & HA_STATUS_AUTO)
 		{
 
@@ -860,6 +970,7 @@ public:
 				if(i < tt.calculated.size()){
 					for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
 						if(j < tt.calculated[i].density.size()){
+							//std::cout << "-[" << table->key_info[i].name << " (" << i << "," << j << ") " << tt.calculated[i].density[j] << "]" << std::endl;
 							table->key_info[i].rec_per_key[j] = tt.calculated[i].density[j];
 						}
 					}
@@ -878,6 +989,7 @@ public:
 				if(i < tt.calculated.size()){
 					for (ulong j = 0; j < table->key_info[i].actual_key_parts; j++) {
 						if(j < tt.calculated[i].density.size()){
+							//std::cout << "*[" << this->path << "." << table->key_info[i].name << " (" << i << "," << j << ") " << tt.calculated[i].density[j] << "]" << std::endl;
 							table->key_info[i].rec_per_key[j] = tt.calculated[i].density[j];
 						}
 					}
@@ -994,14 +1106,14 @@ public:
 				DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 			}
 			
-			tree_stored::tree_table::ptr tt = thread->lock(t, t->s->path.str, writer);
+			tree_stored::tree_table::ptr tt = thread->start(t, n, writer);
 			if(tt==NULL){
 				err_print("could not lock table");
 				DBUG_RETURN(HA_ERR_READ_ONLY_TRANSACTION);
 			}
 			tt->reset_auto_incr(create_info->auto_increment_value);
 			
-			thread->release(table,t->s->path.str);
+			thread->release(n);
 			thread->rollback();					
 			//st.release_writer(thread);
 			
@@ -1067,8 +1179,6 @@ public:
 		int r = 0;
 		std::string from = _from;
 		std::string to = _to;
-		delete_info_table(_from);
-		delete_info_table(_to);/// to avoid potential issues
 
 		_FileNames files = extensions_from_table_name(from);
 
@@ -1137,7 +1247,6 @@ public:
 		///nst::synchronized swl(single_writer_lock);
 		int r = 0;
 		
-		delete_info_table(name);
 		_FileNames files = extensions_from_table_name(name);
 
 		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
@@ -1146,10 +1255,11 @@ public:
 			}
 		
 		}
-
+		tree_stored::tree_thread * thread = st.get_thread();
+		thread->remove_table(name);
 		st.remove_table(name);
 
-		NS_STORAGE::journal::get_instance().synch(); /// synchronize trx log to storage
+		NS_STORAGE::journal::get_instance().synch(true); /// synchronize trx log to storage
 
 		std::string extenstion = TREESTORE_FILE_EXTENSION;
 		for(_FileNames::iterator f = files.begin(); f != files.end(); ++f){
@@ -1226,7 +1336,7 @@ public:
 		inf_print("closing tt %s", table->alias);
 		clear_selection(this->_selection_state);	
 		if(tt!= NULL)
-			tt->clear();
+			tt->rollback();
 		tt = NULL;
 		current_index = NULL;
 		current_index_iterator = NULL;
@@ -1264,6 +1374,7 @@ public:
 	int external_lock(THD *thd, int lock_type){
 
 		DBUG_ENTER("::external_lock");
+
 		if(table == NULL){
 			err_print("table cannot be locked - invalid argument");
 			return 0;
@@ -1343,11 +1454,8 @@ public:
 			}
 			DBUG_PRINT("info", (" *locking %s->%s \n", table->s->normalized_path.str,this->path.c_str()));
 			
-			if(writer)
-				st.lock_writer(thread,this->path);
-			
 			check_tree_table();
-			(*this).tt = thread->lock(table, this->path, writer);
+			(*this).tt = thread->start(table, this->path, writer);
 			if((*this).tt == nullptr){
 				DBUG_RETURN(HA_ERR_READ_ONLY_TRANSACTION);
 			}
@@ -1360,7 +1468,7 @@ public:
 			processed = true;
 			DBUG_PRINT("info", (" -unlocking %s \n", this->path.c_str()));			
 			//thread->commit_table(this->path);
-			thread->release(table,this->path);
+			thread->release(this->path);
 			if(thread->get_locks()==0){
 				
 				this->writer_thread = nullptr;
@@ -2233,17 +2341,10 @@ static handler *treestore_create_handler(handlerton *hton,
 	return new (mem_root) ha_treestore(hton, table);
 }
 static int thread_commit(handlerton *hton, THD *thd){
-	tree_stored::tree_thread* thread = (tree_stored::tree_thread*)thd_get_ha_data(thd, hton);
-	if(thread != NULL){
-		bool writing = thread->is_writing();		
-		thread->commit();		
-		thread->clear();		
-		st.release_writer(thread);
-		thd_set_ha_data(thd, hton, nullptr);
-		if(writing){			
-			NS_STORAGE::journal::get_instance().synch( ); /// synchronize to storage - second phase						
-		}
-		
+	tree_stored::tree_thread* thread = (tree_stored::tree_thread*)thd_get_ha_data(thd, hton);		
+	thd_set_ha_data(thd, hton, nullptr);
+
+	if(st.commit(thread)){		
 		
 	}else{
 		err_print("could not find transaction context");
@@ -2404,7 +2505,6 @@ int treestore_done(void *p)
 {
 	stop_cleaning();
 	stop_calculating();
-	clear_info_tables();
 	
 	return 0;
 }
@@ -2430,6 +2530,7 @@ static struct st_mysql_sys_var* treestore_system_variables[]= {
   MYSQL_SYSVAR(red_address),
   MYSQL_SYSVAR(resolve_values_from_index),
   MYSQL_SYSVAR(use_internal_pool),
+  MYSQL_SYSVAR(reset_statistics),
   NULL
 };
 
@@ -2557,7 +2658,8 @@ namespace ts_cleanup{
 				if(buffer_allocation_pool.is_near_full()){
 					//
 				}
-
+				/// write statistics for idle writers which have something to save
+				st.save_idle_writers_stats();
 				if(os::millis() - last_print_time > 5000 ||
 					llabs(calc_total_use() - last_print_size) > (last_print_size>>4)){
 
@@ -2648,7 +2750,7 @@ namespace allocation{
 		if(src == &(allocation_pool.get_pool())){
 			return get_variable(&std_instance, allocation_pool.get_pool().get_shared());
 		}else{
-			return get_variable(&buff_instance, allocation_pool.get_pool().get_shared());
+			return get_variable(&buff_instance, buffer_allocation_pool.get_pool().get_shared());
 		}
 
 	}

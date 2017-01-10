@@ -39,10 +39,11 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "tree_index.h"
 #include "system_timers.h"
 #include <random>
-
+#include <numeric>
 typedef std::vector<std::string> _FileNames;
 extern my_bool treestore_efficient_text;
 extern char treestore_use_primitive_indexes;
+extern char treestore_reset_statistics;
 namespace tree_stored{
 	/// the table clock
 	extern std::atomic<nst::u64> table_clock;	
@@ -86,12 +87,9 @@ namespace tree_stored{
 
 		public:
 
-			conditional_and_iterator(){
+			conditional_and_iterator(){};
 
-
-			};
 			virtual ~conditional_and_iterator(){};
-
 
 			/// returns NoRecord if no records where found
 			virtual _Rid iterate(_Rid _start) {
@@ -716,20 +714,84 @@ namespace tree_stored{
 	
 	struct table_info{
 		
-		table_info() : table_size(0),row_count(0),max_row_id(0){
+		table_info() : table_size(0), row_count(0),	last_density_rows(0), rows_changed(0){
 		}
 
 		void clear(){
 			calculated.clear();
 			table_size = 0;
-			row_count = 0;
-			max_row_id = 0;			
+			row_count = 0;	
+			last_density_rows = 0;
+			rows_changed = 0;
 		}
-		_DensityInfo calculated;
-		nst::u64 table_size;
+
+		_DensityInfo calculated;		
 		/// these two values are not synonymous
-		_Rid row_count;
-		_Rid max_row_id;		
+		nst::u64 table_size;		
+		_Rid row_count;		
+		_Rid last_density_rows;	/// changes when at the end of calculation of statistics
+		nst::i64 rows_changed;		
+		void write(nst::buffer_type& buffer){
+			nst::u64 bytes = 0;
+			bytes += nst::leb128::signed_size(calculated.size());
+			for(auto d = calculated.begin(); d != calculated.end(); ++d){
+				const _Density& density = (*d).density;
+				bytes += nst::leb128::signed_size(density.size());
+				for(auto e = density.begin(); e != density.end(); ++e){
+					bytes += nst::leb128::signed_size((*e));
+				}
+			}
+			bytes += nst::leb128::signed_size(table_size);
+			bytes += nst::leb128::signed_size(row_count);
+			bytes += nst::leb128::signed_size(last_density_rows);
+			bytes += nst::leb128::signed_size(rows_changed);
+
+			buffer.resize(bytes);
+
+			nst::buffer_type::iterator writer = buffer.begin();
+
+			writer = nst::leb128::write_signed(writer, calculated.size());
+			for(auto d = calculated.begin(); d != calculated.end(); ++d){
+				const _Density& density = (*d).density;
+				writer = nst::leb128::write_signed(writer, density.size());
+				for(auto e = density.begin(); e != density.end(); ++e){
+					writer = nst::leb128::write_signed(writer, (*e));
+				}
+			}
+			writer = nst::leb128::write_signed(writer, table_size);
+			writer = nst::leb128::write_signed(writer, row_count);
+			writer = nst::leb128::write_signed(writer, last_density_rows);
+			writer = nst::leb128::write_signed(writer, rows_changed);
+
+			if(writer != buffer.end()){
+				err_print("table_info (stats) write error: write size miscalculation");
+			}
+			
+		}
+		void read(const nst::buffer_type& buffer){
+			nst::u64 bytes = 0;
+			nst::i64 ival = 0;
+			if(buffer.empty()){				
+				return;
+			}
+			nst::buffer_type::const_iterator reader = buffer.begin();
+			nst::buffer_type::const_iterator e = buffer.end();
+			nst::i64 calced = nst::leb128::read_signed64(reader,e);
+			for(nst::i64 d = 0; d < calced; ++d){
+				 density_info info ;
+				 nst::i64 densities = nst::leb128::read_signed64(reader,e);
+				 for(nst::i64 c =0; c < densities; ++c){
+					 nst::i64 v = nst::leb128::read_signed64(reader,e);
+					info.density.push_back(v);
+				 }
+				 this->calculated.push_back(info);
+			}
+			this->table_size = nst::leb128::read_signed64(reader,e);
+			this->row_count = nst::leb128::read_signed64(reader,e);
+			this->last_density_rows = nst::leb128::read_signed64(reader,e);
+			this->rows_changed = nst::leb128::read_signed64(reader,e);
+			
+		}
 	};
 
 	typedef std::string _SetFields; ///indicates which fields have been set by index
@@ -747,14 +809,96 @@ namespace tree_stored{
 		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
 		struct shared_data{
-			shared_data() : last_write_lock_time(0),auto_incr(0),row_count(0),calculated_max_row_id(0){
+			shared_data() 
+			:	last_write_lock_time(0)
+			,	auto_incr(0)			
+			,	calculated_max_row_id(0)
+			,	rows_changed(0)
+			,	rows_changed_since_last_density(0)			
+			,	last_density_calc(0)
+			,	last_density_tx(std::numeric_limits<nst::i64>::max())
+			,	last_writer_tx(std::numeric_limits<nst::i64>::max())
+			,	changed(false)
+			,	initialized(false)
+			{
+
 			}
 			Poco::Mutex lock;
 			Poco::Mutex write_lock;
 			nst::u64 last_write_lock_time;
-			_Rid auto_incr;
-			_Rid row_count;
+			_Rid auto_incr;			
 			_Rid calculated_max_row_id;
+			nst::i64 rows_changed;
+			_Rid rows_changed_since_last_density;	/// changes every time a row is added,removed or deleted reset when statistics are recalculated
+			
+			nst::u64 last_density_calc;
+			nst::i64 last_density_tx;
+			nst::i64 last_writer_tx;
+			bool changed;
+			bool initialized;
+			table_info persisted;
+			void clear(){
+				changed = false;
+				initialized = false;
+				auto_incr = 0;			
+				calculated_max_row_id = 0;
+				rows_changed = 0;
+				rows_changed_since_last_density = 0;	/// changes every time a row is added,removed or deleted reset when statistics are recalculated			
+				last_density_calc = 0;
+				last_density_tx = std::numeric_limits<nst::i64>::max();
+				last_writer_tx = std::numeric_limits<nst::i64>::max();
+			}
+			template<class _Storage>
+			void persist(_Storage& storage){
+				if(!storage.is_transacted()){
+					err_print("cannot persist statistics: the storage has no transaction");
+					return;
+				}
+				nst::synchronized shared(this->lock);
+				NS_STORAGE::buffer_type stats;
+				if(this->changed){
+					this->persisted.write(stats);
+
+					storage.set_boot_value(stats,8);
+					this->changed = false;
+				}
+			}
+			template<class _Storage>
+			void load(_Storage& storage){
+				nst::synchronized shared(this->lock);
+				
+				this->changed = false;
+				nst::buffer_type stats;
+				storage.get_boot_value(stats,8);
+				if(!stats.empty()){
+					persisted.read(stats);
+					last_density_tx = storage.current_transaction_order(); /// prevent stats recalc.
+				}
+			}
+			/// called at every commit
+			void update_calc(_Rid row_count, nst::u64 table_size, nst::i64 last_writer_tx){
+				
+				nst::synchronized shared(this->lock);
+				this->last_writer_tx = last_writer_tx;
+				(*this).persisted.table_size = table_size;
+				(*this).persisted.row_count = row_count;				
+				
+			}
+			void update_density_calc(_Rid row_count, nst::u64 table_size, const _DensityInfo &di,nst::i64 dtx){
+				nst::synchronized shared(this->lock);
+				(*this).last_density_tx = dtx;
+				(*this).last_density_calc = os::millis();
+				
+				/// update density/cardinality statistics
+				(*this).persisted.clear();
+				(*this).persisted.rows_changed = rows_changed;
+				(*this).persisted.last_density_rows = row_count;
+				(*this).persisted.row_count = row_count;
+				(*this).persisted.calculated = di;			
+				(*this).persisted.table_size = table_size; /// this is updated after every transaction anyway
+				//(*this).persisted.max_row_id = this->auto_incr;
+				this->changed = true;/// some other writing transaction will persist it automatically using persist function
+			}
 		};
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
@@ -1037,12 +1181,9 @@ namespace tree_stored{
 		int locks;
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
-		nst::u64 last_density_calc;
-		nst::i64 last_density_tx;
-
+		
 		bool calculating_statistics;
-		Poco::Mutex tt_info_copy_lock;
-		table_info calculated_info;
+		Poco::Mutex tt_info_copy_lock;		
 		nst::u64 clock;
 		std::vector<bool> all_changed;
 		_PrimaryKeyDef pk_def;
@@ -1069,11 +1210,8 @@ namespace tree_stored{
 			return this->primary_key;
 		}
 		void get_calculated_info(table_info& calc){
-			nst::synchronized _s(tt_info_copy_lock);			
-			(*this).calculated_info.row_count = share->row_count;
-			if(share!=nullptr)
-				(*this).calculated_info.max_row_id = share->auto_incr;			
-			calc = (*this).calculated_info;
+			nst::synchronized _s(tt_info_copy_lock);				
+			calc = (*this).share->persisted;
 		}
 
 		/// upto 4 beelion collumns
@@ -1101,8 +1239,6 @@ namespace tree_stored{
 		,	locks(0)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
-		,	last_density_calc(0)
-		,	last_density_tx(999999999)
 		,	storage(path)
 		,	path(path)
 		,	table(nullptr)
@@ -1117,6 +1253,7 @@ namespace tree_stored{
 				std::shared_ptr<shared_data> sshared;
 				if(shared.count(storage.get_name())==0){
 					shared[storage.get_name()] = std::make_shared<shared_data>();
+
 				}
 				sshared = shared[storage.get_name()];
 				(*this).share = sshared.get();
@@ -1127,6 +1264,7 @@ namespace tree_stored{
 		}
 		void reset_shared(){
 			nst::synchronized shared((*this).share->lock);
+			clear_share();
 			(*this).share->auto_incr = 1;
 		}
 		
@@ -1179,14 +1317,14 @@ namespace tree_stored{
 				nst::synchronized shared(share->lock);
 				share->calculated_max_row_id = calc_max_id;
 			}else{
-				printf("[TS] [ERROR] share not set\n");
+				err_print("share not set");
 			}
 		}
 		void reset_auto_incr(){
 			if(share!=nullptr){
 				share->auto_incr = 1;
 			}else{
-				printf("[TS] [ERROR] share not set\n");
+				err_print("share not set");
 			}
 		}
 
@@ -1200,57 +1338,71 @@ namespace tree_stored{
 		void incr_auto_incr(){
 			if(share!=nullptr){
 				if(share->auto_incr != 0){
-					nst::synchronized shared(share->lock);
-				
+					nst::synchronized shared(share->lock);				
 					++(share->auto_incr);
 				
 				}else{
-					printf("WARNING: share auto incr not initalize\n");
+					err_print("share auto incr not initalized");
 				}
 			}else{
-				printf("share not set\n");
+				err_print("share not set");
 			}
 		}
-		void calc_rowcount(){
+		void update_rowcount(){
 			if(share!=nullptr){
 				if(share->auto_incr == 0){
-					printf("WARNING: share auto incr not initalize\n");
+					err_print("share auto incr not initalized");
 				}
-				(*this).calculated_info.table_size = (*this).table_size();
-				(*this).calculated_info.row_count = (*this).share->row_count;
-				(*this).calculated_info.max_row_id = (*this).share->calculated_max_row_id; //(*this).get_auto_incr();
-				//(*this).calculated_info.calculated_max_row_id = (*this).share->calculated_max_row_id;
+				
+				share->update_calc((*this).get_row_count(),(*this).table_size(),storage.current_transaction_order());
+				//(*this).persisted.calculated_max_row_id = (*this).share->calculated_max_row_id;
 			}else{
-				printf("share not set\n");
+				err_print("share not set");
 			}
 		}
 		bool is_calculating() const{
 			return calculating_statistics;
 		}
 		bool should_calc(){
-			if(last_density_tx == storage.current_transaction_order()){
-				last_density_calc = os::millis();				
+			if((!this->share->last_density_calc|| (this->share->last_density_tx == std::numeric_limits<nst::i64>::max()))){
+				return true;
 			}
-
-			if(os::millis() - last_density_calc < 3000000){
-
-				return false;
+			if( this->share->persisted.table_size == 0){// should really recalc
+				return true;
+			}
+			if(this->share->last_density_tx == this->share->last_writer_tx){				
+				return false; /// no reason to recalc				
+			}
+			if(this->share->last_density_tx == 0){
+				return true; // no calc has been performed - one must be done
+			}
+			
+			/// if more than ten persent of rows changed since last recalc perform a recalc
+			if( ( share->rows_changed - share->persisted.rows_changed ) > share->persisted.last_density_rows/10){
+				if(os::millis() - this->share->last_density_calc < 60000){
+					return false;
+				}
+				return true;
+			}
+			// its been a very long time and there where some changes
+			if(os::millis() - this->share->last_density_calc > 3000000){
+				return true;
 			}
 
 			
-			return true;
+			return false;
 		}
 		void calc_density(){
 
-			if(os::millis() - last_density_calc < 3000000){
+			if(os::millis() - this->share->last_density_calc < 3000){
 
-				return;
+				//return;
 			}
 
-			if(last_density_tx == storage.current_transaction_order()){
-				last_density_calc = os::millis();
-				return;
-			}
+			//if(this->share->last_density_tx == storage.current_transaction_order()){
+			//	this->share->last_density_calc = os::millis();
+			//	return;
+			//}
 			uint i;
 			//std::string path = share->path.str;
 			
@@ -1262,11 +1414,9 @@ namespace tree_stored{
 			}
 			calculating_statistics = true;
 			for (i= 0; i < (*this).indexes.size(); i++){//all the indexes in the table ?
-				
-				
 				stored::index_interface::ptr index = (*this).indexes[i];
-				inf_print("Calculating cardinality of index parts for %s",(*this).indexes[i]->name.c_str());
-				
+			
+				//inf_print("Calculating cardinality of index parts for %s",(*this).indexes[i]->name.c_str());				
 				const _Rid step_size = 8;
 				const _Rid rows = get_row_count();
 				const _Rid sample = rows/step_size;				
@@ -1279,48 +1429,39 @@ namespace tree_stored{
 					nst::u32 u = 0;
 					stored::_Parts::iterator pbegin = index->parts.begin();
 					stored::_Parts::iterator pend = index->parts.end();
-					
-					//for(;u<uniques.size();){ ///
-						ir.clear();
-						for(stored::_Parts::iterator p = pbegin; p != pend; ++p){
-							int ip = (*p);
-							(*this).cols[ip]->compose_by_tree(row, ir);													
-						}	
-						uniques[u].insert(ir);
-						++u;
-						//++pbegin;
-					//}
+					ir.clear();
+					for(stored::_Parts::iterator p = pbegin; p != pend; ++p){
+						int ip = (*p);
+						(*this).cols[ip]->compose_by_tree(row, ir);													
+					}	
+					uniques[u].insert(ir);
+					++u;
 				}
 				nst::u32 partx = 1;
-				//_Uniques::iterator u = uniques.begin();
+				index->clear_density();
 				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){				
 					_Rid den = 1;
 					if(!uniques[0].empty()) den = sample/uniques[0].size(); //(*u).size() ;/// accurate to the nearest page
-					if(den > 1) den = den * 5;
-					
-					inf_print("Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
+					if(den > 1) den = den * 5;					
+					//inf_print("Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
 					index->push_density(den);
 					index->reduce_use();
 					partx++;
-				}
+				}						
 			}
+			
 			reduce_use();
-			last_density_calc = os::millis();
-			last_density_tx= storage.current_transaction_order();
 			{
 				nst::synchronized _s_info(tt_info_copy_lock);
-				(*this).calculated_info.clear();
-				fill_density_info((*this).calculated_info.calculated);
-			
-				(*this).calculated_info.table_size = (*this).table_size();
-				(*this).calculated_info.row_count = share->row_count;
-				(*this).calculated_info.max_row_id = share->auto_incr;
+				
+				
+				(*this).share->update_density_calc(this->get_row_count(),this->table_size(),create_density_info(),storage.current_transaction_order());
 			}
 			calculating_statistics = false;
 		}
-		void begin_table(bool shared = true){
+		void begin_table(bool read, bool shared = true){
 			
-			stored::abstracted_tx_begin(!changed,shared, storage, get_table());
+			stored::abstracted_tx_begin(read, shared, storage, get_table());
 			init_share_auto_incr();
 			
 		}
@@ -1330,9 +1471,28 @@ namespace tree_stored{
 			storage.rollback();
 
 		}
-
+		bool should_save_stats(){
+			return (share && share->changed);		
+		}
+		void save_stats(){
+			if(!storage.is_transacted()){
+				err_print("could not save stats: transaction not started");
+				return;
+			}
+			if(share) {
+				inf_print("saving stats for: %s",this->get_path().c_str());
+				share->persist(storage);
+				changed = true;
+			}else err_print("could not save stats: share does not exist ");
+		}
 		void commit_table1(){
-			if(changed){
+			if(nullptr == share){
+				err_print("could not commit: share not available");
+				return;
+			}
+			if(changed){				
+				update_rowcount(); /// update the row_count and table_size variables
+				this->storage.set_boot_value(share->rows_changed,9);
 				get_table().flush_buffers();
 			}
 		}
@@ -1366,7 +1526,7 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->begin(read,shared);
 			}
-			begin_table(shared);
+			begin_table(read,shared);
 		}
 
 		void commit1(){
@@ -1413,28 +1573,37 @@ namespace tree_stored{
 				(*c)->rollback();
 			}
 			rollback_table();
+			changed = false;
 		}
-
+		void clear_share(){
+			if(nullptr != share) {
+				inf_print("clearing share for permanent table removal");
+				share->clear();				
+				share->persisted.clear();
+			}
+		}
 		void clear(){
 
 			rollback();
 
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				delete (*x);
-
 			}
 
 			indexes.clear();
+
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				delete (*c);
-
 			}
+			
 			cols.clear();
-			if(nullptr != table)
-				table->~_TableMap();
-				//delete table;
-			storage.close();
+						
+			if(nullptr != table) 
+				delete table;
 			table = nullptr;
+
+			storage.close();
+			
 			changed = false;
 		}
 
@@ -1464,7 +1633,7 @@ namespace tree_stored{
 
 		void load(TABLE *table_arg){
 			clear();
-			printf("[TS] [INFO] load table %s\n", this->path.c_str());
+			inf_print("load table %s", this->path.c_str());
 			(*this).load_indexes(table_arg);
 			(*this).load_cols(table_arg);
 			file_names = create_file_names(table_arg);
@@ -1555,7 +1724,8 @@ namespace tree_stored{
 		}
 		
 		/// returns the rows per key for all collumns and index parts
-		void fill_density_info(_DensityInfo& info){
+		_DensityInfo create_density_info(){
+			_DensityInfo info;
 			for(nst::u64 i = 0; i < indexes.size(); ++i){
 				density_info di;
 				for(nst::u64 j = 0; j < indexes[i]->densities(); ++j){
@@ -1563,6 +1733,7 @@ namespace tree_stored{
 				}
 				info.push_back(di);
 			}
+			return info;
 		}
 		/// returns the rows per key for a given collumn
 		stored::_Rid get_rows_per_key(nst::u32 i, nst::u32 part) const {
@@ -1966,9 +2137,10 @@ namespace tree_stored{
 			return get_table().size();
 		}
 		_Rid get_max_row_id_from_table(){
+			/// this function runs first after a transaction started
 			_Rid r = 0;
 			
-			if(share->row_count == 0){
+			if(share->initialized == false){
 				if(has_primary_key()){
 					_TableMap::iterator t = get_table().find(get_primary_key());			
 					if(t!=get_table().end()){
@@ -1983,10 +2155,24 @@ namespace tree_stored{
 				}
 			
 				nst::synchronized shared(share->lock);
-				if(share->row_count == 0){
-					share->row_count = (*this).get_row_count();					
+				if(share->initialized == false){
+					/// the share has not been initialized - do it now
+					share->initialized = true;
+					storage.get_boot_value(share->rows_changed,9);
 					share->auto_incr = ++r;				
 					share->calculated_max_row_id = r;
+					nst::buffer_type stats;
+					if(treestore_reset_statistics == FALSE)
+						storage.get_boot_value(stats, 8);
+					
+					if(!stats.empty()){
+						inf_print("load statistics: %s",this->path.c_str());
+						this->share->persisted.read(stats);						
+						this->share->last_density_tx = 1;
+						this->share->last_density_calc = os::millis();
+					}
+					// statistics and actual row counts probably do not match since the stats is a bit behind
+					share->persisted.row_count = (*this).get_row_count();					
 				}
 			
 			}
@@ -1995,7 +2181,10 @@ namespace tree_stored{
 
 			return r;
 		}
-
+		/// return locks on this table
+		nst::i64 get_locks() const {
+			return this->locks;
+		}
 		/// aquire lock and resources
 		void lock(bool writer)
 		{
@@ -2155,8 +2344,9 @@ namespace tree_stored{
 			if(get_auto_incr() % 300000 == 0){
 				inf_print(" %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
 				
-			}			
-			share->row_count = (*this).get_row_count();			
+			}
+			share->rows_changed++;
+			
 			return 0;
 		}
 		/// maps and copies available data in index to read set - reports those that could not be copied
@@ -2280,6 +2470,7 @@ namespace tree_stored{
 				err_print("writing to unlocked table");
 				return;
 			}
+			share->rows_changed++;
 			erase_row_index(rid,all_changed);
 			if(!has_primary_key())
 				(*this).get_table().erase(rid);
@@ -2304,7 +2495,7 @@ namespace tree_stored{
 				err_print("attempting write to not locked table");				
 				return HA_ERR_UNSUPPORTED;
 			}
-	
+			share->rows_changed++;
 			
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
@@ -2375,7 +2566,7 @@ namespace tree_stored{
 		}
 
 		stored::_Rid shared_row_count() const {
-			return share->row_count;
+			return share->persisted.row_count;
 		}
 		
 		stored::_Rid table_size() const {
@@ -2383,7 +2574,7 @@ namespace tree_stored{
 			for(_Collumns::const_iterator c = cols.begin();c != cols.end(); ++c){
 				r += (*c)->field_size();
 			}
-			return share->row_count*r;
+			return share->persisted.row_count*r;
 		}
 		stored::index_interface* get_index_interface(int at){
 			return indexes[at];

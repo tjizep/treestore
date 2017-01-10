@@ -116,13 +116,13 @@ namespace collums{
 				size = page_size;
 				address = 0;
 				memset(&exists[0], 0, sizeof(exists)); /// empty
-				if(use_pool_allocator!=1)
-					nst::add_buffer_use(sizeof(*this));
+				//if(use_pool_allocator!=1)
+				//	nst::add_buffer_use(sizeof(*this));
 			}
-			~stored_page(){
-				if(use_pool_allocator!=1)
-					nst::remove_buffer_use(sizeof(*this));
-			}
+			//~stored_page(){
+			//	if(use_pool_allocator!=1)
+			//		nst::remove_buffer_use(sizeof(*this));
+			//}
 			void set_exists(size_type which, bool val){
 				size_type b = which & (page_size-1);
 				nst::u8& v = exists[b>>3];// 8 == 1<<3,/8 >>3
@@ -334,35 +334,40 @@ namespace collums{
 				
 				//printf("[TS] [INFO] reduce pages\n");
 				typedef std::vector<address_version> _Released;
-				_Released released;
-				for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
-					stored_page_ptr page = p->second;
-					if(page->get_references() == 0){
-						err_print("inconsistent memory previously visited page or page invalid");
-					}
-					if(page->get_references() == 1 && page->is_modified()){
-						err_print("inconsistent memory page state");
-					}
-					if(page->get_references() == 1 && !page->is_modified()){
-						page->reset_references();
-						if(use_pool_allocator == 1){
-							allocation_pool.free<stored_page>(page);
-						}else{
-							delete page;
+				
+				if(versioned_pages.empty()){
+				}else{
+					_Released released;
+					for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
+						stored_page_ptr page = p->second;
+						if(page->get_references() == 0){
+							err_print("inconsistent memory previously visited page or page invalid");
 						}
+						if(page->get_references() == 1 && page->is_modified()){
+							err_print("inconsistent memory page state");
+						}
+						if(page->get_references() == 1 && !page->is_modified()){
+							page->reset_references();
+							if(use_pool_allocator == 1){
+								allocation_pool.free<stored_page>(page);
+							}else{
+								delete page;
+							}
 						
-						released.push_back(p->first);
+							released.push_back(p->first);
+						}
+						if(released.size() > versioned_pages.size() / 8){
+							break;
+						}
 					}
-					if(released.size() > versioned_pages.size() / 8){
-						break;
+					size_t old = versioned_pages.size();
+					for(_Released::iterator r = released.begin(); r != released.end(); ++r){
+						versioned_pages.erase((*r));
 					}
-				}
-				size_t old = versioned_pages.size();
-				for(_Released::iterator r = released.begin(); r != released.end(); ++r){
-					versioned_pages.erase((*r));
-				}
-				if(versioned_pages.size() != old-released.size()){
-					err_print("inconsistent memory");
+					if(versioned_pages.size() != old-released.size()){
+						err_print("inconsistent memory");
+					}
+					
 				}
 				this->reduced = 1 ;
 			}
@@ -780,7 +785,7 @@ namespace collums{
 		,	largest(0)
 		,	_size(0)
 		{
-			pages.set_logarithmic(1);
+			//pages.set_logarithmic(1);
 			local_page = allocate_page();
 			last_loaded = nullptr;
 			version_control = get_shared().get_context(storage.get_name());

@@ -40,6 +40,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include "MurmurHash3.h"
 #include <map>
 #include <vector>
+#include <rabbit/unordered_map>
 #ifdef _MSC_VER
 #include <conio.h>
 #endif
@@ -198,10 +199,15 @@ namespace stored{
 			get_transaction().complete();
 			return !ba.empty();
 		}
-
+		bool get_boot_value(NS_STORAGE::buffer_type& buffer, NS_STORAGE::stream_address boot){
+			const NS_STORAGE::buffer_type &ba = get_transaction().allocate(boot, NS_STORAGE::read); /// read it
+			buffer = ba;
+			get_transaction().complete();
+			return !ba.empty();
+		}
 		void set_boot_value(NS_STORAGE::i64 r){
 
-			NS_STORAGE::buffer_type &buffer = get_transaction().allocate((*this).boot, NS_STORAGE::create); /// read it
+			NS_STORAGE::buffer_type &buffer = get_transaction().allocate((*this).boot, NS_STORAGE::create); /// write it
 			buffer.resize(NS_STORAGE::leb128::signed_size(r));
 			NS_STORAGE::buffer_type::iterator writer = buffer.begin();
 
@@ -211,11 +217,17 @@ namespace stored{
 		}
 		void set_boot_value(NS_STORAGE::i64 r, NS_STORAGE::stream_address boot){
 
-			NS_STORAGE::buffer_type &buffer = get_transaction().allocate(boot, NS_STORAGE::create); /// read it
+			NS_STORAGE::buffer_type &buffer = get_transaction().allocate(boot, NS_STORAGE::create); /// write it
 			buffer.resize(NS_STORAGE::leb128::signed_size(r));
 			NS_STORAGE::buffer_type::iterator writer = buffer.begin();
 
 			NS_STORAGE::leb128::write_signed(writer, r);
+			get_transaction().complete();
+		}
+		void set_boot_value(const NS_STORAGE::buffer_type& buffer, NS_STORAGE::stream_address boot){
+
+			NS_STORAGE::buffer_type &written = get_transaction().allocate(boot, NS_STORAGE::create); /// write it
+			written = buffer ;
 			get_transaction().complete();
 		}
 		/// return true if the storage is local
@@ -268,11 +280,13 @@ namespace stored{
 			if(_transaction != NULL){
 				if((*this).writer){
 					r = get_allocations().merge(_transaction);
+					(*this).order = get_allocations().get_order();
 				}else{
 					r = get_allocations().commit(_transaction);
 					_transaction = NULL;
 					(*this).order = 0;
 				}
+				
 			}else{
 				(*this).writer = false;
 			}
@@ -410,7 +424,7 @@ namespace stored{
 			map.reload();
 	}
 	/// definitions for registry functions
-	typedef std::unordered_map<std::string, _Allocations*> _AlocationsMap;
+	typedef rabbit::unordered_map<std::string, _Allocations*> _AlocationsMap;
 
 	extern _Allocations* _get_abstracted_storage(std::string name);
 };

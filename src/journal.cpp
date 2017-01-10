@@ -4,6 +4,7 @@
 #include <Poco/BinaryWriter.h>
 #include <Poco/BinaryReader.h>
 #include <Poco/File.h>
+
 namespace nst = stx::storage;
 extern void set_treestore_journal_size(nst::u64 ns);
 
@@ -82,10 +83,9 @@ private:
 		log_entry entry;
 		entry.sequence = ++sequence;
 		entry.command = command;
-		entry.name_size = name.length();
+		entry.name_size = (long)name.length();
 		entry.address = address;
 		entry.buffer_size = buffer.size();
-		const nst::u8* start = (const nst::u8*)&entry;
 		size_t jstart = journal_buffer.size();
 		journal_buffer.resize(jstart + sizeof(entry) + name.length() + buffer.size());
 		memcpy(journal_buffer.data() + jstart, &entry, sizeof(entry));		
@@ -139,26 +139,47 @@ public:
 			journal_buffer.clear();
 		}
 	}
-	struct _Command{
+	class _Command{
+	public:
+		_Command& operator=(const _Command& right){
+			sequence = right.sequence;
+			command = right.command;
+			name = right.name;
+			address = right.address;
+			buffer = right.buffer;
+			return *this;
+		}
+		_Command(const _Command& right){
+			(*this) = right;
+		}
+		_Command(){
+		}
+		~_Command(){
+		}
 		nst::u64 sequence;
 		Poco::UInt32 command;
 		std::string name;
 		Poco::UInt64 address;
 		nst::buffer_type buffer;
-
+		template<class _Vector>
+		void assign_buffer(_Vector& dest) const {
+			dest.clear();
+			dest.reserve(buffer.size());
+			std::copy(buffer.begin(),buffer.end(),std::back_inserter(dest));
+		}
 		void load(Poco::BinaryReader& reader){
 			log_entry entry;
 			memset(&entry, 0 ,sizeof(entry));
 			reader.readRaw( (char*)&entry, sizeof(entry) );
 			sequence = entry.sequence ;
 			command = entry.command;			
-			address = entry.address ;
+			address = entry.address ;	
 			buffer.resize(entry.buffer_size);
-			name.resize(entry.name_size);			
-			buffer.resize(entry.buffer_size);
-			reader.readRaw( entry.name_size, name );
-			if(!buffer.empty())
-				reader.readRaw( (char*)&buffer[0], buffer.size() );
+			name.resize(entry.name_size+1);			
+			reader.readRaw( &name[0], entry.name_size ); 
+			if(entry.buffer_size)
+				reader.readRaw( (char*)buffer.data(), entry.buffer_size ); //
+
 		}
 	};
 
@@ -179,7 +200,7 @@ public:
 
 	void recover(){
 		nst::synchronized _llock(llock);
-		typedef std::vector<_Command> _Commands;
+		typedef std::vector<_Command, sta::buffer_pool_alloc_tracker<_Command>> _Commands;
 		typedef std::unordered_map<std::string, stored::_Transaction*> _PendingTransactions;
 		std::ifstream journal_istr(journal_name.c_str(), std::ios::binary);
 		Poco::BinaryReader reader(journal_istr);
@@ -187,37 +208,38 @@ public:
 		_PendingTransactions pending;
 		_Commands commands;
 		const double MB = 1024.0*1024.0;
+		bool is_error = false;
 		try{
 			double recovered,last_printed = 0.0;
-
+			
 			while(reader.good()){
-				_Command entry;
-				entry.load(reader);
-				if(entry.sequence != ++sequence){
-					if(entry.sequence)
-						printf("bad sequence number %lld received %lld expected\n", (nst::lld)entry.sequence, (nst::lld)sequence);
-
+				_Command record;	
+				record.load(reader);
+				if(sequence == 0){
+					sequence = record.sequence;
+				}else if(record.sequence != ++sequence){
+					if(record.sequence){
+						err_print("bad sequence number %lld received %lld expected", (nst::lld)record.sequence, (nst::lld)sequence);
+						is_error = true;
+					}
 					break;
 				}
 
-				if(entry.command == nst::JOURNAL_PAGE){
+				if(record.command == nst::JOURNAL_PAGE){
 
-					commands.push_back(entry);
+					commands.push_back(record);
 
-				}
-			
-				if(entry.command == nst::JOURNAL_COMMIT){
-					recovered = reader.stream().tellg();
+				}				
+				if(record.command == nst::JOURNAL_COMMIT){
+					recovered = (double) reader.stream().tellg();
 					if(last_printed + 100*MB < recovered ){
-						printf("[TS] [INFO] recovering %lld entries at pos %.4g MB\n", (long long)commands.size(), (double)(recovered/(double)MB) );
+						inf_print("recovering %lld entries at pos %.4g MB", (long long)commands.size(), (double)(recovered/(double)MB) );
 						last_printed = recovered;
 					}
 					for(_Commands::iterator c = commands.begin(); c != commands.end(); ++c){
-
 						_Command &entry =  (*c);
 						nst::stream_address add = entry.address;
-						std::string storage_name = entry.name;
-
+						std::string storage_name = entry.name;						
 						stored::_Allocations* storage = stored::_get_abstracted_storage(storage_name);
 						storage->set_recovery(true);
 						stored::_Transaction* transaction = pending[storage_name];
@@ -230,29 +252,33 @@ public:
 						}
 						if(storage->transactions_away() > 0){
 							nst::buffer_type& dest = transaction->allocate(add, nst::create);
-							dest = entry.buffer;
+							entry.buffer.swap(dest);
 							transaction->complete();
 						}
+						
 
-					}
-
+					}										
 					commands.clear();
-
 				}
 			}
 
 		}catch(...){
-			printf("[TS] [FATAL] unknown exception during recovery\n");
+			err_print("[FATAL] unknown exception during recovery");
 			exit(-1);
 		}
+		
 		for(_PendingTransactions::iterator p = pending.begin(); p != pending.end(); ++p){
 			std::string storage_name = (*p).first;
 			stored::_Transaction* transaction = pending[storage_name];
 			stored::_Allocations* allocations = stored::_get_abstracted_storage(storage_name);
 			if(allocations->transactions_away()){
-				allocations->commit(transaction);
+				if(is_error){
+					allocations->discard(transaction);
+				}else{
+					allocations->commit(transaction);
+				}
 
-				printf("recovered %s\n", storage_name.c_str());
+				inf_print("recovered %s", storage_name.c_str());
 			}
 			allocations->set_recovery(false);
 
@@ -265,7 +291,14 @@ public:
 		journal_istr.close();
 		journal_ostr.close();
 		Poco::File jf(journal_name.c_str());
-		jf.remove();
+		const bool backup_log = true;
+		if(backup_log){
+			nst::pool_string stamp = std::to_string((size_t)os::millis()).c_str();
+			nst::pool_string backup = journal_name + "_" +  stamp;
+			jf.renameTo(backup.c_str());
+		}else{
+			jf.remove();
+		}
 		journal_ostr.open(journal_name.c_str(), o_mode);
 	}
 
@@ -288,7 +321,7 @@ public:
 					try{
 						jsize = jf.getSize();
 					}catch(...){
-						printf("error getting journal size\n");
+						err_print("error getting journal size");
 						return;
 					}
 					set_treestore_journal_size( jsize );
@@ -301,7 +334,7 @@ public:
 						}
 						if(singles == participants.size()){
 							set_treestore_journal_size( 0 );
-							printf("journal file > n GB compacting\n");
+							inf_print("journal file > n GB compacting");
 							//compact();
 							log_journal(journal_name.c_str(),"commit",0);
 							for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
@@ -316,7 +349,8 @@ public:
 							for(participants_type::iterator p = (*this).participants.begin(); p != (*this).participants.end(); ++p){
 								(*p).second->journal_synch_end();
 							}
-							printf("journal file compacting complete\n");
+							flush_buffer();
+							inf_print("journal file compacting complete");
 							journal_ostr.close();
 							jf.remove();
 							sequence = 0;

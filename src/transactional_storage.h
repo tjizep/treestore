@@ -586,31 +586,7 @@ namespace storage{
 			address_type start;
 			_AddressList addresses;
 			_AddressList sizes;
-			_BLOBs blocks;
-			_Descriptors decoded;
-			void init_use(){
-				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
-					add_buffer_use((*b).content().capacity());
-				}
-			}
-			void decode_all(){
-				//init_use();
-				decoded.clear();
-
-				for(_BLOBs::iterator b = blocks.begin(); b!=blocks.end(); ++b){
-					block_descriptor* result = new block_descriptor(version_type());
-					///decompress_zlibh(result->block, (*b).content());
-					result->block.resize((*b).size());
-					memcpy(&result->block[0], &((*b).content()[0]),(*b).size());					
-					//remove_buffer_use((*b).content().capacity());
-					(*b).clear(true);
-					//std::vector<char> e;
-					//(*b).swap(e);
-					decoded.push_back(result);
-				}
-				///printf("decoded %lld blocks in %lld millis\n",(long long)blocks.size(),(long long)os::millis()-ts);
-
-			}
+			_BLOBs blocks;						
 		};
 
 
@@ -701,7 +677,9 @@ namespace storage{
 			current_size = block.size()*sizeof(typename block_type::value_type);
 			encoded_block.clear();
 			if(!block.empty()){
-
+				if(block.size() == 1 && w == 1 && block[0] == 9){
+					inf_print("debug please");
+				}
 				//compress_block
 				//compressed_block = block;
 				//inplace_compress_zlibh(compressed_block);
@@ -765,9 +743,13 @@ namespace storage{
 
 		
 		
-		bool inject(stream_address which, block_descriptor* descriptor){
+		bool inject(stream_address which, const Poco::Data::BLOB & block){
 			synchronized s(lock);
 			if(allocations.count(which)==0){
+				
+				block_descriptor* descriptor = new block_descriptor(version_type());					
+				descriptor->block.resize(block.size());
+				memcpy(&descriptor->block[0], &(block.content()[0]),block.size());															
 				up_use(reflect_block_use(descriptor));
 				descriptor->version = version_off(which);
 				descriptor->set_storage_action(read);
@@ -957,12 +939,12 @@ namespace storage{
 		}
 		void recycle_block(const address_type& at, ref_block_descriptor block){
 			up_use(reflect_block_use(block)); /// update to correctly reflect						
-			
+			down_use( get_block_use(block) );
+			delete block;
 			if(allocations.erase(at)==1){
-				recycled.push_back(block);			
+				//recycled.push_back(block);			
 			}else{
-				down_use( get_block_use(block) );
-				delete block;
+				
 			}
 		}
 		bool find_block(const address_type& which, ref_block_descriptor& result){
@@ -971,18 +953,7 @@ namespace storage{
 				result = a->second;
 				return true;
 			}
-			return false;
-			//allocations.get(which,result)
-			
-			if(false){
-				typename _Allocations::iterator fr = allocations.find(which);
-				
-				bool finder = fr != allocations.end(); //allocations.get(which,result);//
-				if(finder){
-					result = (*fr).second;
-				}
-				return finder;
-			}
+			return false;			
 		}
 	protected:
 		block_type read_block;
@@ -1227,35 +1198,39 @@ namespace storage{
 			
 			typedef std::shared_ptr<block_request> block_request_ptr;
 			inf_print("readahead %s starting %lld s", get_name().c_str(),(long long)count);
-			//while(blocks < count){
-				block_request_ptr block = std::make_shared<block_request>();
-				block->start = start;
-				/// to retrieve a page of blocks
-				/// to retrieve a range of blocks
+			
+			block_request block ;
+			block.start = start;
 
-				std::shared_ptr<Poco::Data::Statement> block_stmt;
-				block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-				//u64 ts = os::millis();
-				*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;",
-					into(block->addresses), into(block->sizes), into(block->blocks), bind(block->start), Poco::Data::Limit(count,false,false);
-				block_stmt->execute();
-				if(block->addresses.empty()){
-					return;
-				}
-				blocks += block->addresses.size();
-				
-				block->decode_all();
-				for(size_t a = 0; a < block->decoded.size(); ++a){
-					if(!inject(block->addresses[a],block->decoded[a])){
-						delete block->decoded[a];
-					}
-				}
-				start = block->addresses.back();
-				if(os::millis() - ts > 1000){
-					inf_print("read %s %lld\n ", get_name().c_str(), (long long)start);
-					ts = os::millis();
-				}
-			//}
+			/// to retrieve a page of blocks
+			/// to retrieve a range of blocks
+			
+
+			std::shared_ptr<Poco::Data::Statement> block_stmt;
+			block_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
+			//u64 ts = os::millis();
+			*block_stmt << "SELECT a1, dsize, data FROM " << (*this).table_name << " WHERE a1 >= ? ;",
+				into(block.addresses), into(block.sizes), into(block.blocks), bind(block.start), Poco::Data::Limit(count,false,false);
+			block_stmt->execute();
+			if(block.addresses.empty()){
+				return;
+			}
+			if(block.addresses.size() != block.blocks.size()){
+				inf_print("read ahead failed: count mismatch");
+				return;
+			}
+			blocks += block.addresses.size();
+			
+			for(size_t a = 0; a < block.blocks.size(); ++a){
+				inject(block.addresses[a],block.blocks[a]);					
+			}
+			
+
+			if(os::millis() - ts > 1000){
+				inf_print("read %s %lld\n ", get_name().c_str(), (long long)start);
+				ts = os::millis();
+			}
+			
 			inf_print("readahead %s complete %.4g s", get_name().c_str(),(double)(os::millis()-tst)/1000.0);
 		}
 		
@@ -1280,6 +1255,7 @@ namespace storage{
 					version_type allocated_version = current->version;
 					
 					if(allocated_version <= dest.get_allocated_version()){
+						/// this could happen when the time changes (forwards) or the time on the destination machine changed
 						throw InvalidVersion();
 					}
 					d->swap(r);	
@@ -1629,6 +1605,9 @@ namespace storage{
 			allocated_version = version_type();
 			if(busy){
 				if(nullptr != result){
+					if(result->block.size() == 1 && currently_active == 1 && result->block[0] == 9){
+						inf_print("debug please");
+					}
 					up_use(reflect_block_use(result)); /// update changes made to last allocation
 				}
 
@@ -1730,6 +1709,9 @@ namespace storage{
 			for(_Addresses::iterator a = todo.begin(); a != todo.end(); ++a){
 				stream_address at = (*a);
 				buffer_type &r = allocate(at, read);
+				if(at == 1 && r.size() == 1 && r[0] == 9){
+					inf_print("debug this");
+				}
 				if(is_end(r)){
 					throw InvalidAddressException();
 				}

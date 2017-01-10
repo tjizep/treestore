@@ -456,8 +456,23 @@ namespace tree_stored{
 		void push_part(_Rid part){
 			this->parts.push_back(part);
 		}
-		void push_density(_Rid dens) {
+		size_t push_density(_Rid dens) {
+			size_t result = density.size();
 			density.push_back(dens);
+			return result;
+		}
+		void clear_density() {
+			density.clear();
+		}
+		void save_statistics(){
+			err_print("save_statistics: method not implemented");
+		}
+		void load_statistics(){
+			err_print("load_statistics: method not implemented");
+		}
+		bool has_statistics(){
+			//err_print("has_statistics: method not implemented");
+			return false;
 		}
 		virtual size_t densities() const {
 			return density.size();

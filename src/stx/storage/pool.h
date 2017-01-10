@@ -85,6 +85,7 @@ namespace stx{
 					remove_buffer_use(bytes);
 				};
 			};			
+			/// set to true to enable heap corruption checking and delete order checking
 			static const bool heap_alloc_check = false;
 			/// derived from The C++ Standard Library - A Tutorial and Reference - Nicolai M. Josuttis
 			/// the bean counting issue
@@ -354,6 +355,7 @@ namespace stx{
 			};
 				
 			typedef unordered::unordered_map<size_t,_ThreadSizeAlloc*> _ThreadAllocPtrMap;
+			typedef std::unordered_multimap<u64, size_t> _ThreadAllocCheckMap;
 			
 			class inner_pool;
 			struct thread_instance{
@@ -363,6 +365,7 @@ namespace stx{
 				u64 total_buckets;
 				_ThreadAllocPtrMap alloc_pairs;
 				_ThreadAllocPtrMap active_pairs;
+				
 				size_t eviction_size(){
 					size_t f = 0xFFFFFFFFFFFFFFll,s = 0;
 					for(auto a = this->active_pairs.begin(); a != this->active_pairs.end(); ++a){
@@ -379,8 +382,9 @@ namespace stx{
 				size_t overhead() const throw(){
 					return sizeof(void*);
 				}
-
-				void evict(size_t size){
+				/// allocations evicted goes back to the os and is therefor neither allocated nor used
+				template<class _InnerPool>
+				void evict(size_t size, _InnerPool& inner){
 					
 					_ThreadSizeAlloc* r = nullptr;
 					auto e = active_pairs.find(size);
@@ -390,8 +394,15 @@ namespace stx{
 						while(!r->buckets.empty()){
 							
 							//free_pairs.push_back(std::make_pair(r->buckets.back(),size));
-							delete r->buckets.back(); //,size
-							(*this).shared->allocated -= (size + overhead());
+							void * data = r->buckets.back(); //,size
+							inner.remove_check_free(data,size);
+							delete data;
+							
+							u64 moved = size + overhead();
+							if((*this).shared->allocated < moved){
+								err_print("invalid de-allocation detected");
+							}
+							(*this).shared->allocated -= moved;
 
 							r->buckets.pop_back();
 						}
@@ -428,14 +439,13 @@ namespace stx{
 			public:
 				/// types
 				struct _Allocated{
-					_Allocated(u8 *data,const std::type_info& tp):data(data),ti(&tp),is_new(false){
+					_Allocated(u8 *data,size_t):data(data),is_new(false){
 					}
 					_Allocated(){
-						ti = &typeid(void);
 						data = nullptr;
 						is_new = true;
 					}
-					const std::type_info* ti;
+					
 					u8* data;
 					bool is_new;
 				};
@@ -453,7 +463,7 @@ namespace stx{
 				
 				typedef unordered::unordered_map<size_t, _Clocked> _Buckets;
 				
-			
+				
 			protected:
 				/// data/fields/state
 
@@ -472,7 +482,7 @@ namespace stx{
 				u64 threads;
 				_Buckets buckets;
 				Poco::Mutex lock;
-				
+				_ThreadAllocCheckMap check_pairs;
 				
 			protected:
 				/// methods
@@ -484,7 +494,11 @@ namespace stx{
 
 				_Bucket &get_bucket(size_t size, bool nc = true){
 					_Clocked &clocked =buckets[size];
-					clocked.size = size;
+					if(clocked.size == 0){
+						clocked.size = size;
+					}else if(clocked.size != size){
+						err_print("bucket size does not match index");
+					}
 					_Bucket &current = clocked.bucket;
 					if(nc){
 						clocked.clock = ++clock;
@@ -545,8 +559,10 @@ namespace stx{
 								while(shared->used > target_used){
 									_Allocated allocated = clocked.bucket.back();
 									///torelease.push_back(allocated);
-									delete allocated.data;									
-									shared->used -= lru_size + overhead();
+									delete allocated.data;			
+									remove_check_free(allocated.data,lru_size);
+									u64 moved = lru_size + overhead();
+									shared->used -= moved;
 									clocked.bucket.pop_back();
 									if(clocked.bucket.empty())
 										break;
@@ -565,14 +581,18 @@ namespace stx{
 					}					
 				}
 				
-				
+				/// allocations passed to this method goes to the inner or central pool
+				/// after calling this they are used but no longer allocated
+				/// eventually they will be returned to the os via evict function
+				/// at which point they will no longer be allocated or used
 				void _free_type(void * data, size_t size){
 					_Bucket &current =  get_bucket(size,false);
-					_Allocated allocated((u8*)data, typeid(u8));						
+					_Allocated allocated((u8*)data, size);						
 					allocated.is_new = false;
 					current.push_back(allocated);
-					shared->used += (size + overhead());
-					(*this).shared->allocated -= (size + overhead());
+					u64 moved = (size + overhead());
+					shared->used += moved;
+					(*this).shared->allocated -= moved;
 					
 				}
 				void check_lru(){
@@ -603,6 +623,38 @@ namespace stx{
 					check_lru();
 				}
 				
+				void add_check_free(void * ptr, size_t size){
+					synchronized l(lock);
+					auto f = check_pairs.find((u64)ptr);
+					if(f != check_pairs.end()){
+						err_print("address already deleted");
+					}else{
+						check_pairs.insert(std::make_pair((u64)ptr, size));
+					}
+
+				}
+				void remove_check_free(void * ptr, size_t size){
+					if(!heap_alloc_check) return;
+					synchronized l(lock);
+					auto f = check_pairs.find((u64)ptr);
+					if(f != check_pairs.end()){
+						if(f->second != size){
+							err_print("address different size");
+						}
+						check_pairs.erase(f);
+					}else{
+						err_print("reused address has never been freed");
+					}
+				}
+				void remove_free(void * ptr, size_t size){
+					synchronized l(lock);
+					auto f = check_pairs.find((u64)ptr);
+					if(f != check_pairs.end()){
+						check_pairs.erase(f);
+					}
+				}
+
+
 				pool_shared * get_shared(){
 					return this->shared;
 				}
@@ -625,7 +677,7 @@ namespace stx{
 
 				void * allocate(size_t requested){
 
-					_Allocated result = allocate_type(requested, typeid(u8));
+					_Allocated result = allocate_type(requested);
 					return result.data;
 				}
 
@@ -640,24 +692,24 @@ namespace stx{
 					u64 max_copy = std::min<u64>( MAX_THREAD_BUCKETS - thread->total_buckets,start/(2 * get_thread_instance_count()));
 					auto& alloc_pairs = thread->access(size);
 					while(copied < max_copy){ // 
-						_Allocated result = current.back();						
+						_Allocated result = current.back();												
 						alloc_pairs.push_back(result.data);												
 						current.pop_back();
 						++copied;
 					}
 					moved = copied * (size + overhead());
-					thread->total_buckets += copied;
+					thread->total_buckets += copied;					
 					shared->allocated += moved;		
 					shared->used -= moved;
 				}
-				_Allocated allocate_type(size_t requested, const std::type_info& ) {
+				_Allocated allocate_type(size_t requested) {
 
 					if(treestore_use_internal_pool == FALSE) { // && requested < MAX_SMALL_ALLOCATION_SIZE){
 
 						shared->allocated += requested + overhead() ;
 						u8 * a = new u8[requested];
 						//memset(a,0,requested);
-						_Allocated result(a,typeid(u8));
+						_Allocated result(a,requested);
 						result.is_new = true;
 
 						return result;
@@ -665,6 +717,9 @@ namespace stx{
 					size_t size = requested + (MIN_ALLOCATION_SIZE - (requested % MIN_ALLOCATION_SIZE));
 					//instance = get_thread_instance();
 					thread_instance* instance = get_thread_instance(this);
+					if(instance->shared != this->shared){
+						err_print("invalid shared data - does not match current pool");
+					}
 					if(instance!=nullptr){
 						
 						auto &alloc_pairs = instance->access(size);
@@ -673,9 +728,9 @@ namespace stx{
 							alloc_pairs.pop_back();	
 							--instance->total_buckets;
 							++clock;
-							_Allocated result((u8*)pos,typeid(u8)) ;																						
+							_Allocated result((u8*)pos,requested) ;																						
 							if(alloc_pairs.empty()){
-								instance->evict(size);
+								instance->evict(size,*this);
 							}
 							if(heap_alloc_check){
 								if(requested < size){
@@ -684,6 +739,7 @@ namespace stx{
 								if(requested+1 < size){
 									result.data[requested+1] = (u8)size;
 								}
+								remove_check_free(result.data,size);
 							}
 							return result;																
 						}else{
@@ -691,8 +747,10 @@ namespace stx{
 						}
 						while(instance->total_buckets > MAX_THREAD_BUCKETS - 1){
 							size_t s = instance->eviction_size();
-							instance->evict(s);							
+							instance->evict(s,*this);							
 						}
+					}else{
+						inf_print("thread allocation instance is null");
 					}
 					_Allocated result ;
 					
@@ -700,8 +758,10 @@ namespace stx{
 					if(instance!=nullptr){
 						if(instance->free_pairs.size() > 16){
 					
-							free_vect(instance->free_pairs);
+							free_vect(instance->free_pairs);/// free to inner pool
 						}
+					}else{
+						inf_print("thread allocation instance is null");
 					}
 					if(last_allocation == size){
 						last_allocation_row++;						
@@ -719,15 +779,17 @@ namespace stx{
 						shared->used -= (size + overhead());
 						if(instance!=nullptr){
 							
-							bucket_2_thread(instance,current,size);
+							bucket_2_thread(instance,current,size);/// inner pool to thread - must increase allocated
+						}else{
+							inf_print("thread allocation instance is null");
 						}
 						if(heap_alloc_check){
 							if(((u8*)result.data)[size-1] != (u8)((result.data)-1)){
 								err_print("freed memory has been overwritten or allocated");
 							}
+							remove_check_free(result.data,size);
 						}												
 					}else{						
-						result.ti = &typeid(u8);
 						result.is_new = true;
 						result.data = new u8[size];						
 					}
@@ -739,7 +801,7 @@ namespace stx{
 							result.data[requested+1] = (u8)size;
 						}
 					}
-					shared->allocated += size + overhead();					
+					shared->allocated += (size + overhead());					
 														
 					return result;
 				}
@@ -749,17 +811,11 @@ namespace stx{
 				void free(void * data, size_t requested){
 					free_type(data,requested);
 				}
-				void free_vect(std::vector<void *>& v,size_t size){
-					
-					while(!v.empty()){
-						_free_type(v.back(),size);
-						v.pop_back();
-					}
-				}
 				void free_vect(std::vector<std::pair<void *,size_t>>& v){
 					
 					while(!v.empty()){
-						_free_type(v.back().first,v.back().second);
+						auto p = v.back();
+						_free_type(p.first,p.second);
 						v.pop_back();
 					}
 				}
@@ -784,6 +840,9 @@ namespace stx{
 				}
 				void free_type(void * data, size_t requested){
 					if(treestore_use_internal_pool == FALSE){// && requested < MAX_SMALL_ALLOCATION_SIZE){
+						if((*this).shared->allocated < (requested + overhead())){
+							err_print("invalid de-allocation detected");
+						}
 						shared->allocated -= requested + overhead();					
 						delete data;
 						return;
@@ -792,18 +851,23 @@ namespace stx{
 					if(heap_alloc_check){
 						if(requested < size){
 							if(((u8*)data)[requested] != (u8)data){
-								err_print("memory has been overwritten or deallocated");
+								err_print("memory has been overwritten or deallocated already");
+							}else{
+								((u8*)data)[requested] = (u8)(((u8*)data)+1);/// if this memory gets freed again before being allocated an error will show
 							}
 
 						}
 						if(requested+1 < size){
 							if(((u8*)data)[requested+1] != (u8)size){
-								err_print("memory has been overwritten or deallocated");
+								err_print("memory has been overwritten or deallocated already");
+							}else{
+								((u8*)data)[requested+1] = (u8)(size+1);/// if this memory gets freed again before being allocated an error will show
 							}
 						}
 						
 						memset((u8*)data,'F',MIN_ALLOCATION_SIZE);
 						((u8*)data)[size-1] = (u8)((u8*)(data)-1);						
+						add_check_free(data,size);
 					}
 					thread_instance* instance = get_thread_instance(this);
 					instance->free_pairs.push_back(std::make_pair(data, size));
@@ -838,7 +902,7 @@ namespace stx{
 				/// simple template allocations
 				template<typename T>
 				T* allocate(){
-					_Allocated allocated = (*this).allocate_type(sizeof(T),typeid(T));
+					_Allocated allocated = (*this).allocate_type(sizeof(T));
 					void * potential = allocated.data;
 					new (potential) T();
 
@@ -847,7 +911,7 @@ namespace stx{
 				template<typename T,typename _Context>
 				T* allocate(_Context * context){
 					
-					_Allocated allocated = (*this).allocate_type(sizeof(T),typeid(T));
+					_Allocated allocated = (*this).allocate_type(sizeof(T));
 					void * potential = allocated.data;
 					new (potential) T();
 

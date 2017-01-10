@@ -25,6 +25,7 @@ char		treestore_use_primitive_indexes = TRUE;
 char		treestore_block_read_ahead = FALSE;
 char		treestore_resolve_values_from_index = FALSE;
 char		treestore_use_internal_pool = FALSE;
+char		treestore_reset_statistics = FALSE;
 
 static MYSQL_SYSVAR_LONGLONG(journal_lower_max, treestore_journal_lower_max,
   PLUGIN_VAR_RQCMDARG,
@@ -112,11 +113,18 @@ static MYSQL_SYSVAR_STR(red_address,treestore_red_address,
 static MYSQL_SYSVAR_BOOL(resolve_values_from_index, treestore_resolve_values_from_index,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "resolve values from index first before consulting columns"
-  "Default is false",
+  "Default is true",
   NULL, NULL, TRUE);
 
 static MYSQL_SYSVAR_BOOL(use_internal_pool, treestore_use_internal_pool,
   PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
   "use the internal pool to improve concurrency"
-  "Default is true",
+  "Default is false",
   NULL, NULL, FALSE);
+
+static MYSQL_SYSVAR_BOOL(reset_statistics, treestore_reset_statistics,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  "reset all statistics"
+  "Default is false",
+  NULL, NULL, FALSE);
+

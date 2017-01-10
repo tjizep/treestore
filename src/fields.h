@@ -3178,7 +3178,11 @@ namespace stored{
 		virtual void set_col_index(int ix)= 0;
 		virtual void set_fields_indexed(int indexed)=0;
 		virtual void push_part(_Rid part)=0;
-		virtual void push_density(_Rid dens) = 0;
+		virtual size_t push_density(_Rid dens) = 0;
+		virtual void clear_density() = 0;
+		virtual void save_statistics() = 0;
+		virtual void load_statistics() = 0;
+		virtual bool has_statistics() = 0;
 		virtual size_t densities() const = 0;
 		virtual stored::_Rid& density_at(size_t at) = 0;
 		virtual const stored::_Rid& density_at(size_t at) const = 0;
