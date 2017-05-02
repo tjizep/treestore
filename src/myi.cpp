@@ -797,6 +797,7 @@ public:
 			}
 		}
 		void clear_fields_set(){
+			/// TODO: won't work very well with tables > 40 cols
 			for(int c= 0; c < fields_set.size(); ++c){
 				fields_set[c] = false;
 			}

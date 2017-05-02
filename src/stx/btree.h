@@ -1366,6 +1366,8 @@ namespace stx
 			}
 			template<typename key_type>
 			void check_cache(const key_type* keys){
+				can_interp = false;
+				return;
 				if(!can_interp){
 					if(sizeof(key_type) > 12 && get_cache_occupants() == 0){
 						set_cache_occupants(populate_cache(&cached[0], cacheslotmax, keys, get_occupants()));
@@ -2433,8 +2435,9 @@ namespace stx
 			}
 			return load(w, nullptr, loader, slot) ;
 		}
-		nst::version_type empty_version;
+		
 		bool is_valid(const node* page, stream_address w) const {
+			
 			if (selfverify){
 				if(get_storage()->current_transaction_order() < page->get_transaction()){
 					err_print("page is probably corrupt - invalid transaction order");

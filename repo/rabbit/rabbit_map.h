@@ -76,11 +76,11 @@ namespace rabbit{
 			size_type l2 = this->config.log2(any);
 			return (size_type)(2ll << l2);
 		}
-		inline size_type randomize(size_type other) const {
+		size_type randomize(size_type other) const {
 		    size_type r = other>>this->primary_bits;
 			return other + r; // (r*r) >> 2; //(other ^ random_val) & this->extent1;
 		}
-		inline size_type operator()(size_type h_n) const {
+		size_type operator()(size_type h_n) const {
 			size_type h = h_n; // & this->gate_bits;
 			//h += (h>>this->primary_bits);
             return  h & this->extent1; //
@@ -360,6 +360,7 @@ namespace rabbit{
 
 			/// the minimum load factor
 			float load_factor() const{
+			    if(!elements) return 0;
 				return (float)((double)elements/(double)bucket_count());
 			}
 			float collision_factor() const{
@@ -369,7 +370,7 @@ namespace rabbit{
 			/// there are a variable ammount of buckets there are at most this much
 			///
 			size_type bucket_count() const {
-
+                if(!elements) return 0;
 				return get_data_size();
 			}
 			/// the size of a bucket can be calculated based on the
@@ -926,7 +927,7 @@ namespace rabbit{
 			}
 
 			size_type begin() const {
-				if(elements==0)
+				if(!elements)
 					return end();
 
 				size_type pos = 0;
@@ -948,6 +949,7 @@ namespace rabbit{
 				return pos ;
 			}
 			size_type end() const {
+
 				return get_data_size();
 			}
 			size_type size() const {
@@ -959,40 +961,31 @@ namespace rabbit{
 			typedef std::shared_ptr<hash_kernel> ptr;
 		}; /// hash_kernel
 		public:
-
+        struct const_iterator;
         struct iterator {
             typedef hash_kernel* kernel_ptr;
             const basic_unordered_map* h;
             size_type pos;
-        private:
+            friend struct const_iterator;
+        protected:
             _Bt index;
             _Bt exists;
             _Bt bsize;
             const kernel_ptr get_kernel() const {
-				if(h == nullptr) return nullptr;
-                return h->current.get();
+				return h->current.get();
             }
             kernel_ptr get_kernel() {
-				if(h == nullptr) return nullptr;
-                return h->current.get();
+				return h->current.get();
             }
-            void set_index() {
-                if (get_kernel() != nullptr) {//
-                    const _Segment& s = get_kernel()->get_segment(pos);
-                    exists = s.exists;
-                    index = get_kernel()->get_segment_index(pos);
-                    bsize = get_kernel()->config.BITS_SIZE;
-                }
-            }
-            void check_index() {
 
-            }
             void increment() {
-				if(get_kernel() == nullptr) return;
-                ++pos;
+				++pos;
                 ++index;
                 if (index == bsize) {
-                    set_index();
+                    auto k = get_kernel();
+                    const _Segment& s = k->get_segment(pos);
+                    exists = s.exists;
+                    index = k->get_segment_index(pos);
                 }
 
             }
@@ -1000,9 +993,9 @@ namespace rabbit{
             iterator() : h(nullptr), pos(0) {
             }
 
-            iterator(const basic_unordered_map* h, size_type pos) :  pos(pos) {
-                this->h = h;
-                set_index();
+            iterator(const basic_unordered_map* h, size_type pos,  _Bt exists, _Bt index, _Bt bsize)
+            :  pos(pos), h(h), exists(exists), index(index), bsize(bsize) {
+
             }
 
             iterator(const iterator& r) {
@@ -1015,15 +1008,15 @@ namespace rabbit{
             iterator& operator=(const iterator& r) {
                 pos = r.pos;
                 h = r.h;
-                set_index();
-
+                exists = r.exists;
+                index = r.index;
+                bsize = r.bsize;
                 return (*this);
             }
             inline iterator& operator++() {
-                increment();
-                while ((exists & (((_Bt)1) << index)) == (_Bt)0){
-					increment();
-				}
+                do {
+                    increment();
+                } while ((exists & (((_Bt)1) << index)) == (_Bt)0);
                 return (*this);
             }
             iterator operator++(int) {
@@ -1073,31 +1066,22 @@ namespace rabbit{
 				}
 			}
             inline const kernel_ptr get_kernel() const {
-				if(h==nullptr) return nullptr;
 				check_pointer();
                 return h->pcurrent;
             }
             inline kernel_ptr get_kernel() {
-				if(h==nullptr) return nullptr;
-                check_pointer();
+				check_pointer();
 				return const_cast<basic_unordered_map*>(h)->pcurrent; // current.get();
             }
-            void set_index() {
-                if (get_kernel() != nullptr) { ///
-                    const _Segment& s = get_kernel()->get_segment(pos);
-                    exists = s.exists;
-                    index = get_kernel()->get_segment_index(pos);
-                }
-            }
-            void check_index() {
 
-            }
             void increment() {
-				if(get_kernel() == nullptr) return;
-                ++pos;
+				++pos;
                 ++index;
-                if (index == get_kernel()->config.BITS_SIZE) {
-                    set_index();
+                auto k = get_kernel();
+                if (index == k->config.BITS_SIZE) {
+                    const _Segment& s = k->get_segment(pos);
+                    exists = s.exists;
+                    index = k->get_segment_index(pos);
                 }
 
             }
@@ -1110,9 +1094,10 @@ namespace rabbit{
             //~const_iterator() {
 
             //}
-            const_iterator(const basic_unordered_map* h, size_type pos) : pos(pos) {
-                this->h = h;
-                set_index();
+            const_iterator
+            (   const basic_unordered_map* h,  size_type pos,  _Bt exists, _Bt index)
+            :  pos(pos), h(h), exists(exists), index(index){
+
             }
             const_iterator(const iterator& r) : h(nullptr){
                 (*this) = r;
@@ -1121,7 +1106,8 @@ namespace rabbit{
             const_iterator& operator=(const iterator& r) {
                 pos = r.pos;
                 h = r.h;
-                set_index();
+                index = r.index;
+                exists = r.exists;
                 return (*this);
             }
 
@@ -1192,6 +1178,17 @@ namespace rabbit{
 
 				set_current(std::allocate_shared<hash_kernel>(alloc,key_c,alloc));
 		}
+		iterator from_pos_empty(size_type pos) const {
+			return iterator(this, pos, 0, 0, 0);
+		}
+		iterator from_pos(size_type pos) const {
+
+            const _Segment& s = pcurrent->get_segment(pos);
+            _Bt index = pcurrent->get_segment_index(pos);
+            _Bt bsize = pcurrent->config.BITS_SIZE;
+            return iterator(this,pos,s.exists,index,bsize);
+		}
+
 	public:
 		float load_factor() const{
 			if(current==nullptr) return 0;
@@ -1206,7 +1203,7 @@ namespace rabbit{
 			return current->bucket_size ( n );
 		}
 		float max_load_factor() const {
-			if(current==nullptr) 1;
+			if(current==nullptr) return 1;
 			return current->max_load_factor();
 		}
 
@@ -1370,7 +1367,7 @@ namespace rabbit{
 		iterator insert(const _K& k,const _V& v){
 			create_current();
 			(*this)[k] = v;
-			return iterator(this, current->last_modified);
+			return from_pos(current->last_modified);
 		}
 
 		iterator insert(const std::pair<_K,_V>& p){
@@ -1384,7 +1381,7 @@ namespace rabbit{
 			for(_Iter i = start; i != _afterLast; ++i){
 				insert((*i).first, (*i).second);
 			}
-			return iterator(this, current->last_modified);
+			return from_pos(current->last_modified);
 		}
 		/// fast getter that doesnt use iterators and doesnt change the table without letting you know
 		bool get(const _K& k, _V& v) const {
@@ -1434,25 +1431,23 @@ namespace rabbit{
 			return current->count(k);
 		}
 		iterator find(const _K& k) const {
-			if(current == nullptr) return iterator(this,size_type());
+			if(current == nullptr) return from_pos_empty(size_type());
 
-			return iterator(this, current->find(k));
+			return from_pos(current->find(k));
 		}
 		iterator begin() const {
-			if(current==nullptr) return iterator(this,size_type());
-			return iterator(this, current->begin());
+			if(current==nullptr) return from_pos_empty(size_type());
+			return from_pos(current->begin());
 		}
 		iterator end() const {
-			if(current==nullptr) return iterator(this,size_type());
-			return iterator(this, current->end());
+			if(current==nullptr) return from_pos_empty(size_type());
+			return from_pos(current->end());
         }
 		const_iterator cbegin() const {
-			if(current==nullptr)return const_iterator(this,size_type());
-			return const_iterator(this, current->begin());
+			return begin();
 		}
 		const_iterator cend() const {
-			if(current==nullptr)return iterator(this,size_type());
-			return const_iterator(this, current->end());
+			return end();
 		}
 		size_type size() const {
 			if(current==nullptr)return size_type();
