@@ -316,11 +316,12 @@ namespace stx{
 		}
 		/// FSE
 		static void inplace_compress_fse(buffer_type& buff){
+			throw std::exception("fse compression not included in this build");
 			typedef unsigned char * encode_type_ref;
 			buffer_type t;
 			i32 origin = (i32)buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
-			i32 cp = buff.empty() ? 0 : (i32)FSE_compress((encode_type_ref)&t[sizeof(i32)],(i32)(t.size())-sizeof(i32), (const encode_type_ref)&buff[0], origin);
+			i32 cp = buff.empty() ? 0 : (i32)0; // FSE_compress((encode_type_ref)&t[sizeof(i32)], (i32)(t.size()) - sizeof(i32), (const encode_type_ref)&buff[0], origin);
 			if(FSE_isError(cp)!=0 || cp <= 1){
 				cp = (i32)buff.size();
 				origin = -cp;
@@ -333,6 +334,8 @@ namespace stx{
 		}
 		template<typename _VectorType>
 		static void decompress_fse(buffer_type &decoded,const _VectorType& buff){
+			throw std::exception("fse compression not included in this build");
+
 			if(buff.empty()){
 				decoded.clear();
 			}else{
@@ -346,7 +349,7 @@ namespace stx{
 				}else{
 					decoded.reserve(d);
 					decoded.resize(d);
-					FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)],((i32)buff.size())-sizeof(i32));
+					//FSE_decompress((encode_type_ref)&decoded[0],d,(const encode_type_ref)&buff[sizeof(i32)],((i32)buff.size())-sizeof(i32));
 				}
 			}
 		}

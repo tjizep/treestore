@@ -209,9 +209,6 @@
     <ClCompile Include="..\src\stx\btree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\repo\fse\fse.c">
-      <Filter>Source Files\fse</Filter>
-    </ClCompile>
     <ClCompile Include="..\repo\fse\zlibh.c">
       <Filter>Source Files\fse</Filter>
     </ClCompile>

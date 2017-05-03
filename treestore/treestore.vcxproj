@@ -290,7 +290,6 @@
     <ClInclude Include="treestore.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\repo\fse\fse.c" />
     <ClCompile Include="..\repo\fse\zlibh.c" />
     <ClCompile Include="..\repo\lz4-r101\lz4.c" />
     <ClCompile Include="..\repo\zlib-1.2.8\adler32.c" />
