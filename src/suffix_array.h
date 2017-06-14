@@ -407,7 +407,7 @@ public:
 			if(compressed < min_compressed ){
 				min_bucket_size = bucket_size;
 				min_compressed = compressed;
-				printf("min compressed %llu, min bucket size %llu\n",compressed,(nst::u64)bucket_size);
+				//printf("min compressed %llu, min bucket size %lld\n",compressed,(nst::u64)bucket_size);
 			}
 			reduced_array.clear();
 			bucket_size -= 1;
@@ -590,7 +590,7 @@ public:
 							++errc;
 						}
 					}
-					printf("decode errors: %llu\n",errc);
+					printf("decode errors: %lld\n",(long long)errc);
 				}
 			}
 			printf("code size %iu %lu codes written to %lu bytes\n",parameters.code_size,out_pos,parameters.capacity());
@@ -598,8 +598,8 @@ public:
 
 	}
 	void encode(const char * buffer, nst::u64 length){
-
-		throw std::exception("fse compression not included in this build");
+        std::cout << "fse compression not included in this build" << std::endl;
+		throw std::exception();
 
 		bool use_std = true;
 		using namespace suffix_array;
@@ -608,10 +608,10 @@ public:
 		if(use_std){
 			typedef _StdSuffixArray _SuffixArrayType;
 			_SuffixArrayType reduced_array;
-			size_t t = ::os::millis();
+			//size_t t = ::os::millis();
 			nst::buffer_type dest(length);
-			nst::u64 dsize = 0ull; // FSE_compress(dest.data(), length, (const unsigned char *)buffer, length);
-			printf("Compressed %llu bytes to %lu in %llu ms.\n",length, dsize, ::os::millis()-t);
+			//nst::u64 dsize = 0ull; // FSE_compress(dest.data(), length, (const unsigned char *)buffer, length);
+			//printf("Compressed %llu bytes to %lu in %llu ms.\n",length, dsize, ::os::millis()-t);
 			/// encode_internal(reduced_array, buffer, length);
 		}else{
 			typedef _SuffixArray _SuffixArrayType;

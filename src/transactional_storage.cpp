@@ -2,6 +2,7 @@
 #include "system_timers.h"
 #include <stx/storage/types.h>
 
+
 typedef Poco::ScopedLockWithUnlock<Poco::Mutex> syncronized;
 static Poco::Mutex& get_stats_lock(){
 	static Poco::Mutex _c_lock;
@@ -46,7 +47,7 @@ namespace storage{
 			void run(){
 				stopped = false;
 				started = true;
-				
+
 				timer_val = os::millis();
 				try{
 					while(is_started()){
@@ -97,9 +98,9 @@ namespace storage{
 		static Poco::Mutex swl;
 		return swl;
 	}
-	
+
 	long long total_use = 0;
-	
+
 	long long buffer_use = 0;
 
 	long long col_use = 0;
@@ -129,19 +130,19 @@ namespace storage{
 		total_use += added;
 		buffer_use += added;
 	}
-	
+
 	extern void remove_buffer_use(long long removed){
 		syncronized l(get_stats_lock());
 		total_use -= removed;
 		buffer_use -= removed;
 	}
-	
+
 	extern void add_col_use(long long added){
 		syncronized l(get_stats_lock());
 		total_use += added;
 		col_use += added;
 	}
-	
+
 	extern void remove_col_use(long long removed){
 		syncronized l(get_stats_lock());
 		total_use -= removed;
@@ -152,7 +153,7 @@ namespace storage{
 		total_use += added;
 		stl_use += added;
 	}
-	
+
 	extern void remove_stl_use(long long removed){
 		syncronized l(get_stats_lock());
 		total_use -= removed;

@@ -6,6 +6,9 @@
 #include "rednode_storage.h"
 #include "NotificationQueueWorker.h"
 #include "system_timers.h"
+#include <chrono>
+#include <thread>
+
 extern char * treestore_red_address;
 static Poco::Mutex aloc_lock;
 static Poco::Mutex sock_lock;
@@ -39,16 +42,16 @@ _RedAlloc* get_red_store(const std::string &name){
 	if(allocs.count(name)){
 		return allocs[name].get();
 	}
-	_RedAllocPtr a = std::make_shared<_RedAlloc>(name+".red",32);		
+	_RedAllocPtr a = std::make_shared<_RedAlloc>(name+".red",32);
 	allocs[name] = a;
 	return a.get();
-		
+
 }
-static std::atomic<nst::u64> connection_ids = 0;
-static std::atomic<nst::u64> client_connection_ids = 0;
+static std::atomic<nst::u64> connection_ids ; ///TODO: NB: removed '= 0' due to deleted constructor
+static std::atomic<nst::u64> client_connection_ids ; ///TODO: NB: removed '= 0' due to deleted constructor
 namespace red_workers{
-	
-	
+
+
 	typedef asynchronous::QueueManager<asynchronous::AbstractWorker> _WorkerManager;
     struct _red_worker{
         _red_worker() : w(1){
@@ -69,33 +72,7 @@ namespace red_workers{
 
 namespace red{
 	static std::string PROTO_NAME = "MARVAL00";
-	enum{
-		cmd_set=1,
-		cmd_get,
-		cmd_open,
-		cmd_close,
-		cmd_begin,
-		cmd_commit,
-		cmd_checkpoint,
-		cmd_rollback, ///types and commands must be mutex - so that stream can be more robust
-		cmd_maxaddress,
-		cmd_evict,
-		cmd_unlock_all,
-		cmd_max_block_address,
-		cmd_version,
-		cmd_contains,
-		type_bool,
-		type_u32,
-		type_u64,
-		type_string,
-		type_buffer,
-		type_data,
-		type_version,
-		err_versions,
-		err_version_mismatch,
-		err_version_locked,
-		err_address_does_not_exist
-	};
+
 	inline void rmsg(nst::u32 r,const char * fun = nullptr){
 		if(r!=0){
 			red_println("[CLIENT] [%s] %s returned [%ld]",r!=0 ? "ERROR":"INFO",fun == nullptr ? "client operation":fun, r);
@@ -105,13 +82,13 @@ namespace red{
 	}
 	class red_socket{
 	private:
-		std::string					address;		
+		std::string					address;
 		Poco::Net::SocketAddress	sa;
 		Poco::Net::StreamSocket		sock;
 		Poco::Net::SocketStream		stream;
 		bool open;
 	public:
-		red_socket(const std::string &address) 
+		red_socket(const std::string &address)
 		:	address(address)
 		,	sa(address)
 		,	sock()
@@ -125,31 +102,31 @@ namespace red{
 			red_println( "[CLIENT] [SOCKET] Starting disconnect to %s:%ld" ,sa.host().toString().c_str(),sa.port());
 			try {
 				sock.close();
-						
-				
+
+
 			}
 			catch (Poco::Exception& error) {
 				red_error("[CLIENT] [SOCKET] disconnection failed (Error: %s)",error.displayText().c_str());
-			
+
 			}
 			open = false;
 			return is_open();
-			
+
 		}
 		bool connect(){
 			red_println( "[CLIENT] [SOCKET] Starting connect to %s:%ld" ,sa.host().toString().c_str(),sa.port());
 			try {
 				sock.connect(sa);
-						
+
 				symbol_stream<Poco::Net::StreamSocket> symbols(sock);
 				symbols.start_buffering();
-				symbols.write(PROTO_NAME);			
+				symbols.write(PROTO_NAME);
 				symbols.flush_buffer();
 				open = true;
 			}
 			catch (Poco::Exception& error) {
 				red_error("[CLIENT] [SOCKET] Connection failed (Error: %s)",error.displayText().c_str());
-			
+
 			}
 			return is_open();
 		}
@@ -171,7 +148,7 @@ namespace red{
 	red_socket* get_socket(const std::string &address){
 		red_socket_ptr result;
 		{
-			synchronized context(sock_lock);		
+			synchronized context(sock_lock);
 			if(!sockets.get(address,result)){
 				result = std::make_shared<red_socket>(address);
 				sockets[address] = result;
@@ -214,7 +191,7 @@ namespace red{
 			return false;
 		}
 	public:
-		
+
 		client_allocator_connection(std::string address);
 		~client_allocator_connection();
 		bool open(const std::string &name);
@@ -222,7 +199,7 @@ namespace red{
 		bool promise(address_type address);
 		bool get_version(address_type address, version_type&version);
 		bool contains(address_type address);
-		
+
 		bool store(version_type &failed, address_type address, version_type version, const block_type &data);
 		bool get(address_type address, version_type version, block_type& data);
 		bool get(address_type address, version_type version, version_type &ov, block_type& data);
@@ -233,7 +210,7 @@ namespace red{
 		std::string get_address() const;
 		bool is_open();
 		address_type max_block_address();
-	
+
 	};
 	client_allocator_connection::client_allocator_connection(std::string address)
 	:	address(address),opened(false){
@@ -241,10 +218,10 @@ namespace red{
 		using Poco::Net::SocketStream;
 		using Poco::Net::SocketAddress;
 		using Poco::Exception;
-		
+
 		this->id = ++client_connection_ids;
 		red_println("[CLIENT] [SOCKET] new connection (id:%lld)",this->id);
-    
+
 	}
 	std::string client_allocator_connection::get_address() const {
 		return this->socket->get_address();
@@ -260,15 +237,15 @@ namespace red{
 		socket = red::get_socket(address);
 		if(!this->socket->is_open()) return not_opended();
 		nst::u32 cmd = cmd_open;
-		nst::u32 r = 0xFFFFFFFF;		
+		nst::u32 r = 0xFFFFFFFF;
 		try{
-			
+
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
 			symbols.write(name);
-			symbols.flush_buffer();		
+			symbols.flush_buffer();
 			symbols.read(r);
 			opened = (r == 0);
 			if(opened)
@@ -278,21 +255,21 @@ namespace red{
 		}
 		return true;
 	}
-	
+
 	bool client_allocator_connection::promise(address_type address){
 		return false;
 	}
-	
+
 	bool client_allocator_connection::get_version(address_type address, version_type&version){
 		if(!opened) return not_opended();
-		nst::u32 r = 0xFFFFFFFF;		
-		nst::u32 cmd = cmd_version;		
+		nst::u32 r = 0xFFFFFFFF;
+		nst::u32 cmd = cmd_version;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
-			symbols.write(address);						
+			symbols.write(address);
 			symbols.flush_buffer();
 			symbols.read(version);
 			symbols.read(r);
@@ -305,15 +282,15 @@ namespace red{
 
 	bool client_allocator_connection::contains(address_type address){
 		if(!opened) return not_opended();
-		nst::u32 r = 0xFFFFFFFF;		
-		nst::u32 cmd = cmd_contains;		
+		nst::u32 r = 0xFFFFFFFF;
+		nst::u32 cmd = cmd_contains;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
 			symbols.write(address);
-			symbols.flush_buffer();		
+			symbols.flush_buffer();
 			symbols.read(r);
 			rmsg(r,"contains");
 		}catch(Poco::Exception &e){
@@ -321,12 +298,12 @@ namespace red{
 		}
 		return r == 0;
 	}
-	
+
 	bool client_allocator_connection::store(version_type &failed, address_type address, version_type version,const block_type &data){
 		failed = version; /// to simplify caller code
 		if(!opened) return not_opended();
-		nst::u32 r = 0xFFFFFFFF;		
-		nst::u32 cmd = cmd_set;		
+		nst::u32 r = 0xFFFFFFFF;
+		nst::u32 cmd = cmd_set;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
@@ -346,14 +323,14 @@ namespace red{
 	}
 	bool client_allocator_connection::close(){
 		if(!opened) return not_opended();
-		nst::u32 r = 0xFFFFFFFF;		
-		nst::u32 cmd = cmd_close;		
+		nst::u32 r = 0xFFFFFFFF;
+		nst::u32 cmd = cmd_close;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
-			symbols.flush_buffer();		
+			symbols.flush_buffer();
 			symbols.read(r);
 			rmsg(r,"close");
 			// ??? opened = false;
@@ -365,7 +342,7 @@ namespace red{
 	bool client_allocator_connection::get(address_type address, version_type version, block_type& data){
 		if(!opened) return not_opended();
 		nst::u32 r = 0xFFFFFFFF;
-		nst::u32 cmd = cmd_get;		
+		nst::u32 cmd = cmd_get;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
@@ -374,9 +351,9 @@ namespace red{
 			symbols.write(address);
 			symbols.write(version);
 			symbols.flush_buffer();
-			symbols.read(data);		
+			symbols.read(data);
 			version_type ov;
-			symbols.read(ov);	
+			symbols.read(ov);
 			symbols.read(r);
 			rmsg(r,"get");
 		}catch(Poco::Exception &e){
@@ -387,7 +364,7 @@ namespace red{
 	bool client_allocator_connection::get(address_type address, version_type version, version_type &ov, block_type& data){
 		if(!opened) return not_opended();
 		nst::u32 r = 0xFFFFFFFF;
-		nst::u32 cmd = cmd_get;		
+		nst::u32 cmd = cmd_get;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
@@ -396,8 +373,8 @@ namespace red{
 			symbols.write(address);
 			symbols.write(version);
 			symbols.flush_buffer();
-			symbols.read(data);					
-			symbols.read(ov);	
+			symbols.read(data);
+			symbols.read(ov);
 			symbols.read(r);
 			rmsg(r,"get version");
 		}catch(Poco::Exception &e){
@@ -408,17 +385,17 @@ namespace red{
 	bool client_allocator_connection::begin(version_type version, bool writer){
 		if(!opened) return not_opended();
 		nst::u32 r = 0xFFFFFFFF;
-		nst::u32 cmd = cmd_begin;		
+		nst::u32 cmd = cmd_begin;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
-		
+
 			symbols.write(id);
 			symbols.write(cmd);
 			symbols.write(writer);
 			symbols.write(version);
 			symbols.flush_buffer();
-		
+
 			symbols.read(r);
 			rmsg(r,"begin");
 		}catch(Poco::Exception &e){
@@ -429,14 +406,14 @@ namespace red{
 	bool client_allocator_connection::commit(){
 		if(!opened) return not_opended();
 		nst::u32 cmd = cmd_commit;
-		nst::u32 r = 0xFFFFFFFF;		
+		nst::u32 r = 0xFFFFFFFF;
 		try{
 			symbol_stream<Poco::Net::StreamSocket> symbols(get_socket());
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
 			symbols.flush_buffer();
-		
+
 			symbols.read(r);
 			rmsg(r,"commit");
 		}catch(Poco::Exception &e){
@@ -453,8 +430,8 @@ namespace red{
 			symbols.start_buffering();
 			symbols.write(id);
 			symbols.write(cmd);
-			symbols.flush_buffer();		
-			symbols.read(r);		
+			symbols.flush_buffer();
+			symbols.read(r);
 			rmsg(r,"rollback");
 		}catch(Poco::Exception &e){
 			comms_failure(e);
@@ -471,8 +448,8 @@ namespace red{
 			symbols.write(id);
 			symbols.write(cmd);
 			symbols.flush_buffer();
-		
-			symbols.read(r);		
+
+			symbols.read(r);
 			rmsg(r,"unlock all");
 		}catch(Poco::Exception &e){
 			comms_failure(e);
@@ -496,7 +473,7 @@ namespace red{
 			symbols.flush_buffer();
 			symbols.read(ma);
 			nst::u32 r =0;
-			symbols.read(r);		
+			symbols.read(r);
 			rmsg(r,"max block address");
 		}catch(Poco::Exception &e){
 			comms_failure(e);
@@ -504,7 +481,7 @@ namespace red{
 		return ma;
 	}
 
-	/// this class implements a version of PAXOS which 
+	/// this class implements a version of PAXOS which
 	/// combines multiple promises into a single operation
 	/// promises are kept as 'locks' each version is defined by
 	/// a orderable uuid
@@ -519,7 +496,7 @@ namespace red{
 				this->set_info(info);
 			}
 			~red_pair(){
-				
+
 			}
 			bool close(){
 				return get_node().close();
@@ -533,17 +510,17 @@ namespace red{
 			const dist_info& get_info(){
 				return this->info;
 			}
-			
-			void open(std::string name){			
-				
+
+			void open(std::string name){
+
 				this->name = name;
-								
+
 			}
-			
+
 			bool contains(address_type address) {
 				return get_node().contains(address);
 			}
-			
+
 			bool get_version(address_type address, version_type& version) {
 				return get_node().get_version(address,version);
 			}
@@ -551,7 +528,7 @@ namespace red{
 			bool store(version_type &failed, address_type address, version_type version, const block_type &data){
 				return get_node().store(failed, address, version, data);
 			}
-			
+
 			bool get(address_type address, version_type version, block_type& data){
 				return get_node().get(address,version,data);
 			}
@@ -630,9 +607,9 @@ namespace red{
 		}
 		bool matches(std::string pattern, std::string val){
 			Poco::Glob matcher(pattern);
-			return matcher.match(val);				
+			return matcher.match(val);
 		}
-		
+
 		bool open(const std::string &name) {
 			resources.open();/// connects to dht
 
@@ -642,18 +619,18 @@ namespace red{
 			connections.reserve(cols.size());
 			size_t con = 0;
 			for(_Infos::iterator i = cols.begin(); i!= cols.end(); ++i){
-				if(matches((*i).name, name)){ /// filters the nodes with col name 
-					connections.push_back(red_pair((*i)));					
+				if(matches((*i).name, name)){ /// filters the nodes with col name
+					connections.push_back(red_pair((*i)));
 					connections.back().open(name);/// all nodes concerned are opened which may be many
 					++con;
 				}
 			}
-			red_println("[SERVER]  client allocator found %lld nodes - local [%s]",connections.size(),treestore_red_address);			
+			red_println("[SERVER]  client allocator found %lld nodes - local [%s]",connections.size(),treestore_red_address);
 			return !connections.empty();
-					
-		};		
+
+		};
 		bool contains(address_type address) {
-			if(this->version == version_type()){			
+			if(this->version == version_type()){
 				red_error("[SERVER] transaction not started for write");
 			}
 			if(!this->writer){
@@ -663,9 +640,9 @@ namespace red{
 			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
 				const dist_info &dist = (*i).get_info();
 				if(address >= dist.start_row && address <= dist.end_row){
-					
+
 					(*i).begin(this->version,this->writer);
-					
+
 					if((*i).contains(address)){
 						++stored;
 					}
@@ -675,7 +652,7 @@ namespace red{
 		}
 
 		bool get_version(address_type address, version_type& version) {
-			if(this->version == version_type()){			
+			if(this->version == version_type()){
 				red_error("[SERVER] transaction not started for write");
 			}
 			if(!this->writer){
@@ -688,7 +665,7 @@ namespace red{
 				const dist_info &dist = (*i).get_info();
 				if(address >= dist.start_row && address <= dist.end_row){
 					++involved;
-					(*i).begin(this->version,this->writer);					
+					(*i).begin(this->version,this->writer);
 					if((*i).get_version(address,version)){
 						involved_versions[version]++;
 						++stored;
@@ -696,17 +673,17 @@ namespace red{
 				}
 			}
 			/// choose highest most popular version which has more than n/2 instances
-			/// if the highest version is not the most popular then return an error 
+			/// if the highest version is not the most popular then return an error
 			/// state(false)
 			return stored > (involved/2);
 		}
 
 		/// in this implementation the PAXOS promise is combined with data
-		/// for a little bit better efficiency. Not all nodes need to be 
+		/// for a little bit better efficiency. Not all nodes need to be
 		/// considered since some of them are not involved with some
 		/// addresses
 		bool store(address_type address, const block_type &data){
-			if(this->version == version_type()){			
+			if(this->version == version_type()){
 				red_error("[SERVER] transaction not started for write");
 				return false;
 			}
@@ -714,7 +691,7 @@ namespace red{
 				red_error("[SERVER]  transaction is read only");
 				return false;
 			}
-			size_t stored = 0;			
+			size_t stored = 0;
 			size_t involved = 0;
 			bool version_order_issue = false;
 			version_type failed;
@@ -727,12 +704,12 @@ namespace red{
 					(*i).begin(this->version,this->writer);
 					/// store/promise can fail because a conflicting promise
 					/// has been made already or the node is down
-					
+
 					if((*i).store(failed,address,this->version,data)){
 						++stored;
 						success_connections.push_back((*i));
 					}else if(this->version < failed){
-						
+
 						/// this means the operation cannot be retried
 						/// so unlock other successfull nodes giving
 						/// the winner the stage
@@ -747,7 +724,7 @@ namespace red{
 			if(version_order_issue){
 				/// unlock all previously success full nodes to avoid algorithm never completing globally
 				for(_InfoNodes::iterator i = success_connections.begin(); i!= success_connections.end(); ++i){
-					(*i).unlock_all();					
+					(*i).unlock_all();
 				}
 			}else if(stored <= (involved/2)){
 				/// retry failed if the where no ordering issues
@@ -755,19 +732,19 @@ namespace red{
 					(*i).begin(this->version,this->writer);
 					/// store/promise can fail because a conflicting promise
 					/// has been made already or the node is down
-					
+
 					if((*i).store(failed,address,this->version,data)){
 						++stored;
 					}
 				}
 			}
 			/// > (involved-1)/2 copies must be stored or the promise has failed
-			
+
 			return stored > (involved/2);
 		};
 		/// the PAXOS retrieve
 		bool get(address_type address, block_type& data){
-			if(this->version==version_type()){			
+			if(this->version==version_type()){
 				red_error("[SERVER] transaction not started for read");
 				return false;
 			}
@@ -789,7 +766,7 @@ namespace red{
 			return ok > (involved/2);
 		};
 		bool get(address_type address, version_type& ov, block_type& data){
-			if(this->version==version_type()){			
+			if(this->version==version_type()){
 				red_error("[SERVER] transaction not started for read");
 				return false;
 			}
@@ -809,63 +786,70 @@ namespace red{
 			/// > (involved-1)/2 copies of the latest version must be retrieved or the operation failed
 			return ok > (involved/2);
 		};
+
 		bool begin(bool writer){
 			this->writer = writer;
 			/// versions are orderable in time and globally unique
 			this->version = Poco::UUIDGenerator::defaultGenerator().create();
 			return true;
 		};
+		/// TODO: nodes that did not commit successfully needs to have their state resert when they come back up -
 		bool commit(){
 			size_t ok = 0;
 			size_t involved = 0;
-			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){					
+			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
 				if((*i).is_started()){
 					++involved;
 					if((*i).commit()) ++ok;
 				}
 			}
-			return ok > 0;
+			return ok > (involved/2);
 		};
+		/// TODO: needs to have some way of nodes to rollback their 'late' transactions if they did not receive a rollback in time
 		bool rollback(){
 			size_t ok = 0;
 			size_t involved = 0;
-			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){					
+			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
 				if((*i).is_started()){
 					++involved;
 					if((*i).rollback()) ++ok;
 				}
 			}
 			return ok > 0;
-		};		
+		};
+		/// TODO: nodes that does not respond need to timeout - it can easily cause deadlock when they come back up again
+		/// nodes that werent up need to be restarted with all locks removed
 		bool unlock_all(){
 			size_t ok = 0;
-			size_t involved = 0;
-			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){					
+			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
 				(*i).begin(this->version,this->writer);
 
 				if((*i).unlock_all()) ++ok;
-				
+
 			}
 			return ok > 0;
-		};		
+		};
 		bool close(){
 			size_t ok = 0;
-			size_t involved = 0;
-			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){					
-				
+			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
+
 				if((*i).close()) ++ok;
-				
+
 			}
 			return ok > 0;
-		};		
+		};
+		/// TODO: this function also needs more than half the nodes to be active
 		address_type max_block_address() {
 			address_type r = 0;
 			size_t ok = 0;
 			size_t involved = 0;
-			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){				
+			for(_InfoNodes::iterator i = connections.begin(); i!= connections.end(); ++i){
 				(*i).begin(this->version,this->writer);
 				++involved;
-				r = std::max<address_type>(r,(*i).max_block_address());				
+				r = std::max<address_type>(r,(*i).max_block_address());
+			}
+			if(ok > (involved / 2)){
+                red_println("[ERR] [RED] not enough nodes to complete request");
 			}
 			return r;
 		}
@@ -873,7 +857,7 @@ namespace red{
 		bool is_open() const {
 			return !connections.empty();
 		};
-		
+
 	};
 	client_allocator* create_allocator(){
 		return new client_allocator_paxos_impl();
@@ -885,22 +869,22 @@ namespace red{
 	class red_block_server{
 	public:
 		red_block_server(StreamSocket& socket, SocketReactor& reactor);
-		
-      
+
+
 		~red_block_server()
 		{
-          
+
 			red_println("[SERVER] leaving red node listener");
-		
+
 			_reactor.removeEventHandler(_socket, NObserver<red_block_server, ReadableNotification>(*this, &red_block_server::onReadable));
-			_reactor.removeEventHandler(_socket, NObserver<red_block_server, ShutdownNotification>(*this, &red_block_server::onShutdown));         
+			_reactor.removeEventHandler(_socket, NObserver<red_block_server, ShutdownNotification>(*this, &red_block_server::onShutdown));
 		}
 
 		void onReadable(const AutoPtr<ReadableNotification>& pNf);
-      
+
 		void onShutdown(const AutoPtr<ShutdownNotification>& pNf)
 		{
-			
+
 			delete this;
 		}
 		void onWorkerExit(){
@@ -916,8 +900,8 @@ namespace red{
 			return versions;
 		}
 	private:
-      
-      
+
+
 		StreamSocket			_socket;
 		SocketReactor&			_reactor;
 		std::atomic<nst::u32>	workersActive;
@@ -930,7 +914,7 @@ namespace red{
 	public:
 		typedef std::shared_ptr<block_type> block_type_ptr;
 		typedef rabbit::unordered_map<address_type, block_type_ptr> _BufferMap;
-	private:		
+	private:
 		size_t				invalid_versions;
 		version_type		writer_version;
 		_BufferMap			buffers;
@@ -980,13 +964,13 @@ namespace red{
 		void unlock_all(){
 			std::vector<address_type> addresses;
 			for(auto b = get_versions().begin(); b != get_versions().end(); ++b){
-				addresses.push_back(b->first);				
+				addresses.push_back(b->first);
 			}
 			red_println("[SERVER] unlocking %lld addresses",addresses.size());
 			for(auto a = addresses.begin(); a != addresses.end(); ++a){
 				unlock(*a);
 			}
-			
+
 		}
 	public:
 		bool has_buffer(address_type address) const {
@@ -1000,18 +984,18 @@ namespace red{
 			return *(bp.get());
 		}
 		void clear(){
-		
+
 		}
-		
+
 		bool process(){
 			bool result = true;
-			symbol_stream<StreamSocket> symbols(server->getSocket());			
+			symbol_stream<StreamSocket> symbols(server->getSocket());
 			symbols.start_buffering();
-			/// do one operation and exit 
+			/// do one operation and exit
 			nst::u32 cmd = 0;
 			nst::u32 r = 0;
 			try	{
-				
+
 				if(!symbols.read(cmd)){
 					red_error("[SERVER] [%lld]  invalid command",this->id);
 					return false;
@@ -1042,24 +1026,24 @@ namespace red{
 						red_error("[SERVER] [%lld] invalid version",this->id);
 						return false;
 					}
-					if(has_buffer(address)){						
+					if(has_buffer(address)){
 						symbols.write(get_buffer(address));
 					}else{
 						_buffer.clear();
 						version_type test = has_version(address) ? get_version(address) : alloc->get(address);
-						if(alloc->lock_version(address, test)){						
+						if(alloc->lock_version(address, test)){
 							version_type test = alloc->get(address, _buffer);
 							if(test!=version_type()){
-								store_version(address,test);							
+								store_version(address,test);
 							}
 						}else{
 							red_println("[SERVER] [%lld] could not read lock %lld",this->id,address);
 							++(this->invalid_versions);
 							r = err_version_locked;
 						}
-					
-						symbols.write(_buffer);						
-						
+
+						symbols.write(_buffer);
+
 					}
 					symbols.write(get_version(address));
 					red_println("[SERVER] [%lld] got %lld",this->id,address);
@@ -1071,26 +1055,26 @@ namespace red{
 					if(!symbols.read(address)){
 						red_error("[SERVER] [%lld] invalid address",this->id);
 						return false;
-				
+
 					}
 					if(!symbols.read(version)) {
 						red_error("[SERVER] [%lld] invalid version",this->id);
 						return false;
-				
+
 					}
 					if(!symbols.read(_buffer)) {
 						red_error("[SERVER] [%lld] invalid buffer",this->id);
-						return false;				
+						return false;
 					}
 					ml = (stx::storage::u32) _buffer.size();
 					version_type result_version = this->writer_version;
 					if(this->writer_version != version){
 						red_println("[SERVER] [%lld] version mismatch %s!=%s",this->id,this->writer_version.toString().c_str(),version.toString().c_str());
-						
+
 						r = err_version_mismatch;
 					}else{
 						if(alloc->lock_version(address, this->writer_version, get_version(address))){
-							replace_version(address, this->writer_version);												
+							replace_version(address, this->writer_version);
 							get_buffer(address) = _buffer;
 						}else{
 							++(this->invalid_versions);
@@ -1105,7 +1089,7 @@ namespace red{
 				}else if(cmd == cmd_version){
 					address_type address = 0;
 					symbols.read(address);
-					version_type version = has_version(address) ? get_version(address) : alloc->get(address);					
+					version_type version = has_version(address) ? get_version(address) : alloc->get(address);
 					symbols.write(version);
 					r = version == version_type() ? err_address_does_not_exist : 0;
 				}else if(cmd == cmd_contains){
@@ -1115,7 +1099,7 @@ namespace red{
 						r = 0;
 					}else{
 						r = err_address_does_not_exist;
-					}					
+					}
 				}else if(cmd == cmd_begin){
 					red_println("[SERVER] [%lld] received begin",this->id);
 					bool writer = false;
@@ -1137,32 +1121,32 @@ namespace red{
 						red_println("[SERVER] [%lld] start commit",this->id);
 						alloc->commit();
 						red_println("[SERVER] [%lld] complete commit",this->id);
-				
-					}else{				
+
+					}else{
 						red_println("[SERVER] [%lld] received invalid versions ->rollback",this->id);
-					
+
 						r = err_versions;
 					}
-			
+
 					buffers.clear();
-				
+
 				}else if(cmd == cmd_checkpoint){
 					red_println("[SERVER] [%lld] received check point",this->id);
 					//synchronized context(alloc->get_lock());
 					if(this->invalid_versions == 0){
 						for(auto b = buffers.begin(); b != buffers.end(); ++b){
 							alloc->set(b->first,this->writer_version,*(b->second.get()));
-						}					
-					}else{				
+						}
+					}else{
 						red_println("[SERVER] [%lld] received invalid versions ->rollback",this->id);
-					
+
 						r = err_versions;
 					}
-			
-					buffers.clear();				
+
+					buffers.clear();
 				}else if(cmd == cmd_rollback){
 					red_println("[SERVER] [%lld] received rollback",this->id);
-					buffers.clear();			
+					buffers.clear();
 					transacted = false;
 				}else if(cmd == cmd_evict){
 					red_println("[SERVER] [%lld] received evict ",this->id);
@@ -1170,31 +1154,31 @@ namespace red{
 					/// if transacted dont do notin inf fact rollback afterwards
 					red_println("[SERVER] [%lld] received unlock all",this->id);
 					unlock_all();
-					r = 0;				
+					r = 0;
 				}else if(cmd == cmd_max_block_address){
 					red_println("[SERVER] [%lld] received cmd max block address",this->id);
 					address_type max_address = alloc->max_block_address();
 					symbols.write(max_address);
 				}
 				red_println("[SERVER] [%lld] there is %lld lock(s) ",this->id,(address_type)get_versions().size());
-						
+
 				symbols.write(r);
 				symbols.flush_buffer();
 
 			}catch (Poco::Exception& e)	{
 				red_error("[SERVER] Could not process storage instruction - %s",e.name());
 			}
-			
-			
+
+
 			return result;
 		}
-		
+
 		red_server_state(red_block_server* server, nst::u64 id)
 		:	server(server)
 		,	id(id)
 		,	transacted(false){
-			
-			invalid_versions = 0;		
+
+			invalid_versions = 0;
 		}
 	};
 	typedef std::shared_ptr<red_server_state> red_server_state_ptr;
@@ -1208,7 +1192,7 @@ namespace red{
 		_States				states;
 	public:
 		red_server_worker(red_block_server* server) : server(server){
-			
+
 		}
 		virtual void work(){
 			symbol_stream<Poco::Net::StreamSocket> symbols(server->getSocket());
@@ -1220,7 +1204,7 @@ namespace red{
 					break;
 				}
 				if(!states.get(id, processor)){
-					processor = std::make_shared<red_server_state>(server,id);	
+					processor = std::make_shared<red_server_state>(server,id);
 					states[id] = processor;
 				}
 				if(!processor->process()){
@@ -1229,14 +1213,14 @@ namespace red{
 				processor = nullptr;
 
 			}
-			
+
 			server->onWorkerExit();
-			
+
 			///red_error("[SERVER] operation could not be completed");
-			
+
 			//}
 		}
-		virtual ~red_server_worker(){			
+		virtual ~red_server_worker(){
 		}
 	};
 
@@ -1247,12 +1231,12 @@ namespace red{
 		red_println("[SERVER]  starting red node listener");
 		wid = ++connection_ids; /// assigns all comms to this server on one thread
 		std::string proto;
-			
+
 		symbol_stream<Poco::Net::StreamSocket> symbols(_socket);
 		symbols.read(proto,PROTO_NAME.size());
 		if(PROTO_NAME==proto){
-			++workersActive;	
-				
+			++workersActive;
+
 			red_workers::get_threads((*this).wid).add(new red_server_worker(this));
 		}else{
 			red_error("[SERVER] disconnected invalid client");
@@ -1262,39 +1246,39 @@ namespace red{
 		_reactor.addEventHandler(_socket, NObserver<red_block_server, ShutdownNotification>(*this, &red_block_server::onShutdown));
 	}
 	void red_block_server::onReadable(const AutoPtr<ReadableNotification>& pNf){
-		
+
 		if(workersActive==0){
-			
-			
+
+
 		}
 		///printf("received idle chatter\n");
-        
+
 	///delete this;
-		  
+
 	}
 class node_block : public Poco::Runnable{
 	public:
-	void run(){		
-		typedef std::vector<std::string> _Nodes;
+	void run(){
+		//typedef std::vector<std::string> _Nodes;
 		unsigned short port = 8989; //(unsigned short) config().getInt("red.port", 9977);
-		
-		
+
+
 
 		rednodes resources;
 		resources.open();
-		
+
         // set-up a server socket
         ServerSocket server(port);
         // set-up a SocketReactor...
         SocketReactor reactor;
         // ... and a SocketAcceptor
         SocketAcceptor<red_block_server> acceptor(server, reactor);
-        // run the reactor in its own thread so that we can wait for 
+        // run the reactor in its own thread so that we can wait for
         // a termination request
         Thread thread;
         thread.start(reactor);
 		// start the node in the dht
-		if(resources.has_node(treestore_red_address)){		
+		if(resources.has_node(treestore_red_address)){
 			resources.start_node(treestore_red_address);
 			resources.set_node_space(treestore_red_address);
 		}else{
@@ -1304,65 +1288,67 @@ class node_block : public Poco::Runnable{
         // wait for CTRL-C or kill
         while(Poco::Thread::current()->isRunning()){
 			Poco::Thread::sleep(100);
-			
+
 		}
         // Stop the SocketReactor
         reactor.stop();
         thread.join();
 	}
-		
+
 };
 void red_tests(){
 	int start ;
 	std::cout << "enter a value" << std::endl;
 	std::cin >> start;
-	
-	block_type data;					
-		
+
+	block_type data;
+
 	client_allocator_paxos_impl red,red1;
 	red.open("mydata");
 	red1.open("mydata");
 	std::cout<< "start test " << std::endl;
 	for(nst::u32 t = 0; t  < 2000;++t){
-			
+
 		red_println("Test Iteration %ld started",t);
-		red.begin(true);			
+		red.begin(true);
 		red1.begin(true);
 		red.get(15,data);
-		red.store(15,data);		
+		red.store(15,data);
 		red1.get(15,data);
-		red1.store(15,data);		
+		red1.store(15,data);
 		red1.commit();
-		red.commit();			
+		red.commit();
 		red.begin(false);
 		red1.begin(false);
 		red1.unlock_all();
 		red.unlock_all();
 		if(t %100 == 0){
-			printf("Test Iteration %ld finished\n",t);
+			printf("Test Iteration %ld finished\n",(long)t);
 		}
 	}
-			
+
 	red_println("Test Iterations complete ");
 	std::cout<< "end test " << std::endl;
 }
+
 class node_chat : public Poco::Runnable{
 public:
-	void run(){	
+	void run(){
 		typedef std::vector<std::string> _Nodes;
 		red_println("[SERVER] waiting for server");
-		
+
 		rednodes resources;
 		resources.open();
 
 		_Nodes nodes = resources.get_nodes();
 		red_println("[SERVER] found %lld nodes - local [%s]",nodes.size(),treestore_red_address);
 		//red_tests();
-		while(Poco::Thread::current()->isRunning()){			
-			::Sleep(100);
+		while(Poco::Thread::current()->isRunning()){
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 
-	}	
+	}
 };
 
 static node_block block;

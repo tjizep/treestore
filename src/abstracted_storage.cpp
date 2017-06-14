@@ -1,9 +1,13 @@
 #include "abstracted_storage.h"
+static int test_compression(){
+    stx::storage::test_compression();
+}
+static int test_c = test_compression();
 
 static Poco::Mutex m;
 namespace nst = ::stx::storage;
 namespace stored{
-	
+
 	static _AlocationsMap instances;
 	_Allocations* _get_abstracted_storage(std::string name){
 		_Allocations* r = NULL;
@@ -16,7 +20,7 @@ namespace stored{
 		return r;
 	}
 	bool erase_abstracted_storage(std::string name){
-		
+
 		nst::synchronized ll(m);
 		_Allocations* r = NULL;
 		_AlocationsMap::iterator s = instances.find(name);
@@ -32,7 +36,7 @@ namespace stored{
 		}
 
 		if(r->is_idle()){
-			
+
 			r->set_recovery(false);
 			delete r;
 			instances.erase(name);
@@ -40,8 +44,8 @@ namespace stored{
 			return true;
 		}else{
 			inf_print("the storage '%s' is not idle and could not be erased",name.c_str());
-		}				
-		
+		}
+
 		return false;
 	}
 	_Allocations* get_abstracted_storage(std::string name){
@@ -66,7 +70,7 @@ namespace stored{
 		nst::u64 reduced = 0;
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
 			//if(buffer_allocation_pool.is_near_depleted()){ //
-				if((*a).second->get_age() > 15000 && (*a).second->transactions_away() <= 1){				
+				if((*a).second->get_age() > 15000 && (*a).second->transactions_away() <= 1){
 					//(*a).second->reduce();
 					//(*a).second->touch();
 					//reduced++;
@@ -79,7 +83,7 @@ namespace stored{
 	void reduce_all(){
 
 		nst::synchronized ll(m);
-		
+
 		for(_AlocationsMap::iterator a = instances.begin(); a != instances.end(); ++a){
 			if(buffer_allocation_pool.is_near_depleted())
 				(*a).second->reduce();

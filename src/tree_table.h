@@ -46,7 +46,7 @@ extern char treestore_use_primitive_indexes;
 extern char treestore_reset_statistics;
 namespace tree_stored{
 	/// the table clock
-	extern std::atomic<nst::u64> table_clock;	
+	extern std::atomic<nst::u64> table_clock;
 
 	class InvalidTablePointer : public std::exception{
 	public:
@@ -173,7 +173,7 @@ namespace tree_stored{
 			if(destroyed)
 				printf("col already destroyed");
 			destroyed = true;
-			
+
 		}
 		virtual void seek_retrieve(stored::_Rid row, Field* f) = 0;
 		virtual void add_row(stored::_Rid row, Field * f) = 0;
@@ -566,21 +566,21 @@ namespace tree_stored{
 		virtual void compose_by_tree(stored::_Rid r, CompositeStored & to){
 			const _Fieldt& field = col.seek_by_tree(r);
 			to.add(field);
-			
+
 		}
 		virtual void compose_by_cache(stored::_Rid r, CompositeStored & to){
 			const _Fieldt& field = col.seek_by_cache(r);
 			to.add(field);
-			
+
 		}
 		/// purely provide conversion for from mysql field to composite stored
 		virtual void compose(CompositeStored & to, Field* f){
 			/// possibly also use , const uchar * ptr, uint flags
 			convertor.fget(temp, f, NULL, 0);/// convert into temp
 			to.add(temp); /// append to destination
-			
+
 		}
-		
+
 		virtual void compose(CompositeStored & to, Field* f, const uchar * ptr, uint flags){
 			//convertor.fget(temp, f, ptr, flags);
 			//to.add(temp.get_value());// TODO: due to this interface, BLOBS are impossible in indexes
@@ -608,7 +608,7 @@ namespace tree_stored{
 				f->set_null();
 			}else{
 				f->set_notnull();
-				
+
 				convertor.fset(row, f, t);
 			}
 		}
@@ -703,34 +703,34 @@ namespace tree_stored{
         uchar * saved_ptr;
 		uchar * base_ptr;
 	};
-	
+
 	typedef std::vector<nst::u64> _Density;
 
 	struct density_info{
 		_Density density;
 	};
-	
+
 	typedef std::vector<density_info> _DensityInfo;
-	
+
 	struct table_info{
-		
+
 		table_info() : table_size(0), row_count(0),	last_density_rows(0), rows_changed(0){
 		}
 
 		void clear(){
 			calculated.clear();
 			table_size = 0;
-			row_count = 0;	
+			row_count = 0;
 			last_density_rows = 0;
 			rows_changed = 0;
 		}
 
-		_DensityInfo calculated;		
+		_DensityInfo calculated;
 		/// these two values are not synonymous
-		nst::u64 table_size;		
-		_Rid row_count;		
+		nst::u64 table_size;
+		_Rid row_count;
 		_Rid last_density_rows;	/// changes when at the end of calculation of statistics
-		nst::i64 rows_changed;		
+		nst::u64 rows_changed;
 		void write(nst::buffer_type& buffer){
 			nst::u64 bytes = 0;
 			bytes += nst::leb128::signed_size(calculated.size());
@@ -766,12 +766,12 @@ namespace tree_stored{
 			if(writer != buffer.end()){
 				err_print("table_info (stats) write error: write size miscalculation");
 			}
-			
+
 		}
 		void read(const nst::buffer_type& buffer){
-			nst::u64 bytes = 0;
-			nst::i64 ival = 0;
-			if(buffer.empty()){				
+			//nst::u64 bytes = 0;
+			//nst::i64 ival = 0;
+			if(buffer.empty()){
 				return;
 			}
 			nst::buffer_type::const_iterator reader = buffer.begin();
@@ -790,13 +790,13 @@ namespace tree_stored{
 			this->row_count = nst::leb128::read_signed64(reader,e);
 			this->last_density_rows = nst::leb128::read_signed64(reader,e);
 			this->rows_changed = nst::leb128::read_signed64(reader,e);
-			
+
 		}
 	};
 
 	typedef std::vector<char> _SetFields; ///indicates which fields have been set by index
 	typedef std::vector<selection_tuple, sta::buffer_pool_alloc_tracker<selection_tuple>> _Selection;
-	
+
 	/// this class translates errors and behaviour into internal data structures without
 	/// exposing them to mysql shenanigans
 	class tree_table{
@@ -806,15 +806,15 @@ namespace tree_stored{
 		typedef std::vector<abstract_conditional_iterator::ptr, sta::buffer_pool_alloc_tracker<selection_tuple>> _Conditional;
 		typedef rabbit::unordered_map<nst::u32,nst::u32> _PrimaryKeyDef;
 		///, stored::abstracted_storage,std::less<_StoredRowId>, stored::int_terpolator
-		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> 
+		/// , std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag>
 		typedef stx::btree_map<_StoredRowId, _StoredRowFlag, stored::abstracted_storage, std::less<_StoredRowId>, stored::int_terpolator<_StoredRowId,_StoredRowFlag> > _TableMap;
 		struct shared_data{
-			shared_data() 
+			shared_data()
 			:	last_write_lock_time(0)
-			,	auto_incr(0)			
+			,	auto_incr(0)
 			,	calculated_max_row_id(0)
 			,	rows_changed(0)
-			,	rows_changed_since_last_density(0)			
+			,	rows_changed_since_last_density(0)
 			,	last_density_calc(0)
 			,	last_density_tx(std::numeric_limits<nst::i64>::max())
 			,	last_writer_tx(std::numeric_limits<nst::i64>::max())
@@ -826,11 +826,11 @@ namespace tree_stored{
 			Poco::Mutex lock;
 			Poco::Mutex write_lock;
 			nst::u64 last_write_lock_time;
-			_Rid auto_incr;			
+			_Rid auto_incr;
 			_Rid calculated_max_row_id;
 			nst::i64 rows_changed;
 			_Rid rows_changed_since_last_density;	/// changes every time a row is added,removed or deleted reset when statistics are recalculated
-			
+
 			nst::u64 last_density_calc;
 			nst::i64 last_density_tx;
 			nst::i64 last_writer_tx;
@@ -840,10 +840,10 @@ namespace tree_stored{
 			void clear(){
 				changed = false;
 				initialized = false;
-				auto_incr = 0;			
+				auto_incr = 0;
 				calculated_max_row_id = 0;
 				rows_changed = 0;
-				rows_changed_since_last_density = 0;	/// changes every time a row is added,removed or deleted reset when statistics are recalculated			
+				rows_changed_since_last_density = 0;	/// changes every time a row is added,removed or deleted reset when statistics are recalculated
 				last_density_calc = 0;
 				last_density_tx = std::numeric_limits<nst::i64>::max();
 				last_writer_tx = std::numeric_limits<nst::i64>::max();
@@ -866,7 +866,7 @@ namespace tree_stored{
 			template<class _Storage>
 			void load(_Storage& storage){
 				nst::synchronized shared(this->lock);
-				
+
 				this->changed = false;
 				nst::buffer_type stats;
 				storage.get_boot_value(stats,8);
@@ -877,24 +877,24 @@ namespace tree_stored{
 			}
 			/// called at every commit
 			void update_calc(_Rid row_count, nst::u64 table_size, nst::i64 last_writer_tx){
-				
+
 				nst::synchronized shared(this->lock);
 				this->last_writer_tx = last_writer_tx;
 				(*this).persisted.table_size = table_size;
-				(*this).persisted.row_count = row_count;				
-				
+				(*this).persisted.row_count = row_count;
+
 			}
 			void update_density_calc(_Rid row_count, nst::u64 table_size, const _DensityInfo &di,nst::i64 dtx){
 				nst::synchronized shared(this->lock);
 				(*this).last_density_tx = dtx;
 				(*this).last_density_calc = os::millis();
-				
+
 				/// update density/cardinality statistics
 				(*this).persisted.clear();
 				(*this).persisted.rows_changed = rows_changed;
 				(*this).persisted.last_density_rows = row_count;
 				(*this).persisted.row_count = row_count;
-				(*this).persisted.calculated = di;			
+				(*this).persisted.calculated = di;
 				(*this).persisted.table_size = table_size; /// this is updated after every transaction anyway
 				//(*this).persisted.max_row_id = this->auto_incr;
 				this->changed = true;/// some other writing transaction will persist it automatically using persist function
@@ -903,7 +903,7 @@ namespace tree_stored{
 		typedef std::map<std::string , std::shared_ptr<shared_data>> _SharedData;
 		static Poco::Mutex shared_lock;
 		static _SharedData shared;
-		
+
 	protected:
 		bool changed;
 		inline const char* INDEX_SEP(){
@@ -924,7 +924,7 @@ namespace tree_stored{
 			all_changed.resize(rowsize);
 			//collums::_LockedRowData * lrd = collums::get_locked_rows(storage.get_name());
 			for (Field **field=share->field ; *field ; field++){
-				
+
 				ha_base_keytype bt = (*field)->key_type();
 				nst::u32 fi = (*field)->field_index;
 				nst::u32 field_size = (*field)->max_display_length();
@@ -1011,7 +1011,7 @@ namespace tree_stored{
 
 						break; //do nothing pass
 				}//switch
-				
+
 				//_max_row_id = std::max<_Rid>(_max_row_id, cols[(*field)->field_index]->stored_rows());
 			}
 		}
@@ -1057,13 +1057,13 @@ namespace tree_stored{
 				bool field_primitive =false;
 				if(treestore_use_primitive_indexes && pos->usable_key_parts==1){
 					Field *field = pos->key_part[0].field;// the jth field in the key
-					
+
 					field_primitive = true;
 					ha_base_keytype bt = field->key_type();
 					if(this->primary_key == i){
 						pk_def[field->field_index] = this->primary_key;
 					}
-					
+
 					switch(bt){
 						case HA_KEYTYPE_END:
 							// ERROR ??
@@ -1141,14 +1141,14 @@ namespace tree_stored{
 					key_size+=pos->usable_key_parts;
 					//index = new tree_index<stored::StandardDynamicKey>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 					if(index==nullptr){
-						const size_t min_key_size0 = sizeof(stored::DynamicKey<0>);
+						//const size_t min_key_size0 = sizeof(stored::DynamicKey<0>);
 						const size_t min_key_size = sizeof(stored::DynamicKey<0>::_Data);
 						if(key_size <= min_key_size){
 							index = new tree_index<stored::DynamicKey<0>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 						}else if(key_size <= min_key_size + 2){
-							index = new tree_index<stored::DynamicKey<2>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );						
+							index = new tree_index<stored::DynamicKey<2>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 						}else if(key_size <= min_key_size + 4){
-							index = new tree_index<stored::DynamicKey<4>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );						
+							index = new tree_index<stored::DynamicKey<4>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 						}else if(key_size <= min_key_size + 8){
 							index = new tree_index<stored::DynamicKey<8>>(index_name, ( pos->flags & (HA_NOSAME|HA_UNIQUE_CHECK) ) != 0 );
 						}else if(key_size <= min_key_size + 16){
@@ -1176,14 +1176,14 @@ namespace tree_stored{
 		}
 	protected:
 		_FileNames file_names;
-		
-		
+
+
 		int locks;
 		nst::u64 last_lock_time;
 		nst::u64 last_unlock_time;
-		
+
 		bool calculating_statistics;
-		Poco::Mutex tt_info_copy_lock;		
+		Poco::Mutex tt_info_copy_lock;
 		nst::u64 clock;
 		std::vector<bool> all_changed;
 		_PrimaryKeyDef pk_def;
@@ -1210,7 +1210,7 @@ namespace tree_stored{
 			return this->primary_key;
 		}
 		void get_calculated_info(table_info& calc){
-			nst::synchronized _s(tt_info_copy_lock);				
+			nst::synchronized _s(tt_info_copy_lock);
 			calc = (*this).share->persisted;
 		}
 
@@ -1235,15 +1235,15 @@ namespace tree_stored{
 		}
 
 		tree_table(TABLE *table_arg, const std::string& path, bool writing = false)
-		:	changed(false)				
+		:	changed(false)
 		,	locks(0)
 		,	last_lock_time(os::micros())
 		,	last_unlock_time(os::micros())
 		,	storage(path)
 		,	path(path)
-		,	table(nullptr)
 		,	calculating_statistics(false)
 		,	clock(++table_clock)
+		,	table(nullptr)
 		,	share(nullptr)
 		,	writing(writing)
 		,	primary_key(MAX_KEY)
@@ -1259,7 +1259,7 @@ namespace tree_stored{
 				(*this).share = sshared.get();
 			}
 			load(table_arg);
-			
+
 			rollback();
 		}
 		void reset_shared(){
@@ -1267,7 +1267,7 @@ namespace tree_stored{
 			clear_share();
 			(*this).share->auto_incr = 1;
 		}
-		
+
 		~tree_table(){
 			clear();
 			delete_extendsions();
@@ -1276,7 +1276,7 @@ namespace tree_stored{
 
 		_TableMap& get_table(){
 
-			if(nullptr==table){				
+			if(nullptr==table){
 				table = new _TableMap(storage);
 			}
 			return *table;
@@ -1297,7 +1297,7 @@ namespace tree_stored{
 		};
 		void init_share_auto_incr(){
 			if(share->auto_incr == 0){
-				get_max_row_id_from_table();				
+				get_max_row_id_from_table();
 			}
 		}
 		_Rid get_auto_incr() const {
@@ -1332,15 +1332,15 @@ namespace tree_stored{
 			if(share != nullptr){
 				nst::synchronized shared(share->lock);
 				share->auto_incr = initial;
-				
+
 			}
 		}
 		void incr_auto_incr(){
 			if(share!=nullptr){
 				if(share->auto_incr != 0){
-					nst::synchronized shared(share->lock);				
+					nst::synchronized shared(share->lock);
 					++(share->auto_incr);
-				
+
 				}else{
 					err_print("share auto incr not initalized");
 				}
@@ -1353,7 +1353,7 @@ namespace tree_stored{
 				if(share->auto_incr == 0){
 					err_print("share auto incr not initalized");
 				}
-				
+
 				share->update_calc((*this).get_row_count(),(*this).table_size(),storage.current_transaction_order());
 				//(*this).persisted.calculated_max_row_id = (*this).share->calculated_max_row_id;
 			}else{
@@ -1370,13 +1370,13 @@ namespace tree_stored{
 			if( this->share->persisted.table_size == 0){// should really recalc
 				return true;
 			}
-			if(this->share->last_density_tx == this->share->last_writer_tx){				
-				return false; /// no reason to recalc				
+			if(this->share->last_density_tx == this->share->last_writer_tx){
+				return false; /// no reason to recalc
 			}
 			if(this->share->last_density_tx == 0){
 				return true; // no calc has been performed - one must be done
 			}
-			
+
 			/// if more than ten persent of rows changed since last recalc perform a recalc
 			if( ( share->rows_changed - share->persisted.rows_changed ) > share->persisted.last_density_rows/10){
 				if(os::millis() - this->share->last_density_calc < 60000){
@@ -1389,7 +1389,7 @@ namespace tree_stored{
 				return true;
 			}
 
-			
+
 			return false;
 		}
 		void calc_density(){
@@ -1405,7 +1405,7 @@ namespace tree_stored{
 			//}
 			uint i;
 			//std::string path = share->path.str;
-			
+
 			if(!(*this).share->auto_incr){
 				return;
 			}
@@ -1415,55 +1415,55 @@ namespace tree_stored{
 			calculating_statistics = true;
 			for (i= 0; i < (*this).indexes.size(); i++){//all the indexes in the table ?
 				stored::index_interface::ptr index = (*this).indexes[i];
-			
-				//inf_print("Calculating cardinality of index parts for %s",(*this).indexes[i]->name.c_str());				
+
+				//inf_print("Calculating cardinality of index parts for %s",(*this).indexes[i]->name.c_str());
 				const _Rid step_size = 8;
 				const _Rid rows = get_row_count();
-				const _Rid sample = rows/step_size;				
+				const _Rid sample = rows/step_size;
 				typedef std::unordered_set<CompositeStored,hash_composite, std::equal_to<CompositeStored>, sta::tracker<CompositeStored> > _Unique;
-				typedef std::vector<_Unique,sta::tracker<_Unique> > _Uniques;				
+				typedef std::vector<_Unique,sta::tracker<_Unique> > _Uniques;
 				_Uniques uniques( index->parts.size() );
 				CompositeStored ir;
-				
-				for(_Rid row = 0; row < rows/step_size; ++row){								
+
+				for(_Rid row = 0; row < rows/step_size; ++row){
 					nst::u32 u = 0;
 					stored::_Parts::iterator pbegin = index->parts.begin();
 					stored::_Parts::iterator pend = index->parts.end();
 					ir.clear();
 					for(stored::_Parts::iterator p = pbegin; p != pend; ++p){
 						int ip = (*p);
-						(*this).cols[ip]->compose_by_tree(row, ir);													
-					}	
+						(*this).cols[ip]->compose_by_tree(row, ir);
+					}
 					uniques[u].insert(ir);
 					++u;
 				}
 				nst::u32 partx = 1;
 				index->clear_density();
-				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){				
+				for(_Uniques::iterator u = uniques.begin(); u != uniques.end(); ++u){
 					_Rid den = 1;
 					if(!uniques[0].empty()) den = sample/uniques[0].size(); //(*u).size() ;/// accurate to the nearest page
-					if(den > 1) den = den * 5;					
+					if(den > 1) den = den * 5;
 					//inf_print("Calculating cardinality of index parts for %s.%ld as %lld = %lld / %lld (rows %lld est. %lld)\n",(*this).indexes[i]->name.c_str(),partx,den,sample,(*u).size(),get_row_count(),sample*step_size);
 					index->push_density(den);
 					index->reduce_use();
 					partx++;
-				}						
+				}
 			}
-			
+
 			reduce_use();
 			{
 				nst::synchronized _s_info(tt_info_copy_lock);
-				
-				
+
+
 				(*this).share->update_density_calc(this->get_row_count(),this->table_size(),create_density_info(),storage.current_transaction_order());
 			}
 			calculating_statistics = false;
 		}
 		void begin_table(bool read, bool shared = true){
-			
+
 			stored::abstracted_tx_begin(read, shared, storage, get_table());
 			init_share_auto_incr();
-			
+
 		}
 
 		void rollback_table(){
@@ -1472,7 +1472,7 @@ namespace tree_stored{
 
 		}
 		bool should_save_stats(){
-			return (share && share->changed);		
+			return (share && share->changed);
 		}
 		void save_stats(){
 			if(!storage.is_transacted()){
@@ -1490,7 +1490,7 @@ namespace tree_stored{
 				err_print("could not commit: share not available");
 				return;
 			}
-			if(changed){				
+			if(changed){
 				update_rowcount(); /// update the row_count and table_size variables
 				this->storage.set_boot_value(share->rows_changed,9);
 				get_table().flush_buffers();
@@ -1502,7 +1502,7 @@ namespace tree_stored{
 				if(!storage.commit()){
 					rollback_table();
 				}
-				
+
 			}
 		}
 
@@ -1578,7 +1578,7 @@ namespace tree_stored{
 		void clear_share(){
 			if(nullptr != share) {
 				inf_print("clearing share for permanent table removal");
-				share->clear();				
+				share->clear();
 				share->persisted.clear();
 			}
 		}
@@ -1595,15 +1595,15 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				delete (*c);
 			}
-			
+
 			cols.clear();
-						
-			if(nullptr != table) 
+
+			if(nullptr != table)
 				delete table;
 			table = nullptr;
 
 			storage.close();
-			
+
 			changed = false;
 		}
 
@@ -1621,7 +1621,7 @@ namespace tree_stored{
 		nst::u64 get_clock() const {
 			return this->clock;
 		}
-		
+
 		/// this function gets called before the table gets accessed
 		void check_load(TABLE *table_arg){
 			clock = ++table_clock; /// used for lru
@@ -1669,7 +1669,7 @@ namespace tree_stored{
 			for(_Collumns::iterator c = cols.begin(); c!=cols.end();++c){
 				(*c)->reduce_col_use();
 			}
-			
+
 		}
 		void reduce_col_use(){
 			reduce_tree_use();
@@ -1722,7 +1722,7 @@ namespace tree_stored{
 		inline const CompositeStored& get_index_query() const {
 			return temp;
 		}
-		
+
 		/// returns the rows per key for all collumns and index parts
 		_DensityInfo create_density_info(){
 			_DensityInfo info;
@@ -1869,7 +1869,7 @@ namespace tree_stored{
 						field->ptr = (uchar *)ptr;
 						if(pi->null_bit)
 							field->ptr++;
-						cols[field->field_index]->compose(temp, field, field->ptr, 0);						
+						cols[field->field_index]->compose(temp, field, field->ptr, 0);
 					}
 					field->ptr = okey;
 				}else{
@@ -1930,10 +1930,10 @@ namespace tree_stored{
 		,	const uchar *key
 		,	uint key_l
 		,	uint key_map
-		
+
 		){
 			check_load(table);
-			stored::index_interface::ptr ix =  indexes[ax];			
+			stored::index_interface::ptr ix =  indexes[ax];
 			_compose_query_nb(table, 0ull, ax, key, key_l, key_map);
 		}
 
@@ -2040,17 +2040,17 @@ namespace tree_stored{
 
 			indexes[ax]->lower_(out, temp);
 		}
-		
+
 		/// returns true if temo is less than other
-		bool is_less(const tree_stored::CompositeStored& other){			
+		bool is_less(const tree_stored::CompositeStored& other){
 			return temp < other;
 		}
 
 		/// returns true if temo is equal to other
-		bool is_equal(const tree_stored::CompositeStored& other){			
+		bool is_equal(const tree_stored::CompositeStored& other){
 			return temp == other;
 		}
-		
+
 
 		void temp_lower
 		(	TABLE* table
@@ -2076,7 +2076,7 @@ namespace tree_stored{
 		,	uint ax
 		,	const uchar *key
 		,	uint key_l
-		,	uint key_map		
+		,	uint key_map
 		){
 			check_load(table);
 			stored::index_interface::ptr ix =  indexes[ax];
@@ -2139,45 +2139,45 @@ namespace tree_stored{
 		_Rid get_max_row_id_from_table(){
 			/// this function runs first after a transaction started
 			_Rid r = 0;
-			
+
 			if(share->initialized == false){
 				if(has_primary_key()){
-					_TableMap::iterator t = get_table().find(get_primary_key());			
+					_TableMap::iterator t = get_table().find(get_primary_key());
 					if(t!=get_table().end()){
 						r = t.data().get_value();
 					}
 				}else{
-					_TableMap::iterator t = get_table().end();			
-					if(!get_table().empty()){				
+					_TableMap::iterator t = get_table().end();
+					if(!get_table().empty()){
 						--t;
-						r = t.key().get_value();				
+						r = t.key().get_value();
 					}
 				}
-			
+
 				nst::synchronized shared(share->lock);
 				if(share->initialized == false){
 					/// the share has not been initialized - do it now
 					share->initialized = true;
 					storage.get_boot_value(share->rows_changed,9);
-					share->auto_incr = ++r;				
+					share->auto_incr = ++r;
 					share->calculated_max_row_id = r;
 					nst::buffer_type stats;
 					if(treestore_reset_statistics == FALSE)
 						storage.get_boot_value(stats, 8);
-					
+
 					if(!stats.empty()){
 						inf_print("load statistics: %s",this->path.c_str());
-						this->share->persisted.read(stats);						
+						this->share->persisted.read(stats);
 						this->share->last_density_tx = 1;
 						this->share->last_density_calc = os::millis();
 					}
 					// statistics and actual row counts probably do not match since the stats is a bit behind
-					share->persisted.row_count = (*this).get_row_count();					
+					share->persisted.row_count = (*this).get_row_count();
 				}
-			
+
 			}
 			r = share->auto_incr;
-			
+
 
 			return r;
 		}
@@ -2222,7 +2222,7 @@ namespace tree_stored{
 				commit2(p2_lock);
 				if(calc_total_use() > treestore_max_mem_use){
 					///stored::reduce_all();
-				}					
+				}
 
 				changed = false;
 			}else
@@ -2230,7 +2230,7 @@ namespace tree_stored{
 				bool rolling = true; //treestore_reduce_tree_use_on_unlock;
 				//if
 				//(	//::os::millis() - (*this).share->last_write_lock_time < READER_ROLLBACK_THRESHHOLD
-					//||	
+					//||
 					// calc_total_use() > treestore_max_mem_use*0.7f
 					//||  rolling
 				//)
@@ -2238,7 +2238,7 @@ namespace tree_stored{
 					if(storage.stale()){
 						rollback();
 					}
-				}else 
+				}else
 					rollback();/// relieves the version load when new data is added to the collums
 			}
 		}
@@ -2252,13 +2252,13 @@ namespace tree_stored{
 			}
 
 			if(--locks == 0){
-				
+
 				last_unlock_time = os::micros();
 			}
 			return locks;
 		}
 		stored::index_interface *error_index;
-		int write_noinc(TABLE* table,_Rid auto_row){			
+		int write_noinc(TABLE* table,_Rid auto_row){
 			error_index  = nullptr;
 			check_load(table);
 			if(!is_writing())
@@ -2279,37 +2279,37 @@ namespace tree_stored{
 			nst::u32 keys = (nst::u32)indexes.size();
 
 			/// first check for unique indexes
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){				
-				(*x)->temp.clear();				
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
+				(*x)->temp.clear();
 				(*x)->resolved.row = stored::MAX_ROWS;
-				if((*x)->is_unique()){										
+				if((*x)->is_unique()){
 					++unique_keys;
 				}
 			}
 
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){	
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->temp.clear();
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 					cols[(*p)]->compose((*x)->temp,table->field[(*p)]); /// compose the new field data into temp
 				}
-				if((*x)->is_unique()){					
-					/// places matching key data in resolved if it exists				
-					if((*x)->resolve((*x)->temp) != stored::MAX_ROWS){						
+				if((*x)->is_unique()){
+					/// places matching key data in resolved if it exists
+					if((*x)->resolve((*x)->temp) != stored::MAX_ROWS){
 						(*x)->resolved = (*x)->temp;
 						error_index = (*x);
-					
+
 						return HA_ERR_FOUND_DUPP_KEY;
 					}else{
-					
+
 					}
 				}
 			}
 
-			
+
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
 				if
-				(	bitmap_is_set(table->write_set, (*field)->field_index) 				
+				(	bitmap_is_set(table->write_set, (*field)->field_index)
 				)
 				{
 					if(cols[(*field)->field_index]){
@@ -2327,26 +2327,26 @@ namespace tree_stored{
 					}
 				}
 			}
-			
-			
-			
+
+
+
 			/// can add it to the index as a normal new row
-			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){		
+			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				(*x)->temp.row = resolved;
-				(*x)->add((*x)->temp);					
+				(*x)->add((*x)->temp);
 			}
-			
+
 			if(has_primary_key()){
 				(*this).get_table()[get_primary_key()] = get_auto_incr();
 			}else{
 				(*this).get_table().insert(get_auto_incr(), 0);
 			}
 			if(get_auto_incr() % 300000 == 0){
-				inf_print(" %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());				
-				
+				inf_print(" %lld rows added to %s\n", (nst::lld)get_auto_incr() , this->path.c_str());
+
 			}
 			share->rows_changed++;
-			
+
 			return 0;
 		}
 		/// maps and copies available data in index to read set - reports those that could not be copied
@@ -2354,8 +2354,8 @@ namespace tree_stored{
 		void read_index_key_to_fields(_SelectionType& to_set, TABLE* table, nst::u32 ix, const _KeyType& key,std::vector<Field*>& field_map){
 			TABLE_SHARE *share= table->s;
 			stored::index_interface::ptr index  = indexes[ix];
-			Field **fields =share->field ;
-			
+			//Field **fields =share->field ;
+
 			stored::StandardDynamicKey::iterator k = key;
 			for(stored::_Parts::iterator p = index->parts.begin(); p != index->parts.end(); ++p){
 				if(bitmap_is_set(table->read_set, (*p) )){
@@ -2363,21 +2363,21 @@ namespace tree_stored{
 					//if(f->field_index == (*p)){ /// only do this if the field index is the same as the part index
 						const nst::u8 * data = k.get_data();
 						longlong lval = 0;
-						to_set.set_field((*p),true);		
+						to_set.set_field((*p),true);
 						int kt = k.get_type();
-						switch(kt){						
-						
+						switch(kt){
+
 						case CompositeStored::UI8:
 							lval = *(const nst::u64*)(data);
 							f->set_notnull();
-							f->store(lval,true); 
+							f->store(lval,true);
 							break;
 						case CompositeStored::I1:
 							lval = *(const nst::i8*)(data);
 							f->set_notnull();
-							f->store(lval,false);						
+							f->store(lval,false);
 							break;
-						
+
 						case CompositeStored::I2:
 							lval = *(const nst::i16*)(data);
 							f->set_notnull();
@@ -2391,7 +2391,7 @@ namespace tree_stored{
 						case CompositeStored::I8:
 							lval = *(const nst::i64*)(data);
 							f->set_notnull();
-							f->store(lval,false); 
+							f->store(lval,false);
 							break;
 						case CompositeStored::R4:
 							f->store(*(const float*)(data));
@@ -2400,7 +2400,7 @@ namespace tree_stored{
 							break;
 						case CompositeStored::R8:
 							f->set_notnull();
-							f->store(*(const double*)(data));					
+							f->store(*(const double*)(data));
 							break;
 						case CompositeStored::S:
 							to_set.set_field((*p),false);
@@ -2410,26 +2410,26 @@ namespace tree_stored{
 								case CompositeStored::UI1:
 									lval = *(const nst::u8*)(data);
 									f->set_notnull();
-									f->store(lval,true);						
+									f->store(lval,true);
 									break;
 								case CompositeStored::UI2:
 									lval = *(const nst::u16*)(data);
 									f->set_notnull();
 									f->store(lval,true);
 									break;
-						
+
 								case CompositeStored::UI4:
 									lval = *(const nst::u32*)(data);
 									f->set_notnull();
 									f->store(lval,true);
-									break;															
+									break;
 								default:
 									to_set.set_field((*p),false);
-									break;		
+									break;
 							};
-							
+
 							break;
-							
+
 						};
 					//}else{/// complain about the field index
 					//	printf("[TS] [WARNING] the field index and index part index is not the same");
@@ -2438,16 +2438,16 @@ namespace tree_stored{
 				k.next();
 				if(!k.valid()) break;
 			}
-			
+
 		}
 		int write(TABLE* table){
 			if(!is_writing()){
-				err_print("writing to read only table [%s]",this->path.c_str());				
+				err_print("writing to read only table [%s]",this->path.c_str());
 				return HA_ERR_UNSUPPORTED;
 			}
 			if(!changed)
 			{
-				err_print("writing to unlocked table [%s]",this->path.c_str());				
+				err_print("writing to unlocked table [%s]",this->path.c_str());
 				return HA_ERR_UNSUPPORTED;
 			}
 			int r = write_noinc(table,get_auto_incr());
@@ -2455,15 +2455,15 @@ namespace tree_stored{
 			if(r==0)
 				(*this).share->auto_incr++;
 			return r;
-			
+
 		}
-		
-		void erase(stored::_Rid rid, TABLE* table){			
+
+		void erase(stored::_Rid rid, TABLE* table){
 			if(!is_writing()){
 				err_print("writing to read only table");
 				return;
 			}
-			
+
 			check_load(table);
 			if(!changed)
 			{
@@ -2482,21 +2482,21 @@ namespace tree_stored{
 			}
 
 		}
-		
+
 		int update(stored::_Rid rid, TABLE* table,const std::vector<bool>& change_set){
 			if(!is_writing()){
-				err_print("writing to read only table");				
+				err_print("writing to read only table");
 				return HA_ERR_UNSUPPORTED;
-			}		
+			}
 			/// erase_row_index must be called before this function
 			check_load(table);
 			if(!changed)
 			{
-				err_print("attempting write to not locked table");				
+				err_print("attempting write to not locked table");
 				return HA_ERR_UNSUPPORTED;
 			}
 			share->rows_changed++;
-			
+
 			/// TABLE_SHARE *share= table->s;
 			for (Field **field=table->field ; *field ; field++){
 				Field * f = (*field);
@@ -2505,11 +2505,11 @@ namespace tree_stored{
 						cols[f->field_index]->erase_row(rid);
 					}else{
 						cols[f->field_index]->add_row(rid, f);
-					}					
+					}
 				}
 			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
-				
+
 				nst::u32 changed_parts = 0;
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 					if(change_set[(*p)]){
@@ -2518,11 +2518,11 @@ namespace tree_stored{
 				}
 				if(changed_parts){
 					temp.clear();
-					for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){						
+					for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 						cols[(*p)]->compose_by_tree(rid, temp);
 					}
-					
-					//temp.add(rid);				
+
+					//temp.add(rid);
 					temp.row = rid;
 					(*x)->add(temp);
 				}
@@ -2543,7 +2543,7 @@ namespace tree_stored{
 			}
 			for(_Indexes::iterator x = indexes.begin(); x != indexes.end(); ++x){
 				temp.clear();
-				
+
 				nst::u32 parts_changed = 0;
 				for(stored::_Parts::iterator p = (*x)->parts.begin(); p != (*x)->parts.end(); ++p){
 					cols[(*p)]->compose_by_cache(rid, temp);
@@ -2553,7 +2553,7 @@ namespace tree_stored{
 				//temp.add(rid);
 				if(parts_changed){
 					temp.row = rid;
-					(*x)->remove(temp);					
+					(*x)->remove(temp);
 				}
 			}
 		}
@@ -2568,7 +2568,7 @@ namespace tree_stored{
 		stored::_Rid shared_row_count() const {
 			return share->persisted.row_count;
 		}
-		
+
 		stored::_Rid table_size() const {
 			stored::_Rid r = 0;
 			for(_Collumns::const_iterator c = cols.begin();c != cols.end(); ++c){
@@ -2638,7 +2638,7 @@ namespace tree_stored{
 			}
 			return r;
 		}
-		
+
 		void init_iterators(){
 			(*this).r = this->get_table().begin();
 			(*this).r_stop = this->get_table().end();

@@ -62,7 +62,7 @@ namespace collums{
 		typedef _Key							key_type;
 		/// the type of values stored
 		typedef _Value							data_type;
-		
+
 		/// the value encoder
 		typedef _ValueEncoder					value_encoder_type;
 		/// the storage type
@@ -71,7 +71,7 @@ namespace collums{
 		typedef nst::buffer_type				buffer_type;
 		/// the key value pair for iterators
 		typedef std::pair<key_type, data_type>	value_type;
-		
+
 	protected:
 		enum{
 			page_size = 128,//192,348
@@ -80,7 +80,7 @@ namespace collums{
 		struct stored_page{
 		private:
 			mutable bool modified;
-			size_type size; 	
+			size_type size;
 			size_type address;
 			version_type version;
 			nst::u8	exists[page_size/8];
@@ -88,15 +88,15 @@ namespace collums{
 			std::atomic<nst::u64> references;
 		private:
 			void set_bit(nst::u8& w, nst::u8 index, bool f){
-				
+
 				#ifdef _MSC_VER
 				#pragma warning(disable:4804)
-				#endif				
-				nst::u8 m = (nst::u8)1ul << index;// the bit mask				
-				w ^= (-f ^ w) & m;				
+				#endif
+				nst::u8 m = (nst::u8)1ul << index;// the bit mask
+				w ^= (-f ^ w) & m;
 			}
-		
-			
+
+
 		public:
 			void reset_references(){
 				this->references = 0;
@@ -147,10 +147,10 @@ namespace collums{
 				nst::u8 bit = b & 7;
 				return ((v >> bit) & (nst::u8)1ul);
 			}
-			data_type& get(size_type which) {				
+			data_type& get(size_type which) {
 				return values[which % page_size];
 			}
-			data_type* pget(size_type which) {				
+			data_type* pget(size_type which) {
 				if(is_exists(which))
 					return &values[which % page_size];
 				return nullptr;
@@ -158,21 +158,21 @@ namespace collums{
 			const data_type& get(size_type which) const {
 				return values[which % page_size];
 			}
-			
-			void set(size_type which, const data_type& value){				
+
+			void set(size_type which, const data_type& value){
 				modified = true;
 				set_exists(which, true);
-				get(which) = value;				
+				get(which) = value;
 			}
-			
+
 			void set_address(size_type address){
 				(*this).address = address;
 			}
-			
+
 			size_type get_address() const {
 				return (*this).address;
 			}
-			
+
 			void set_version(version_type version){
 				this->version = version;
 			}
@@ -180,7 +180,7 @@ namespace collums{
 			version_type get_version() const {
 				return (*this).version;
 			}
-			
+
 			void load
 			(	value_encoder_type encoder
 			,	storage_type & storage
@@ -207,18 +207,18 @@ namespace collums{
 
 				size_t d = reader - buffer.begin();
 
-				if(d != bsize){					
+				if(d != bsize){
 					err_print("page has invalid size");
 				}
 			}
-			
+
 			void save(value_encoder_type encoder, storage_type &storage, buffer_type& buffer) const {
 				if(!modified) return;
-					
+
 				using namespace stx::storage;
 				size_type storage_use = 0;
 				nst::i32 encoded_value_size = encoder.encoded_values_size((*this).values, page_size);
-				storage_use += leb128::signed_size(encoded_value_size);				
+				storage_use += leb128::signed_size(encoded_value_size);
 				storage_use += page_size/8;
 				if(encoded_value_size > 0){
 					storage_use += encoded_value_size;
@@ -233,16 +233,16 @@ namespace collums{
 				if(buffer.size() != storage_use){
 					err_print("resize failed");
 				}
-				buffer_type::iterator writer = buffer.begin();				
-				writer = leb128::write_signed(writer, encoded_value_size);			
+				buffer_type::iterator writer = buffer.begin();
+				writer = leb128::write_signed(writer, encoded_value_size);
 				for(size_type b = 0; b < page_size/8; ++b){
 					(*writer) = exists[b];
 					++writer;
 				}
-					
+
 				if(encoded_value_size > 0 ){
 					encoder.encode_values_row(buffer, writer, (*this).values, page_size);
-				}else{					
+				}else{
 					for(size_type v = 0; v < page_size; ++v){
 						if(is_exists_row(v))
 							storage.store(writer, values[v]);
@@ -252,10 +252,10 @@ namespace collums{
 				if(d > storage_use){
 					err_print("array page encoding failed");
 				}
-				
+
 				modified = false;
 			}
-				
+
 			bool is_modified() const {
 				return this->modified;
 			}
@@ -267,7 +267,7 @@ namespace collums{
 		class shared_context{
 		public:
 			typedef std::pair<size_type,version_type> address_version;
-			
+
 			struct hash_address_version{
 				unsigned long operator() (const address_version& k) const {
 					return (k.first << 7) ^ std::hash<version_type>()(k.second);
@@ -278,14 +278,14 @@ namespace collums{
 			mutable Poco::Mutex lock;
 			_Pages versioned_pages;
 			mutable nst::u64 reduced;
-			
+
 		public:
 			shared_context(){
 				reduced = 0;
 			}
 			~shared_context(){
-			}			
-			
+			}
+
 			bool has(stored_page_ptr page){
 				//
 				nst::synchronized l(this->lock);
@@ -296,7 +296,7 @@ namespace collums{
 				return false;
 			}
 			bool release(stored_page_ptr page){
-				
+
 				nst::synchronized l(this->lock);
 				address_version location = std::make_pair(page->get_address(), page->get_version());
 				stored_page_ptr r = nullptr;
@@ -315,7 +315,7 @@ namespace collums{
 						return true;
 					}
 				}
-				
+
 				return false;
 			}
 			void reduce(){
@@ -326,19 +326,19 @@ namespace collums{
 				if(!stx::memory_mark_state){
 					return;
 				}
-				
-				
+
+
 				//if(now - this->reduced < treestore_cleanup_time/4){
 				//	return;
 				//}
-				
+
 				//printf("[TS] [INFO] reduce pages\n");
 				typedef std::vector<address_version> _Released;
-				
+
 				if(versioned_pages.empty()){
 				}else{
 					_Released released;
-					for(_Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
+					for(typename _Pages::iterator p = versioned_pages.begin();p!=versioned_pages.end();++p){
 						stored_page_ptr page = p->second;
 						if(page->get_references() == 0){
 							err_print("inconsistent memory previously visited page or page invalid");
@@ -353,7 +353,7 @@ namespace collums{
 							}else{
 								delete page;
 							}
-						
+
 							released.push_back(p->first);
 						}
 						if(released.size() > versioned_pages.size() / 8){
@@ -367,7 +367,7 @@ namespace collums{
 					if(versioned_pages.size() != old-released.size()){
 						err_print("inconsistent memory");
 					}
-					
+
 				}
 				this->reduced = 1 ;
 			}
@@ -376,17 +376,17 @@ namespace collums{
 				if(p->get_references() < 1){
 					err_print("page has invalid reference count");
 				}
-				address_version location = std::make_pair(p->get_address(), p->get_version());				
+				address_version location = std::make_pair(p->get_address(), p->get_version());
 				nst::synchronized l(this->lock);
-				if(versioned_pages.count(location)==0){					
-					p->ref();/// reference for pages collection			
+				if(versioned_pages.count(location)==0){
+					p->ref();/// reference for pages collection
 					if(p->is_modified()){
 						err_print("page added as modified");
 					}
-					versioned_pages[location] = p;			
+					versioned_pages[location] = p;
 					this->reduced = 0;
 					return true;
-				}				
+				}
 				return false;
 			}
 			/// notify that something has changed inside
@@ -399,19 +399,19 @@ namespace collums{
 				stored_page_ptr r = nullptr;
 				nst::synchronized l(this->lock);
 				address_version query = std::make_pair(address, version);
-				versioned_pages.get(query,r);				
+				versioned_pages.get(query,r);
 				if(r != nullptr){
-					address_version location = std::make_pair(r->get_address(), r->get_version());	
+					address_version location = std::make_pair(r->get_address(), r->get_version());
 					if(location != query){
 						err_print("the retrieved version does not match the query");
 					}
-					r->ref(); 
+					r->ref();
 					this->reduced = 0;
 				}
-				
+
 				return r;
 			}
-		
+
 		};
 
 		class shared_pages{
@@ -423,7 +423,7 @@ namespace collums{
 			shared_pages(){
 			}
 			~shared_pages(){
-				for(_Contexts::iterator c = contexts.begin(); c!=contexts.end(); ++c){
+				for(typename _Contexts::iterator c = contexts.begin(); c!=contexts.end(); ++c){
 					delete (*c).second;
 				}
 			}
@@ -449,7 +449,7 @@ namespace collums{
 		mutable storage_type* storage;
 		/// the largest key added
 		stx::storage::i64 largest;
-		/// the key count 
+		/// the key count
 		stx::storage::i64 _size;
 		/// buffer type temporary compress destination
 		mutable buffer_type temp_encode;
@@ -467,7 +467,7 @@ namespace collums{
 			if(use_pool_allocator==1){
 				page = allocation_pool.allocate<stored_page>();
 			}else{
-				page = new stored_page(); 
+				page = new stored_page();
 			}
 			return page;
 		}
@@ -502,18 +502,18 @@ namespace collums{
 			//if(version_control->has(page)){
 			//	if(page->get_references() < 2){
 			//		err_print("array page is under referenced");
-			//	}								
+			//	}
 			//}
 			version_control->release(page);
 			stream_address w = page->get_address();
 			//temp_encode.clear();
-			page->save(encoder, get_storage(), temp_encode);		
+			page->save(encoder, get_storage(), temp_encode);
 			buffer_type swapped;
-			compress_lz4_fast(swapped,temp_encode);				
+			compress_lz4_fast(swapped,temp_encode);
 			buffer_type &buffer = get_storage().allocate(w, stx::storage::create);
 			buffer.swap(swapped);
 			page->set_version(get_storage().get_allocated_version());
-								
+
 			get_storage().complete();
 
 			version_control->add(page);
@@ -526,7 +526,7 @@ namespace collums{
 				last_loaded->unref();
 			last_loaded = nullptr;
 			if(pages.empty()) return;
-			for(page_map_type::iterator p = pages.begin(); p != pages.end();++p){
+			for(typename page_map_type::iterator p = pages.begin(); p != pages.end();++p){
 				stored_page_ptr page = (*p).second;
 				if(page == local_page){
 					if(page->is_modified()){
@@ -545,7 +545,7 @@ namespace collums{
 		/// get version of page relative to current transaction
 		/// this is an expensive function - relatively speaking
 		version_type get_page_version(size_type address) {
-			version_req.clear();			
+			version_req.clear();
 			version_req.push_back(std::make_pair(address, version_type()));
 			if(get_storage().get_greater_version_diff(version_req)){
 				if(!version_req.empty() && version_req[0].first == address){
@@ -559,15 +559,15 @@ namespace collums{
 		version_type get_page_version(size_type address) const {
 			return ((paged_vector*)this)->get_page_version(address);
 		}
-		/// load a page from an address 
+		/// load a page from an address
 		stored_page_ptr load_page(size_type address) const {
 			bool mem_low = false;//(treestore_column_cache != 0 && !stx::memory_mark_state) && get_storage().is_readonly();
-			
+
 			stored_page_ptr page = nullptr;
 			if(true){ ///get_storage().is_local()
-				version_type current_version = get_page_version(address);			
-				page = version_control->check_out(address, current_version);				
-				if(page){	/// check out refs the page			
+				version_type current_version = get_page_version(address);
+				page = version_control->check_out(address, current_version);
+				if(page){	/// check out refs the page
 					return page;
 				}
 			}
@@ -576,22 +576,22 @@ namespace collums{
 			/// the dangling buffer is not copied
 			buffer_type& dangling_buffer = get_storage().allocate(w, stx::storage::read);
 			if(get_storage().is_end(dangling_buffer) || dangling_buffer.size() == 0){
-				
+
 			}
 			/// TODO: if there is shortage of ram first try getting a page from version control
-			if(mem_low ){				
+			if(mem_low ){
 				//clear_cache();
-				
+
 				//version_control->reduce();
 			}
 			if(mem_low){
-				page = local_page;				
+				page = local_page;
 			}else {
-				page = allocate_page(); 
-			}			
+				page = allocate_page();
+			}
 			page->set_address(address);
 			nst::version_type version = get_storage().get_allocated_version();
-			//if(current_version != version){	
+			//if(current_version != version){
 			//	current_version = get_page_version(address);
 			//	printf("[TS] [ERROR] the current version is invalid - does not match allocated version\n");
 			//}
@@ -601,15 +601,15 @@ namespace collums{
 			page->set_version(version);
 			if(!mem_low){
 				page->ref();/// for this
-				if(version_control->add(page)){				
-				
+				if(version_control->add(page)){
+
 				}else{
 					///printf("[TS] [ERROR] the current page already exists in version control or could not be added\n");
 				}
 			}
 			return page;
 		}
-		
+
 		stored_page_ptr get_page(size_type which) const {
 			size_type address = (which / page_size) + 128;
 			if(last_loaded && last_loaded->get_address()==address){
@@ -621,7 +621,7 @@ namespace collums{
 			if(local_page->get_address() == address){
 				return local_page;
 			}
-			stored_page::ptr page;
+			typename stored_page::ptr page;
 			auto i = pages.find(address);
 			//if(!pages.get(address,page)){
 			if(i != pages.end()){
@@ -656,20 +656,20 @@ namespace collums{
 		}
 
 		struct iterator{
-			
+
 		private:
-			mutable paged_vector* h;			
+			mutable paged_vector* h;
 			size_type pos;
 			mutable value_type t;
 			mutable key_type k;
-			
+
 		public:
 			iterator() : h(nullptr), pos(0), t(value_type()), k(key_type()){
-				
+
 			}
 			iterator(const paged_vector* h, size_type pos)
 			: h((paged_vector*)h),pos(pos), t(value_type()), k(key_type()){
-				
+
 			}
 			iterator(const iterator& r){
 				(*this) = r;
@@ -705,7 +705,7 @@ namespace collums{
 				iterator t = (*this);
 				--(*this);
 				return t;
-				
+
 			}
 			inline data_type& value(){
 				return h->resolve(pos);
@@ -740,14 +740,14 @@ namespace collums{
 			}
 
 			inline key_type& key() {
-				k = (key_type::value_type)pos;
+				this->k = this->pos; //(key_type::value_type)
 				return k;
 			}
 			/// TODO:
 			/// this might be safe but if the iterator itself is temporary its not
 			/// the key should be safe while the map type is still alive
 			inline const key_type& key() const {
-				k = (key_type::value_type)pos;
+				k = this->pos;//(key_type::value_type)
 				return k;
 			}
 			/// TODO:
@@ -780,7 +780,7 @@ namespace collums{
 			}
 		};
 		typedef iterator const_iterator;
-		paged_vector(storage_type& storage) 
+		paged_vector(storage_type& storage)
 		:	storage(&storage)
 		,	largest(0)
 		,	_size(0)
@@ -792,28 +792,28 @@ namespace collums{
 			get_storage().get_boot_value(largest,2) ;
 			get_storage().get_boot_value(_size,3);
 		}
-		
+
 		~paged_vector(){
 			clear_cache();
 			free_page(local_page);
 		}
 		std::pair<iterator, bool> erase(const key_type&  key){
 			size_t h = key.get_hash();
-			if(h <= largest){
+			if(h <= (size_t)largest){
 				if(h > 0)
 					largest = std::min<size_type>(largest, h-1);
 				if(get_storage().is_readonly()){
 					get_page(h);
 				}else{
-					stored_page::ptr page = get_page(h);
+					typename stored_page::ptr page = get_page(h);
 					if(page->is_exists(h)){
 						--_size;
-					}					
+					}
 					page->erase(h);
 					modified_pages[h] = page;
 					return std::make_pair(iterator(this, key.get_hash()), true);
 				}
-					
+
 			}
 			std::pair<iterator, bool> r = std::make_pair(iterator(this, key.get_hash()), false);
 			return r;
@@ -831,7 +831,7 @@ namespace collums{
 				if(!get_page(h)->is_exists(h)){
 					++_size;
 				}
-				stored_page::ptr page = get_page(h);
+				typename stored_page::ptr page = get_page(h);
 				page->set(h, value);
 				modified_pages[h] = page;
 
@@ -871,16 +871,16 @@ namespace collums{
 		bool count(size_type key) {
 			return false;
 		}
-		void reduce_use(){			
+		void reduce_use(){
 			//if(stx::memory_low_state){
-				
+
 				flush();
 				//if(pages.size()*sizeof(stored_page) < 2048*1024) return;
 				clear_cache();
 				version_control->reduce();
-			//}			
+			//}
 		}
-		
+
 		void flush(){
 			flush_buffers();
 			if(stx::memory_mark_state){
@@ -895,7 +895,7 @@ namespace collums{
 				get_storage().set_boot_value(_size, 3);
 				for(auto p = modified_pages.begin(); p != modified_pages.end();++p){
 					store_page((*p).second);
-				}		
+				}
 				modified_pages.clear();
 			}
 		}
@@ -928,7 +928,7 @@ namespace collums{
 			return true;
 		}
 	};
-	
+
 	template<>
 	struct col_policy_type<stored::CharStored>{
 		bool load(size_t) const{
@@ -965,7 +965,7 @@ namespace collums{
 			return true;
 		}
 	};
-	
+
 	using namespace iterator;
 	typedef stored::_Rid _Rid;
 
@@ -985,10 +985,6 @@ namespace collums{
 		static const nst::u16 F_CHANGED = 2;
 		static const nst::u16 F_INVALID = 4;
 
-
-
-		
-		
 	private:
 		_ColMap col;
 		typedef typename _ColMap::iterator _ColIter;
@@ -998,16 +994,16 @@ namespace collums{
 		_Rid max_row_id;
 		_Rid rows_per_key;
 		bool modified;
-		bool lazy;		
+		bool lazy;
 		size_t max_size;
 		col_policy_type<_Stored> col_policy;
-		inline bool has_cache() const {
-			return pages != nullptr ;
+		inline bool _D_has_cache() const {
+			return true; //pages != nullptr ;
 		}
 
 		void load_cache(){
 		}
-		
+
 		void reset_cache_locals(){
 
 			ival = col.end();
@@ -1027,7 +1023,7 @@ namespace collums{
 			max_row_id = get_v_row_count(); //(_Rid)col.size();
 			load_cache();
 		}
-		
+
 		void uncheck_page_cache(){
 		}
 		/// no assignments please
@@ -1050,11 +1046,11 @@ namespace collums{
 		,	max_row_id(0)
 		,	rows_per_key(0)
 		,	modified(false)
-		,	lazy(load)		
+		,	lazy(load)
 		,	max_size(max_size)
 		{
 			storage.load_all();
-			
+
 #ifdef _DEBUG
 
 			//int_terpolator t;
@@ -1069,7 +1065,7 @@ namespace collums{
 		void set_data_max_size(size_t max_size){
 			this->max_size = max_size;
 		}
-		
+
 		void initialize(bool by_tree){
 
 			cend = col.end();
@@ -1101,23 +1097,23 @@ namespace collums{
 		bool is_null(const _Stored&v){
 			return (&v == &empty);
 		}
-		
+
 		_Stored& seek_by_tree(_Rid row) {
 
 			if(ival != cend){
-				++ival;				
+				++ival;
 				if(ival != cend && ival.key().get_value() == row){
 					_Stored* val = ival.ref_value();
 					if(val!=nullptr){
 						return *val;
-					}else 
+					}else
 						return empty;
 				}
 			}
 			//if(allocation_pool.is_near_depleted())
 			///	col.reduce_use();
 			ival = col.find(row);
-			
+
 
 			if(ival == cend || ival.key().get_value() != row)
 			{
@@ -1131,8 +1127,8 @@ namespace collums{
 		}
 
 		inline _Stored& seek_by_cache(_Rid row)  {
-			
-			
+
+
 
 			return seek_by_tree(row);
 
@@ -1188,7 +1184,7 @@ namespace collums{
 			return max_row_id;
 		}
 		void rollback(){
-			
+
 			if(modified){
 				col.flush();
 			}
@@ -1228,12 +1224,12 @@ namespace collums{
 
 		void erase(_Rid row){
 			col.erase(row);
-		
+
 		}
 
 		void add(_Rid row, const _Stored& s){
 			max_row_id = std::max<_Rid>(row+1, max_row_id);
-		
+
 			col[row] = s;
 			modified = true;
 		}

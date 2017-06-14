@@ -24,7 +24,7 @@ struct has_member
     : std::integral_constant<bool, has_member_impl<T, NameGetter>::value>
 {};
 /**
- * NOTE on treestore: vector is use as a contiguous array. If a version of STL 
+ * NOTE on treestore: vector is use as a contiguous array. If a version of STL
  * is encountered that uses a different allocation scheme then a replacement
  * will be provided here.
  */
@@ -65,11 +65,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
 #include <vector>
 #include <Poco/Types.h>
 #include <Poco/UUID.h>
+#include <stdio.h>
 /// files that use these macros need to include <iostream> or <stdio.h>
-#define dbg_print(x,...)          do { if (true) (printf("[TS DBG] " x "\n", __VA_ARGS__)); } while(0)
-#define wrn_print(x,...)          do { if (true) (printf("[TS WRN] " x "\n", __VA_ARGS__)); } while(0)
-#define err_print(x,...)          do { if (true) (printf("[TS ERR] " x "\n", __VA_ARGS__)); } while(0)
-#define inf_print(x,...)          do { if (true) (printf("[TS INF] " x "\n", __VA_ARGS__)); } while(0)
+#define dbg_print(x,...)          do {  } while(0) //if (true) printf("[TS DBG] " x "\n", __VA_ARGS__);
+#define wrn_print(x,...)          do {  } while(0) //if (true) printf("[TS WRN] " x "\n", __VA_ARGS__);
+#define err_print(x,...)          do {  } while(0) //if (true) printf("[TS ERR] " x "\n", __VA_ARGS__);
+#define inf_print(x,...)          do {  } while(0) //if (true) printf("[TS INF] " x "\n", __VA_ARGS__);
 namespace stx{
 	namespace storage{
 		/// unsigned integer primitive types
@@ -85,7 +86,7 @@ namespace stx{
 			typedef long long int lld;
 		/// virtual allocator address type
 			typedef u64 stream_address ;
-			
+
 			/// the version type
 			typedef Poco::UUID version_type;
 
@@ -100,7 +101,7 @@ namespace std {
 			u64 r = 0;
 			if(sizeof(version_type) >= sizeof(u64)){
 				const u64 * data = reinterpret_cast<const u64*>(&version);
-				r = data[0];				
+				r = data[0];
 				if(sizeof(version_type) == sizeof(u64) * 2){
 					 r ^= data[1];
 				}

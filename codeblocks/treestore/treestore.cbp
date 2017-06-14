@@ -48,7 +48,7 @@
 				</Linker>
 			</Target>
 			<Environment>
-				<Variable name="MYSQL_REPO" value="/home/test/Desktop/mysql-5.6.23" />
+				<Variable name="MYSQL_REPO" value="/home/chris/dev/mysql-5.7.18" />
 			</Environment>
 		</Build>
 		<Compiler>
@@ -58,8 +58,11 @@
 			<Add directory="../../src" />
 			<Add directory="../../src/poco-1.4.6p1-all/Foundation/include" />
 			<Add directory="../../src/poco-1.4.6p1-all/Data/include" />
+			<Add directory="../../src/poco-1.4.6p1-all/Net/include" />
 			<Add directory="../../src/poco-1.4.6p1-all/Data/SQLite/include" />
 			<Add directory="../../src/poco-1.4.6p1-all" />
+			<Add directory="../../src/poco-1.4.6p1-all/Net/src" />
+			<Add directory="../../src/poco-1.4.6p1-all/Util/include" />
 			<Add directory="../../repo" />
 			<Add directory="../../repo/lz4-r101" />
 			<Add directory="../../repo/zlib-1.2.8" />
@@ -68,6 +71,9 @@
 			<Add directory="$(MYSQL_REPO)/regex" />
 			<Add directory="$(MYSQL_REPO)/bld/include" />
 			<Add directory="$(MYSQL_REPO)/bld/sql" />
+			<Add directory="$(MYSQL_REPO)/libbinlogevents/export" />
+			<Add directory="$(MYSQL_REPO)/libbinlogevents/include" />
+			<Add directory="$(MYSQL_REPO)/bld/libbinlogevents/include" />
 		</Compiler>
 		<Unit filename="../../repo/fse/fse.c">
 			<Option compilerVar="CC" />
@@ -168,6 +174,7 @@
 		<Unit filename="../../src/poco-1.4.6p1-all/Foundation/src/zutil.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="../../src/rednode.cpp" />
 		<Unit filename="../../src/stx/btree" />
 		<Unit filename="../../src/stx/btree.cpp" />
 		<Unit filename="../../src/stx/btree.h" />

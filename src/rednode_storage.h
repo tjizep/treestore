@@ -1,7 +1,36 @@
 #include "red_includes.h"
 #include "rednode.h"
 namespace red{
+
 	using namespace Poco::Data;
+	enum{
+		cmd_set=1,
+		cmd_get,
+		cmd_open,
+		cmd_close,
+		cmd_begin,
+		cmd_commit,
+		cmd_checkpoint,
+		cmd_rollback, ///types and commands must be mutex - so that stream can be more robust
+		cmd_maxaddress,
+		cmd_evict,
+		cmd_unlock_all,
+		cmd_max_block_address,
+		cmd_version,
+		cmd_contains,
+		type_bool,
+		type_u32,
+		type_u64,
+		type_string,
+		type_buffer,
+		type_data,
+		type_version,
+		err_versions,
+		err_version_mismatch,
+		err_version_locked,
+		err_address_does_not_exist
+	};
+
 	typedef rabbit::unordered_map<address_type, version_type> _Versions;
 	template<typename _T>
 		class symbol_stream{
@@ -20,14 +49,14 @@ namespace red{
 					}
 					total += (nst::u32)n;
 					remaining -= (nst::u32)n;
-				}			
+				}
 				return true;
 			}
 			nst::u8 read_type(){
-				nst::u8 r = 0;						
+				nst::u8 r = 0;
 				readn(&r, sizeof(r));
 				return r;
-			
+
 			}
 			bool write_buffer(const void * b, size_t s){
 				if(s > 0xFFFFFFFFl){
@@ -35,7 +64,7 @@ namespace red{
 				}
 				if(buffering){
 					const nst::u8 * bytes = (const nst::u8 *)b;
-					for(int b = 0; b < s; ++b){
+					for(size_t b = 0; b < s; ++b){
 						buffer.push_back(bytes[b]);
 					}
 				}else{
@@ -57,29 +86,29 @@ namespace red{
 				buffering = false;
 				write_buffer(buffer.data(), (int)buffer.size());
 				buffer.clear();
-				
+
 			}
-			
-			bool write(bool symbol){			
+
+			bool write(bool symbol){
 				write_type(type_bool);
 				write_buffer(&symbol, sizeof(symbol));
-				
+
 				return true;
 			}
 
 			bool write(nst::u32 symbol){
-			
+
 				write_type(type_u32);
 				write_buffer(&symbol, sizeof(symbol));
 				return true;
 			}
-		
+
 			bool write(nst::u64 symbol){
 				write_type(type_u64);
 				write_buffer(&symbol, sizeof(symbol));
 				return true;
 			}
-		
+
 			bool write(const nst::buffer_type &data){
 				if(data.size() > 0xFFFFFFFFl){
 					return false;
@@ -89,15 +118,15 @@ namespace red{
 				write_buffer(data.data(), data.size());
 				return true;
 			}
-		
+
 			bool write(const std::string &data){
-				
+
 				write_type(type_string);
 				write((nst::u32)data.size());
 				write_buffer(data.data(), (int)data.size());
 				return true;
 			}
-		
+
 			bool write(const version_type& symbol){
 				write_type(type_version);
 				char buffer[16];
@@ -105,7 +134,7 @@ namespace red{
 				write_buffer(buffer, sizeof(buffer));
 				return true;
 			}
-			
+
 			bool read(bool &symbol){
 				nst::u8 t = read_type();
 				if(t!=type_bool) return false;
@@ -116,13 +145,13 @@ namespace red{
 				if(t!=type_u32) return false;
 				return readn(&symbol, sizeof(symbol));
 			}
-		
+
 			bool read(nst::u64 &symbol){
 				nst::u8 t = read_type();
 				if(t!=type_u64) return false;
 				return readn(&symbol, sizeof(symbol));
 			}
-		
+
 			bool read(nst::buffer_type &data){
 				nst::u8 t = read_type();
 				if(t!=type_buffer) return false;
@@ -142,10 +171,10 @@ namespace red{
 				return readn(&data[0], l);
 			}
 
-			bool read(version_type& symbol){				
+			bool read(version_type& symbol){
 				char buffer[16];
 				nst::u8 t = read_type();
-				if(t!=type_version) return false;				
+				if(t!=type_version) return false;
 				bool r = readn(&buffer[0], sizeof(buffer));
 				if(r)
 					symbol.copyFrom(buffer);
@@ -165,7 +194,7 @@ namespace red{
 	private: /// private types
 
 		typedef std::shared_ptr<block_type> block_type_ptr;
-		
+
 		typedef rabbit::unordered_map<address_type, block_type_ptr> _BufferMap;
 
 		struct version_rec{
@@ -174,7 +203,7 @@ namespace red{
 				this->count = 0;
 			}
 			version_type version;
-			nst::u64 count;			
+			nst::u64 count;
 		};
 		typedef rabbit::unordered_map<address_type, version_rec> _VersionLockMap;
 	private: /// private fields
@@ -198,31 +227,32 @@ namespace red{
 
 		std::shared_ptr<Poco::Data::Statement> version_stmt ;
 
-		/// has-a transaction been started
-
-		bool transacted;
 
 		std::shared_ptr<Poco::Data::Session> _session;
 
 		nst::u32 clock;
 
 		std::string table_name;
-		
+
 		std::string name;
 
 		std::string extension;
 
-		nst::u64 file_size;
+		/// has-a transaction been started
+
+		bool transacted;
+
+        nst::u64 file_size;
 
 		bool is_new;
-		
+
 		_BufferMap	buffers;
 	private:
-		
+
 		bool has_mem_buffer(address_type address) const {
 			return buffers.count(address) != 0;
 		}
-		
+
 		block_type& get_mem_buffer(address_type address){
 			block_type_ptr& bp = buffers[address];
 			if(bp == nullptr){
@@ -236,7 +266,7 @@ namespace red{
 				(*b).second = nullptr;
 			}
 		}
-		
+
 		static std::string get_storage_path(){
 
 			return ""; //".\\";
@@ -258,7 +288,7 @@ namespace red{
 				 sql += "a1 integer primary key, ";
 				 sql += "dsize integer, ";
 				 sql += "version BLOB, ";
-				 sql += "packet integer, ";				 
+				 sql += "packet integer, ";
 				 sql += "data BLOB);";
 				 get_session() << sql, now;
 			}
@@ -275,7 +305,7 @@ namespace red{
 		block_type current_block;
 		block_type compressed_block;
 		nst::u64 next;
-		
+
 		template <typename T> Binding<T>* bind(const T& t)
 			/// Convenience function for a more compact Binding creation.
 		{
@@ -284,7 +314,7 @@ namespace red{
 
 		void create_statements(){
 			insert_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
-			*insert_stmt << "INSERT OR REPLACE INTO " << (*this).table_name << " VALUES(?,?,?,?,?) ;", 
+			*insert_stmt << "INSERT OR REPLACE INTO " << (*this).table_name << " VALUES(?,?,?,?,?) ;",
 				bind(current_address), bind(current_size), bind(current_version), bind(current_packet), bind(encoded_block);
 
 			get_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
@@ -292,7 +322,7 @@ namespace red{
 			*get_stmt << "SELECT a1, dsize, data, version, packet FROM " << (*this).table_name << " WHERE a1 = ? AND packet = ?;"
 				, into(current_address), into(current_size), into(encoded_block), into(current_version), into(current_packet)
 				, bind(selector_address) , bind(selector_packet);
-			
+
 			version_stmt = std::make_shared<Poco::Data::Statement>( get_session() );
 
 			*version_stmt << "SELECT version FROM " << (*this).table_name << " WHERE a1 = ? AND packet = ?;"
@@ -308,7 +338,7 @@ namespace red{
 
 			get_session() << "SELECT max(a1) AS the_max FROM " << (*this).table_name << " ;" , into(max_address), now;
 			(*this).next = std::max<address_type>((address_type)max_address, (*this).next); /// next is pre incremented
-			
+
 
 		}
 		/// open the connection if its closed
@@ -324,7 +354,7 @@ namespace red{
 				create_statements();
 				Poco::File df (get_storage_path() + name + extension );
 				file_size = df.getSize();
-					
+
 				//printf("opened %s\n", name.c_str());
 			}
 			return *_session;
@@ -343,20 +373,20 @@ namespace red{
 		version_type convert(const Poco::Data::BLOB& from) const {
 			version_type r;
 			copy(r, from);
-			return r;			
+			return r;
 		}
 		void add_buffer(const address_type& w,const version_type& version, const block_type& block){
 			if(version==version_type()){
 				printf("[TS] [RED] invalid version\n");
 				return;
 			}
-			
-			current_address = w;			
-			current_size = block.size()*sizeof(block_type::value_type);			
-			
 
 			current_address = w;
-			copy(current_version, version);			
+			current_size = block.size()*sizeof(block_type::value_type);
+
+
+			current_address = w;
+			copy(current_version, version);
 			current_packet = 0;
 			/// assumes block_type is some form of stl vector container
 			current_size = block.size()*sizeof(block_type::value_type);
@@ -375,9 +405,9 @@ namespace red{
 
 			insert_stmt->execute();
 			get_mem_buffer(w) = block;
-			
+
 		}
-		
+
 		/// returns true if the buffer with address specified by w has been retrieved
 		bool get_exists(const address_type& w){
 			//if(is_new) return false;
@@ -402,20 +432,20 @@ namespace red{
 			//if(is_new) return false;
 			get_session();
 			current_block.clear();
-			
+
 			selector_address = w;
-			selector_packet = 0;			
+			selector_packet = 0;
 			copy(current_version,version_type());
 			///queue_block_read(w);
 			get_stmt->execute();
 			current_block.clear();
-			
+
 			if(current_address == selector_address){
 				//decompress_zlibh(current_block, encoded_block.content());
 				current_block.resize(encoded_block.size());
-				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());				
+				memcpy(&current_block[0], &(encoded_block.content()[0]),encoded_block.size());
 			}
-			
+
 			return (current_address == selector_address); /// returns true if a record was retrieved
 
 		}
@@ -455,15 +485,15 @@ namespace red{
 
 		}
 	protected:
-		
+
 	public:
 
-		
+
 		/// construct a sqlite database with name specifying the table in which blocks will be stored
 		/// in this case the name default is used
 		/// TODO: the get_storage_path function provides a configurable path to the database file itself
 
-		
+
 		sqlite_allocator
 		(	std::string name			/// storage name
 		,	address_type ma = 32		/// minimum address
@@ -473,11 +503,11 @@ namespace red{
 		,	extension("")				/// extension used by rednode
 										/// if true the data files are deleted on destruction
 		,	transacted(false)
-		,	selector_packet(0)
 		,	is_new(false)
+		,	selector_packet(0)
 		,	next(ma)
 		{
-			
+
 			using Poco::File;
 			//current_version.resize(16);
 
@@ -486,21 +516,21 @@ namespace red{
 				(*this).is_new = !df.exists();
 				if(!(*this).is_new){
 					get_session();
-					
+
 				}
 			}else (*this).is_new = true;
-			
+
 		}
 		virtual std::string get_name() const {
 			return (*this).name;
 		}
-	
+
 
 		~sqlite_allocator(){
 			discard();
-	
+
 		}
-			
+
 	private:
 		/// throws an exception when an assignment is attempted
 
@@ -517,19 +547,19 @@ namespace red{
 		}
 	public:
 
-		
+
 		/// discard all data and internal state if references are 0
 
 		void discard(){
 
 			synchronized ul(lock);
-		
+
 		}
 
 		/// initialize a specific address to exist if it didn't before otherwise return
 
 		void initialize(const address_type& which){
-			
+
 		}
 		/// return the storage size of this allocator
 		nst::u64 get_storage_size() const {
@@ -543,7 +573,7 @@ namespace red{
 			return (*this).next;
 		}
 
-		
+
 
 		/// contains
 		/// returns true if an address exists
@@ -552,12 +582,12 @@ namespace red{
 			if(which){
 				if((*this).get_exists(which))
 					return true;
-				
+
 			}
 			return false;
 		}
-		
-		
+
+
 	public:
 		/// start a transaction valid during the lifetime of this storage
 
@@ -608,7 +638,7 @@ namespace red{
 		void set(const address_type& w, const version_type& version, const block_type& block){
 			synchronized ul(lock);
 			check_use();
-			add_buffer(w,version, block);			
+			add_buffer(w,version, block);
 		}
 		/// returns the vesion and value
 		version_type get(const address_type& w, block_type& block){
@@ -628,7 +658,7 @@ namespace red{
 		}
 		/// lock a version of w
 		/// if version != locked version version fails
-		/// if a non 0 old_version is specified the 
+		/// if a non 0 old_version is specified the
 		/// lock count on that is reuced (used for read locks)
 		/// if function succeeds the lock count is incremented
 		bool lock_version
@@ -639,7 +669,7 @@ namespace red{
 			//	printf("[TS] [RED] [ERROR] [STORAGE] invalid lock version\n");
 			//	return false;
 			//}
-			
+
 			synchronized ul(lock);
 			if(old_version!=version_type()){
 				_unlock_version(w, old_version);
@@ -662,13 +692,13 @@ namespace red{
 		}
 		bool unlock_version(const address_type& w, const version_type& version){
 			synchronized ul(lock);
-			
-			return _unlock_version(w, version);	
+
+			return _unlock_version(w, version);
 		}
 	private:
 		void _begin(){
 			if(!transacted){
-				
+
 				get_session() << "begin transaction;", now;
 
 				transacted = true;
@@ -682,7 +712,7 @@ namespace red{
 				get_session() << "commit;", now;
 
 			}
-			
+
 			transacted = false;
 		}
 
@@ -706,13 +736,13 @@ namespace red{
 				get_session() << "rollback;", now;
 
 			}
-			
+
 			transacted = false;
 			check_use();
 		}
 		void reduce(){
 			check_use();
-			
+
 		}
 	};
 }; //red namespace

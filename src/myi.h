@@ -30,7 +30,7 @@ myi.cpp" - MySQL Storage Engine Interfaces
 #endif
 #include <algorithm>
 //#include "sql_priv.h"
-#include "probes_mysql.h"
+//#include "probes_mysql.h"
 #include "key.h"                                // key_copy
 #include "sql_plugin.h"
 #include <m_ctype.h>

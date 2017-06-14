@@ -30,7 +30,7 @@ extern "C"{
 namespace stx{
 
 	namespace storage{
-	
+
 		namespace allocation{
 			template <class T>
 			class pool_alloc_tracker : public base_tracker<T>{
@@ -316,8 +316,8 @@ namespace stx{
 		}
 		/// FSE
 		static void inplace_compress_fse(buffer_type& buff){
-			throw std::exception("fse compression not included in this build");
-			typedef unsigned char * encode_type_ref;
+			std::cout << "fse compression not included in this build" << std::endl;
+			throw std::exception();
 			buffer_type t;
 			i32 origin = (i32)buff.size();
 			t.resize(FSE_compressBound(origin)+sizeof(i32));
@@ -334,12 +334,12 @@ namespace stx{
 		}
 		template<typename _VectorType>
 		static void decompress_fse(buffer_type &decoded,const _VectorType& buff){
-			throw std::exception("fse compression not included in this build");
+		    std::cout << "fse compression not included in this build" << std::endl;
+			throw std::exception();
 
 			if(buff.empty()){
 				decoded.clear();
 			}else{
-				typedef unsigned char * encode_type_ref;
 				i32 d = *((i32*)&buff[0]) ;
 				if(d < 0){
 					d = -d;
@@ -390,7 +390,7 @@ namespace stx{
 			/// TODO: cannot compress sizes lt 200 mb
 			i32 tcl = LZ4_compressBound((int)from.size())+sizeof(i32);
 			encode_type_ref to_ref;
-			
+
 			char s_buf[max_static];
 			if(tcl < max_static){
 				to_ref = s_buf;
@@ -458,7 +458,7 @@ namespace stx{
 				/// decompress_zlibh(buff, input);
 				/// decompress_fse(buff, input);
 				i32 d = *((i32*)&buff[0]) ;
-				if(decoded.size() < d){
+				if((i32)decoded.size() < d){
 					i32 rs = d; //std::max<i32>(d,256000);
 					decoded.reserve(rs);
 					decoded.resize(rs);
@@ -514,6 +514,15 @@ namespace stx{
 			if(decoded.empty()) return;
 			buffer_type t(decoded);
 			decompress_zlib(decoded,t);
+		}
+		static void test_compression(){
+		    buffer_type buff,buff2;
+            inplace_compress_zlibh(buff);
+            inplace_decompress_zlibh(buff);
+            inplace_decompress_zlibh(buff,buff2);
+            inplace_compress_fse(buff);
+            inplace_decompress_fse(buff);
+
 		}
 		/// allocation type read only ,write or
 		enum storage_action{

@@ -16147,3 +16147,5267 @@
 	<stdint.h>
 	<intrin.h>
 
+1494423218 source:/home/chris/dev/treestore/src/collumn.cpp
+
+1497445285 source:/home/chris/dev/treestore/src/rednode.cpp
+	"rednode.h"
+	"Poco/Thread.h"
+	"Poco/Glob.h"
+	<string>
+	"rednode_file.h"
+	"rednode_storage.h"
+	"NotificationQueueWorker.h"
+	"system_timers.h"
+	<chrono>
+	<thread>
+
+1494423218 /home/chris/dev/treestore/src/rednode.h
+	<stx/storage/types.h>
+	<stx/storage/basic_storage.h>
+
+1496135899 /home/chris/dev/treestore/src/stx/storage/types.h
+	<type_traits>
+	<vector>
+	<Poco/Types.h>
+	<Poco/UUID.h>
+	<stdio.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Types.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Foundation.h
+	"Poco/Config.h"
+	"Poco/Platform.h"
+	"Poco/Platform_WIN32.h"
+	"Poco/Platform_VMS.h"
+	"Poco/Platform_VX.h"
+	"Poco/Platform_POSIX.h"
+	"Poco/Bugcheck.h"
+	"Poco/Types.h"
+	<string>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Config.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Platform.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Platform_WIN32.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Platform_VMS.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Platform_VX.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Platform_POSIX.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Bugcheck.h
+	"Poco/Foundation.h"
+	<string>
+	<iostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UUID.h
+	"Poco/Foundation.h"
+
+1497443732 /home/chris/dev/treestore/src/stx/storage/basic_storage.h
+	<stx/storage/types.h>
+	<stx/storage/leb128.h>
+	<Poco/Mutex.h>
+	<Poco/Timestamp.h>
+	<lz4.h>
+	<stdio.h>
+	<string.h>
+	<stx/storage/pool.h>
+	"zlib.h"
+	<fse/fse.h>
+	<fse/zlibh.h>
+	"system_timers.h"
+
+1494423218 /home/chris/dev/treestore/src/stx/storage/leb128.h
+	<stx/storage/types.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Mutex.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/ScopedLock.h"
+	"Poco/Mutex_WINCE.h"
+	"Poco/Mutex_WIN32.h"
+	"Poco/Mutex_VX.h"
+	"Poco/Mutex_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Exception.h
+	"Poco/Foundation.h"
+	<stdexcept>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ScopedLock.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Mutex_WINCE.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UnWindows.h
+	<windows.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Mutex_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Mutex_VX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<semLib.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Mutex_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Timestamp.h
+	"Poco/Foundation.h"
+	<ctime>
+
+1494423217 /home/chris/dev/treestore/repo/lz4-r101/lz4.h
+
+1497443520 /home/chris/dev/treestore/src/stx/storage/pool.h
+	<limits>
+	<vector>
+	<atomic>
+	<Poco/Mutex.h>
+	<Poco/Thread.h>
+	<Poco/ThreadPool.h>
+	<Poco/ThreadLocal.h>
+	<Poco/TaskManager.h>
+	<Poco/Task.h>
+	<Poco/Timestamp.h>
+	"NotificationQueueWorker.h"
+	<stx/storage/types.h>
+	<vector>
+	<rabbit/unordered_map>
+	<system_timers.h>
+	<typeinfo>
+	<unordered_map>
+
+1489823796 /home/chris/dev/mysql-5.7.18/include/atomic
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Thread.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/Thread_WINCE.h"
+	"Poco/Thread_WIN32.h"
+	"Poco/Thread_VX.h"
+	"Poco/Thread_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Thread_WINCE.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Runnable.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Thread_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Thread_VX.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/SignalHandler.h"
+	"Poco/Event.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	<taskLib.h>
+	<taskVarLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SignalHandler.h
+	"Poco/Foundation.h"
+	<vector>
+	<setjmp.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Event.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/Event_WIN32.h"
+	"Poco/Event_VX.h"
+	"Poco/Event_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Event_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Event_VX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<semLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Event_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RefCountedObject.h
+	"Poco/Foundation.h"
+	"Poco/AtomicCounter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AtomicCounter.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+	<libkern/OSAtomic.h>
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AutoPtr.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Thread_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/SignalHandler.h"
+	"Poco/Event.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	<pthread.h>
+	<limits.h>
+	<sys/select.h>
+	<errno.h>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ThreadPool.h
+	"Poco/Foundation.h"
+	"Poco/Thread.h"
+	"Poco/Mutex.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ThreadLocal.h
+	"Poco/Foundation.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TaskManager.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/Task.h"
+	"Poco/AutoPtr.h"
+	"Poco/NotificationCenter.h"
+	"Poco/Timestamp.h"
+	<list>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Task.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/RefCountedObject.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NotificationCenter.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+	"Poco/Mutex.h"
+	"Poco/SharedPtr.h"
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Notification.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedPtr.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/AtomicCounter.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/NotificationQueueWorker.h
+	<vector>
+	"Poco/Notification.h"
+	"Poco/NotificationQueue.h"
+	"Poco/ThreadPool.h"
+	"Poco/Thread.h"
+	"Poco/Runnable.h"
+	"Poco/Mutex.h"
+	"Poco/Random.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NotificationQueue.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+	<deque>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Random.h
+	"Poco/Foundation.h"
+
+1494423217 /home/chris/dev/treestore/repo/rabbit/unordered_map
+	<rabbit/rabbit_map.h>
+
+1497445364 /home/chris/dev/treestore/repo/rabbit/rabbit_map.h
+	<cstddef>
+	<stdio.h>
+	<stdlib.h>
+	<iostream>
+	<vector>
+	<chrono>
+	<assert.h>
+	<memory>
+	<string>
+	<random>
+	<limits>
+	<iomanip>
+
+1494423218 /home/chris/dev/treestore/src/system_timers.h
+	<fstream>
+	<Poco/Timestamp.h>
+	<Poco/Thread.h>
+	<Poco/BinaryWriter.h>
+	<Poco/BinaryReader.h>
+	<Poco/File.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BinaryWriter.h
+	"Poco/Foundation.h"
+	<vector>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BinaryReader.h
+	"Poco/Foundation.h"
+	<vector>
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	<vector>
+	"File_WINCE.h"
+	"Poco/File_WIN32U.h"
+	"Poco/File_WIN32.h"
+	"Poco/File_VX.h"
+	"Poco/File_UNIX.h"
+	"Poco/File_VMS.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_WINCE.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_VX.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_UNIX.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/File_VMS.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/repo/zlib-1.2.8/zlib.h
+	"zconf.h"
+
+1494423218 /home/chris/dev/treestore/repo/zlib-1.2.8/zconf.h
+	<windows.h>
+	<limits.h>
+	<sys/types.h>
+	<stdarg.h>
+	<stddef.h>
+	<unistd.h>
+	<unixio.h>
+
+1494423217 /home/chris/dev/treestore/repo/fse/fse.h
+	<stddef.h>
+
+1494423217 /home/chris/dev/treestore/repo/fse/zlibh.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Glob.h
+	"Poco/Foundation.h"
+	"Poco/TextIterator.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TextIterator.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/rednode_file.h
+	"red_includes.h"
+	"Poco/Net/SocketReactor.h"
+	"Poco/Net/SocketAcceptor.h"
+	"Poco/Net/SocketNotification.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/Net/ServerSocket.h"
+	"Poco/NObserver.h"
+	"Poco/Exception.h"
+	"Poco/Thread.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionSet.h"
+	<iostream>
+
+1494423218 /home/chris/dev/treestore/src/red_includes.h
+	<stdlib.h>
+	<memory>
+	<string>
+	<map>
+	<vector>
+	<unordered_map>
+	<unordered_set>
+	<rabbit/unordered_map>
+	"Poco/NumberFormatter.h"
+	"Poco/String.h"
+	"Poco/File.h"
+	"Poco/Mutex.h"
+	"Poco/Data/Common.h"
+	"Poco/Data/Session.h"
+	"Poco/Data/BLOB.h"
+	"Poco/Data/Limit.h"
+	"Poco/Data/SQLite/Connector.h"
+	"Poco/Exception.h"
+	"Poco/AtomicCounter.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/Logger.h"
+	"Poco/LogFile.h"
+	"Poco/StringTokenizer.h"
+	"Poco/Timestamp.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/BinaryWriter.h"
+	"Poco/BinaryReader.h"
+	"Poco/File.h"
+	"Poco/ThreadLocal.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/Net/SocketStream.h"
+	"Poco/Net/SocketAddress.h"
+	"Poco/Exception.h"
+	"Poco/LRUCache.h"
+	"Poco/UUID.h"
+	"Poco/UUIDGenerator.h"
+	<stx/storage/types.h>
+	<stx/storage/pool.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NumberFormatter.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/String.h
+	"Poco/Foundation.h"
+	"Poco/Ascii.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Ascii.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Common.h
+	"Poco/Data/Binding.h"
+	"Poco/Data/Extraction.h"
+	"Poco/Data/Limit.h"
+	"Poco/Data/SessionFactory.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Binding.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractBinding.h"
+	"Poco/Data/DataException.h"
+	"Poco/Data/TypeHandler.h"
+	<set>
+	<vector>
+	<map>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Data.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractBinding.h
+	"Poco/Data/Data.h"
+	"Poco/Any.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Any.h
+	"Poco/Exception.h"
+	<algorithm>
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/DataException.h
+	"Poco/Data/Data.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/TypeHandler.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractBinder.h"
+	"Poco/Data/AbstractExtractor.h"
+	"Poco/Data/AbstractPreparation.h"
+	"Poco/Tuple.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractBinder.h
+	"Poco/Data/Data.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractExtractor.h
+	"Poco/Data/Data.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractPreparation.h
+	"Poco/Data/Data.h"
+	"Poco/RefCountedObject.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Tuple.h
+	"Poco/Foundation.h"
+	"Poco/TypeList.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TypeList.h
+	"Poco/Foundation.h"
+	"Poco/MetaProgramming.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/MetaProgramming.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Extraction.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractExtraction.h"
+	"Poco/Data/Prepare.h"
+	"Poco/Data/TypeHandler.h"
+	"Poco/Data/Column.h"
+	"Poco/Data/DataException.h"
+	<set>
+	<vector>
+	<list>
+	<map>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractExtraction.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractExtractor.h"
+	"Poco/Data/Limit.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Limit.h
+	"Poco/Data/Data.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Prepare.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractPrepare.h"
+	"Poco/Data/TypeHandler.h"
+	<cstddef>
+	<map>
+	<set>
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractPrepare.h
+	"Poco/Data/Data.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Column.h
+	"Poco/Data/Data.h"
+	"Poco/Data/MetaColumn.h"
+	"Poco/SharedPtr.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/MetaColumn.h
+	"Poco/Data/Data.h"
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/SessionFactory.h
+	"Poco/Data/Data.h"
+	"Poco/Data/Connector.h"
+	"Poco/Data/Session.h"
+	"Poco/Mutex.h"
+	"Poco/SharedPtr.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Connector.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/SessionImpl.h
+	"Poco/Data/Data.h"
+	"Poco/RefCountedObject.h"
+	"Poco/Any.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Session.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/Data/Statement.h"
+	"Poco/Data/StatementCreator.h"
+	"Poco/Data/Binding.h"
+	"Poco/AutoPtr.h"
+	"Poco/Any.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Statement.h
+	"Poco/Data/Data.h"
+	"Poco/Data/StatementImpl.h"
+	"Poco/Data/Range.h"
+	"Poco/SharedPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/StatementImpl.h
+	"Poco/Data/Data.h"
+	"Poco/Data/AbstractBinding.h"
+	"Poco/Data/AbstractExtraction.h"
+	"Poco/Data/Range.h"
+	"Poco/Data/Column.h"
+	"Poco/Data/Extraction.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	"Poco/String.h"
+	"Poco/Format.h"
+	"Poco/Exception.h"
+	<vector>
+	<sstream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/Range.h
+	"Poco/Data/Data.h"
+	"Poco/Data/Limit.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Format.h
+	"Poco/Foundation.h"
+	"Poco/Any.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/StatementCreator.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/Data/Statement.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/BLOB.h
+	"Poco/Data/Data.h"
+	"Poco/SharedPtr.h"
+	"Poco/DynamicAnyHolder.h"
+	"Poco/Exception.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DynamicAnyHolder.h
+	"Poco/Foundation.h"
+	"Poco/NumberFormatter.h"
+	"Poco/NumberParser.h"
+	"Poco/DateTime.h"
+	"Poco/Timestamp.h"
+	"Poco/LocalDateTime.h"
+	"Poco/DateTimeFormat.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTimeParser.h"
+	"Poco/String.h"
+	"Poco/Exception.h"
+	<vector>
+	<typeinfo>
+	<limits>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NumberParser.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DateTime.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	"Poco/Timespan.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Timespan.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LocalDateTime.h
+	"Poco/Foundation.h"
+	"Poco/DateTime.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DateTimeFormat.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DateTimeFormatter.h
+	"Poco/Foundation.h"
+	"Poco/DateTime.h"
+	"Poco/LocalDateTime.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DateTimeParser.h
+	"Poco/Foundation.h"
+	"Poco/DateTime.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/Connector.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/Connector.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/SQLite.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Logger.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Message.h"
+	"Poco/Format.h"
+	<map>
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Channel.h
+	"Poco/Foundation.h"
+	"Poco/Configurable.h"
+	"Poco/Mutex.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Configurable.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Message.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogFile.h
+	"Poco/Foundation.h"
+	"Poco/LogFile_WIN32U.h"
+	"Poco/LogFile_WIN32.h"
+	"Poco/LogFile_VMS.h"
+	"Poco/LogFile_STD.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogFile_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogFile_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogFile_VMS.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	<stdio.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogFile_STD.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+	"Poco/FileStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FileStream.h
+	"Poco/Foundation.h"
+	"FileStream_WIN32.h"
+	"FileStream_POSIX.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FileStream_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/BufferedBidirectionalStreamBuf.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BufferedBidirectionalStreamBuf.h
+	"Poco/Foundation.h"
+	"Poco/BufferAllocator.h"
+	"Poco/StreamUtil.h"
+	<streambuf>
+	<iosfwd>
+	<ios>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BufferAllocator.h
+	"Poco/Foundation.h"
+	<ios>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StreamUtil.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FileStream_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/BufferedBidirectionalStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StringTokenizer.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryIterator.h
+	"Poco/Foundation.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/StreamSocket.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/Net.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/Socket.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketImpl.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketImpl.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketDefs.h"
+	"Poco/Net/SocketAddress.h"
+	"Poco/RefCountedObject.h"
+	"Poco/Timespan.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketDefs.h
+	"Poco/UnWindows.h"
+	<winsock2.h>
+	<ws2tcpip.h>
+	<hostLib.h>
+	<ifLib.h>
+	<inetLib.h>
+	<ioLib.h>
+	<resolvLib.h>
+	<types.h>
+	<socket.h>
+	<netinet/tcp.h>
+	<unistd.h>
+	<errno.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<sys/select.h>
+	<sys/ioctl.h>
+	<inet.h>
+	<arpa/inet.h>
+	<netinet/in.h>
+	<netinet/tcp.h>
+	<netdb.h>
+	<net/if.h>
+	<sys/sockio.h>
+	<sys/filio.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketAddress.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketDefs.h"
+	"Poco/Net/IPAddress.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/IPAddress.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketDefs.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketStream.h
+	"Poco/Net/Net.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/BufferedBidirectionalStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LRUCache.h
+	"Poco/AbstractCache.h"
+	"Poco/LRUStrategy.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AbstractCache.h
+	"Poco/KeyValueArgs.h"
+	"Poco/ValidArgs.h"
+	"Poco/Mutex.h"
+	"Poco/Exception.h"
+	"Poco/FIFOEvent.h"
+	"Poco/EventArgs.h"
+	"Poco/Delegate.h"
+	"Poco/SharedPtr.h"
+	<map>
+	<rabbit/unordered_map>
+	<set>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/KeyValueArgs.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ValidArgs.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FIFOEvent.h
+	"Poco/AbstractEvent.h"
+	"Poco/FIFOStrategy.h"
+	"Poco/AbstractDelegate.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AbstractEvent.h
+	"Poco/Foundation.h"
+	"Poco/SingletonHolder.h"
+	"Poco/SharedPtr.h"
+	"Poco/ActiveResult.h"
+	"Poco/ActiveMethod.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SingletonHolder.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ActiveResult.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+	"Poco/RefCountedObject.h"
+	"Poco/Exception.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ActiveMethod.h
+	"Poco/Foundation.h"
+	"Poco/ActiveResult.h"
+	"Poco/ActiveRunnable.h"
+	"Poco/ActiveStarter.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ActiveRunnable.h
+	"Poco/Foundation.h"
+	"Poco/ActiveResult.h"
+	"Poco/Runnable.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ActiveStarter.h
+	"Poco/Foundation.h"
+	"Poco/ThreadPool.h"
+	"Poco/ActiveRunnable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FIFOStrategy.h
+	"Poco/DefaultStrategy.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DefaultStrategy.h
+	"Poco/NotificationStrategy.h"
+	"Poco/SharedPtr.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NotificationStrategy.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AbstractDelegate.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/EventArgs.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Delegate.h
+	"Poco/Foundation.h"
+	"Poco/AbstractDelegate.h"
+	"Poco/FunctionDelegate.h"
+	"Poco/Expire.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FunctionDelegate.h
+	"Poco/Foundation.h"
+	"Poco/AbstractDelegate.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Expire.h
+	"Poco/Foundation.h"
+	"Poco/AbstractDelegate.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LRUStrategy.h
+	"Poco/KeyValueArgs.h"
+	"Poco/ValidArgs.h"
+	"Poco/AbstractStrategy.h"
+	"Poco/EventArgs.h"
+	"Poco/Exception.h"
+	<list>
+	<map>
+	<cstddef>
+	<rabbit/unordered_map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AbstractStrategy.h
+	"Poco/KeyValueArgs.h"
+	"Poco/ValidArgs.h"
+	"Poco/EventArgs.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UUIDGenerator.h
+	"Poco/Foundation.h"
+	"Poco/UUID.h"
+	"Poco/Mutex.h"
+	"Poco/Random.h"
+	"Poco/Timestamp.h"
+	"Poco/Environment.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Environment.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketReactor.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+	"Poco/Runnable.h"
+	"Poco/Timespan.h"
+	"Poco/Observer.h"
+	"Poco/AutoPtr.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Observer.h
+	"Poco/Foundation.h"
+	"Poco/AbstractObserver.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AbstractObserver.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketAcceptor.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketNotification.h"
+	"Poco/Net/ServerSocket.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/Observer.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketNotification.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+	"Poco/Notification.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/ServerSocket.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+	"Poco/Net/StreamSocket.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NObserver.h
+	"Poco/Foundation.h"
+	"Poco/AbstractObserver.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Option.h
+	"Poco/Util/Util.h"
+	"Poco/Util/OptionCallback.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Util.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/OptionCallback.h
+	"Poco/Util/Util.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/OptionSet.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Option.h"
+	<vector>
+
+1497444736 /home/chris/dev/treestore/src/rednode_storage.h
+	"red_includes.h"
+	"rednode.h"
+
+1497445547 source:/home/chris/dev/treestore/src/myi.cpp
+	"myi.h"
+	"var.cpp"
+	"info.cpp"
+	<atomic>
+	"poco.cpp"
+	<stx/storage/pool.h>
+
+1496147176 /home/chris/dev/treestore/src/myi.h
+	<cmath>
+	<algorithm>
+	"key.h"
+	"sql_plugin.h"
+	<m_ctype.h>
+	<my_bit.h>
+	<stdarg.h>
+	"sql_table.h"
+	"sql_class.h"
+	<limits>
+	<map>
+	<string>
+	"collumn.h"
+	"tree_stored.h"
+	"conversions.h"
+	"tree_index.h"
+	"tree_table.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/key.h
+	"my_global.h"
+	"my_base.h"
+	"sql_plugin_ref.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_global.h
+	"my_config.h"
+	<winsock2.h>
+	<ws2tcpip.h>
+	<io.h>
+	<stdio.h>
+	<stdarg.h>
+	<stdlib.h>
+	<stddef.h>
+	<math.h>
+	<limits.h>
+	<float.h>
+	<fcntl.h>
+	<time.h>
+	<errno.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netdb.h>
+	<crtdbg.h>
+	<assert.h>
+	<new>
+	"my_compiler.h"
+	<ieeefp.h>
+	<cmath>
+	<my_byteorder.h>
+	<my_dbug.h>
+
+1493917200 /home/chris/dev/mysql-5.7.18/bld/include/my_config.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_compiler.h
+	<stddef.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_byteorder.h
+	"byte_order_generic_x86.h"
+	"byte_order_generic.h"
+	"big_endian.h"
+	"little_endian.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/byte_order_generic_x86.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/byte_order_generic.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/big_endian.h
+	<string.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/little_endian.h
+	<string.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_dbug.h
+	"my_global.h"
+	<crtdbg.h>
+	<sstream>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_base.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_plugin_ref.h
+	"my_alloc.h"
+	"mysql/mysql_lex_string.h"
+	"prealloced_array.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_alloc.h
+	"mysql/psi/psi_memory.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/psi_memory.h
+	"psi_base.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/psi_base.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/mysql_lex_string.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/prealloced_array.h
+	"my_global.h"
+	"my_sys.h"
+	"my_dbug.h"
+	<algorithm>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_sys.h
+	"my_global.h"
+	"m_ctype.h"
+	"my_thread.h"
+	"mysql/psi/psi.h"
+	"mysql/service_mysql_alloc.h"
+	"mysql/psi/mysql_memory.h"
+	"mysql/psi/mysql_thread.h"
+	<alloca.h>
+	<malloc.h>
+	<unistd.h>
+	<valgrind/valgrind.h>
+	<valgrind/memcheck.h>
+	<typelib.h>
+	<errno.h>
+	<my_alloc.h>
+	<sys/mman.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/m_ctype.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_thread.h
+	"my_global.h"
+	<pthread.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/psi.h
+	"psi_base.h"
+	"psi_memory.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_mysql_alloc.h
+	<stdlib.h>
+	"mysql/psi/psi_memory.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/mysql_memory.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/mysql_thread.h
+	"my_thread.h"
+	"my_thread_local.h"
+	"thr_mutex.h"
+	"thr_rwlock.h"
+	"mysql/psi/psi.h"
+	"pfs_thread_provider.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_thread_local.h
+	<pthread.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/thr_mutex.h
+	<my_global.h>
+	"my_thread.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/thr_rwlock.h
+	"my_global.h"
+	"my_thread.h"
+	"thr_cond.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/thr_cond.h
+	"my_thread.h"
+	"thr_mutex.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/pfs_thread_provider.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/typelib.h
+	"my_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_plugin.h
+	<my_global.h>
+	<vector>
+	<mysql/plugin.h>
+	"mysql/mysql_lex_string.h"
+	"my_alloc.h"
+	"my_getopt.h"
+	"sql_const.h"
+	<my_sys.h>
+	"sql_list.h"
+	"sql_cmd.h"
+	"sql_plugin_ref.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/plugin.h
+	<stddef.h>
+	"mysql_version.h"
+	<mysql/services.h>
+	"sql_plugin_enum.h"
+
+1493917200 /home/chris/dev/mysql-5.7.18/bld/include/mysql_version.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/services.h
+	<mysql/service_srv_session.h>
+	<mysql/service_srv_session_info.h>
+	<mysql/service_command.h>
+	<mysql/service_my_snprintf.h>
+	<mysql/service_thd_alloc.h>
+	<mysql/service_thd_wait.h>
+	<mysql/service_thread_scheduler.h>
+	<mysql/service_my_plugin_log.h>
+	<mysql/service_mysql_string.h>
+	<mysql/service_mysql_alloc.h>
+	<mysql/service_mysql_password_policy.h>
+	<mysql/service_parser.h>
+	<mysql/service_rpl_transaction_ctx.h>
+	<mysql/service_rpl_transaction_write_set.h>
+	<mysql/service_security_context.h>
+	<mysql/service_locking.h>
+	<mysql/service_mysql_keyring.h>
+	<mysql/service_rules_table.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_srv_session.h
+	"mysql/plugin.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_srv_session_info.h
+	"mysql/service_srv_session.h"
+	"my_thread.h"
+	"m_string.h"
+	"plugin.h"
+	"mysql_com.h"
+	"violite.h"
+	<stdint.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/m_string.h
+	"my_global.h"
+	<string.h>
+	"mysql/service_my_snprintf.h"
+	<mysql/mysql_lex_string.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_my_snprintf.h
+	<stdarg.h>
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql_com.h
+	"binary_log_types.h"
+	"my_command.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/export/binary_log_types.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_command.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/violite.h
+	<my_thread.h>
+	<mysql/psi/psi.h>
+	<pfs_socket_provider.h>
+	<mysql/psi/mysql_socket.h>
+	<openssl/opensslv.h>
+	<openssl/ssl.h>
+	<openssl/err.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/pfs_socket_provider.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/mysql_socket.h
+	<string.h>
+	<my_dir.h>
+	<my_sys.h>
+	<ws2def.h>
+	<winsock2.h>
+	<MSWSock.h>
+	<netinet/in.h>
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_dir.h
+	"my_global.h"
+	<sys/stat.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_command.h
+	"mysql/service_srv_session.h"
+	"mysql/com_data.h"
+	"mysql_time.h"
+	"decimal.h"
+	"m_ctype.h"
+	<stdint.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/com_data.h
+	"my_global.h"
+	"mysql_com.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql_time.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/decimal.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_thd_alloc.h
+	<stdlib.h>
+	<mysql/mysql_lex_string.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_thd_wait.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_thread_scheduler.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_my_plugin_log.h
+	<stdarg.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_mysql_string.h
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_mysql_password_policy.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_parser.h
+	"my_md5_size.h"
+	<mysql/mysql_lex_string.h>
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_md5_size.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_rpl_transaction_ctx.h
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_rpl_transaction_write_set.h
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_security_context.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_locking.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_mysql_keyring.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/service_rules_table.h
+	<my_global.h>
+	<my_dbug.h>
+	<string>
+	<stdlib.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_plugin_enum.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_getopt.h
+	"my_sys.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_const.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_list.h
+	"sql_alloc.h"
+	"my_global.h"
+	"my_sys.h"
+	"m_string.h"
+	"my_sys.h"
+	"m_string.h"
+	"thr_malloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_alloc.h
+	"my_sys.h"
+	"thr_malloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/thr_malloc.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_cmd.h
+	"my_sqlcommand.h"
+	"sql_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_sqlcommand.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_bit.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_table.h
+	"my_global.h"
+	"m_ctype.h"
+	"mysql_com.h"
+	"mysql/psi/mysql_thread.h"
+	"my_global.h"
+	"m_ctype.h"
+	"mysql_com.h"
+	"mysql/psi/mysql_thread.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_class.h
+	"my_global.h"
+	"dur_prop.h"
+	"mysql/mysql_lex_string.h"
+	"mysql_com.h"
+	"mysql_com_server.h"
+	"auth/sql_security_ctx.h"
+	"derror.h"
+	"discrete_interval.h"
+	"handler.h"
+	"opt_trace_context.h"
+	"protocol.h"
+	"protocol_classic.h"
+	"rpl_context.h"
+	"rpl_gtid.h"
+	"session_tracker.h"
+	"sql_alloc.h"
+	"sql_digest_stream.h"
+	"sql_lex.h"
+	"sql_locale.h"
+	"sql_profile.h"
+	"sys_vars_resource_mgr.h"
+	"transaction_info.h"
+	<pfs_stage_provider.h>
+	<mysql/psi/mysql_stage.h>
+	<pfs_statement_provider.h>
+	<mysql/psi/mysql_statement.h>
+	<memory>
+	"mysql/thread_type.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/dur_prop.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql_com_server.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/auth/sql_security_ctx.h
+	"my_global.h"
+	"sql_string.h"
+	"mysql_com.h"
+	"sql_const.h"
+	"auth/auth_acls.h"
+	"mysqld.h"
+	<algorithm>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/sql_string.h
+	"m_ctype.h"
+	"my_sys.h"
+	"m_string.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/auth/auth_acls.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/mysqld.h
+	"my_global.h"
+	"my_bitmap.h"
+	"my_decimal.h"
+	"mysql_com.h"
+	"my_atomic.h"
+	"sql_cmd.h"
+	"my_thread_local.h"
+	"my_thread.h"
+	"atomic_class.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_bitmap.h
+	<m_string.h>
+	"mysql/psi/mysql_thread.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/my_decimal.h
+	"sql_string.h"
+	<decimal.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_atomic.h
+	"atomic/generic-msvc.h"
+	"atomic/solaris.h"
+	"atomic/gcc_sync.h"
+	"atomic/gcc_atomic.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/atomic/generic-msvc.h
+	<windows.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/atomic/solaris.h
+	<atomic.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/atomic/gcc_sync.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/atomic/gcc_atomic.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/atomic_class.h
+	"my_atomic.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/derror.h
+	"my_global.h"
+	"mysqld_error.h"
+
+1493917427 /home/chris/dev/mysql-5.7.18/bld/include/mysqld_error.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/discrete_interval.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/handler.h
+	"my_global.h"
+	"ft_global.h"
+	"my_thread_local.h"
+	"thr_lock.h"
+	"discrete_interval.h"
+	"key.h"
+	"mysqld.h"
+	"sql_const.h"
+	"sql_list.h"
+	"sql_plugin_ref.h"
+	"mysql/psi/psi.h"
+	<algorithm>
+	<string>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/ft_global.h
+	"my_global.h"
+	"my_base.h"
+	"m_ctype.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/thr_lock.h
+	<my_thread.h>
+	<my_list.h>
+	"mysql/psi/mysql_thread.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_list.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/opt_trace_context.h
+	"my_config.h"
+	"prealloced_array.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/protocol.h
+	"sql_error.h"
+	"my_decimal.h"
+	"violite.h"
+	"mysql/com_data.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_error.h
+	"sql_list.h"
+	"sql_string.h"
+	"sql_plist.h"
+	"mysql_com.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_plist.h
+	<my_global.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/protocol_classic.h
+	"sql_error.h"
+	"my_decimal.h"
+	"field.h"
+	"protocol.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/field.h
+	"my_global.h"
+	"my_base.h"
+	"my_compare.h"
+	"my_time.h"
+	"binary_log_funcs.h"
+	"handler.h"
+	"mysqld.h"
+	"mysqld_error.h"
+	"sql_error.h"
+	"sql_string.h"
+	"table.h"
+	"mysql_version.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_compare.h
+	"myisampack.h"
+	"m_ctype.h"
+	"my_icp.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/myisampack.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_icp.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_time.h
+	"my_global.h"
+	"mysql_time.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/export/binary_log_funcs.h
+	"binary_log_types.h"
+	<cstdint>
+	<stdint.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/table.h
+	"my_global.h"
+	"hash.h"
+	"datadict.h"
+	"handler.h"
+	"mdl.h"
+	"opt_costmodel.h"
+	"sql_bitmap.h"
+	"sql_sort.h"
+	"table_id.h"
+	"lock.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/hash.h
+	"my_global.h"
+	"my_sys.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/datadict.h
+	"handler.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/mdl.h
+	"sql_plist.h"
+	<my_sys.h>
+	<m_string.h>
+	<mysql_com.h>
+	<algorithm>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/opt_costmodel.h
+	"my_dbug.h"
+	"sql_const.h"
+	"opt_costconstants.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/opt_costconstants.h
+	"my_dbug.h"
+	"handler.h"
+	"m_string.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_bitmap.h
+	<my_sys.h>
+	<my_bitmap.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_sort.h
+	"my_global.h"
+	"my_base.h"
+	"sql_array.h"
+	"mysql_com.h"
+	"filesort_utils.h"
+	"sql_alloc.h"
+	<string.h>
+	<vector>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_array.h
+	<my_dbug.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/filesort_utils.h
+	"my_global.h"
+	"my_base.h"
+	"sql_array.h"
+	"my_sys.h"
+	<algorithm>
+	<utility>
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/table_id.h
+	<stdint.h>
+	"wrapper_functions.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/wrapper_functions.h
+	"binlog_config.h"
+	"my_sys.h"
+	<cassert>
+	<stdlib.h>
+	<string.h>
+
+1493917198 /home/chris/dev/mysql-5.7.18/bld/libbinlogevents/include/binlog_config.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/lock.h
+	"thr_lock.h"
+	"mdl.h"
+	"sql_hset.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_hset.h
+	"my_global.h"
+	"hash.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/rpl_context.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/rpl_gtid.h
+	"my_global.h"
+	"hash.h"
+	"my_atomic.h"
+	"prealloced_array.h"
+	"control_events.h"
+	"mysqld.h"
+	"table.h"
+	<list>
+	"atomic_class.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/control_events.h
+	"binlog_event.h"
+	<list>
+	<map>
+	<vector>
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/binlog_event.h
+	"debug_vars.h"
+	"byteorder.h"
+	"wrapper_functions.h"
+	<zlib.h>
+	<cstdio>
+	<iostream>
+	<climits>
+	<Winsock2.h>
+	<sys/times.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/debug_vars.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/libbinlogevents/include/byteorder.h
+	"my_compiler.h"
+	"binlog_config.h"
+	<stdint.h>
+	<endian.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/session_tracker.h
+	"m_string.h"
+	"thr_lock.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_digest_stream.h
+	"sql_digest.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_digest.h
+	<string.h>
+	"sql_string.h"
+	"my_md5.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/my_md5.h
+	"m_string.h"
+	"my_md5_size.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_lex.h
+	"my_global.h"
+	"mem_root_array.h"
+	"prealloced_array.h"
+	"thr_lock.h"
+	"violite.h"
+	"item.h"
+	"item_subselect.h"
+	"lex_symbol.h"
+	"parse_tree_node_base.h"
+	"query_options.h"
+	"sql_alloc.h"
+	"sql_chars.h"
+	"sql_alter.h"
+	"sql_connect.h"
+	"sql_data_change.h"
+	"sql_get_diagnostics.h"
+	"sql_servers.h"
+	"sql_signal.h"
+	"table.h"
+	"trigger_def.h"
+	"xa.h"
+	"select_lex_visitor.h"
+	"parse_tree_hints.h"
+	"sql_admin.h"
+	<map>
+	"item_func.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/mem_root_array.h
+	<my_alloc.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/item.h
+	"field.h"
+	"parse_tree_node_base.h"
+	"sql_array.h"
+	"template_utils.h"
+	"trigger_def.h"
+	"table_trigger_field_support.h"
+	"mysql/service_parser.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/parse_tree_node_base.h
+	"my_config.h"
+	<cstdlib>
+	<cstring>
+	"my_sys.h"
+	"sql_const.h"
+	"parse_location.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/parse_location.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/template_utils.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/trigger_def.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/table_trigger_field_support.h
+	"trigger_def.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/item_subselect.h
+	"item.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/lex_symbol.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/query_options.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/sql_chars.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_alter.h
+	"sql_cmd.h"
+	"sql_list.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_connect.h
+	"my_global.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_data_change.h
+	"my_base.h"
+	"my_bitmap.h"
+	"sql_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_get_diagnostics.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_servers.h
+	"my_global.h"
+	"sql_cmd.h"
+	"sql_string.h"
+	"sql_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_signal.h
+	"sql_alloc.h"
+	"sp_pcontext.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sp_pcontext.h
+	"my_global.h"
+	"mysql/mysql_lex_string.h"
+	"mysql_com.h"
+	"field.h"
+	"mem_root_array.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/xa.h
+	"my_global.h"
+	"mysql/plugin.h"
+	"mysqld.h"
+	"sql_cmd.h"
+	"sql_plugin_ref.h"
+	<string.h>
+	"xa_aux.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/xa_aux.h
+	"m_string.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/select_lex_visitor.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/parse_tree_hints.h
+	"my_config.h"
+	"parse_tree_node_base.h"
+	"sql_alloc.h"
+	"sql_list.h"
+	"mem_root_array.h"
+	"sql_string.h"
+	"sql_show.h"
+	"opt_hints.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_show.h
+	"my_global.h"
+	"handler.h"
+	"table.h"
+	"set_var.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/set_var.h
+	"my_global.h"
+	"m_string.h"
+	"my_getopt.h"
+	"mysql_com.h"
+	"typelib.h"
+	"mysql/plugin.h"
+	"sql_alloc.h"
+	"sql_const.h"
+	"sql_plugin_ref.h"
+	"prealloced_array.h"
+	<vector>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/opt_hints.h
+	"my_config.h"
+	"parse_tree_node_base.h"
+	"sql_alloc.h"
+	"sql_list.h"
+	"mem_root_array.h"
+	"sql_string.h"
+	"sql_bitmap.h"
+	"sql_show.h"
+	"item_subselect.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_admin.h
+	"my_global.h"
+	"sql_cmd.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/item_func.h
+	"my_global.h"
+	"item.h"
+	"my_decimal.h"
+	"set_var.h"
+	"sql_udf.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_udf.h
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_locale.h
+	"my_global.h"
+	"derror.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_profile.h
+	"my_global.h"
+	"mysql/mysql_lex_string.h"
+	<sys/resource.h>
+	"mysql/psi/psi_memory.h"
+	"mysql/service_mysql_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sys_vars_resource_mgr.h
+	<hash.h>
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/transaction_info.h
+	"my_global.h"
+	"my_dbug.h"
+	"my_sys.h"
+	"xa.h"
+	"my_alloc.h"
+	"thr_malloc.h"
+	"sql_cache.h"
+	"mdl.h"
+	"handler.h"
+	"rpl_transaction_ctx.h"
+	"rpl_transaction_write_set_ctx.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/sql_cache.h
+	"hash.h"
+	"my_base.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/rpl_transaction_ctx.h
+	"my_global.h"
+	"mysql/service_rpl_transaction_ctx.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/sql/rpl_transaction_write_set_ctx.h
+	"my_global.h"
+	<vector>
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/pfs_stage_provider.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/mysql_stage.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/pfs_statement_provider.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/psi/mysql_statement.h
+	"mysql/psi/psi.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/thread_type.h
+
+1497447432 /home/chris/dev/treestore/src/collumn.h
+	<stdlib.h>
+	<string>
+	"fields.h"
+	"Poco/Mutex.h"
+	"Poco/Thread.h"
+	"Poco/ThreadPool.h"
+	"Poco/TaskManager.h"
+	"Poco/Task.h"
+	"NotificationQueueWorker.h"
+	"conversions.h"
+	"iterator.h"
+	<rabbit/unordered_map>
+	<stx/storage/pool.h>
+
+1497451892 /home/chris/dev/treestore/src/fields.h
+	<Windows.h>
+	<stx/storage/basic_storage.h>
+	<bit_symbols.h>
+	<stx/btree.h>
+	<stx/btree_map>
+	<stx/btree_map.h>
+	<stx/btree_multimap>
+	<stx/btree_multimap.h>
+	<stx/btree_set>
+	"transactional_storage.h"
+	"MurmurHash3.h"
+	<map>
+	<vector>
+	<conio.h>
+	"abstracted_storage.h"
+	"suffix_array.h"
+	<stx/storage/pool.h>
+
+1494423218 /home/chris/dev/treestore/src/bit_symbols.h
+	<stx/storage/basic_storage.h>
+
+1497452349 /home/chris/dev/treestore/src/stx/btree.h
+	<Windows.h>
+	<algorithm>
+	<functional>
+	<istream>
+	<ostream>
+	<memory>
+	<cstddef>
+	<assert.h>
+	<vector>
+	<set>
+	<map>
+	<unordered_map>
+	<stx/storage/basic_storage.h>
+	<stx/storage/pool.h>
+	<Poco/AtomicCounter.h>
+	<Poco/Mutex.h>
+	<Poco/Thread.h>
+	<Poco/ThreadPool.h>
+	<Poco/TaskManager.h>
+	<Poco/Task.h>
+	<Poco/Timestamp.h>
+	<stx/storage/pool.h>
+	<rabbit/unordered_map>
+	"NotificationQueueWorker.h"
+	<iostream>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_map
+	<stx/btree_map.h>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_map.h
+	<stx/btree.h>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_multimap
+	<stx/btree_multimap.h>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_multimap.h
+	<stx/btree.h>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_set
+	<stx/btree_set.h>
+
+1494423218 /home/chris/dev/treestore/src/stx/btree_set.h
+	<stx/btree.h>
+
+1497450497 /home/chris/dev/treestore/src/transactional_storage.h
+	<stdlib.h>
+	<memory>
+	<string>
+	<map>
+	<vector>
+	<unordered_map>
+	<unordered_set>
+	<rabbit/unordered_map>
+	<stx/storage/types.h>
+	<stx/storage/basic_storage.h>
+	"Poco/NumberFormatter.h"
+	"Poco/String.h"
+	"Poco/File.h"
+	"Poco/Mutex.h"
+	"Poco/Data/Common.h"
+	"Poco/Data/Session.h"
+	"Poco/Data/BLOB.h"
+	"Poco/Data/Limit.h"
+	"Poco/Data/SQLite/Connector.h"
+	"Poco/Exception.h"
+	"Poco/AtomicCounter.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/Logger.h"
+	"Poco/LogFile.h"
+	"Poco/StringTokenizer.h"
+	"Poco/Timestamp.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/BinaryWriter.h"
+	"Poco/BinaryReader.h"
+	"Poco/File.h"
+	"Poco/ThreadLocal.h"
+	"rednode.h"
+	<stx/storage/pool.h>
+	<Poco/UUIDGenerator.h>
+
+1494423218 /home/chris/dev/treestore/src/MurmurHash3.h
+	<stdint.h>
+
+1494423218 /home/chris/dev/treestore/src/abstracted_storage.h
+	"stx/storage/basic_storage.h"
+	"fields.h"
+	"MurmurHash3.h"
+	<map>
+	<vector>
+	<rabbit/unordered_map>
+	<conio.h>
+
+1497446170 /home/chris/dev/treestore/src/suffix_array.h
+	<stx/storage/types.h>
+	<stx/btree_map.h>
+	"simple_storage.h"
+	"MurmurHash3.h"
+	<fse/fse.h>
+
+1494423218 /home/chris/dev/treestore/src/simple_storage.h
+	<stx/storage/basic_storage.h>
+	<stx/btree.h>
+	<stx/btree_map>
+	<stx/btree_map.h>
+	<stx/btree_multimap>
+	<stx/btree_multimap.h>
+	<stx/btree_set>
+	"transactional_storage.h"
+	<map>
+	<vector>
+	<conio.h>
+
+1494423218 /home/chris/dev/treestore/src/conversions.h
+	<cmath>
+	"sql_class.h"
+	<mysql.h>
+	<mysql/plugin.h>
+	"fields.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql.h
+	<sys/types.h>
+	<windows.h>
+	<winsock2.h>
+	"mysql_version.h"
+	"mysql_com.h"
+	"mysql_time.h"
+	"my_list.h"
+	"mysql/client_plugin.h"
+	"typelib.h"
+	"my_alloc.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/client_plugin.h
+	<stdarg.h>
+	<stdlib.h>
+	"plugin_auth_common.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/mysql/plugin_auth_common.h
+	<windows.h>
+
+1494423218 /home/chris/dev/treestore/src/iterator.h
+	"fields.h"
+
+1494423218 /home/chris/dev/treestore/src/tree_stored.h
+
+1494423218 /home/chris/dev/treestore/src/tree_index.h
+	"collumn.h"
+	"PredictiveCache.h"
+	<stx/btree.h>
+	"iterator.h"
+
+1494423218 /home/chris/dev/treestore/src/PredictiveCache.h
+	"fields.h"
+
+1497449311 /home/chris/dev/treestore/src/tree_table.h
+	"tree_stored.h"
+	"conversions.h"
+	"tree_index.h"
+	"system_timers.h"
+	<random>
+	<numeric>
+
+1494423218 /home/chris/dev/treestore/src/var.cpp
+
+1494423218 /home/chris/dev/treestore/src/info.cpp
+
+1494423218 /home/chris/dev/treestore/src/poco.cpp
+	<cmath>
+	<algorithm>
+	"probes_mysql.h"
+	"key.h"
+	"sql_plugin.h"
+	<m_ctype.h>
+	<my_bit.h>
+	<stdarg.h>
+	"sql_table.h"
+	"sql_class.h"
+	<limits>
+	<map>
+	<string>
+	"Poco/Platform.h"
+	"Data/src/Connector.cpp"
+	"Data/src/AbstractBinder.cpp"
+	"Data/src/AbstractBinding.cpp"
+	"Data/src/AbstractExtraction.cpp"
+	"Data/src/AbstractExtractor.cpp"
+	"Data/src/AbstractPreparation.cpp"
+	"Data/src/AbstractPrepare.cpp"
+	"Data/src/BLOB.cpp"
+	"Data/src/BLOBStream.cpp"
+	"Data/src/DataException.cpp"
+	"Data/src/Limit.cpp"
+	"Data/src/MetaColumn.cpp"
+	"Data/src/PooledSessionHolder.cpp"
+	"Data/src/PooledSessionImpl.cpp"
+	"Data/src/Range.cpp"
+	"Data/src/RecordSet.cpp"
+	"Data/src/Session.cpp"
+	"Data/src/SessionImpl.cpp"
+	"Data/src/SessionPool.cpp"
+	"Data/src/SessionFactory.cpp"
+	"Data/src/Statement.cpp"
+	"Data/src/StatementCreator.cpp"
+	"Data/src/StatementImpl.cpp"
+	"Data/SQLite/src/Connector.cpp"
+	"Data/SQLite/src/Binder.cpp"
+	"Data/SQLite/src/Extractor.cpp"
+	"Data/SQLite/src/SessionImpl.cpp"
+	"Data/SQLite/src/SQLiteException.cpp"
+	"Data/SQLite/src/SQLiteStatementImpl.cpp"
+	"Data/SQLite/src/Utility.cpp"
+	"Foundation/src/AbstractObserver.cpp"
+	"Foundation/src/ActiveDispatcher.cpp"
+	"Foundation/src/ArchiveStrategy.cpp"
+	"Foundation/src/Ascii.cpp"
+	"Foundation/src/ASCIIEncoding.cpp"
+	"Foundation/src/AsyncChannel.cpp"
+	"Foundation/src/AtomicCounter.cpp"
+	"Foundation/src/Base64Decoder.cpp"
+	"Foundation/src/Base64Encoder.cpp"
+	"Foundation/src/BinaryReader.cpp"
+	"Foundation/src/BinaryWriter.cpp"
+	"Foundation/src/Bugcheck.cpp"
+	"Foundation/src/ByteOrder.cpp"
+	"Foundation/src/Channel.cpp"
+	"Foundation/src/Checksum.cpp"
+	"Foundation/src/Condition.cpp"
+	"Foundation/src/Configurable.cpp"
+	"Foundation/src/ConsoleChannel.cpp"
+	"Foundation/src/CountingStream.cpp"
+	"Foundation/src/DateTime.cpp"
+	"Foundation/src/DateTimeFormat.cpp"
+	"Foundation/src/DateTimeFormatter.cpp"
+	"Foundation/src/DateTimeParser.cpp"
+	"Foundation/src/Debugger.cpp"
+	"Foundation/src/DeflatingStream.cpp"
+	"Foundation/src/DigestEngine.cpp"
+	"Foundation/src/DigestStream.cpp"
+	"Foundation/src/DirectoryIterator.cpp"
+	"Foundation/src/DirectoryWatcher.cpp"
+	"Foundation/src/DynamicAny.cpp"
+	"Foundation/src/DynamicAnyHolder.cpp"
+	"Foundation/src/ErrorHandler.cpp"
+	"Foundation/src/Event.cpp"
+	"Foundation/src/EventArgs.cpp"
+	"Foundation/src/EventLogChannel.cpp"
+	"Foundation/src/Exception.cpp"
+	"Foundation/src/File.cpp"
+	"Foundation/src/FileChannel.cpp"
+	"Foundation/src/FileStream.cpp"
+	"Foundation/src/FileStreamFactory.cpp"
+	"Foundation/src/Format.cpp"
+	"Foundation/src/Formatter.cpp"
+	"Foundation/src/FormattingChannel.cpp"
+	"Foundation/src/Glob.cpp"
+	"Foundation/src/Hash.cpp"
+	"Foundation/src/HashStatistic.cpp"
+	"Foundation/src/HexBinaryDecoder.cpp"
+	"Foundation/src/HexBinaryEncoder.cpp"
+	"Foundation/src/InflatingStream.cpp"
+	"Foundation/src/Latin1Encoding.cpp"
+	"Foundation/src/Latin9Encoding.cpp"
+	"Foundation/src/LineEndingConverter.cpp"
+	"Foundation/src/LocalDateTime.cpp"
+	"Foundation/src/LogFile.cpp"
+	"Foundation/src/Logger.cpp"
+	"Foundation/src/LoggingFactory.cpp"
+	"Foundation/src/LoggingRegistry.cpp"
+	"Foundation/src/LogStream.cpp"
+	"Foundation/src/Manifest.cpp"
+	"Foundation/src/MD5Engine.cpp"
+	"Foundation/src/MemoryPool.cpp"
+	"Foundation/src/MemoryStream.cpp"
+	"Foundation/src/Message.cpp"
+	"Foundation/src/Mutex.cpp"
+	"Foundation/src/NamedEvent.cpp"
+	"Foundation/src/NamedMutex.cpp"
+	"Foundation/src/NestedDiagnosticContext.cpp"
+	"Foundation/src/Notification.cpp"
+	"Foundation/src/NotificationCenter.cpp"
+	"Foundation/src/NotificationQueue.cpp"
+	"Foundation/src/NullChannel.cpp"
+	"Foundation/src/NullStream.cpp"
+	"Foundation/src/NumberFormatter.cpp"
+	"Foundation/src/NumberParser.cpp"
+	"Foundation/src/Path.cpp"
+	"Foundation/src/PatternFormatter.cpp"
+	"Foundation/src/Pipe.cpp"
+	"Foundation/src/PipeImpl.cpp"
+	"Foundation/src/PipeStream.cpp"
+	"Foundation/src/PriorityNotificationQueue.cpp"
+	"Foundation/src/Process.cpp"
+	"Foundation/src/PurgeStrategy.cpp"
+	"Foundation/src/Random.cpp"
+	"Foundation/src/RandomStream.cpp"
+	"Foundation/src/RefCountedObject.cpp"
+	"Foundation/src/RotateStrategy.cpp"
+	"Foundation/src/Runnable.cpp"
+	"Foundation/src/RWLock.cpp"
+	"Foundation/src/Semaphore.cpp"
+	"Foundation/src/SHA1Engine.cpp"
+	"Foundation/src/SharedLibrary.cpp"
+	"Foundation/src/SharedMemory.cpp"
+	"Foundation/src/SignalHandler.cpp"
+	"Foundation/src/SimpleFileChannel.cpp"
+	"Foundation/src/SplitterChannel.cpp"
+	"Foundation/src/Stopwatch.cpp"
+	"Foundation/src/StreamChannel.cpp"
+	"Foundation/src/StreamConverter.cpp"
+	"Foundation/src/StreamCopier.cpp"
+	"Foundation/src/StreamTokenizer.cpp"
+	"Foundation/src/String.cpp"
+	"Foundation/src/StringTokenizer.cpp"
+	"Foundation/src/SynchronizedObject.cpp"
+	"Foundation/src/Task.cpp"
+	"Foundation/src/TaskManager.cpp"
+	"Foundation/src/TaskNotification.cpp"
+	"Foundation/src/TeeStream.cpp"
+	"Foundation/src/TemporaryFile.cpp"
+	"Foundation/src/TextBufferIterator.cpp"
+	"Foundation/src/TextConverter.cpp"
+	"Foundation/src/TextEncoding.cpp"
+	"Foundation/src/TextIterator.cpp"
+	"Foundation/src/Thread.cpp"
+	"Foundation/src/ThreadLocal.cpp"
+	"Foundation/src/ThreadPool.cpp"
+	"Foundation/src/ThreadTarget.cpp"
+	"Foundation/src/TimedNotificationQueue.cpp"
+	"Foundation/src/Timer.cpp"
+	"Foundation/src/Timespan.cpp"
+	"Foundation/src/Timestamp.cpp"
+	"Foundation/src/Timezone.cpp"
+	"Foundation/src/Token.cpp"
+	"Foundation/src/URI.cpp"
+	"Foundation/src/URIStreamFactory.cpp"
+	"Foundation/src/URIStreamOpener.cpp"
+	"Foundation/src/UTF16Encoding.cpp"
+	"Foundation/src/UTF8Encoding.cpp"
+	"Foundation/src/UTF8String.cpp"
+	"Foundation/src/UUID.cpp"
+	"Foundation/src/UUIDGenerator.cpp"
+	"Foundation/src/Void.cpp"
+	"Foundation/src/Unicode.cpp"
+	"Foundation/src/UnicodeConverter.cpp"
+	"Foundation/src/Windows1252Encoding.cpp"
+	"Foundation/src/WindowsConsoleChannel.cpp"
+	"Net/src/DNS.cpp"
+	"Net/src/Socket.cpp"
+	"Net/src/SocketImpl.cpp"
+	"Net/src/SocketReactor.cpp"
+	"Net/src/SocketNotification.cpp"
+	"Net/src/SocketNotifier.cpp"
+	"Net/src/RawSocket.cpp"
+	"Net/src/RawSocketImpl.cpp"
+	"Net/src/SocketAddress.cpp"
+	"Net/src/ServerSocket.cpp"
+	"Net/src/ServerSocketImpl.cpp"
+	"Net/src/SocketStream.cpp"
+	"Net/src/StreamSocket.cpp"
+	"Net/src/StreamSocketImpl.cpp"
+	"Net/src/TCPServer.cpp"
+	"Net/src/TCPServerConnection.cpp"
+	"Net/src/TCPServerConnectionFactory.cpp"
+	"Net/src/TCPServerDispatcher.cpp"
+	"Net/src/TCPServerParams.cpp"
+	"Net/src/IPAddress.cpp"
+	"Net/src/NetException.cpp"
+	"Net/src/NetworkInterface.cpp"
+	"Net/src/HostEntry.cpp"
+	"Util/src/Application.cpp"
+	"Util/src/ConfigurationMapper.cpp"
+	"Util/src/ConfigurationView.cpp"
+	"Util/src/FilesystemConfiguration.cpp"
+	"Util/src/HelpFormatter.cpp"
+	"Util/src/IniFileConfiguration.cpp"
+	"Util/src/IntValidator.cpp"
+	"Util/src/LayeredConfiguration.cpp"
+	"Util/src/LoggingConfigurator.cpp"
+	"Util/src/LoggingSubsystem.cpp"
+	"Util/src/MapConfiguration.cpp"
+	"Util/src/Option.cpp"
+	"Util/src/OptionCallback.cpp"
+	"Util/src/OptionException.cpp"
+	"Util/src/OptionProcessor.cpp"
+	"Util/src/OptionSet.cpp"
+	"Util/src/PropertyFileConfiguration.cpp"
+	"Util/src/RegExpValidator.cpp"
+	"Util/src/ServerApplication.cpp"
+	"Util/src/Subsystem.cpp"
+	"Util/src/SystemConfiguration.cpp"
+	"Util/src/Timer.cpp"
+	"Util/src/TimerTask.cpp"
+	"Util/src/Validator.cpp"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/probes_mysql.h
+	<my_global.h>
+	"probes_mysql_dtrace.h"
+	"probes_mysql_nodtrace.h"
+
+1489823114 /home/chris/dev/mysql-5.7.18/include/probes_mysql_nodtrace.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/Connector.cpp
+	"Poco/Data/Connector.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractBinder.cpp
+	"Poco/Data/AbstractBinder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractBinding.cpp
+	"Poco/Data/AbstractBinding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractExtraction.cpp
+	"Poco/Data/AbstractExtraction.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractExtractor.cpp
+	"Poco/Data/AbstractExtractor.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractPreparation.cpp
+	"Poco/Data/AbstractPreparation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/AbstractPrepare.cpp
+	"Poco/Data/AbstractPrepare.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/BLOB.cpp
+	"Poco/Data/BLOB.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/BLOBStream.cpp
+	"Poco/Data/BLOBStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/BLOBStream.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	"Poco/Data/BLOB.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UnbufferedStreamBuf.h
+	"Poco/Foundation.h"
+	"Poco/StreamUtil.h"
+	<streambuf>
+	<iosfwd>
+	<ios>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/DataException.cpp
+	"Poco/Data/DataException.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/Limit.cpp
+	"Poco/Data/Limit.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/MetaColumn.cpp
+	"Poco/Data/MetaColumn.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/PooledSessionHolder.cpp
+	"Poco/Data/PooledSessionHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/PooledSessionHolder.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/AutoPtr.h"
+	"Poco/Timestamp.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/PooledSessionImpl.cpp
+	"Poco/Data/PooledSessionImpl.h"
+	"Poco/Data/DataException.h"
+	"Poco/Data/SessionPool.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/PooledSessionImpl.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/Data/PooledSessionHolder.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/SessionPool.h
+	"Poco/Data/Data.h"
+	"Poco/Data/PooledSessionHolder.h"
+	"Poco/Data/PooledSessionImpl.h"
+	"Poco/Data/Session.h"
+	"Poco/Timer.h"
+	"Poco/Mutex.h"
+	<list>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Timer.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+	"Poco/Thread.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/Range.cpp
+	"Poco/Data/Range.h"
+	"Poco/Data/DataException.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/RecordSet.cpp
+	"Poco/Data/RecordSet.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/RecordSet.h
+	"Poco/Data/Data.h"
+	"Poco/Data/Extraction.h"
+	"Poco/Data/Statement.h"
+	"Poco/Data/BLOB.h"
+	"Poco/String.h"
+	"Poco/DynamicAny.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DynamicAny.h
+	"Poco/Foundation.h"
+	"Poco/DynamicAnyHolder.h"
+	"Poco/Format.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/Session.cpp
+	"Poco/Data/Session.h"
+	"Poco/Data/SessionFactory.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/SessionImpl.cpp
+	"Poco/Data/SessionImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/SessionPool.cpp
+	"Poco/Data/SessionPool.h"
+	"Poco/Data/SessionFactory.h"
+	"Poco/Data/DataException.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/SessionFactory.cpp
+	"Poco/Data/SessionFactory.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/Statement.cpp
+	"Poco/Data/Statement.h"
+	"Poco/Data/DataException.h"
+	"Poco/Data/Extraction.h"
+	"Poco/Data/Session.h"
+	"Poco/Any.h"
+	"Poco/Tuple.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/StatementCreator.cpp
+	"Poco/Data/StatementCreator.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/src/StatementImpl.cpp
+	"Poco/Data/StatementImpl.h"
+	"Poco/Data/DataException.h"
+	"Poco/Data/AbstractBinder.h"
+	"Poco/Data/Extraction.h"
+	"Poco/Data/BLOB.h"
+	"Poco/SharedPtr.h"
+	"Poco/String.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/Connector.cpp
+	"Poco/Data/SQLite/Connector.h"
+	"Poco/Data/SQLite/SessionImpl.h"
+	"Poco/Data/SessionFactory.h"
+	<sqlite3.h>
+	"sqlite3.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/SessionImpl.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/SQLite/Binder.h"
+	"Poco/Data/AbstractSessionImpl.h"
+	"Poco/SharedPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/Binder.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/AbstractBinder.h"
+	"Poco/Any.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/include/Poco/Data/AbstractSessionImpl.h
+	"Poco/Data/Data.h"
+	"Poco/Data/SessionImpl.h"
+	"Poco/Data/DataException.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/sqlite3.h
+	<stdarg.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/Binder.cpp
+	"Poco/Data/SQLite/Binder.h"
+	"Poco/Data/SQLite/Utility.h"
+	"Poco/Data/BLOB.h"
+	"Poco/Exception.h"
+	<sqlite3.h>
+	"sqlite3.h"
+	<cstdlib>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/Utility.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/MetaColumn.h"
+	"Poco/Mutex.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/Extractor.cpp
+	"Poco/Data/SQLite/Extractor.h"
+	"Poco/Data/SQLite/Utility.h"
+	"Poco/Data/BLOB.h"
+	"Poco/Data/DataException.h"
+	"Poco/Exception.h"
+	<sqlite3.h>
+	"sqlite3.h"
+	<cstdlib>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/Extractor.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/AbstractExtractor.h"
+	"Poco/Any.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/SessionImpl.cpp
+	"Poco/Data/SQLite/SessionImpl.h"
+	"Poco/Data/SQLite/Utility.h"
+	"Poco/Data/SQLite/SQLiteStatementImpl.h"
+	<sqlite3.h>
+	"sqlite3.h"
+	<cstdlib>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/SQLiteStatementImpl.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/SQLite/Binder.h"
+	"Poco/Data/SQLite/Extractor.h"
+	"Poco/Data/StatementImpl.h"
+	"Poco/Data/MetaColumn.h"
+	"Poco/SharedPtr.h"
+	"Poco/Random.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/SQLiteException.cpp
+	"Poco/Data/SQLite/SQLiteException.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/include/Poco/Data/SQLite/SQLiteException.h
+	"Poco/Data/SQLite/SQLite.h"
+	"Poco/Data/DataException.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/SQLiteStatementImpl.cpp
+	"Poco/Data/SQLite/SQLiteStatementImpl.h"
+	"Poco/Data/SQLite/Utility.h"
+	"Poco/Data/SQLite/SQLiteException.h"
+	"Poco/Thread.h"
+	"Poco/String.h"
+	<cstdlib>
+	<cstring>
+	<sqlite3.h>
+	"sqlite3.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Data/SQLite/src/Utility.cpp
+	"Poco/Data/SQLite/Utility.h"
+	"Poco/Data/SQLite/SQLiteException.h"
+	"Poco/NumberFormatter.h"
+	"Poco/String.h"
+	"Poco/Exception.h"
+	<sqlite3.h>
+	"sqlite3.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/AbstractObserver.cpp
+	"Poco/AbstractObserver.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ActiveDispatcher.cpp
+	"Poco/ActiveDispatcher.h"
+	"Poco/Notification.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ActiveDispatcher.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+	"Poco/Thread.h"
+	"Poco/ActiveStarter.h"
+	"Poco/ActiveRunnable.h"
+	"Poco/NotificationQueue.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ArchiveStrategy.cpp
+	"Poco/ArchiveStrategy.h"
+	"Poco/NumberFormatter.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/DeflatingStream.h"
+	"Poco/StreamCopier.h"
+	"Poco/Exception.h"
+	"Poco/ActiveDispatcher.h"
+	"Poco/ActiveMethod.h"
+	"Poco/Void.h"
+	"Poco/FileStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ArchiveStrategy.h
+	"Poco/Foundation.h"
+	"Poco/LogFile.h"
+	"Poco/File.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/NumberFormatter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DeflatingStream.h
+	"Poco/Foundation.h"
+	"Poco/BufferedStreamBuf.h"
+	<istream>
+	<ostream>
+	<zlib.h>
+	"Poco/zlib.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BufferedStreamBuf.h
+	"Poco/Foundation.h"
+	"Poco/BufferAllocator.h"
+	"Poco/StreamUtil.h"
+	<streambuf>
+	<iosfwd>
+	<ios>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/zlib.h
+	"zconf.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/zconf.h
+	<windows.h>
+	<sys/types.h>
+	<unistd.h>
+	<unixio.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StreamCopier.h
+	"Poco/Foundation.h"
+	<istream>
+	<ostream>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Void.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Ascii.cpp
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ASCIIEncoding.cpp
+	"Poco/ASCIIEncoding.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ASCIIEncoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TextEncoding.h
+	"Poco/Foundation.h"
+	"Poco/SharedPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/AsyncChannel.cpp
+	"Poco/AsyncChannel.h"
+	"Poco/Notification.h"
+	"Poco/Message.h"
+	"Poco/Formatter.h"
+	"Poco/AutoPtr.h"
+	"Poco/LoggingRegistry.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/AsyncChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Thread.h"
+	"Poco/Mutex.h"
+	"Poco/Runnable.h"
+	"Poco/NotificationQueue.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Formatter.h
+	"Poco/Foundation.h"
+	"Poco/Configurable.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LoggingRegistry.h
+	"Poco/Foundation.h"
+	"Poco/AutoPtr.h"
+	"Poco/Channel.h"
+	"Poco/Formatter.h"
+	"Poco/Mutex.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/AtomicCounter.cpp
+	"Poco/AtomicCounter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Base64Decoder.cpp
+	"Poco/Base64Decoder.h"
+	"Poco/Base64Encoder.h"
+	"Poco/Exception.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Base64Decoder.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Base64Encoder.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Base64Encoder.cpp
+	"Poco/Base64Encoder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/BinaryReader.cpp
+	"Poco/BinaryReader.h"
+	"Poco/ByteOrder.h"
+	"Poco/TextEncoding.h"
+	"Poco/TextConverter.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ByteOrder.h
+	"Poco/Foundation.h"
+	"Poco/Types.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TextConverter.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/BinaryWriter.cpp
+	"Poco/BinaryWriter.h"
+	"Poco/ByteOrder.h"
+	"Poco/TextEncoding.h"
+	"Poco/TextConverter.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Bugcheck.cpp
+	"Poco/Bugcheck.h"
+	"Poco/Debugger.h"
+	"Poco/Exception.h"
+	<sstream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Debugger.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ByteOrder.cpp
+	"Poco/ByteOrder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Channel.cpp
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Checksum.cpp
+	"Poco/Checksum.h"
+	<zlib.h>
+	"Poco/zlib.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Checksum.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Condition.cpp
+	"Poco/Condition.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Condition.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/ScopedUnlock.h"
+	"Poco/Event.h"
+	"Poco/Exception.h"
+	<deque>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ScopedUnlock.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Configurable.cpp
+	"Poco/Configurable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ConsoleChannel.cpp
+	"Poco/ConsoleChannel.h"
+	"Poco/Message.h"
+	<iostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ConsoleChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Mutex.h"
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/CountingStream.cpp
+	"Poco/CountingStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/CountingStream.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DateTime.cpp
+	"Poco/DateTime.h"
+	"Poco/Timespan.h"
+	<algorithm>
+	<cmath>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DateTimeFormat.cpp
+	"Poco/DateTimeFormat.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DateTimeFormatter.cpp
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTimeFormat.h"
+	"Poco/Timestamp.h"
+	"Poco/NumberFormatter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DateTimeParser.cpp
+	"Poco/DateTimeParser.h"
+	"Poco/DateTimeFormat.h"
+	"Poco/DateTime.h"
+	"Poco/Exception.h"
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Debugger.cpp
+	"Poco/Debugger.h"
+	<sstream>
+	<cstdlib>
+	<cstdio>
+	"Poco/UnWindows.h"
+	<unistd.h>
+	<signal.h>
+	<lib$routines.h>
+	<ssdef.h>
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UnicodeConverter.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DeflatingStream.cpp
+	"Poco/DeflatingStream.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DigestEngine.cpp
+	"Poco/DigestEngine.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DigestEngine.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DigestStream.cpp
+	"Poco/DigestStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DigestStream.h
+	"Poco/Foundation.h"
+	"Poco/BufferedStreamBuf.h"
+	"Poco/DigestEngine.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryIterator.cpp
+	"Poco/DirectoryIterator.h"
+	"DirectoryIterator_WIN32U.cpp"
+	"DirectoryIterator_WIN32.cpp"
+	"DirectoryIterator_UNIX.cpp"
+	"DirectoryIterator_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryIterator_WIN32U.cpp
+	"Poco/DirectoryIterator_WIN32U.h"
+	"Poco/File_WINCE.h"
+	"Poco/File_WIN32U.h"
+	"Poco/Path.h"
+	"Poco/UnicodeConverter.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryIterator_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryIterator_WIN32.cpp
+	"Poco/DirectoryIterator_WIN32.h"
+	"Poco/File_WIN32.h"
+	"Poco/Path.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryIterator_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryIterator_UNIX.cpp
+	"Poco/DirectoryIterator_UNIX.h"
+	"Poco/File_VX.h"
+	"Poco/File_UNIX.h"
+	"Poco/Path.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryIterator_UNIX.h
+	"Poco/Foundation.h"
+	<dirent.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryIterator_VMS.cpp
+	"Poco/DirectoryIterator_VMS.h"
+	"Poco/Path.h"
+	"Poco/Exception.h"
+	<iodef.h>
+	<atrdef.h>
+	<fibdef.h>
+	<starlet.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryIterator_VMS.h
+	"Poco/Foundation.h"
+	<rms.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DirectoryWatcher.cpp
+	"Poco/DirectoryWatcher.h"
+	"Poco/Path.h"
+	"Poco/Glob.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/Event.h"
+	"Poco/Exception.h"
+	"Poco/Buffer.h"
+	"Poco/UnicodeConverter.h"
+	<sys/inotify.h>
+	<sys/select.h>
+	<unistd.h>
+	<fcntl.h>
+	<sys/types.h>
+	<sys/event.h>
+	<sys/time.h>
+	<unistd.h>
+	<algorithm>
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DirectoryWatcher.h
+	"Poco/Foundation.h"
+	"Poco/File.h"
+	"Poco/BasicEvent.h"
+	"Poco/Runnable.h"
+	"Poco/Thread.h"
+	"Poco/AtomicCounter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/BasicEvent.h
+	"Poco/AbstractEvent.h"
+	"Poco/DefaultStrategy.h"
+	"Poco/AbstractDelegate.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Buffer.h
+	"Poco/Foundation.h"
+	<cstring>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DynamicAny.cpp
+	"Poco/DynamicAny.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/DynamicAnyHolder.cpp
+	"Poco/DynamicAnyHolder.h"
+	"Poco/DynamicAny.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ErrorHandler.cpp
+	"Poco/ErrorHandler.h"
+	"Poco/SingletonHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ErrorHandler.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Event.cpp
+	"Poco/Event.h"
+	"Event_WIN32.cpp"
+	"Event_VX.cpp"
+	"Event_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Event_WIN32.cpp
+	"Poco/Event_WIN32.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Event_VX.cpp
+	"Poco/Event_VX.h"
+	<sysLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Event_POSIX.cpp
+	"Poco/Event_POSIX.h"
+	<timers.h>
+	<cstring>
+	<sys/time.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/EventArgs.cpp
+	"Poco/EventArgs.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/EventLogChannel.cpp
+	"Poco/EventLogChannel.h"
+	"Poco/Message.h"
+	"Poco/String.h"
+	"pocomsg.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/EventLogChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/pocomsg.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Exception.cpp
+	"Poco/Exception.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File.cpp
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/Platform.h"
+	"File_WINCE.cpp"
+	"File_WIN32U.cpp"
+	"File_WIN32.cpp"
+	"File_VX.cpp"
+	"File_UNIX.cpp"
+	"File_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_WINCE.cpp
+	"Poco/File_WINCE.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Path.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_WIN32U.cpp
+	"Poco/File_WIN32U.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_WIN32.cpp
+	"Poco/File_WIN32.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_VX.cpp
+	"Poco/File_VX.h"
+	"Poco/Buffer.h"
+	"Poco/Exception.h"
+	<algorithm>
+	<sys/stat.h>
+	<sys/types.h>
+	<fcntl.h>
+	<errno.h>
+	<unistd.h>
+	<stdio.h>
+	<utime.h>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_UNIX.cpp
+	"Poco/File_UNIX.h"
+	"Poco/Buffer.h"
+	"Poco/Exception.h"
+	<algorithm>
+	<sys/stat.h>
+	<sys/types.h>
+	<fcntl.h>
+	<errno.h>
+	<unistd.h>
+	<stdio.h>
+	<utime.h>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/File_VMS.cpp
+	"Poco/File_VMS.h"
+	"Poco/Exception.h"
+	"Poco/Path.h"
+	"Poco/String.h"
+	<stdio.h>
+	<unistd.h>
+	<unixio.h>
+	<file.h>
+	<stat.h>
+	<errno.h>
+	<utime.h>
+	<lib$routines.h>
+	<rmsdef.h>
+	<starlet.h>
+	<lnmdef.h>
+	<ssdef.h>
+	<descrip.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FileChannel.cpp
+	"Poco/FileChannel.h"
+	"Poco/ArchiveStrategy.h"
+	"Poco/RotateStrategy.h"
+	"Poco/PurgeStrategy.h"
+	"Poco/Message.h"
+	"Poco/NumberParser.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTime.h"
+	"Poco/LocalDateTime.h"
+	"Poco/String.h"
+	"Poco/Timespan.h"
+	"Poco/Exception.h"
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FileChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Timestamp.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RotateStrategy.h
+	"Poco/Foundation.h"
+	"Poco/Timespan.h"
+	"Poco/Timestamp.h"
+	"Poco/Exception.h"
+	"Poco/LogFile.h"
+	"Poco/StringTokenizer.h"
+	"Poco/DateTimeParser.h"
+	"Poco/NumberParser.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PurgeStrategy.h
+	"Poco/Foundation.h"
+	"Poco/File.h"
+	"Poco/Timespan.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FileStream.cpp
+	"Poco/FileStream.h"
+	"Poco/Exception.h"
+	"FileStream_WIN32.cpp"
+	"FileStream_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FileStream_WIN32.cpp
+	"Poco/FileStream.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FileStream_POSIX.cpp
+	"Poco/FileStream.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+	<sys/types.h>
+	<sys/stat.h>
+	<fcntl.h>
+	<unistd.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FileStreamFactory.cpp
+	"Poco/FileStreamFactory.h"
+	"Poco/URI.h"
+	"Poco/Path.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+	"Poco/FileStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FileStreamFactory.h
+	"Poco/Foundation.h"
+	"Poco/URIStreamFactory.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/URIStreamFactory.h
+	"Poco/Foundation.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/URI.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Format.cpp
+	"Poco/Format.h"
+	"Poco/Exception.h"
+	"Poco/Ascii.h"
+	<sstream>
+	<locale>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Formatter.cpp
+	"Poco/Formatter.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/FormattingChannel.cpp
+	"Poco/FormattingChannel.h"
+	"Poco/Formatter.h"
+	"Poco/Message.h"
+	"Poco/LoggingRegistry.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/FormattingChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Glob.cpp
+	"Poco/Glob.h"
+	"Poco/Path.h"
+	"Poco/Exception.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/File.h"
+	"Poco/UTF8Encoding.h"
+	"Poco/Unicode.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UTF8Encoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Unicode.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Hash.cpp
+	"Poco/Hash.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Hash.h
+	"Poco/Foundation.h"
+	<cstddef>
+
+1497446799 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/HashStatistic.cpp
+	"Poco/HashStatistic.h"
+	<sstream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/HashStatistic.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/HexBinaryDecoder.cpp
+	"Poco/HexBinaryDecoder.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/HexBinaryDecoder.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/HexBinaryEncoder.cpp
+	"Poco/HexBinaryEncoder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/HexBinaryEncoder.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/InflatingStream.cpp
+	"Poco/InflatingStream.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/InflatingStream.h
+	"Poco/Foundation.h"
+	"Poco/BufferedStreamBuf.h"
+	<istream>
+	<ostream>
+	<zlib.h>
+	"Poco/zlib.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Latin1Encoding.cpp
+	"Poco/Latin1Encoding.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Latin1Encoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Latin9Encoding.cpp
+	"Poco/Latin9Encoding.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Latin9Encoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LineEndingConverter.cpp
+	"Poco/LineEndingConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LineEndingConverter.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LocalDateTime.cpp
+	"Poco/LocalDateTime.h"
+	"Poco/Timezone.h"
+	"Poco/Timespan.h"
+	"Poco/Exception.h"
+	<algorithm>
+	<ctime>
+	"wce_time.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Timezone.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogFile.cpp
+	"Poco/LogFile.h"
+	"LogFile_WIN32U.cpp"
+	"LogFile_WIN32.cpp"
+	"LogFile_VMS.cpp"
+	"LogFile_STD.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogFile_WIN32U.cpp
+	"Poco/LogFile_WIN32U.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogFile_WIN32.cpp
+	"Poco/LogFile_WIN32.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogFile_VMS.cpp
+	"Poco/LogFile_VMS.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogFile_STD.cpp
+	"Poco/LogFile_STD.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+
+1497446828 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Logger.cpp
+	"Poco/Logger.h"
+	"Poco/Formatter.h"
+	"Poco/LoggingRegistry.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LoggingFactory.cpp
+	"Poco/LoggingFactory.h"
+	"Poco/SingletonHolder.h"
+	"Poco/AsyncChannel.h"
+	"Poco/ConsoleChannel.h"
+	"Poco/FileChannel.h"
+	"Poco/FormattingChannel.h"
+	"Poco/SplitterChannel.h"
+	"Poco/NullChannel.h"
+	"Poco/SyslogChannel.h"
+	"Poco/OpcomChannel.h"
+	"Poco/EventLogChannel.h"
+	"Poco/WindowsConsoleChannel.h"
+	"Poco/PatternFormatter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LoggingFactory.h
+	"Poco/Foundation.h"
+	"Poco/DynamicFactory.h"
+	"Poco/Channel.h"
+	"Poco/Formatter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/DynamicFactory.h
+	"Poco/Foundation.h"
+	"Poco/Instantiator.h"
+	"Poco/Exception.h"
+	"Poco/Mutex.h"
+	<map>
+	<memory>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Instantiator.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SplitterChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Mutex.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NullChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SyslogChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/OpcomChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/WindowsConsoleChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Mutex.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PatternFormatter.h
+	"Poco/Foundation.h"
+	"Poco/Formatter.h"
+	"Poco/Message.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LoggingRegistry.cpp
+	"Poco/LoggingRegistry.h"
+	"Poco/SingletonHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/LogStream.cpp
+	"Poco/LogStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/LogStream.h
+	"Poco/Foundation.h"
+	"Poco/Logger.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Manifest.cpp
+	"Poco/Manifest.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Manifest.h
+	"Poco/Foundation.h"
+	"Poco/MetaObject.h"
+	<map>
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/MetaObject.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/SingletonHolder.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/MD5Engine.cpp
+	"Poco/MD5Engine.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/MD5Engine.h
+	"Poco/Foundation.h"
+	"Poco/DigestEngine.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/MemoryPool.cpp
+	"Poco/MemoryPool.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/MemoryPool.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	<vector>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/MemoryStream.cpp
+	"Poco/MemoryStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/MemoryStream.h
+	"Poco/Foundation.h"
+	"Poco/StreamUtil.h"
+	<streambuf>
+	<iosfwd>
+	<ios>
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Message.cpp
+	"Poco/Message.h"
+	"Poco/Exception.h"
+	"Poco/Process.h"
+	"Poco/Thread.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process.h
+	"Poco/Foundation.h"
+	"Process_WINCE.h"
+	"Poco/Process_WIN32U.h"
+	"Poco/Process_WIN32.h"
+	"Poco/Process_VX.h"
+	"Poco/Process_UNIX.h"
+	"Poco/Process_VMS.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_WINCE.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<vector>
+	<map>
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<vector>
+	<map>
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<vector>
+	<map>
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_VX.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<vector>
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_UNIX.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<unistd.h>
+	<vector>
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Process_VMS.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	<vector>
+	<map>
+	<unistd.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Mutex.cpp
+	"Poco/Mutex.h"
+	"Mutex_WINCE.cpp"
+	"Mutex_WIN32.cpp"
+	"Mutex_VX.cpp"
+	"Mutex_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Mutex_WINCE.cpp
+	"Poco/Mutex_WINCE.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Mutex_WIN32.cpp
+	"Poco/Mutex_WIN32.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Mutex_VX.cpp
+	"Poco/Mutex_VX.h"
+	<sysLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Mutex_POSIX.cpp
+	"Poco/Mutex_POSIX.h"
+	"Poco/Timestamp.h"
+	<sys/select.h>
+	<unistd.h>
+	<timers.h>
+	<cstring>
+	<sys/time.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent.cpp
+	"Poco/NamedEvent.h"
+	"NamedEvent_WIN32U.cpp"
+	"NamedEvent_WIN32.cpp"
+	"NamedEvent_Android.cpp"
+	"NamedEvent_UNIX.cpp"
+	"NamedEvent_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent.h
+	"Poco/Foundation.h"
+	"Poco/NamedEvent_WIN32U.h"
+	"Poco/NamedEvent_WIN32.h"
+	"Poco/NamedEvent_Android.h"
+	"Poco/NamedEvent_UNIX.h"
+	"Poco/NamedEvent_VMS.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent_Android.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent_UNIX.h
+	"Poco/Foundation.h"
+	<semaphore.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedEvent_VMS.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent_WIN32U.cpp
+	"Poco/NamedEvent_WIN32U.h"
+	"Poco/Exception.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent_WIN32.cpp
+	"Poco/NamedEvent_WIN32.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent_Android.cpp
+	"Poco/NamedEvent_Android.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent_UNIX.cpp
+	"Poco/NamedEvent_UNIX.h"
+	"Poco/Exception.h"
+	<fcntl.h>
+	<sys/stat.h>
+	<errno.h>
+	<semaphore.h>
+	<unistd.h>
+	<sys/types.h>
+	<sys/ipc.h>
+	<sys/sem.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedEvent_VMS.cpp
+	"Poco/NamedEvent_VMS.h"
+	<lib$routines.h>
+	<starlet.h>
+	<descrip.h>
+	<iodef.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex.cpp
+	"Poco/NamedMutex.h"
+	"NamedMutex_WIN32U.cpp"
+	"NamedMutex_WIN32.cpp"
+	"NamedMutex_Android.cpp"
+	"NamedMutex_UNIX.cpp"
+	"NamedMutex_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex.h
+	"Poco/Foundation.h"
+	"Poco/ScopedLock.h"
+	"Poco/NamedMutex_WIN32U.h"
+	"Poco/NamedMutex_WIN32.h"
+	"Poco/NamedMutex_Android.h"
+	"Poco/NamedMutex_UNIX.h"
+	"Poco/NamedMutex_VMS.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex_Android.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex_UNIX.h
+	"Poco/Foundation.h"
+	<sys/types.h>
+	<sys/stat.h>
+	<semaphore.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NamedMutex_VMS.h
+	"Poco/Foundation.h"
+	<descrip.h>
+	<lckdef.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex_WIN32U.cpp
+	"Poco/NamedMutex_WIN32U.h"
+	"Poco/Exception.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex_WIN32.cpp
+	"Poco/NamedMutex_WIN32.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex_Android.cpp
+	"Poco/NamedMutex_Android.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex_UNIX.cpp
+	"Poco/NamedMutex_UNIX.h"
+	"Poco/Exception.h"
+	<fcntl.h>
+	<sys/stat.h>
+	<errno.h>
+	<semaphore.h>
+	<unistd.h>
+	<sys/types.h>
+	<sys/ipc.h>
+	<sys/sem.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NamedMutex_VMS.cpp
+	"Poco/NamedMutex_VMS.h"
+	<starlet.h>
+	<iodef.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NestedDiagnosticContext.cpp
+	"Poco/NestedDiagnosticContext.h"
+	"Poco/SingletonHolder.h"
+	"Poco/ThreadLocal.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NestedDiagnosticContext.h
+	"Poco/Foundation.h"
+	<vector>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Notification.cpp
+	"Poco/Notification.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NotificationCenter.cpp
+	"Poco/NotificationCenter.h"
+	"Poco/Notification.h"
+	"Poco/Observer.h"
+	"Poco/AutoPtr.h"
+	"Poco/SingletonHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NotificationQueue.cpp
+	"Poco/NotificationQueue.h"
+	"Poco/NotificationCenter.h"
+	"Poco/Notification.h"
+	"Poco/SingletonHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NullChannel.cpp
+	"Poco/NullChannel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NullStream.cpp
+	"Poco/NullStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/NullStream.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NumberFormatter.cpp
+	"Poco/NumberFormatter.h"
+	"Poco/MemoryStream.h"
+	<iomanip>
+	<locale>
+	<cstdio>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/NumberParser.cpp
+	"Poco/NumberParser.h"
+	"Poco/Exception.h"
+	"Poco/MemoryStream.h"
+	<locale>
+	<cstdio>
+
+1497446867 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path.cpp
+	"Poco/Path.h"
+	"Poco/File.h"
+	"Poco/Exception.h"
+	"Poco/StringTokenizer.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Buffer.h"
+	<algorithm>
+	"Path_VMS.cpp"
+	"Path_UNIX.cpp"
+	"Path_WINCE.cpp"
+	"Path_WIN32U.cpp"
+	"Path_WIN32.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path_VMS.cpp
+	"Poco/Path_VMS.h"
+	"Poco/Environment_VMS.h"
+	<unistd.h>
+	<descrip.h>
+	<dvsdef.h>
+	<dcdef.h>
+	<iledef.h>
+	<gen64def.h>
+	<starlet.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path_VMS.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Environment_VMS.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path_UNIX.cpp
+	"Poco/Path_UNIX.h"
+	"Poco/Exception.h"
+	"Poco/Environment_UNIX.h"
+	"Poco/Ascii.h"
+	<unistd.h>
+	<stdlib.h>
+	<sys/types.h>
+	<pwd.h>
+	<climits>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path_UNIX.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Environment_UNIX.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path_WINCE.cpp
+	"Poco/Path_WINCE.h"
+	"Poco/Environment_WINCE.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Buffer.h"
+	"Poco/Environment.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path_WINCE.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Environment_WINCE.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path_WIN32U.cpp
+	"Poco/Path_WIN32U.h"
+	"Poco/Environment_WIN32.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Buffer.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path_WIN32U.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Environment_WIN32.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Path_WIN32.cpp
+	"Poco/Path_WIN32.h"
+	"Poco/Environment_WIN32.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Path_WIN32.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PatternFormatter.cpp
+	"Poco/PatternFormatter.h"
+	"Poco/Message.h"
+	"Poco/NumberFormatter.h"
+	"Poco/DateTimeFormat.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTime.h"
+	"Poco/Timestamp.h"
+	"Poco/Timezone.h"
+	"Poco/Environment.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Pipe.cpp
+	"Poco/Pipe.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Pipe.h
+	"Poco/Foundation.h"
+	"Poco/PipeImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PipeImpl.h
+	"Poco/Foundation.h"
+	"PipeImpl_DUMMY.h"
+	"Poco/PipeImpl_WIN32.h"
+	"Poco/PipeImpl_POSIX.h"
+	"Poco/PipeImpl_DUMMY.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PipeImpl_DUMMY.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PipeImpl_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PipeImpl_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PipeImpl.cpp
+	"Poco/PipeImpl.h"
+	"PipeImpl_DUMMY.cpp"
+	"PipeImpl_WIN32.cpp"
+	"PipeImpl_POSIX.cpp"
+	"PipeImpl_DUMMY.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PipeImpl_DUMMY.cpp
+	"Poco/PipeImpl_DUMMY.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PipeImpl_WIN32.cpp
+	"Poco/PipeImpl_WIN32.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PipeImpl_POSIX.cpp
+	"Poco/PipeImpl_POSIX.h"
+	"Poco/Exception.h"
+	<sys/types.h>
+	<unistd.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PipeStream.cpp
+	"Poco/PipeStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PipeStream.h
+	"Poco/Foundation.h"
+	"Poco/Pipe.h"
+	"Poco/BufferedStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PriorityNotificationQueue.cpp
+	"Poco/PriorityNotificationQueue.h"
+	"Poco/NotificationCenter.h"
+	"Poco/Notification.h"
+	"Poco/SingletonHolder.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/PriorityNotificationQueue.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+	<map>
+	<deque>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process.cpp
+	"Poco/Process.h"
+	"Poco/Environment.h"
+	"Process_WINCE.cpp"
+	"Process_WIN32U.cpp"
+	"Process_WIN32.cpp"
+	"Process_VX.cpp"
+	"Process_UNIX.cpp"
+	"Process_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_WINCE.cpp
+	"Poco/Process_WINCE.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/NamedEvent.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Pipe.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_WIN32U.cpp
+	"Poco/Process_WIN32U.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/NamedEvent.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Pipe.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_WIN32.cpp
+	"Poco/Process_WIN32.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/NamedEvent.h"
+	"Poco/Pipe.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_VX.cpp
+	"Poco/Process_VX.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_UNIX.cpp
+	"Poco/Process_UNIX.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Pipe.h"
+	<errno.h>
+	<signal.h>
+	<sys/time.h>
+	<sys/types.h>
+	<sys/resource.h>
+	<sys/wait.h>
+	<process.h>
+	<spawn.h>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Process_VMS.cpp
+	"Poco/Process_VMS.h"
+	"Poco/NumberFormatter.h"
+	"Poco/NamedEvent.h"
+	<sstream>
+	<times.h>
+	<time.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/PurgeStrategy.cpp
+	"Poco/PurgeStrategy.h"
+	"Poco/Path.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Random.cpp
+	"Poco/Random.h"
+	"Poco/RandomStream.h"
+	<ctime>
+	"wce_time.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RandomStream.h
+	"Poco/Foundation.h"
+	"Poco/BufferedStreamBuf.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RandomStream.cpp
+	"Poco/RandomStream.h"
+	"Poco/Random.h"
+	"Poco/SHA1Engine.h"
+	"Poco/UnWindows.h"
+	<wincrypt.h>
+	<fcntl.h>
+	<unistd.h>
+	<ctime>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SHA1Engine.h
+	"Poco/Foundation.h"
+	"Poco/DigestEngine.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RefCountedObject.cpp
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RotateStrategy.cpp
+	"Poco/RotateStrategy.h"
+	"Poco/FileStream.h"
+	"Poco/DateTimeParser.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTimeFormat.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Runnable.cpp
+	"Poco/Runnable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock.cpp
+	"Poco/RWLock.h"
+	"RWLock_WINCE.cpp"
+	"RWLock_WIN32.cpp"
+	"RWLock_Android.cpp"
+	"RWLock_VX.cpp"
+	"RWLock_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/RWLock_WINCE.h"
+	"Poco/RWLock_WIN32.h"
+	"Poco/RWLock_Android.h"
+	"Poco/RWLock_VX.h"
+	"Poco/RWLock_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock_WINCE.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock_Android.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock_VX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RWLock_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock_WINCE.cpp
+	"Poco/RWLock_WINCE.h"
+	"Poco/Thread.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock_WIN32.cpp
+	"Poco/RWLock_WIN32.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock_Android.cpp
+	"Poco/RWLock_Android.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock_VX.cpp
+	"Poco/RWLock_VX.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/RWLock_POSIX.cpp
+	"Poco/RWLock_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Semaphore.cpp
+	"Poco/Semaphore.h"
+	"Semaphore_WIN32.cpp"
+	"Semaphore_VX.cpp"
+	"Semaphore_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Semaphore.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/Semaphore_WIN32.h"
+	"Poco/Semaphore_VX.h"
+	"Poco/Semaphore_POSIX.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Semaphore_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Semaphore_VX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<semLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Semaphore_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/Exception.h"
+	<pthread.h>
+	<errno.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Semaphore_WIN32.cpp
+	"Poco/Semaphore_WIN32.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Semaphore_VX.cpp
+	"Poco/Semaphore_VX.h"
+	<sysLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Semaphore_POSIX.cpp
+	"Poco/Semaphore_POSIX.h"
+	<timers.h>
+	<cstring>
+	<sys/time.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SHA1Engine.cpp
+	"Poco/SHA1Engine.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary.cpp
+	"Poco/SharedLibrary.h"
+	"Poco/Exception.h"
+	"SharedLibrary_HPUX.cpp"
+	"SharedLibrary_VX.cpp"
+	"SharedLibrary_UNIX.cpp"
+	"SharedLibrary_WIN32U.cpp"
+	"SharedLibrary_WIN32.cpp"
+	"SharedLibrary_VMS.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary.h
+	"Poco/Foundation.h"
+	"Poco/SharedLibrary_HPUX.h"
+	"Poco/SharedLibrary_VX.h"
+	"Poco/SharedLibrary_UNIX.h"
+	"Poco/SharedLibrary_WIN32U.h"
+	"Poco/SharedLibrary_WIN32.h"
+	"Poco/SharedLibrary_VMS.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_HPUX.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	<dl.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_VX.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	<moduleLib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_UNIX.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_WIN32U.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_WIN32.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedLibrary_VMS.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_HPUX.cpp
+	"Poco/SharedLibrary_HPUX.h"
+	<dl.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_VX.cpp
+	"Poco/SharedLibrary_VX.h"
+	"Poco/Exception.h"
+	"Poco/Format.h"
+	<loadLib.h>
+	<unldLib.h>
+	<ioLib.h>
+	<symLib.h>
+	<sysSymTbl.h>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_UNIX.cpp
+	"Poco/SharedLibrary_UNIX.h"
+	"Poco/Exception.h"
+	<dlfcn.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_WIN32U.cpp
+	"Poco/SharedLibrary_WIN32U.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Path.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_WIN32.cpp
+	"Poco/SharedLibrary_WIN32.h"
+	"Poco/Path.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedLibrary_VMS.cpp
+	"Poco/SharedLibrary_VMS.h"
+	"Poco/Path.h"
+	<lib$routines.h>
+	<libdef.h>
+	<descrip.h>
+	<chfdef.h>
+	<libfisdef.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedMemory.cpp
+	"Poco/SharedMemory.h"
+	"Poco/Exception.h"
+	"SharedMemory_DUMMY.cpp"
+	"SharedMemory_WIN32.cpp"
+	"SharedMemory_POSIX.cpp"
+	"SharedMemory_DUMMY.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedMemory.h
+	"Poco/Foundation.h"
+	<algorithm>
+	<cstddef>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedMemory_DUMMY.cpp
+	"Poco/SharedMemory_DUMMY.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedMemory_DUMMY.h
+	"Poco/Foundation.h"
+	"Poco/SharedMemory.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedMemory_WIN32.cpp
+	"Poco/SharedMemory_WIN32.h"
+	"Poco/Exception.h"
+	"Poco/File.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedMemory_WIN32.h
+	"Poco/Poco.h"
+	"Poco/SharedMemory.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Poco.h
+	"Poco/Foundation.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SharedMemory_POSIX.cpp
+	"Poco/SharedMemory_POSIX.h"
+	"Poco/Exception.h"
+	"Poco/File.h"
+	<sys/types.h>
+	<sys/stat.h>
+	<sys/mman.h>
+	<fcntl.h>
+	<unistd.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SharedMemory_POSIX.h
+	"Poco/Foundation.h"
+	"Poco/SharedMemory.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SignalHandler.cpp
+	"Poco/SignalHandler.h"
+	"Poco/Thread.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Exception.h"
+	<cstdlib>
+	<signal.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SimpleFileChannel.cpp
+	"Poco/SimpleFileChannel.h"
+	"Poco/LogFile.h"
+	"Poco/File.h"
+	"Poco/Message.h"
+	"Poco/Exception.h"
+	"Poco/Ascii.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SimpleFileChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Timestamp.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SplitterChannel.cpp
+	"Poco/SplitterChannel.h"
+	"Poco/LoggingRegistry.h"
+	"Poco/StringTokenizer.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Stopwatch.cpp
+	"Poco/Stopwatch.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Stopwatch.h
+	"Poco/Foundation.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/StreamChannel.cpp
+	"Poco/StreamChannel.h"
+	"Poco/Message.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StreamChannel.h
+	"Poco/Foundation.h"
+	"Poco/Channel.h"
+	"Poco/Mutex.h"
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/StreamConverter.cpp
+	"Poco/StreamConverter.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StreamConverter.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/StreamCopier.cpp
+	"Poco/StreamCopier.h"
+	"Poco/Buffer.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/StreamTokenizer.cpp
+	"Poco/StreamTokenizer.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/StreamTokenizer.h
+	"Poco/Foundation.h"
+	"Poco/Token.h"
+	<istream>
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Token.h
+	"Poco/Foundation.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/String.cpp
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/StringTokenizer.cpp
+	"Poco/StringTokenizer.h"
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/SynchronizedObject.cpp
+	"Poco/SynchronizedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/SynchronizedObject.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Task.cpp
+	"Poco/Task.h"
+	"Poco/TaskManager.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TaskManager.cpp
+	"Poco/TaskManager.h"
+	"Poco/TaskNotification.h"
+	"Poco/ThreadPool.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TaskNotification.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+	"Poco/Task.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TaskNotification.cpp
+	"Poco/TaskNotification.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TeeStream.cpp
+	"Poco/TeeStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TeeStream.h
+	"Poco/Foundation.h"
+	"Poco/UnbufferedStreamBuf.h"
+	<vector>
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TemporaryFile.cpp
+	"Poco/TemporaryFile.h"
+	"Poco/Path.h"
+	"Poco/Exception.h"
+	"Poco/Process.h"
+	"Poco/Mutex.h"
+	<set>
+	<sstream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TemporaryFile.h
+	"Poco/Foundation.h"
+	"Poco/File.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TextBufferIterator.cpp
+	"Poco/TextBufferIterator.h"
+	"Poco/TextEncoding.h"
+	<algorithm>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TextBufferIterator.h
+	"Poco/Foundation.h"
+	<cstdlib>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TextConverter.cpp
+	"Poco/TextConverter.h"
+	"Poco/TextIterator.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TextEncoding.cpp
+	"Poco/TextEncoding.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/ASCIIEncoding.h"
+	"Poco/Latin1Encoding.h"
+	"Poco/Latin9Encoding.h"
+	"Poco/UTF16Encoding.h"
+	"Poco/UTF8Encoding.h"
+	"Poco/Windows1252Encoding.h"
+	"Poco/RWLock.h"
+	"Poco/SingletonHolder.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UTF16Encoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/Windows1252Encoding.h
+	"Poco/Foundation.h"
+	"Poco/TextEncoding.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TextIterator.cpp
+	"Poco/TextIterator.h"
+	"Poco/TextEncoding.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Thread.cpp
+	"Poco/Thread.h"
+	"Poco/Mutex.h"
+	"Poco/Exception.h"
+	"Poco/ThreadLocal.h"
+	<sstream>
+	"Thread_WINCE.cpp"
+	"Thread_WIN32.cpp"
+	"Thread_VX.cpp"
+	"Thread_POSIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Thread_WINCE.cpp
+	"Poco/Thread_WINCE.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Thread_WIN32.cpp
+	"Poco/Thread_WIN32.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+	<process.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Thread_VX.cpp
+	"Poco/Thread_VX.h"
+	"Poco/ErrorHandler.h"
+	"Poco/Exception.h"
+	"Poco/Timestamp.h"
+	"Poco/Timespan.h"
+	<timers.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Thread_POSIX.cpp
+	"Poco/Thread_POSIX.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+	"Poco/Timespan.h"
+	"Poco/Timestamp.h"
+	<signal.h>
+	<time.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ThreadLocal.cpp
+	"Poco/ThreadLocal.h"
+	"Poco/SingletonHolder.h"
+	"Poco/Thread.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ThreadPool.cpp
+	"Poco/ThreadPool.h"
+	"Poco/Runnable.h"
+	"Poco/Thread.h"
+	"Poco/Event.h"
+	"Poco/ThreadLocal.h"
+	"Poco/ErrorHandler.h"
+	<sstream>
+	<ctime>
+	"wce_time.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ThreadTarget.cpp
+	"Poco/ThreadTarget.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/ThreadTarget.h
+	"Poco/Foundation.h"
+	"Poco/Runnable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/TimedNotificationQueue.cpp
+	"Poco/TimedNotificationQueue.h"
+	"Poco/Notification.h"
+	<limits>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/TimedNotificationQueue.h
+	"Poco/Foundation.h"
+	"Poco/Notification.h"
+	"Poco/Mutex.h"
+	"Poco/Event.h"
+	"Poco/Timestamp.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timer.cpp
+	"Poco/Timer.h"
+	"Poco/ThreadPool.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timespan.cpp
+	"Poco/Timespan.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timestamp.cpp
+	"Poco/Timestamp.h"
+	"Poco/Exception.h"
+	<algorithm>
+	<time.h>
+	<unistd.h>
+	<timers.h>
+	<sys/time.h>
+	<sys/times.h>
+	"Poco/UnWindows.h"
+	<cmath>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timezone.cpp
+	"Poco/Timezone.h"
+	<ctime>
+	"Timezone_WINCE.cpp"
+	"Timezone_WIN32.cpp"
+	"Timezone_VX.cpp"
+	"Timezone_UNIX.cpp"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timezone_WINCE.cpp
+	"Poco/Timezone.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+	<ctime>
+	"wce_time.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timezone_WIN32.cpp
+	"Poco/Timezone.h"
+	"Poco/UnicodeConverter.h"
+	"Poco/Exception.h"
+	"Poco/UnWindows.h"
+	<ctime>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timezone_VX.cpp
+	"Poco/Timezone.h"
+	"Poco/Exception.h"
+	"Poco/Environment.h"
+	<ctime>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Timezone_UNIX.cpp
+	"Poco/Timezone.h"
+	"Poco/Exception.h"
+	<ctime>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Token.cpp
+	"Poco/Token.h"
+	"Poco/NumberParser.h"
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/URI.cpp
+	"Poco/URI.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/NumberParser.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/URIStreamFactory.cpp
+	"Poco/URIStreamFactory.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/URIStreamOpener.cpp
+	"Poco/URIStreamOpener.h"
+	"Poco/URIStreamFactory.h"
+	"Poco/FileStreamFactory.h"
+	"Poco/URI.h"
+	"Poco/Path.h"
+	"Poco/SingletonHolder.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/URIStreamOpener.h
+	"Poco/Foundation.h"
+	"Poco/Mutex.h"
+	<istream>
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UTF16Encoding.cpp
+	"Poco/UTF16Encoding.h"
+	"Poco/ByteOrder.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UTF8Encoding.cpp
+	"Poco/UTF8Encoding.h"
+	"Poco/String.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UTF8String.cpp
+	"Poco/UTF8String.h"
+	"Poco/Unicode.h"
+	"Poco/TextIterator.h"
+	"Poco/TextConverter.h"
+	"Poco/UTF8Encoding.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/UTF8String.h
+	"Poco/Foundation.h"
+
+1497448113 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UUID.cpp
+	"Poco/UUID.h"
+	"Poco/ByteOrder.h"
+	"Poco/Exception.h"
+	<algorithm>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UUIDGenerator.cpp
+	"Poco/UUIDGenerator.h"
+	"Poco/Thread.h"
+	"Poco/RandomStream.h"
+	"Poco/DigestEngine.h"
+	"Poco/MD5Engine.h"
+	"Poco/SingletonHolder.h"
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Void.cpp
+	"Poco/Void.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Unicode.cpp
+	"Poco/Unicode.h"
+	"pcre_config.h"
+	"pcre_internal.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/pcre_config.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/pcre_internal.h
+	<ctype.h>
+	<limits.h>
+	<stddef.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<setjmp.h>
+	<stdarg.h>
+	"pcre.h"
+	"ucp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/pcre.h
+	<stdlib.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/ucp.h
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/UnicodeConverter.cpp
+	"Poco/UnicodeConverter.h"
+	"Poco/TextConverter.h"
+	"Poco/TextIterator.h"
+	"Poco/UTF8Encoding.h"
+	"Poco/UTF16Encoding.h"
+	<cstring>
+	<wchar.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/Windows1252Encoding.cpp
+	"Poco/Windows1252Encoding.h"
+	"Poco/String.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/src/WindowsConsoleChannel.cpp
+	"Poco/WindowsConsoleChannel.h"
+	"Poco/Message.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/DNS.cpp
+	"Poco/Net/DNS.h"
+	"Poco/Net/NetException.h"
+	"Poco/Net/SocketAddress.h"
+	"Poco/Environment.h"
+	"Poco/NumberFormatter.h"
+	"Poco/RWLock.h"
+	<cstring>
+	<resolv.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/DNS.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketDefs.h"
+	"Poco/Net/IPAddress.h"
+	"Poco/Net/HostEntry.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/HostEntry.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketDefs.h"
+	"Poco/Net/IPAddress.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/NetException.h
+	"Poco/Net/Net.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/Socket.cpp
+	"Poco/Net/Socket.h"
+	"Poco/Net/StreamSocketImpl.h"
+	"Poco/Timestamp.h"
+	<algorithm>
+	<string.h>
+	<sys/epoll.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/StreamSocketImpl.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketImpl.cpp
+	"Poco/Net/SocketImpl.h"
+	"Poco/Net/NetException.h"
+	"Poco/Net/StreamSocketImpl.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Timestamp.h"
+	<string.h>
+	<sys/epoll.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketReactor.cpp
+	"Poco/Net/SocketReactor.h"
+	"Poco/Net/SocketNotification.h"
+	"Poco/Net/SocketNotifier.h"
+	"Poco/ErrorHandler.h"
+	"Poco/Thread.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/SocketNotifier.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+	"Poco/RefCountedObject.h"
+	"Poco/NotificationCenter.h"
+	"Poco/Observer.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketNotification.cpp
+	"Poco/Net/SocketNotification.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketNotifier.cpp
+	"Poco/Net/SocketNotifier.h"
+	"Poco/Net/SocketReactor.h"
+	"Poco/Net/SocketNotification.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/RawSocket.cpp
+	"Poco/Net/RawSocket.h"
+	"Poco/Net/RawSocketImpl.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/RawSocket.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/RawSocketImpl.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/RawSocketImpl.cpp
+	"Poco/Net/RawSocketImpl.h"
+	"Poco/Net/NetException.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketAddress.cpp
+	"Poco/Net/SocketAddress.h"
+	"Poco/Net/IPAddress.h"
+	"Poco/Net/NetException.h"
+	"Poco/Net/DNS.h"
+	"Poco/RefCountedObject.h"
+	"Poco/NumberParser.h"
+	"Poco/NumberFormatter.h"
+	<algorithm>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/ServerSocket.cpp
+	"Poco/Net/ServerSocket.h"
+	"Poco/Net/ServerSocketImpl.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/ServerSocketImpl.h
+	"Poco/Net/Net.h"
+	"Poco/Net/SocketImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/ServerSocketImpl.cpp
+	"Poco/Net/ServerSocketImpl.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/SocketStream.cpp
+	"Poco/Net/SocketStream.h"
+	"Poco/Net/StreamSocketImpl.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/StreamSocket.cpp
+	"Poco/Net/StreamSocket.h"
+	"Poco/Net/StreamSocketImpl.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/StreamSocketImpl.cpp
+	"Poco/Net/StreamSocketImpl.h"
+	"Poco/Exception.h"
+	"Poco/Thread.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/TCPServer.cpp
+	"Poco/Net/TCPServer.h"
+	"Poco/Net/TCPServerDispatcher.h"
+	"Poco/Net/TCPServerConnection.h"
+	"Poco/Net/TCPServerConnectionFactory.h"
+	"Poco/Timespan.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/TCPServer.h
+	"Poco/Net/Net.h"
+	"Poco/Net/ServerSocket.h"
+	"Poco/Net/TCPServerConnectionFactory.h"
+	"Poco/Net/TCPServerParams.h"
+	"Poco/Runnable.h"
+	"Poco/Thread.h"
+	"Poco/ThreadPool.h"
+
+1497450769 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/TCPServerConnectionFactory.h
+	"Poco/Net/Net.h"
+	"Poco/Net/TCPServerConnection.h"
+	"Poco/SharedPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/TCPServerConnection.h
+	"Poco/Net/Net.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/Runnable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/TCPServerParams.h
+	"Poco/Net/Net.h"
+	"Poco/RefCountedObject.h"
+	"Poco/Timespan.h"
+	"Poco/Thread.h"
+	"Poco/AutoPtr.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/TCPServerDispatcher.h
+	"Poco/Net/Net.h"
+	"Poco/Net/StreamSocket.h"
+	"Poco/Net/TCPServerConnectionFactory.h"
+	"Poco/Net/TCPServerParams.h"
+	"Poco/Runnable.h"
+	"Poco/NotificationQueue.h"
+	"Poco/ThreadPool.h"
+	"Poco/Mutex.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/TCPServerConnection.cpp
+	"Poco/Net/TCPServerConnection.h"
+	"Poco/Exception.h"
+	"Poco/ErrorHandler.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/TCPServerConnectionFactory.cpp
+	"Poco/Net/TCPServerConnectionFactory.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/TCPServerDispatcher.cpp
+	"Poco/Net/TCPServerDispatcher.h"
+	"Poco/Net/TCPServerConnectionFactory.h"
+	"Poco/Notification.h"
+	"Poco/AutoPtr.h"
+	<memory>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/TCPServerParams.cpp
+	"Poco/Net/TCPServerParams.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/IPAddress.cpp
+	"Poco/Net/IPAddress.h"
+	"Poco/Net/NetException.h"
+	"Poco/RefCountedObject.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Types.h"
+	<algorithm>
+	<cstring>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/NetException.cpp
+	"Poco/Net/NetException.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/NetworkInterface.cpp
+	"Poco/Net/NetworkInterface.h"
+	"Poco/Net/DatagramSocket.h"
+	"Poco/Net/NetException.h"
+	"Poco/NumberFormatter.h"
+	"Poco/RefCountedObject.h"
+	"Poco/UnicodeConverter.h"
+	<cstring>
+	<iphlpapi.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<ifaddrs.h>
+	<net/if_dl.h>
+	<sys/types.h>
+	<ifaddrs.h>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/NetworkInterface.h
+	"Poco/Net/Net.h"
+	"Poco/Net/IPAddress.h"
+	"Poco/Mutex.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/include/Poco/Net/DatagramSocket.h
+	"Poco/Net/Net.h"
+	"Poco/Net/Socket.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Net/src/HostEntry.cpp
+	"Poco/Net/HostEntry.h"
+	"Poco/Exception.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/Application.cpp
+	"Poco/Util/Application.h"
+	"Poco/Util/SystemConfiguration.h"
+	"Poco/Util/MapConfiguration.h"
+	"Poco/Util/PropertyFileConfiguration.h"
+	"Poco/Util/IniFileConfiguration.h"
+	"Poco/Util/XMLConfiguration.h"
+	"Poco/Util/LoggingSubsystem.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionProcessor.h"
+	"Poco/Util/Validator.h"
+	"Poco/Environment.h"
+	"Poco/Exception.h"
+	"Poco/NumberFormatter.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/String.h"
+	"Poco/ConsoleChannel.h"
+	"Poco/AutoPtr.h"
+	"Poco/UnWindows.h"
+	"Poco/SignalHandler.h"
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Application.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Subsystem.h"
+	"Poco/Util/LayeredConfiguration.h"
+	"Poco/Util/OptionSet.h"
+	"Poco/AutoPtr.h"
+	"Poco/Logger.h"
+	"Poco/Path.h"
+	"Poco/Timestamp.h"
+	"Poco/Timespan.h"
+	"Poco/AutoPtr.h"
+	<cstdarg>
+	<vector>
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Subsystem.h
+	"Poco/Util/Util.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/LayeredConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+	"Poco/AutoPtr.h"
+	<list>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/AbstractConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Mutex.h"
+	"Poco/RefCountedObject.h"
+	"Poco/BasicEvent.h"
+	<vector>
+	<utility>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/SystemConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/MapConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/PropertyFileConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/MapConfiguration.h"
+	<istream>
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/IniFileConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+	<map>
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/XMLConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/MapConfiguration.h"
+	"Poco/DOM/Document.h"
+	"Poco/DOM/AutoPtr.h"
+	"Poco/DOM/DOMWriter.h"
+	"Poco/SAX/InputSource.h"
+	<istream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/LoggingSubsystem.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Subsystem.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/OptionProcessor.h
+	"Poco/Util/Util.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Validator.h
+	"Poco/Util/Util.h"
+	"Poco/RefCountedObject.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/ConfigurationMapper.cpp
+	"Poco/Util/ConfigurationMapper.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/ConfigurationMapper.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/ConfigurationView.cpp
+	"Poco/Util/ConfigurationView.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/ConfigurationView.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/FilesystemConfiguration.cpp
+	"Poco/Util/FilesystemConfiguration.h"
+	"Poco/File.h"
+	"Poco/Path.h"
+	"Poco/DirectoryIterator.h"
+	"Poco/StringTokenizer.h"
+	"Poco/FileStream.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/FilesystemConfiguration.h
+	"Poco/Util/Util.h"
+	"Poco/Util/AbstractConfiguration.h"
+	"Poco/Path.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/HelpFormatter.cpp
+	"Poco/Util/HelpFormatter.h"
+	"Poco/Util/OptionSet.h"
+	"Poco/Util/Option.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/HelpFormatter.h
+	"Poco/Util/Util.h"
+	<ostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/IniFileConfiguration.cpp
+	"Poco/Util/IniFileConfiguration.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/Path.h"
+	"Poco/FileStream.h"
+	"Poco/Ascii.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/IntValidator.cpp
+	"Poco/Util/IntValidator.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionException.h"
+	"Poco/NumberParser.h"
+	"Poco/Format.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/IntValidator.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Validator.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/OptionException.h
+	"Poco/Util/Util.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/LayeredConfiguration.cpp
+	"Poco/Util/LayeredConfiguration.h"
+	"Poco/Exception.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/LoggingConfigurator.cpp
+	"Poco/Util/LoggingConfigurator.h"
+	"Poco/Util/AbstractConfiguration.h"
+	"Poco/AutoPtr.h"
+	"Poco/Channel.h"
+	"Poco/FormattingChannel.h"
+	"Poco/Formatter.h"
+	"Poco/PatternFormatter.h"
+	"Poco/Logger.h"
+	"Poco/LoggingRegistry.h"
+	"Poco/LoggingFactory.h"
+	<map>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/LoggingConfigurator.h
+	"Poco/Util/Util.h"
+	"Poco/Formatter.h"
+	"Poco/Channel.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/LoggingSubsystem.cpp
+	"Poco/Util/LoggingSubsystem.h"
+	"Poco/Util/LoggingConfigurator.h"
+	"Poco/Util/Application.h"
+	"Poco/Logger.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/MapConfiguration.cpp
+	"Poco/Util/MapConfiguration.h"
+	<set>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/Option.cpp
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionException.h"
+	"Poco/Util/Validator.h"
+	"Poco/Util/AbstractConfiguration.h"
+	"Poco/String.h"
+	<algorithm>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/OptionCallback.cpp
+	"Poco/Util/OptionCallback.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/OptionException.cpp
+	"Poco/Util/OptionException.h"
+	<typeinfo>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/OptionProcessor.cpp
+	"Poco/Util/OptionProcessor.h"
+	"Poco/Util/OptionSet.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionException.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/OptionSet.cpp
+	"Poco/Util/OptionSet.h"
+	"Poco/Util/OptionException.h"
+	"Poco/Exception.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/PropertyFileConfiguration.cpp
+	"Poco/Util/PropertyFileConfiguration.h"
+	"Poco/Exception.h"
+	"Poco/String.h"
+	"Poco/Path.h"
+	"Poco/FileStream.h"
+	"Poco/LineEndingConverter.h"
+	"Poco/Ascii.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/RegExpValidator.cpp
+	"Poco/Util/RegExpValidator.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionException.h"
+	"Poco/RegularExpression.h"
+	"Poco/Format.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/RegExpValidator.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Validator.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Foundation/include/Poco/RegularExpression.h
+	"Poco/Foundation.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/ServerApplication.cpp
+	"Poco/Util/ServerApplication.h"
+	"Poco/Util/Option.h"
+	"Poco/Util/OptionSet.h"
+	"Poco/Util/OptionException.h"
+	"Poco/Exception.h"
+	"Poco/Process.h"
+	"Poco/NamedEvent.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Logger.h"
+	"Poco/String.h"
+	"Poco/TemporaryFile.h"
+	<stdlib.h>
+	<unistd.h>
+	<stdio.h>
+	<signal.h>
+	<sys/stat.h>
+	<fstream>
+	"Poco/Util/WinService.h"
+	"Poco/Util/WinRegistryKey.h"
+	"Poco/UnWindows.h"
+	<cstring>
+	"Poco/UnicodeConverter.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/ServerApplication.h
+	"Poco/Util/Util.h"
+	"Poco/Util/Application.h"
+	"Poco/Event.h"
+	"Poco/NamedEvent.h"
+	<iostream>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/WinService.h
+	"Poco/Util/Util.h"
+	"Poco/UnWindows.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/WinRegistryKey.h
+	"Poco/Util/Util.h"
+	"Poco/UnWindows.h"
+	<vector>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/Subsystem.cpp
+	"Poco/Util/Subsystem.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/SystemConfiguration.cpp
+	"Poco/Util/SystemConfiguration.h"
+	"Poco/Environment.h"
+	"Poco/Path.h"
+	"Poco/DateTime.h"
+	"Poco/DateTimeFormatter.h"
+	"Poco/DateTimeFormat.h"
+	"Poco/NumberFormatter.h"
+	"Poco/Process.h"
+	"Poco/Exception.h"
+	<cstdio>
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/Timer.cpp
+	"Poco/Util/Timer.h"
+	"Poco/Notification.h"
+	"Poco/ErrorHandler.h"
+	"Poco/Event.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/Timer.h
+	"Poco/Util/Util.h"
+	"Poco/Util/TimerTask.h"
+	"Poco/TimedNotificationQueue.h"
+	"Poco/Thread.h"
+	"Poco/Runnable.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/include/Poco/Util/TimerTask.h
+	"Poco/Util/Util.h"
+	"Poco/Runnable.h"
+	"Poco/RefCountedObject.h"
+	"Poco/AutoPtr.h"
+	"Poco/Timestamp.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/TimerTask.cpp
+	"Poco/Util/TimerTask.h"
+
+1494423218 /home/chris/dev/treestore/src/poco-1.4.6p1-all/Util/src/Validator.cpp
+	"Poco/Util/Validator.h"
+
